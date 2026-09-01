@@ -18,6 +18,8 @@ const router = useRouter()
 const clinic = useClinic()
 const { appointments, isLoading, fetchAppointments, updateAppointment } = useAppointments()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
+const { canManageAllProfessionals } = usePermissions()
+const auth = useAuth()
 const { isMobile } = useBreakpoint()
 
 // Query params for pre-selecting patient from treatment plan flow
@@ -68,6 +70,10 @@ watch(() => clinic.cabinets.value, (cabinets) => {
 
 // Initialize selected professionals when professionals load
 watch(professionals, (profs) => {
+  if (!canManageAllProfessionals.value && auth.user.value?.id) {
+    selectedProfessionals.value = [auth.user.value.id]
+    return
+  }
   if (profs.length > 0 && selectedProfessionals.value.length === 0) {
     selectedProfessionals.value = profs.map(p => p.id)
   }
@@ -113,7 +119,10 @@ const professionalFilterOptions = computed(() => {
 
 // Professionals with colors for calendar
 const professionalsWithColors = computed(() => {
-  return professionals.value.map(prof => ({
+  const visible = canManageAllProfessionals.value
+    ? professionals.value
+    : professionals.value.filter(prof => prof.id === auth.user.value?.id)
+  return visible.map(prof => ({
     ...prof,
     color: getProfessionalColor(prof.id)
   }))
@@ -658,7 +667,7 @@ watch(isMobile, async (mobile) => {
       </div>
 
       <div
-        v-if="professionalFilterOptions.length > 0"
+        v-if="canManageAllProfessionals && professionalFilterOptions.length > 0"
         class="flex items-center gap-2 min-w-0 flex-1"
       >
         <span class="text-caption text-subtle shrink-0">

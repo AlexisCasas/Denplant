@@ -22,6 +22,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.patients.access import PatientAccessPolicy
 
+from .access import AppointmentAccessPolicy
 from .kanban_service import KanbanDayService
 from .models import Appointment
 from .schemas import (
@@ -52,12 +53,13 @@ router = APIRouter(dependencies=[Depends(mark_financial_response)])
 
 
 async def _get_accessible_appointment(db: AsyncSession, ctx: ClinicContext, appointment_id: UUID):
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
+    appointment = await AppointmentService.get_appointment(
+        db,
+        ctx.clinic_id,
+        appointment_id,
+        access_predicate=AppointmentAccessPolicy.predicate(ctx),
+    )
     if appointment is None:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    if appointment.patient_id and not await PatientAccessPolicy.can_access(
-        db, ctx, appointment.patient_id
-    ):
         raise HTTPException(status_code=404, detail="Appointment not found")
     return appointment
 
@@ -106,6 +108,7 @@ async def list_appointments(
         page,
         page_size,
         patient_id=patient_id,
+        access_predicate=AppointmentAccessPolicy.predicate(ctx),
     )
     return PaginatedApiResponse(
         data=[_localize(AppointmentResponse.model_validate(a), ctx) for a in appointments],
@@ -134,8 +137,12 @@ async def create_appointment(
                 detail="Patient not found",
             )
 
+    appointment_data = data.model_dump(exclude_unset=True)
+    if ctx.role == "dentist":
+        appointment_data["professional_id"] = ctx.user_id
+
     if not await AppointmentService.validate_professional_access(
-        db, ctx.clinic_id, data.professional_id
+        db, ctx.clinic_id, appointment_data["professional_id"]
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -146,7 +153,7 @@ async def create_appointment(
         appointment = await AppointmentService.create_appointment(
             db,
             ctx.clinic_id,
-            data.model_dump(exclude_unset=True),
+            appointment_data,
             created_by=ctx.user_id,
         )
     except ValueError as e:
@@ -195,6 +202,11 @@ async def update_appointment(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found",
             )
+
+    if ctx.role == "dentist" and data.professional_id not in (None, ctx.user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot reassign appointment"
+        )
 
     if data.professional_id:
         if not await AppointmentService.validate_professional_access(
@@ -380,7 +392,12 @@ async def get_kanban_day(
 ) -> ApiResponse[KanbanDaySnapshot]:
     """Return the professionals strip state for the kanban board."""
     target_date = target or datetime.now(safe_zone(ctx.clinic.timezone)).date()
-    data = await KanbanDayService.snapshot(db, ctx.clinic_id, target_date)
+    data = await KanbanDayService.snapshot(
+        db,
+        ctx.clinic_id,
+        target_date,
+        professional_ids=[ctx.user_id] if ctx.role == "dentist" else None,
+    )
     return ApiResponse(data=KanbanDaySnapshot(**data))
 
 
@@ -512,6 +529,8 @@ async def update_appointment_treatment_note(
     is the visit-level anchor of the four-level clinical-notes model even
     though the row is owned by the agenda module (issue #60).
     """
+    if not await AppointmentAccessPolicy.can_access_treatment(db, ctx, appointment_treatment_id):
+        raise HTTPException(status_code=404, detail="Appointment treatment not found")
     row = await AppointmentService.update_appointment_treatment_note(
         db,
         ctx.clinic_id,

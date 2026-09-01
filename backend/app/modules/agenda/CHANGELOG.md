@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- feat(security): dentists are now scoped to appointments assigned to them,
+  including list/detail/mutations, appointment children and agenda tools.
+
 - Require dentist patient access before creating an appointment, preventing
   appointment creation from granting access to an arbitrary patient.
 

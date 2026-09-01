@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.auth.models import ClinicMembership
 from app.core.events import EventType, event_bus
@@ -160,6 +161,7 @@ class AppointmentService:
         page_size: int = 100,
         *,
         patient_id: UUID | None = None,
+        access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[Appointment], int]:
         """List appointments with filters.
 
@@ -194,6 +196,8 @@ class AppointmentService:
             )
             .where(Appointment.clinic_id == clinic_id)
         )
+        if access_predicate is not None:
+            query = query.where(access_predicate)
 
         if start_date:
             query = query.where(Appointment.start_time >= start_date)
@@ -209,6 +213,8 @@ class AppointmentService:
             query = query.where(Appointment.status == status)
 
         count_filters = [Appointment.clinic_id == clinic_id]
+        if access_predicate is not None:
+            count_filters.append(access_predicate)
         if start_date:
             count_filters.append(Appointment.start_time >= start_date)
         if end_date:
@@ -272,9 +278,13 @@ class AppointmentService:
 
     @staticmethod
     async def get_appointment(
-        db: AsyncSession, clinic_id: UUID, appointment_id: UUID
+        db: AsyncSession,
+        clinic_id: UUID,
+        appointment_id: UUID,
+        *,
+        access_predicate: ColumnElement[bool] | None = None,
     ) -> Appointment | None:
-        result = await db.execute(
+        stmt = (
             select(Appointment)
             .options(
                 selectinload(Appointment.patient),
@@ -295,6 +305,9 @@ class AppointmentService:
                 Appointment.clinic_id == clinic_id,
             )
         )
+        if access_predicate is not None:
+            stmt = stmt.where(access_predicate)
+        result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod

@@ -34,6 +34,7 @@ export function usePermissions() {
   const canViewFinancialAmounts = computed(() =>
     auth.user.value?.role !== 'dentist'
   )
+  const canManageAllProfessionals = computed(() => auth.user.value?.role !== 'dentist')
 
   return {
     permissions: readonly(permissions),
@@ -41,6 +42,7 @@ export function usePermissions() {
     canAny,
     canAll,
     isAdmin,
-    canViewFinancialAmounts
+    canViewFinancialAmounts,
+    canManageAllProfessionals
   }
 }
