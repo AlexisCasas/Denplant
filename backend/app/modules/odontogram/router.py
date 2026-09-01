@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
-from app.modules.patients.models import Patient
+from app.modules.patients.access import PatientAccessPolicy
 
 from .constants import CONDITION_COLORS, SURFACES, ToothCondition, is_valid_tooth_number
 from .schemas import (
@@ -35,20 +35,16 @@ from .service import OdontogramService, TreatmentService, build_treatment_respon
 router = APIRouter()
 
 
-async def validate_patient_access(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> Patient:
-    from sqlalchemy import select
-
-    result = await db.execute(
-        select(Patient).where(
-            Patient.id == patient_id,
-            Patient.clinic_id == clinic_id,
-            Patient.status != "archived",
-        )
-    )
-    patient = result.scalar_one_or_none()
-    if not patient:
+async def validate_patient_access(db: AsyncSession, ctx: ClinicContext, patient_id: UUID) -> None:
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-    return patient
+
+
+async def _get_accessible_treatment(db: AsyncSession, ctx: ClinicContext, treatment_id: UUID):
+    treatment = await TreatmentService.get_treatment(db, ctx.clinic_id, treatment_id)
+    if treatment is None or not await PatientAccessPolicy.can_access(db, ctx, treatment.patient_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Treatment not found")
+    return treatment
 
 
 # ============================================================================
@@ -66,7 +62,7 @@ async def get_odontogram(
     _: Annotated[None, Depends(require_permission("odontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[OdontogramResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     teeth = await OdontogramService.get_patient_odontogram(db, ctx.clinic_id, patient_id)
     treatments, _total = await TreatmentService.list_patient_treatments(
         db=db, clinic_id=ctx.clinic_id, patient_id=patient_id, page=1, page_size=500
@@ -95,7 +91,7 @@ async def get_tooth(
     _: Annotated[None, Depends(require_permission("odontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ToothRecordResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     if not is_valid_tooth_number(tooth_number):
         raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
     tooth = await OdontogramService.get_tooth_record(db, ctx.clinic_id, patient_id, tooth_number)
@@ -118,7 +114,7 @@ async def create_or_update_tooth(
     _: Annotated[None, Depends(require_permission("odontogram.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ToothRecordResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     if not is_valid_tooth_number(tooth_number):
         raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
     surface_updates = None
@@ -151,7 +147,7 @@ async def bulk_update_teeth(
     _: Annotated[None, Depends(require_permission("odontogram.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[ToothRecordResponse]]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     for u in data.updates:
         if not is_valid_tooth_number(u.tooth_number):
             raise HTTPException(status_code=400, detail=f"Invalid tooth number: {u.tooth_number}")
@@ -203,7 +199,7 @@ async def get_tooth_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
 ) -> PaginatedApiResponse[HistoryEntryWithUser]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     if not is_valid_tooth_number(tooth_number):
         raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
     history, total = await OdontogramService.get_tooth_history(
@@ -230,7 +226,7 @@ async def get_patient_odontogram_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
 ) -> PaginatedApiResponse[HistoryEntryWithUser]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     history, total = await OdontogramService.get_patient_history(
         db, ctx.clinic_id, patient_id, page, page_size
     )
@@ -253,7 +249,7 @@ async def get_odontogram_timeline(
     _: Annotated[None, Depends(require_permission("odontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TimelineResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     dates = await OdontogramService.get_timeline_dates(db, ctx.clinic_id, patient_id)
     return ApiResponse(
         data=TimelineResponse(dates=[TimelineDateEntry(**d) for d in dates], total=len(dates))
@@ -271,7 +267,7 @@ async def get_odontogram_at_date(
     db: Annotated[AsyncSession, Depends(get_db)],
     target_date: date = Query(..., alias="date"),
 ) -> ApiResponse[HistoricalOdontogramResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     historical = await OdontogramService.get_odontogram_at_date(
         db, ctx.clinic_id, patient_id, target_date
     )
@@ -312,7 +308,7 @@ async def create_treatment(
     go through this endpoint. `scope` is derived from tooth count when omitted for
     non-global treatments; globals must pass `scope` explicitly.
     """
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     # Schema `validate_shape` always resolves `scope` (raising if ambiguous).
     assert data.scope is not None
     try:
@@ -354,7 +350,7 @@ async def list_patient_treatments(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
 ) -> PaginatedApiResponse[TreatmentResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     treatments, total = await TreatmentService.list_patient_treatments(
         db=db,
         clinic_id=ctx.clinic_id,
@@ -384,9 +380,7 @@ async def get_treatment(
     _: Annotated[None, Depends(require_permission("odontogram.treatments.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentResponse]:
-    treatment = await TreatmentService.get_treatment(db, ctx.clinic_id, treatment_id)
-    if not treatment:
-        raise HTTPException(status_code=404, detail="Treatment not found")
+    treatment = await _get_accessible_treatment(db, ctx, treatment_id)
     return ApiResponse(data=TreatmentResponse.model_validate(build_treatment_response(treatment)))
 
 
@@ -401,6 +395,7 @@ async def update_treatment(
     _: Annotated[None, Depends(require_permission("odontogram.treatments.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentResponse]:
+    await _get_accessible_treatment(db, ctx, treatment_id)
     treatment = await TreatmentService.update(
         db=db,
         clinic_id=ctx.clinic_id,
@@ -422,6 +417,7 @@ async def delete_treatment(
     _: Annotated[None, Depends(require_permission("odontogram.treatments.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    await _get_accessible_treatment(db, ctx, treatment_id)
     deleted = await TreatmentService.delete(db, ctx.clinic_id, treatment_id, ctx.user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Treatment not found")
@@ -438,6 +434,7 @@ async def perform_treatment(
     _: Annotated[None, Depends(require_permission("odontogram.treatments.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentResponse]:
+    await _get_accessible_treatment(db, ctx, treatment_id)
     treatment = await TreatmentService.perform(
         db=db,
         clinic_id=ctx.clinic_id,
@@ -461,7 +458,7 @@ async def get_tooth_with_treatments(
     _: Annotated[None, Depends(require_permission("odontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ToothRecordWithTreatmentsResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    await validate_patient_access(db, ctx, patient_id)
     if not is_valid_tooth_number(tooth_number):
         raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
     tooth, treatments = await OdontogramService.get_tooth_with_treatments(

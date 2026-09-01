@@ -106,11 +106,53 @@ class ToolRegistry:
         from app.core.agents.guardrails import check as guardrails_check
         from app.core.agents.service import ApprovalService, AuditService
         from app.core.agents.tooling import jsonify
-        from app.core.auth.permissions import permission_matches
+        from app.core.auth.financial_visibility import FinancialVisibilityPolicy, strip_financial_fields
+        from app.core.auth.models import ClinicMembership, User
+        from app.core.auth.permissions import get_role_permissions, permission_matches
+        from sqlalchemy import select
 
         tool = self._tools.get(qualified_name)
         if tool is None:
             raise ToolRegistryError(f"Unknown tool: {qualified_name}")
+
+        # A tool must always run on behalf of a currently authenticated
+        # clinic member.  Agent/supervisor ids are audit metadata, never an
+        # authorization substitute.
+        if ctx.actor_user_id is None or ctx.actor_role is None:
+            await AuditService.record(
+                ctx,
+                qualified_name,
+                arguments,
+                error="missing effective actor",
+                status="BLOCKED",
+                execution_time_ms=0,
+            )
+            return ToolResult(ok=False, error="missing effective actor")
+
+        # Contexts can outlive a membership change (queued work, an open
+        # copilot session). Re-read the current active membership instead of
+        # trusting the role captured when the context was built.
+        current_role = await ctx.db.scalar(
+            select(ClinicMembership.role)
+            .join(User, User.id == ClinicMembership.user_id)
+            .where(
+                ClinicMembership.user_id == ctx.actor_user_id,
+                ClinicMembership.clinic_id == ctx.clinic_id,
+                User.is_active.is_(True),
+            )
+        )
+        if current_role is None:
+            await AuditService.record(
+                ctx,
+                qualified_name,
+                arguments,
+                error="effective actor has no active clinic membership",
+                status="BLOCKED",
+                execution_time_ms=0,
+            )
+            return ToolResult(ok=False, error="effective actor has no active clinic membership")
+        ctx.actor_role = current_role
+        ctx.permissions = get_role_permissions(current_role)
 
         decision = guardrails_check(ctx, tool, qualified_name, ctx.guardrail_config)
         if decision is GuardrailDecision.BLOCK:
@@ -174,6 +216,8 @@ class ToolRegistry:
         try:
             raw = await tool.handler(ctx, validated)
             data = jsonify(raw)
+            if not FinancialVisibilityPolicy.can_role_view_financial_amounts(ctx.actor_role):
+                data = strip_financial_fields(data)
             elapsed_ms = int((time.monotonic() - t0) * 1000)
             await AuditService.record(
                 ctx,

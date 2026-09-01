@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- fix(security): dentist catalog responses and catalog UI omit prices, costs, VAT and pricing configuration.
+
 - fix(#184): type-check clean — VAT-type toasts use semantic colours; `useCatalog` passes typed payloads to `useApi` without `Record` casts; `CatalogItemModal` builds a typed payload (create narrows the required fields instead of casting), option lists are typed to the form's unions, `UTextarea :rows` is a number; VAT badge colours are `UiColor`.
 - feat(onboarding): the `catalog-empty` getting-started step resolves inline — `CatalogSeedQuickModal` calls `POST /catalog/seed` from the dashboard card, or hands off to `/settings/catalog`.
 

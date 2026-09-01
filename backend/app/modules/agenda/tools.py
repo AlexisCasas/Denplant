@@ -23,7 +23,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
 from app.core.agents import AgentContext, Tool, ToolCategory
+from app.modules.patients.access import PatientAccessPolicy
 
+from .access import AppointmentAccessPolicy
 from .kanban_service import _fetch_professionals
 from .service import (
     VALID_TRANSITIONS,
@@ -93,6 +95,10 @@ async def _get_appointment(ctx: AgentContext, params: GetAppointmentArgs) -> dic
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
         return {"error": "not_found"}
+    if not await AppointmentAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.id
+    ):
+        return {"error": "not_found"}
     return _appt_summary(appt)
 
 
@@ -119,7 +125,13 @@ async def _get_day_overview(ctx: AgentContext, params: DayOverviewArgs) -> dict:
     start = datetime.combine(params.date, time.min)
     end = datetime.combine(params.date, time.max)
     items, total = await AppointmentService.list_appointments(
-        ctx.db, ctx.clinic_id, start_date=start, end_date=end
+        ctx.db,
+        ctx.clinic_id,
+        start_date=start,
+        end_date=end,
+        access_predicate=AppointmentAccessPolicy.predicate_for(
+            ctx.actor_role, ctx.clinic_id, ctx.actor_user_id
+        ),
     )
     return {
         "date": params.date,
@@ -129,12 +141,19 @@ async def _get_day_overview(ctx: AgentContext, params: DayOverviewArgs) -> dict:
 
 
 async def _book_appointment(ctx: AgentContext, params: BookAppointmentArgs) -> dict:
+    if not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, params.patient_id
+    ):
+        return {"error": "patient_not_found"}
     try:
+        appointment_data = params.model_dump(exclude_none=True)
+        if ctx.actor_role == "dentist":
+            appointment_data["professional_id"] = ctx.actor_user_id
         appt = await AppointmentService.create_appointment(
             ctx.db,
             ctx.clinic_id,
-            params.model_dump(exclude_none=True),
-            created_by=ctx.supervisor_id,
+            appointment_data,
+            created_by=ctx.actor_user_id,
         )
     except IntegrityError:
         # Slot conflict. Roll back the failed insert so the session stays
@@ -149,11 +168,17 @@ async def _reschedule_appointment(ctx: AgentContext, params: RescheduleAppointme
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
         return {"error": "not_found"}
+    if not await AppointmentAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.id
+    ):
+        return {"error": "not_found"}
     data = params.model_dump(exclude_none=True)
     data.pop("appointment_id")
+    if ctx.actor_role == "dentist":
+        data.pop("professional_id", None)
     try:
         appt = await AppointmentService.update_appointment(
-            ctx.db, appt, data, changed_by=ctx.supervisor_id
+            ctx.db, appt, data, changed_by=ctx.actor_user_id
         )
     except IntegrityError:
         # update_appointment already rolled the session back.
@@ -167,9 +192,13 @@ async def _update_appointment_status(
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
         return {"error": "not_found"}
+    if not await AppointmentAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.id
+    ):
+        return {"error": "not_found"}
     try:
         appt = await AppointmentService.transition(
-            ctx.db, appt, params.to_status, changed_by=ctx.supervisor_id, note=params.note
+            ctx.db, appt, params.to_status, changed_by=ctx.actor_user_id, note=params.note
         )
     except AlreadyInStateError:
         return {"error": "already_in_state", "status": appt.status}
@@ -191,9 +220,13 @@ async def _cancel_appointment(ctx: AgentContext, params: CancelAppointmentArgs) 
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
         return {"error": "not_found"}
+    if not await AppointmentAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.id
+    ):
+        return {"error": "not_found"}
     try:
         appt = await AppointmentService.cancel_appointment(
-            ctx.db, appt, changed_by=ctx.supervisor_id
+            ctx.db, appt, changed_by=ctx.actor_user_id
         )
     except InvalidTransitionError:
         return {

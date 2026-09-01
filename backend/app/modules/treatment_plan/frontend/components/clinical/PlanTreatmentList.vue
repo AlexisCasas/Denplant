@@ -58,6 +58,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const { canViewFinancialAmounts } = usePermissions()
 
 // Confirmation modal state
 const showConfirmModal = ref(false)
@@ -335,13 +336,13 @@ const { format: formatCurrency } = useCurrency()
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span
-                v-if="discountedFrom(item) !== undefined"
+                v-if="canViewFinancialAmounts && discountedFrom(item) !== undefined"
                 class="text-xs text-muted line-through"
               >
                 {{ formatCurrency(discountedFrom(item)) }}
               </span>
               <span
-                v-if="itemEffectivePrice(item) !== undefined"
+                v-if="canViewFinancialAmounts && itemEffectivePrice(item) !== undefined"
                 class="font-medium text-sm"
               >
                 {{ formatCurrency(itemEffectivePrice(item)) }}

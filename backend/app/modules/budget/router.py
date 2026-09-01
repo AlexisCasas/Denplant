@@ -9,7 +9,12 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.dependencies import (
+    ClinicContext,
+    get_clinic_context,
+    require_financial_visibility,
+    require_permission,
+)
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.core.schemas import ApiResponse, PaginatedApiResponse
@@ -38,7 +43,7 @@ from .schemas import (
 from .service import BudgetHistoryService, BudgetItemService, BudgetService
 from .workflow import BudgetWorkflowError, BudgetWorkflowService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_financial_visibility)])
 
 
 # ============================================================================

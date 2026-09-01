@@ -34,7 +34,7 @@ const toast = useToast()
 const auth = useAuth()
 const clinic = useClinic()
 const api = useApi()
-const { can } = usePermissions()
+const { can, canManageAllProfessionals } = usePermissions()
 const { isMobile } = useBreakpoint()
 const { createAppointment, updateAppointment, cancelAppointment } = useAppointments()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
@@ -111,7 +111,10 @@ const cabinetOptions = computed(() => {
 
 // Professional options
 const professionalOptions = computed(() => {
-  return professionals.value.map(prof => ({
+  const visible = canManageAllProfessionals.value
+    ? professionals.value
+    : professionals.value.filter(prof => prof.id === auth.user.value?.id)
+  return visible.map(prof => ({
     value: prof.id,
     label: `${prof.first_name} ${prof.last_name}`,
     color: getProfessionalColor(prof.id)
@@ -375,7 +378,9 @@ watch(() => props.open, async (isOpen) => {
 
     // Set professional - use initialProfessionalId, current user if professional, or first available
     if (props.initialProfessionalId) {
-      selectedProfessionalId.value = props.initialProfessionalId
+      selectedProfessionalId.value = canManageAllProfessionals.value
+        ? props.initialProfessionalId
+        : auth.user.value?.id || ''
     } else {
       // Check if current user is a professional
       const currentUserId = auth.user.value?.id
@@ -520,7 +525,9 @@ async function handleSave() {
 
     const appointmentData: AppointmentCreate = {
       patient_id: selectedPatient.value.id,
-      professional_id: selectedProfessionalId.value,
+      professional_id: canManageAllProfessionals.value
+        ? selectedProfessionalId.value
+        : auth.user.value?.id || selectedProfessionalId.value,
       cabinet: cabinetValue,
       start_time: startTime,
       end_time: endTime,
@@ -775,6 +782,7 @@ function openPatientFile() {
               </UFormField>
 
               <UFormField
+                v-if="canManageAllProfessionals"
                 :label="t('appointments.professional')"
                 required
               >

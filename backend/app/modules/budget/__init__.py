@@ -45,7 +45,7 @@ class BudgetModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["*"],
+            "dentist": [],
             "hygienist": ["read"],
             "assistant": ["read", "write", "accept_in_clinic"],
             "receptionist": [

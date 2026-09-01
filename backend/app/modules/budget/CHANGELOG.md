@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- fix(security): deny dentists access to budget HTTP endpoints and monetary PDFs.
+
 - fix(#184): type-check clean — item helpers on the detail page accept the readonly item view.
 - feat(#184): `BudgetListResponse` exposes `plan_number_snapshot` so patient-side lists can show the plan link without importing treatment_plan.
 - fix(#183): the three plan-sync handlers are transactional (ADR 0019); a failed mirror now fails the request instead of leaving the quote out of sync with the plan.

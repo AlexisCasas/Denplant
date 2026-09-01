@@ -23,6 +23,7 @@ from app.core.auth.dependencies import (
 )
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.patients.access import PatientAccessPolicy
 
 from .schemas import (
     AttemptCreate,
@@ -50,6 +51,18 @@ from .service import (
 )
 
 router = APIRouter()
+
+
+async def _get_accessible_recall(db: AsyncSession, ctx: ClinicContext, recall_id: UUID):
+    recall = await RecallService.get(db, ctx.clinic_id, recall_id)
+    if recall is None or not await PatientAccessPolicy.can_access(db, ctx, recall.patient_id):
+        raise HTTPException(status_code=404, detail="Recall not found")
+    return recall
+
+
+async def _require_patient_access(db: AsyncSession, ctx: ClinicContext, patient_id: UUID) -> None:
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Patient not found")
 
 
 # --- Helpers --------------------------------------------------------------
@@ -82,6 +95,8 @@ async def list_recalls(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
 ) -> PaginatedApiResponse[RecallResponse]:
+    if patient_id is not None:
+        await _require_patient_access(db, ctx, patient_id)
     filters = RecallFilters(
         month=month,
         reason=reason,
@@ -94,7 +109,12 @@ async def list_recalls(
         include_do_not_contact=include_do_not_contact,
     )
     items, total = await RecallService.list(
-        db, ctx.clinic_id, filters, page=page, page_size=page_size
+        db,
+        ctx.clinic_id,
+        filters,
+        page=page,
+        page_size=page_size,
+        patient_access_predicate=PatientAccessPolicy.predicate(ctx),
     )
     return PaginatedApiResponse(
         data=[_serialise(r) for r in items],
@@ -115,6 +135,7 @@ async def create_recall(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallResponse]:
+    await _require_patient_access(db, ctx, data.patient_id)
     try:
         recall, _created = await RecallService.create(
             db,
@@ -134,7 +155,11 @@ async def get_dashboard_stats(
     _: Annotated[None, Depends(require_permission("recalls.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallDashboardStats]:
-    stats = await RecallService.dashboard_stats(db, ctx.clinic_id)
+    stats = await RecallService.dashboard_stats(
+        db,
+        ctx.clinic_id,
+        patient_access_predicate=PatientAccessPolicy.predicate(ctx),
+    )
     return ApiResponse(data=RecallDashboardStats(**stats))
 
 
@@ -147,6 +172,7 @@ async def suggest_next_recall(
     treatment_category_key: str | None = Query(default=None),
     treatment_id: UUID | None = Query(default=None),
 ) -> ApiResponse[RecallSuggestion | None]:
+    await _require_patient_access(db, ctx, patient_id)
     suggestion = await RecallService.suggest_next_for_treatment(
         db,
         clinic_id=ctx.clinic_id,
@@ -204,7 +230,12 @@ async def export_csv(
         overdue=overdue,
         professional_id=professional_id,
     )
-    rows = await RecallService.export_rows(db, ctx.clinic_id, filters)
+    rows = await RecallService.export_rows(
+        db,
+        ctx.clinic_id,
+        filters,
+        patient_access_predicate=PatientAccessPolicy.predicate(ctx),
+    )
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
@@ -249,6 +280,7 @@ async def list_patient_recalls(
     _: Annotated[None, Depends(require_permission("recalls.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[RecallResponse]]:
+    await _require_patient_access(db, ctx, patient_id)
     items = await RecallService.list_for_patient(db, ctx.clinic_id, patient_id)
     return ApiResponse(data=[RecallResponse.model_validate(r) for r in items])
 
@@ -263,6 +295,7 @@ async def get_recall(
     _: Annotated[None, Depends(require_permission("recalls.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallDetailResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     recall, attempts = await RecallService.get_with_attempts(db, ctx.clinic_id, recall_id)
     if not recall:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recall not found")
@@ -279,6 +312,7 @@ async def update_recall(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     recall = await RecallService.update(
         db, ctx.clinic_id, recall_id, data.model_dump(exclude_unset=True)
     )
@@ -296,6 +330,7 @@ async def snooze_recall(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     recall = await RecallService.snooze(
         db,
         ctx.clinic_id,
@@ -318,6 +353,7 @@ async def cancel_recall(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     recall = await RecallService.cancel(
         db,
         ctx.clinic_id,
@@ -338,6 +374,7 @@ async def mark_recall_done(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     recall = await RecallService.mark_done(db, ctx.clinic_id, recall_id, by_user=ctx.user_id)
     if not recall:
         raise HTTPException(status_code=404, detail="Recall not found")
@@ -357,6 +394,7 @@ async def log_attempt(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AttemptResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     if not ctx.user_id:
         raise HTTPException(status_code=400, detail="user_id required to log attempt")
     result = await RecallService.log_attempt(
@@ -380,6 +418,7 @@ async def list_attempts(
     _: Annotated[None, Depends(require_permission("recalls.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[AttemptResponse]]:
+    await _get_accessible_recall(db, ctx, recall_id)
     attempts = await RecallService.list_attempts(db, ctx.clinic_id, recall_id)
     return ApiResponse(data=[AttemptResponse.model_validate(a) for a in attempts])
 
@@ -392,6 +431,7 @@ async def link_appointment(
     _: Annotated[None, Depends(require_permission("recalls.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[RecallResponse]:
+    await _get_accessible_recall(db, ctx, recall_id)
     recall = await RecallService.link_appointment(db, ctx.clinic_id, recall_id, data.appointment_id)
     if not recall:
         raise HTTPException(status_code=404, detail="Recall not found")
@@ -406,9 +446,7 @@ async def delete_recall(
     _: Annotated[None, Depends(require_permission("recalls.delete"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    recall = await RecallService.get(db, ctx.clinic_id, recall_id)
-    if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+    recall = await _get_accessible_recall(db, ctx, recall_id)
     await db.delete(recall)
     await db.commit()
     return None

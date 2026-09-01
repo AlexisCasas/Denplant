@@ -165,3 +165,16 @@ def require_permission(permission: str) -> Callable:
             )
 
     return permission_checker
+
+
+async def require_financial_visibility(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+) -> None:
+    """Fail closed for endpoints whose only useful content is monetary."""
+    from .financial_visibility import FinancialVisibilityPolicy
+
+    if not FinancialVisibilityPolicy.can_view_financial_amounts(ctx):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Financial information is not available for this role",
+        )
