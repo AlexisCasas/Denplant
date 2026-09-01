@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import json
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -7,7 +8,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.auth.router import limiter
 from app.core.auth.router import router as auth_router
+from app.core.auth.financial_visibility import strip_financial_fields
 from app.core.log_context import (
     new_request_id,
     reset_request_context,
@@ -138,6 +140,47 @@ async def request_id_middleware(request: Request, call_next):
         reset_request_context(tokens)
     response.headers["X-Request-Id"] = rid
     return response
+
+
+@app.middleware("http")
+async def financial_response_middleware(request: Request, call_next):
+    """Remove monetary fields from marked clinical responses for dentists.
+
+    Router dependencies set the marker only after authentication has resolved
+    the effective clinic role.  Keeping this at the serialized-response
+    boundary makes it impossible for nested schemas or Pydantic defaults to
+    accidentally reintroduce an amount.
+    """
+    response = await call_next(request)
+    if not getattr(request.state, "hide_financial_amounts", False):
+        return response
+    if "application/json" not in response.headers.get("content-type", ""):
+        return response
+
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    headers = {
+        key: value
+        for key, value in response.headers.items()
+        if key.lower() != "content-length"
+    }
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        # The body iterator was consumed above. Preserve a malformed but
+        # JSON-labelled upstream response verbatim rather than returning an
+        # empty body; redaction applies only to valid JSON documents.
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=headers,
+            background=response.background,
+        )
+    return JSONResponse(
+        content=strip_financial_fields(payload),
+        status_code=response.status_code,
+        headers=headers,
+        background=response.background,
+    )
 
 
 def _cors_headers(request: Request) -> dict[str, str]:

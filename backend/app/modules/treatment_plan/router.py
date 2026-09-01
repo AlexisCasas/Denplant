@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.financial_visibility import mark_financial_response
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
@@ -32,7 +33,7 @@ from .schemas import (
 )
 from .service import PlanLockedError, TreatmentPlanService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(mark_financial_response)])
 
 
 # -----------------------------------------------------------------------------

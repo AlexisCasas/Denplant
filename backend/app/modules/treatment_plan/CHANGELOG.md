@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- fix(security): dentist treatment-plan responses omit plan, budget, treatment and session monetary fields.
+
 - fix(#184): the layer type-checks clean under `nuxt typecheck`. Real
   bugs behind the type errors: `TreatmentPlanStatus` now matches the API
   (`pending`/`closed` instead of the phantom `cancelled`), toasts use

@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.financial_visibility import mark_financial_response
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
@@ -46,7 +47,7 @@ from .service import (
 )
 from .tz import safe_zone
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(mark_financial_response)])
 
 
 def _localize(response: AppointmentResponse, ctx: ClinicContext) -> AppointmentResponse:

@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.dependencies import (
+    ClinicContext,
+    get_clinic_context,
+    require_financial_visibility,
+    require_permission,
+)
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.payments.schemas import PaymentResponse
@@ -62,7 +67,7 @@ def _attach_paid_summary(
     response.balance_due = balance_due
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_financial_visibility)])
 
 
 # ============================================================================

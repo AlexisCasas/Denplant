@@ -111,6 +111,8 @@ async def _digest_context(
         permissions=get_role_permissions(role),
         tools=tool_registry,
         db=db,
+        actor_user_id=user.id,
+        actor_role=role,
         supervisor_id=user.id,
         guardrail_config=COPILOT_GUARDRAILS,
     )

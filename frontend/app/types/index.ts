@@ -7,6 +7,7 @@ export interface User {
   first_name: string
   last_name: string
   professional_id?: string
+  role?: 'admin' | 'dentist' | 'hygienist' | 'assistant' | 'receptionist'
   is_active: boolean
   created_at: string
   updated_at: string

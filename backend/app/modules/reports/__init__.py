@@ -30,7 +30,7 @@ class ReportsModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["billing.read", "scheduling.read"],
+            "dentist": ["scheduling.read"],
             "hygienist": ["scheduling.read"],
             "assistant": ["scheduling.read"],
             "receptionist": ["billing.read", "scheduling.read"],
@@ -42,7 +42,7 @@ class ReportsModule(BaseModule):
                     "label": "nav.reports",
                     "icon": "i-lucide-bar-chart-3",
                     "to": "/reports",
-                    "permission": "reports.billing.read",
+                    "permission": "reports.scheduling.read",
                     "order": 60,
                 },
             ],

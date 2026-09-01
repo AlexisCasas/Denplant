@@ -43,6 +43,10 @@ class AgentContext:
     permissions: list[str]
     tools: ToolRegistry
     db: AsyncSession
+    # Effective human actor, derived by the entry surface from the current
+    # membership. ``agent_id`` identifies automation for audit only.
+    actor_user_id: UUID | None = None
+    actor_role: str | None = None
     memory: AgentMemory | None = None
     supervisor_id: UUID | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

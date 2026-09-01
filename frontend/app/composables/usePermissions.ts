@@ -31,12 +31,16 @@ export function usePermissions() {
   }
 
   const isAdmin = computed(() => can(PERMISSIONS.users.write))
+  const canViewFinancialAmounts = computed(() =>
+    auth.user.value?.role !== 'dentist'
+  )
 
   return {
     permissions: readonly(permissions),
     can,
     canAny,
     canAll,
-    isAdmin
+    isAdmin,
+    canViewFinancialAmounts
   }
 }

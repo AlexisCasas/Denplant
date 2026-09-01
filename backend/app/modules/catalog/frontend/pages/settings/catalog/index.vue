@@ -5,7 +5,7 @@ import { PERMISSIONS } from '~~/app/config/permissions'
 import type { UiColor } from '~~/app/config/severity'
 
 const { t, locale } = useI18n()
-const { isAdmin, can } = usePermissions()
+const { isAdmin, can, canViewFinancialAmounts } = usePermissions()
 const catalog = useCatalog()
 const canAdmin = computed(() => can(PERMISSIONS.catalog.admin))
 
@@ -374,10 +374,16 @@ const categoryOptions = computed(() => [
                   <th class="text-left py-2 px-4 font-medium text-muted text-sm">
                     {{ t('catalog.name') }}
                   </th>
-                  <th class="text-right py-2 px-4 font-medium text-muted text-sm">
+                  <th
+                    v-if="canViewFinancialAmounts"
+                    class="text-right py-2 px-4 font-medium text-muted text-sm"
+                  >
                     {{ t('catalog.price') }}
                   </th>
-                  <th class="hidden sm:table-cell text-center py-2 px-4 font-medium text-muted text-sm">
+                  <th
+                    v-if="canViewFinancialAmounts"
+                    class="hidden sm:table-cell text-center py-2 px-4 font-medium text-muted text-sm"
+                  >
                     {{ t('catalog.vatType') }}
                   </th>
                   <th class="hidden md:table-cell text-center py-2 px-4 font-medium text-muted text-sm">
@@ -420,10 +426,16 @@ const categoryOptions = computed(() => [
                       {{ t('common.inactive') }}
                     </UBadge>
                   </td>
-                  <td class="py-2.5 px-4 text-right font-medium">
+                  <td
+                    v-if="canViewFinancialAmounts"
+                    class="py-2.5 px-4 text-right font-medium"
+                  >
                     {{ catalog.formatPrice(item.default_price) }}
                   </td>
-                  <td class="hidden sm:table-cell py-2.5 px-4 text-center">
+                  <td
+                    v-if="canViewFinancialAmounts"
+                    class="hidden sm:table-cell py-2.5 px-4 text-center"
+                  >
                     <UBadge
                       :color="getVatTypeBadgeColor(item.vat_type)"
                       variant="subtle"
@@ -541,10 +553,16 @@ const categoryOptions = computed(() => [
               <th class="hidden md:table-cell text-left py-3 px-4 font-medium text-muted">
                 {{ t('catalog.category') }}
               </th>
-              <th class="text-right py-3 px-4 font-medium text-muted">
+              <th
+                v-if="canViewFinancialAmounts"
+                class="text-right py-3 px-4 font-medium text-muted"
+              >
                 {{ t('catalog.price') }}
               </th>
-              <th class="hidden sm:table-cell text-center py-3 px-4 font-medium text-muted">
+              <th
+                v-if="canViewFinancialAmounts"
+                class="hidden sm:table-cell text-center py-3 px-4 font-medium text-muted"
+              >
                 {{ t('catalog.vatType') }}
               </th>
               <th class="hidden lg:table-cell text-center py-3 px-4 font-medium text-muted">
@@ -590,10 +608,16 @@ const categoryOptions = computed(() => [
               <td class="hidden md:table-cell py-3 px-4 text-muted dark:text-subtle">
                 {{ getCategoryName(item.category_id) }}
               </td>
-              <td class="py-3 px-4 text-right font-medium">
+              <td
+                v-if="canViewFinancialAmounts"
+                class="py-3 px-4 text-right font-medium"
+              >
                 {{ catalog.formatPrice(item.default_price) }}
               </td>
-              <td class="hidden sm:table-cell py-3 px-4 text-center">
+              <td
+                v-if="canViewFinancialAmounts"
+                class="hidden sm:table-cell py-3 px-4 text-center"
+              >
                 <UBadge
                   :color="getVatTypeBadgeColor(item.vat_type)"
                   variant="subtle"

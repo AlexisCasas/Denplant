@@ -134,7 +134,7 @@ async def _book_appointment(ctx: AgentContext, params: BookAppointmentArgs) -> d
             ctx.db,
             ctx.clinic_id,
             params.model_dump(exclude_none=True),
-            created_by=ctx.supervisor_id,
+            created_by=ctx.actor_user_id,
         )
     except IntegrityError:
         # Slot conflict. Roll back the failed insert so the session stays
@@ -153,7 +153,7 @@ async def _reschedule_appointment(ctx: AgentContext, params: RescheduleAppointme
     data.pop("appointment_id")
     try:
         appt = await AppointmentService.update_appointment(
-            ctx.db, appt, data, changed_by=ctx.supervisor_id
+            ctx.db, appt, data, changed_by=ctx.actor_user_id
         )
     except IntegrityError:
         # update_appointment already rolled the session back.
@@ -169,7 +169,7 @@ async def _update_appointment_status(
         return {"error": "not_found"}
     try:
         appt = await AppointmentService.transition(
-            ctx.db, appt, params.to_status, changed_by=ctx.supervisor_id, note=params.note
+            ctx.db, appt, params.to_status, changed_by=ctx.actor_user_id, note=params.note
         )
     except AlreadyInStateError:
         return {"error": "already_in_state", "status": appt.status}
@@ -193,7 +193,7 @@ async def _cancel_appointment(ctx: AgentContext, params: CancelAppointmentArgs) 
         return {"error": "not_found"}
     try:
         appt = await AppointmentService.cancel_appointment(
-            ctx.db, appt, changed_by=ctx.supervisor_id
+            ctx.db, appt, changed_by=ctx.actor_user_id
         )
     except InvalidTransitionError:
         return {
