@@ -10,11 +10,13 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.auth.models import ClinicMembership
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.modules.odontogram.models import Treatment
+from app.modules.patients.access import PatientAccessPolicy
 from app.modules.patients.models import Patient
 
 from .models import PlannedTreatmentItem, PlannedTreatmentItemSession, TreatmentPlan
@@ -224,6 +226,7 @@ class TreatmentPlanService:
         page_size: int = 20,
         patient_id: UUID | None = None,
         status: str | list[str] | None = None,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[TreatmentPlan], int]:
         """List treatment plans with pagination and filters."""
         page_size = min(max(page_size, 1), 100)
@@ -238,6 +241,8 @@ class TreatmentPlanService:
 
         if patient_id:
             base_where.append(TreatmentPlan.patient_id == patient_id)
+        if patient_access_predicate is not None:
+            base_where.append(TreatmentPlan.patient.has(patient_access_predicate))
 
         if status:
             statuses = [status] if isinstance(status, str) else list(status)
@@ -1313,6 +1318,8 @@ class TreatmentPlanService:
         db: AsyncSession,
         clinic_id: UUID,
         tab: str,
+        role: str,
+        user_id: UUID,
         page: int = 1,
         page_size: int = 20,
         doctor_id: UUID | None = None,
@@ -1360,6 +1367,10 @@ class TreatmentPlanService:
             raise ValueError(f"Unknown pipeline tab '{tab}'")
 
         params: dict[str, object] = {"clinic_id": clinic_id}
+        patient_scope_where, patient_scope_params = PatientAccessPolicy.sql_predicate(
+            role, patient_alias="pat", user_id=user_id
+        )
+        params.update(patient_scope_params)
         extra_where = ""
         if doctor_id is not None:
             extra_where += " AND p.assigned_professional_id = :doctor_id"
@@ -1457,6 +1468,7 @@ class TreatmentPlanService:
               AND p.deleted_at IS NULL
               AND ({tab_where})
               {extra_where}
+              {patient_scope_where}
         """
 
         # ----- count + page ---------------------------------------------

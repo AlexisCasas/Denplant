@@ -33,7 +33,10 @@ async def _ensure_clinic_and_patient(
     await db_session.flush()
 
     db_session.add(
-        ClinicMembership(id=uuid4(), user_id=user_id, clinic_id=clinic.id, role="dentist")
+        # These workflow tests exercise budget transitions; use an admin
+        # actor. Dentist financial visibility is covered separately with a
+        # patient-scoped Dentist A fixture.
+        ClinicMembership(id=uuid4(), user_id=user_id, clinic_id=clinic.id, role="admin")
     )
     await db_session.commit()
 

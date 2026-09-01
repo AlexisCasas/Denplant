@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- security: scope treatment-plan patient, plan, item, session, and budget-link routes through the central patient access policy.
+
 - fix(security): dentist treatment-plan responses omit plan, budget, treatment and session monetary fields.
 
 - fix(#184): the layer type-checks clean under `nuxt typecheck`. Real

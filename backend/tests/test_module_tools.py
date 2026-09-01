@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.agents.context import AgentContext, AgentMode
 from app.core.agents.models import Agent, AgentSession
-from app.core.auth.models import ClinicMembership
 from app.core.agents.tools.registry import tool_registry
+from app.core.auth.models import ClinicMembership
 from app.modules.patients.service import PatientService
 
 
@@ -197,7 +197,7 @@ async def test_patient_timeline_empty(db_session, test_clinic) -> None:
         ctx, "patient_timeline.get_patient_timeline", {"patient_id": str(uuid4())}
     )
     assert res.ok
-    assert res.data["total"] == 0
+    assert res.data == {"error": "not_found"}
 
 
 def test_financial_tools_registered() -> None:
@@ -878,9 +878,7 @@ async def test_record_payment_and_history(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_record_payment_denied_without_write(db_session, test_clinic) -> None:
-    ctx = await _ctx(
-        db_session, test_clinic.id, ["payments.record.read"], actor_role="hygienist"
-    )
+    ctx = await _ctx(db_session, test_clinic.id, ["payments.record.read"], actor_role="hygienist")
     res = await tool_registry.call(
         ctx,
         "payments.record_payment",

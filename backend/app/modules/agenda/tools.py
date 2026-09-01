@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
 from app.core.agents import AgentContext, Tool, ToolCategory
+from app.modules.patients.access import PatientAccessPolicy
 
 from .kanban_service import _fetch_professionals
 from .service import (
@@ -93,6 +94,10 @@ async def _get_appointment(ctx: AgentContext, params: GetAppointmentArgs) -> dic
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
         return {"error": "not_found"}
+    if appt.patient_id and not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.patient_id
+    ):
+        return {"error": "not_found"}
     return _appt_summary(appt)
 
 
@@ -129,6 +134,10 @@ async def _get_day_overview(ctx: AgentContext, params: DayOverviewArgs) -> dict:
 
 
 async def _book_appointment(ctx: AgentContext, params: BookAppointmentArgs) -> dict:
+    if not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, params.patient_id
+    ):
+        return {"error": "patient_not_found"}
     try:
         appt = await AppointmentService.create_appointment(
             ctx.db,
@@ -149,6 +158,10 @@ async def _reschedule_appointment(ctx: AgentContext, params: RescheduleAppointme
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
         return {"error": "not_found"}
+    if appt.patient_id and not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.patient_id
+    ):
+        return {"error": "not_found"}
     data = params.model_dump(exclude_none=True)
     data.pop("appointment_id")
     try:
@@ -166,6 +179,10 @@ async def _update_appointment_status(
 ) -> dict:
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
+        return {"error": "not_found"}
+    if appt.patient_id and not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.patient_id
+    ):
         return {"error": "not_found"}
     try:
         appt = await AppointmentService.transition(
@@ -190,6 +207,10 @@ async def _update_appointment_status(
 async def _cancel_appointment(ctx: AgentContext, params: CancelAppointmentArgs) -> dict:
     appt = await AppointmentService.get_appointment(ctx.db, ctx.clinic_id, params.appointment_id)
     if appt is None:
+        return {"error": "not_found"}
+    if appt.patient_id and not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, appt.patient_id
+    ):
         return {"error": "not_found"}
     try:
         appt = await AppointmentService.cancel_appointment(

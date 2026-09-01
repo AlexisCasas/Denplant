@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.core.agents import AgentContext, Tool, ToolCategory
+from app.modules.patients.access import PatientAccessPolicy
 
 from .channels import Channel
 from .gateway import NotificationGateway
@@ -49,6 +50,10 @@ async def _send_notification(ctx: AgentContext, params: SendNotificationArgs) ->
         )
     ).scalar_one_or_none()
     if patient is None:
+        return {"error": "patient_not_found"}
+    if not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, patient.id
+    ):
         return {"error": "patient_not_found"}
 
     context = dict(params.context)

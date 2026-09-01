@@ -73,9 +73,23 @@ async def financial_http_world(db_session, test_clinic):
         is_active=True,
     )
     db_session.add(dentist)
+    dentist_b = User(
+        id=uuid4(),
+        email="dentist-financial-http-b@test.clinic",
+        password_hash=hash_password("TestPass1234"),
+        first_name="Dental",
+        last_name="Other",
+        is_active=True,
+    )
+    db_session.add(dentist_b)
     db_session.add(
         ClinicMembership(
             id=uuid4(), user_id=dentist.id, clinic_id=test_clinic.id, role="dentist"
+        )
+    )
+    db_session.add(
+        ClinicMembership(
+            id=uuid4(), user_id=dentist_b.id, clinic_id=test_clinic.id, role="dentist"
         )
     )
     category = TreatmentCategory(
@@ -112,6 +126,10 @@ async def financial_http_world(db_session, test_clinic):
         "dentist_headers": {
             "Authorization": f"Bearer {create_access_token(dentist.id, token_version=dentist.token_version)}"
         },
+        "dentist_b_headers": {
+            "Authorization": f"Bearer {create_access_token(dentist_b.id, token_version=dentist_b.token_version)}"
+        },
+        "dentist_id": dentist.id,
         "item_id": item.id,
     }
 
@@ -138,6 +156,7 @@ async def plan_and_agenda_world(db_session, test_clinic, financial_http_world):
         last_name="Paciente",
         email="plan-paciente@test.clinic",
         phone="600000001",
+        created_by_user_id=financial_http_world["dentist_id"],
     )
     treatment = Treatment(
         id=uuid4(),
@@ -182,7 +201,7 @@ async def plan_and_agenda_world(db_session, test_clinic, financial_http_world):
         id=uuid4(),
         clinic_id=test_clinic.id,
         patient_id=patient.id,
-        professional_id=admin_membership.user_id,
+        professional_id=financial_http_world["dentist_id"],
         cabinet="Gabinete 1",
         start_time=datetime.now(UTC) + timedelta(days=1),
         end_time=datetime.now(UTC) + timedelta(days=1, minutes=30),
@@ -277,6 +296,8 @@ async def test_treatment_plan_http_is_sanitized_for_dentist_but_complete_for_adm
         _assert_no_financial_fields(dentist.json())
         for amount in ("137.45", "872.30", "1549.99"):
             assert amount not in dentist.text
+    denied = await client.get(paths[1], headers=world["dentist_b_headers"])
+    assert denied.status_code == 404
     admin_detail = (await client.get(paths[1], headers=auth_headers)).json()["data"]
     assert admin_detail["items"][0]["treatment"]["price_snapshot"] == "872.30"
     assert admin_detail["items"][0]["sessions"][0]["amount"] == "1549.99"

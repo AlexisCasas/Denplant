@@ -20,6 +20,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.auth.financial_visibility import mark_financial_response
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.patients.access import PatientAccessPolicy
 
 from .kanban_service import KanbanDayService
 from .models import Appointment
@@ -48,6 +49,17 @@ from .service import (
 from .tz import safe_zone
 
 router = APIRouter(dependencies=[Depends(mark_financial_response)])
+
+
+async def _get_accessible_appointment(db: AsyncSession, ctx: ClinicContext, appointment_id: UUID):
+    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if appointment.patient_id and not await PatientAccessPolicy.can_access(
+        db, ctx, appointment.patient_id
+    ):
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    return appointment
 
 
 def _localize(response: AppointmentResponse, ctx: ClinicContext) -> AppointmentResponse:
@@ -81,6 +93,8 @@ async def list_appointments(
     page_size: int = Query(default=100, ge=1, le=500),
 ) -> PaginatedApiResponse[AppointmentResponse]:
     """List appointments with filters."""
+    if patient_id is not None and not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     appointments, total = await AppointmentService.list_appointments(
         db,
         ctx.clinic_id,
@@ -114,7 +128,7 @@ async def create_appointment(
 ) -> ApiResponse[AppointmentResponse]:
     """Create a new appointment."""
     if data.patient_id:
-        if not await AppointmentService.validate_patient_access(db, ctx.clinic_id, data.patient_id):
+        if not await PatientAccessPolicy.can_access(db, ctx, data.patient_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found",
@@ -157,12 +171,7 @@ async def get_appointment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AppointmentResponse]:
     """Get an appointment by ID, including the status audit trail."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     response = _localize(AppointmentResponse.model_validate(appointment), ctx)
     response.history = [AppointmentStatusEventResponse.model_validate(e) for e in events]
@@ -178,15 +187,10 @@ async def update_appointment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AppointmentResponse]:
     """Update an appointment."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
 
     if data.patient_id:
-        if not await AppointmentService.validate_patient_access(db, ctx.clinic_id, data.patient_id):
+        if not await PatientAccessPolicy.can_access(db, ctx, data.patient_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found",
@@ -230,12 +234,7 @@ async def delete_appointment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Cancel an appointment."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     try:
         await AppointmentService.cancel_appointment(db, appointment, changed_by=ctx.user_id)
     except ValueError as e:
@@ -261,12 +260,7 @@ async def transition_appointment(
     Returns the full appointment with its ``history`` populated so the
     frontend can update the detail view in one round-trip.
     """
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     try:
         await AppointmentService.transition(
             db, appointment, data.to_status, changed_by=ctx.user_id, note=data.note
@@ -304,12 +298,7 @@ async def list_appointment_transitions(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[AppointmentStatusEventResponse]]:
     """Return the full status audit trail for an appointment (asc)."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     return ApiResponse(data=[AppointmentStatusEventResponse.model_validate(e) for e in events])
 
@@ -330,12 +319,7 @@ async def assign_appointment_cabinet(
     Returns the updated appointment with its cabinet history populated so
     the frontend can update the detail view in one round-trip.
     """
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     try:
         await AppointmentService.assign_cabinet(
             db,
@@ -372,12 +356,7 @@ async def list_appointment_cabinet_history(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[AppointmentCabinetEventResponse]]:
     """Return the cabinet assignment audit trail (asc)."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     events = await AppointmentService.list_cabinet_events(db, ctx.clinic_id, appointment.id)
     return ApiResponse(data=[AppointmentCabinetEventResponse.model_validate(e) for e in events])
 

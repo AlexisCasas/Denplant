@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
+from app.modules.patients.access import PatientAccessPolicy
 
 from .models import ClinicalNote
 from .schemas import (
@@ -51,6 +52,26 @@ ATTACHMENT_OWNER_PATTERN = "^(patient|treatment|plan|appointment|clinical_note)$
 
 def _is_admin_role(ctx: ClinicContext) -> bool:
     return ctx.role == "admin"
+
+
+async def _require_owner_access(
+    db: AsyncSession, ctx: ClinicContext, owner_type: str, owner_id: UUID
+) -> UUID:
+    try:
+        patient_id = await resolve_owner_patient(db, ctx.clinic_id, owner_type, owner_id)
+    except NoteOwnerError as exc:
+        raise HTTPException(status_code=404, detail="Owner not found") from exc
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Owner not found")
+    return patient_id
+
+
+async def _require_note_access(db: AsyncSession, ctx: ClinicContext, note_id: UUID) -> ClinicalNote:
+    note = await NoteService.get(db, ctx.clinic_id, note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    await _require_owner_access(db, ctx, note.owner_type, note.owner_id)
+    return note
 
 
 _THUMBNAILABLE = {
@@ -140,7 +161,7 @@ async def list_notes(
 ) -> ApiResponse[list[ClinicalNoteResponse]]:
     """List clinical notes for a single owner (patient / treatment / plan)."""
     try:
-        await resolve_owner_patient(db, ctx.clinic_id, owner_type, owner_id)
+        await _require_owner_access(db, ctx, owner_type, owner_id)
         notes = await NoteService.list_for_owner(db, ctx.clinic_id, owner_type, owner_id)
     except NoteOwnerError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -160,6 +181,7 @@ async def create_note(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ClinicalNoteResponse]:
     """Create a clinical note. Owner must exist in the same clinic."""
+    await _require_owner_access(db, ctx, data.owner_type, data.owner_id)
     try:
         note = await NoteService.create(
             db,
@@ -191,6 +213,7 @@ async def update_note(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ClinicalNoteResponse]:
     """Edit a note body. Author or admin only."""
+    await _require_note_access(db, ctx, note_id)
     try:
         note = await NoteService.update(
             db,
@@ -218,6 +241,7 @@ async def delete_note(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Soft-delete a note. Author or admin only."""
+    await _require_note_access(db, ctx, note_id)
     try:
         ok = await NoteService.soft_delete(
             db,
@@ -247,6 +271,8 @@ async def count_notes_by_owner(
     "has notes" indicator next to a list of entities (e.g. the agenda
     weekly/daily/kanban views) without fetching each note body.
     """
+    for owner_id in owner_ids:
+        await _require_owner_access(db, ctx, owner_type, owner_id)
     counts = await count_notes_for_owners(db, ctx.clinic_id, owner_type, owner_ids)
     return ApiResponse(data={str(k): v for k, v in counts.items()})
 
@@ -270,6 +296,10 @@ async def list_attachments(
 ) -> ApiResponse[list[NoteAttachmentResponse]]:
     """Proxy of media's attachment list — kept for transitional callers."""
     try:
+        if owner_type == "clinical_note":
+            await _require_note_access(db, ctx, owner_id)
+        else:
+            await _require_owner_access(db, ctx, owner_type, owner_id)
         rows = await list_attachments_for_owner(db, ctx.clinic_id, owner_type, owner_id)
     except NoteOwnerError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -304,6 +334,7 @@ async def list_patient_recent_notes(
                 status_code=422,
                 detail=f"Unknown note_type values: {invalid}",
             )
+    await _require_owner_access(db, ctx, "patient", patient_id)
     try:
         entries = await list_recent_for_patient(
             db,
@@ -331,6 +362,7 @@ async def list_patient_clinical_notes_by_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[PlanNotesGroup]]:
     """Clinical notes grouped by plan → treatment for one patient."""
+    await _require_owner_access(db, ctx, "patient", patient_id)
     groups = await list_grouped_for_patient(db, ctx.clinic_id, patient_id)
     for g in groups:
         for entry in g.get("plan_notes", []):
@@ -352,6 +384,7 @@ async def list_plan_merged_clinical_notes(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[ClinicalNoteEntry]]:
     """Merged clinical-notes feed for a plan (plan + treatment + visit)."""
+    await _require_owner_access(db, ctx, "plan", plan_id)
     entries = await list_merged_for_plan(db, ctx.clinic_id, plan_id)
     for e in entries:
         e["attachments"] = [_decorate_attachment(a) for a in e["attachments"]]

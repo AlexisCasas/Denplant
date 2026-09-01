@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.email import EmailResult, email_service
 
@@ -528,6 +529,7 @@ class NotificationService:
         patient_id: UUID | None = None,
         status: str | None = None,
         template_key: str | None = None,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[CommunicationMessage], int]:
         """List email logs with optional filters."""
         conditions = [CommunicationMessage.clinic_id == clinic_id]
@@ -538,6 +540,8 @@ class NotificationService:
             conditions.append(CommunicationMessage.status == status)
         if template_key:
             conditions.append(CommunicationMessage.template_key == template_key)
+        if patient_access_predicate is not None:
+            conditions.append(CommunicationMessage.patient.has(patient_access_predicate))
 
         # Count total
         count_query = select(func.count()).select_from(CommunicationMessage)

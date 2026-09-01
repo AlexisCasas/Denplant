@@ -8,8 +8,9 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, column, func, or_, select, table, text
+from sqlalchemy import and_, column, func, or_, select, table
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.events import EventType, event_bus
 from app.core.list_query import parse_sort
@@ -88,6 +89,8 @@ class PatientService:
         db: AsyncSession,
         clinic_id: UUID,
         limit: int = 8,
+        *,
+        access_predicate: ColumnElement[bool] | None = None,
     ) -> list[Patient]:
         """Patients ordered by last visit, falling back to newest created.
 
@@ -97,20 +100,28 @@ class PatientService:
         table through a raw SQL fragment. The table name is the only
         contract; agenda renames must be coordinated here.
         """
+        last_visit_conditions = [
+            _appointments_t.c.clinic_id == clinic_id,
+            _appointments_t.c.patient_id.is_not(None),
+        ]
+        if access_predicate is not None:
+            last_visit_conditions.append(Patient.id == _appointments_t.c.patient_id)
+
         last_visit_rows = (
             await db.execute(
-                text(
-                    """
-                    SELECT patient_id, MAX(start_time) AS last_visit
-                    FROM appointments
-                    WHERE clinic_id = :clinic_id
-                      AND patient_id IS NOT NULL
-                    GROUP BY patient_id
-                    ORDER BY last_visit DESC
-                    LIMIT :limit
-                    """
-                ),
-                {"clinic_id": clinic_id, "limit": limit},
+                select(
+                    _appointments_t.c.patient_id,
+                    func.max(_appointments_t.c.start_time).label("last_visit"),
+                )
+                .select_from(_appointments_t)
+                .join(Patient, Patient.id == _appointments_t.c.patient_id)
+                .where(
+                    *last_visit_conditions,
+                    *([access_predicate] if access_predicate is not None else []),
+                )
+                .group_by(_appointments_t.c.patient_id)
+                .order_by(func.max(_appointments_t.c.start_time).desc())
+                .limit(limit)
             )
         ).all()
 
@@ -122,6 +133,7 @@ class PatientService:
                 .where(
                     Patient.clinic_id == clinic_id,
                     Patient.status != "archived",
+                    *([access_predicate] if access_predicate is not None else []),
                 )
                 .order_by(Patient.created_at.desc())
                 .limit(limit)
@@ -133,6 +145,7 @@ class PatientService:
                 Patient.clinic_id == clinic_id,
                 Patient.id.in_(ordered_ids),
                 Patient.status != "archived",
+                *([access_predicate] if access_predicate is not None else []),
             )
         )
         by_id = {p.id: p for p in result.scalars().all()}
@@ -152,6 +165,7 @@ class PatientService:
         do_not_contact: bool | None = None,
         include_archived: bool = False,
         sort: str | None = None,
+        access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[Patient], int]:
         """List patients with optional search + filters + sort.
 
@@ -169,6 +183,8 @@ class PatientService:
             return [], 0
 
         conditions = [Patient.clinic_id == clinic_id]
+        if access_predicate is not None:
+            conditions.append(access_predicate)
         if not include_archived:
             conditions.append(Patient.status != "archived")
 
@@ -238,18 +254,24 @@ class PatientService:
         return list(result.scalars().all()), total
 
     @staticmethod
-    async def get_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> Patient | None:
-        result = await db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.clinic_id == clinic_id,
-            )
-        )
+    async def get_patient(
+        db: AsyncSession,
+        clinic_id: UUID,
+        patient_id: UUID,
+        *,
+        access_predicate: ColumnElement[bool] | None = None,
+    ) -> Patient | None:
+        conditions = [Patient.id == patient_id, Patient.clinic_id == clinic_id]
+        if access_predicate is not None:
+            conditions.append(access_predicate)
+        result = await db.execute(select(Patient).where(*conditions))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def create_patient(db: AsyncSession, clinic_id: UUID, data: dict) -> Patient:
-        patient = Patient(clinic_id=clinic_id, **data)
+    async def create_patient(
+        db: AsyncSession, clinic_id: UUID, data: dict, *, created_by_user_id: UUID | None = None
+    ) -> Patient:
+        patient = Patient(clinic_id=clinic_id, created_by_user_id=created_by_user_id, **data)
         db.add(patient)
         await db.flush()
 

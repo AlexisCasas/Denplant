@@ -15,6 +15,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.events import event_bus
 from app.core.events.types import EventType
@@ -97,6 +98,7 @@ class RecallService:
         filters: RecallFilters,
         page: int = 1,
         page_size: int = 50,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[Recall], int]:
         # Both predicates matter: Recall.clinic_id scopes the rows, and
         # Patient.clinic_id keeps the join from ever surfacing a foreign
@@ -111,6 +113,8 @@ class RecallService:
             conditions.append(Patient.status != "archived")
         if not filters.include_do_not_contact:
             conditions.append(Patient.do_not_contact.is_(False))
+        if patient_access_predicate is not None:
+            conditions.append(patient_access_predicate)
 
         if filters.month:
             month = _normalize_due_month(filters.month)
@@ -540,7 +544,10 @@ class RecallService:
 
     @staticmethod
     async def dashboard_stats(
-        db: AsyncSession, clinic_id: UUID, today: date | None = None
+        db: AsyncSession,
+        clinic_id: UUID,
+        today: date | None = None,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> dict[str, int | float]:
         today = today or date.today()
         month_start = _normalize_due_month(today)
@@ -556,6 +563,7 @@ class RecallService:
                     Recall.clinic_id == clinic_id,
                     Patient.status != "archived",
                     Patient.do_not_contact.is_(False),
+                    *([patient_access_predicate] if patient_access_predicate is not None else []),
                     *conditions,
                 )
             )
@@ -606,9 +614,17 @@ class RecallService:
         db: AsyncSession,
         clinic_id: UUID,
         filters: RecallFilters,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> Sequence[tuple[Recall, Patient]]:
         """Stream rows for CSV export. Same filter rules as ``list``."""
-        items, _ = await RecallService.list(db, clinic_id, filters, page=1, page_size=10_000)
+        items, _ = await RecallService.list(
+            db,
+            clinic_id,
+            filters,
+            page=1,
+            page_size=10_000,
+            patient_access_predicate=patient_access_predicate,
+        )
         # Patient was attached as ``recall.patient`` in ``list``.
         return [(r, r.patient) for r in items]  # type: ignore[attr-defined]
 

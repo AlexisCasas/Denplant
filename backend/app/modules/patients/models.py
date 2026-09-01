@@ -20,7 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.core.auth.models import Clinic
+    from app.core.auth.models import Clinic, User
 
 
 class Patient(Base, TimestampMixin):
@@ -41,6 +41,11 @@ class Patient(Base, TimestampMixin):
     # exclude the patient from active call lists and surface them in a
     # ``needs_review`` bucket instead.
     do_not_contact: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The authenticated user that created this patient. Historical rows stay
+    # NULL: access is never inferred or backfilled from unrelated data.
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # Extended demographics
     gender: Mapped[str | None] = mapped_column(String(20))  # male, female, other, prefer_not_say
@@ -67,6 +72,7 @@ class Patient(Base, TimestampMixin):
     # ``back_populates`` — callers that need ``patient.appointments``
     # must query agenda explicitly.
     clinic: Mapped[Clinic] = relationship(back_populates="patients")
+    created_by_user: Mapped[User | None] = relationship(foreign_keys=[created_by_user_id])
 
     @property
     def full_name(self) -> str:
