@@ -854,7 +854,9 @@
     },
     "completionGate": {
       "title": "Quels traitements ont été réalisés ?",
-      "description": "Cochez les traitements du plan réalisés lors de ce rendez-vous. Ceux non cochés resteront en attente dans le plan."
+      "description": "Cochez les traitements du plan réalisés lors de ce rendez-vous. Ceux non cochés resteront en attente dans le plan.",
+      "evolutionLabel": "Évolution clinique",
+      "evolutionPlaceholder": "Décrivez ce qui a été fait lors de cette visite (facultatif)"
     },
     "noActivePlans": "Aucun plan de traitement en cours.",
     "noPendingTreatmentsInPlan": "Ce plan n'a aucun traitement en attente.",

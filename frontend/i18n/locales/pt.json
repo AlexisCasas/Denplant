@@ -854,7 +854,9 @@
     },
     "completionGate": {
       "title": "Quais tratamentos foram realizados?",
-      "description": "Marque os tratamentos do plano concluídos nesta consulta. Os que ficarem desmarcados continuam pendentes no plano."
+      "description": "Marque os tratamentos do plano concluídos nesta consulta. Os que ficarem desmarcados continuam pendentes no plano.",
+      "evolutionLabel": "Evolução clínica",
+      "evolutionPlaceholder": "Descreva o que foi feito nesta consulta (opcional)"
     },
     "noActivePlans": "Não há planos de tratamento vigentes.",
     "noPendingTreatmentsInPlan": "Este plano não tem tratamentos pendentes.",

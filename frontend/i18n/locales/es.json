@@ -875,7 +875,9 @@
     },
     "completionGate": {
       "title": "¿Qué tratamientos se realizaron?",
-      "description": "Marca los tratamientos del plan que se completaron en esta cita. Los que dejes sin marcar seguirán pendientes en el plan."
+      "description": "Marca los tratamientos del plan que se completaron en esta cita. Los que dejes sin marcar seguirán pendientes en el plan.",
+      "evolutionLabel": "Evolución clínica",
+      "evolutionPlaceholder": "Describe lo realizado en esta visita (opcional)"
     },
     "noActivePlans": "No hay planes de tratamiento vigentes.",
     "noPendingTreatmentsInPlan": "Este plan no tiene tratamientos pendientes.",

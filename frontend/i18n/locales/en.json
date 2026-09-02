@@ -854,7 +854,9 @@
     },
     "completionGate": {
       "title": "Which treatments were done?",
-      "description": "Check off the plan treatments that were completed at this appointment. Anything left unchecked stays pending on the plan."
+      "description": "Check off the plan treatments that were completed at this appointment. Anything left unchecked stays pending on the plan.",
+      "evolutionLabel": "Clinical evolution",
+      "evolutionPlaceholder": "Describe what was done at this visit (optional)"
     },
     "noActivePlans": "No active treatment plans.",
     "noPendingTreatmentsInPlan": "This plan has no pending treatments.",
