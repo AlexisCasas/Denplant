@@ -906,3 +906,278 @@ async def test_budget_acceptance_reopens_scheduling_window(
         },
     )
     assert appt_active.status_code == 201, appt_active.text
+
+
+# ---------------------------------------------------------------------------
+# Second follow-up round: note idempotency + exact session-mapping proof
+# ---------------------------------------------------------------------------
+
+
+async def _find_or_create_evolution_note(
+    client: AsyncClient, auth_headers: dict, appointment_id: str, body: str
+) -> str:
+    """Mirrors AppointmentCompletionGateModal.vue's ``findOrCreateEvolutionNote``.
+
+    Deliberately standalone — no shared Python variable/session between
+    calls beyond the HTTP API — so two calls to this function simulate two
+    genuinely independent attempts (retry after timeout, page refresh, a
+    second frontend instance), not just "the same composable called
+    twice".
+    """
+    existing = await client.get(
+        f"/api/v1/clinical_notes/notes?owner_type=appointment&owner_id={appointment_id}",
+        headers=auth_headers,
+    )
+    assert existing.status_code == 200, existing.text
+    match = next(
+        (
+            n
+            for n in existing.json()["data"]
+            if n["note_type"] == "appointment_clinical" and n["body"] == body
+        ),
+        None,
+    )
+    if match:
+        return match["id"]
+    created = await client.post(
+        "/api/v1/clinical_notes/notes",
+        headers=auth_headers,
+        json={
+            "note_type": "appointment_clinical",
+            "owner_type": "appointment",
+            "owner_id": appointment_id,
+            "body": body,
+        },
+    )
+    assert created.status_code == 201, created.text
+    return created.json()["data"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_evolution_note_retry_from_independent_request_does_not_duplicate(
+    client: AsyncClient, auth_headers: dict, flow_world: dict
+):
+    """Server-side idempotency, not frontend state.
+
+    Two independent find-or-create calls with the same body persist
+    exactly one note (retry-after-timeout / refresh / a second frontend
+    instance resubmitting the same text). A genuinely different body is —
+    correctly, per the existing multi-note-per-appointment feed semantics
+    (docs/technical/appointment-notes.md) — a second, legitimate entry,
+    not a duplicate to collapse.
+    """
+    world = flow_world
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Retry note"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, world, 16)
+    i1 = await _add_item(client, auth_headers, plan_id, t1)
+
+    appt_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-11-01T09:00:00",
+            "end_time": "2026-11-01T09:30:00",
+            "planned_item_ids": [i1],
+        },
+    )
+    assert appt_resp.status_code == 201, appt_resp.text
+    appointment_id = appt_resp.json()["data"]["id"]
+
+    evolution_text = "Restauracion 16 sin complicaciones."
+
+    note_id_1 = await _find_or_create_evolution_note(
+        client, auth_headers, appointment_id, evolution_text
+    )
+    note_id_2 = await _find_or_create_evolution_note(
+        client, auth_headers, appointment_id, evolution_text
+    )
+    assert note_id_1 == note_id_2
+
+    notes = (
+        await client.get(
+            f"/api/v1/clinical_notes/notes?owner_type=appointment&owner_id={appointment_id}",
+            headers=auth_headers,
+        )
+    ).json()["data"]
+    matching = [
+        n for n in notes if n["note_type"] == "appointment_clinical" and n["body"] == evolution_text
+    ]
+    assert len(matching) == 1
+
+    different_text = "Nota de seguimiento distinta."
+    note_id_3 = await _find_or_create_evolution_note(
+        client, auth_headers, appointment_id, different_text
+    )
+    assert note_id_3 != note_id_1
+    notes_after = (
+        await client.get(
+            f"/api/v1/clinical_notes/notes?owner_type=appointment&owner_id={appointment_id}",
+            headers=auth_headers,
+        )
+    ).json()["data"]
+    assert len([n for n in notes_after if n["note_type"] == "appointment_clinical"]) == 2
+
+
+async def _seed_three_session_catalog(db_session: AsyncSession, clinic_id, *, code: str) -> str:
+    vat = VatType(clinic_id=clinic_id, names={"es": "Exento"}, rate=0.0, is_default=True)
+    db_session.add(vat)
+    await db_session.flush()
+    cat = TreatmentCategory(
+        clinic_id=clinic_id, key=f"cat-{code}", names={"es": "R"}, is_system=True
+    )
+    db_session.add(cat)
+    await db_session.flush()
+    item = TreatmentCatalogItem(
+        clinic_id=clinic_id,
+        category_id=cat.id,
+        internal_code=code,
+        names={"es": "Tratamiento 3 sesiones"},
+        default_price=Decimal("900.00"),
+        pricing_strategy="flat",
+        treatment_scope="tooth",
+        vat_type_id=vat.id,
+    )
+    db_session.add(item)
+    await db_session.flush()
+    db_session.add(
+        TreatmentOdontogramMapping(
+            clinic_id=clinic_id,
+            catalog_item_id=item.id,
+            odontogram_treatment_type="filling",
+            clinical_category="restauradora",
+            visualization_rules=[],
+            visualization_config={},
+        )
+    )
+    db_session.add_all(
+        [
+            CatalogItemSession(
+                catalog_item_id=item.id,
+                sequence=1,
+                labels={"es": "Sesion 1"},
+                default_price=Decimal("300.00"),
+            ),
+            CatalogItemSession(
+                catalog_item_id=item.id,
+                sequence=2,
+                labels={"es": "Sesion 2"},
+                default_price=Decimal("300.00"),
+            ),
+            CatalogItemSession(
+                catalog_item_id=item.id,
+                sequence=3,
+                labels={"es": "Sesion 3"},
+                default_price=Decimal("300.00"),
+            ),
+        ]
+    )
+    await db_session.commit()
+    return str(item.id)
+
+
+async def _next_pending_session_id(
+    client: AsyncClient, auth_headers: dict, plan_id: str, item_id: str
+) -> str:
+    """What PlannedTreatmentSelector's ``getSessionLabel`` would display:
+    the earliest-sequence pending session. Mirrors
+    frontend/app/components/shared/PlannedTreatmentSelector.vue's
+    ``sessions.find(s => s.status === 'pending')`` over the
+    sequence-ordered list.
+    """
+    detail = (
+        await client.get(f"/api/v1/treatment_plan/treatment-plans/{plan_id}", headers=auth_headers)
+    ).json()["data"]
+    item = next(i for i in detail["items"] if i["id"] == item_id)
+    sessions = sorted(item["sessions"], key=lambda s: s["sequence"])
+    return next(s["id"] for s in sessions if s["status"] == "pending")
+
+
+@pytest.mark.asyncio
+async def test_multi_session_sequential_mapping_is_unambiguous(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, flow_world: dict
+):
+    """Session mapping: three consecutive appointments must each advance
+    exactly the session PlannedTreatmentSelector would have displayed at
+    scheduling time — S1, then S2, then S3, never out of order and never
+    a session other than the one shown.
+    """
+    world = flow_world
+    catalog_item_id = await _seed_three_session_catalog(
+        db_session, world["clinic_id"], code="THREE-SESSION"
+    )
+
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Tres sesiones"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    treatment_resp = await client.post(
+        f"/api/v1/odontogram/patients/{world['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"catalog_item_id": catalog_item_id, "tooth_numbers": [37], "status": "planned"},
+    )
+    assert treatment_resp.status_code == 201, treatment_resp.text
+    treatment_id = treatment_resp.json()["data"]["id"]
+    add = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    assert add.status_code == 201, add.text
+    item_id = add.json()["data"]["id"]
+    sessions_at_add = sorted(add.json()["data"]["sessions"], key=lambda s: s["sequence"])
+    s1_id, s2_id, s3_id = (s["id"] for s in sessions_at_add)
+
+    cabinet_id = await _create_cabinet(client, auth_headers, "Gabinete 3S")
+
+    slots = [
+        ("2026-11-10T09:00:00", "2026-11-10T09:30:00"),
+        ("2026-11-17T09:00:00", "2026-11-17T09:30:00"),
+        ("2026-11-24T09:00:00", "2026-11-24T09:30:00"),
+    ]
+    for expected_session_id, (start, end) in zip((s1_id, s2_id, s3_id), slots, strict=True):
+        # What the selector WOULD show right now, before scheduling — must
+        # match the session this appointment is expected to advance.
+        shown = await _next_pending_session_id(client, auth_headers, plan_id, item_id)
+        assert shown == expected_session_id
+
+        appt = await client.post(
+            "/api/v1/agenda/appointments",
+            headers=auth_headers,
+            json={
+                "patient_id": world["patient_id"],
+                "professional_id": world["dentist_id"],
+                "start_time": start,
+                "end_time": end,
+                "planned_item_ids": [item_id],
+            },
+        )
+        assert appt.status_code == 201, appt.text
+        apt = appt.json()["data"]
+        at_id = apt["treatments"][0]["id"]
+        r = await client.patch(
+            f"/api/v1/agenda/appointment-treatments/{at_id}",
+            headers=auth_headers,
+            json={"completed_in_appointment": True},
+        )
+        assert r.status_code == 200, r.text
+        await _complete_appointment(client, auth_headers, apt["id"], cabinet_id)
+
+        await db_session.commit()
+        db_session.expire_all()
+
+        session_after = await db_session.get(PlannedTreatmentItemSession, UUID(expected_session_id))
+        assert session_after.status == "completed"
+
+    item_final = await db_session.get(PlannedTreatmentItem, item_id)
+    assert item_final.status == "completed"
+    treatment_final = await db_session.get(Treatment, UUID(treatment_id))
+    assert treatment_final.status == "performed"

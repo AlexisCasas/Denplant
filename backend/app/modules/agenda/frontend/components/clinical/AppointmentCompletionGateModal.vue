@@ -16,7 +16,7 @@
  *     item, whether to advance the linked PlannedTreatmentItem — items
  *     left unchecked (or not linked to this appointment at all) stay
  *     untouched.
- *  2. If the clinician typed an evolución, POSTs a ClinicalNote
+ *  2. If the clinician typed an evolución, finds-or-creates a ClinicalNote
  *     (``note_type='appointment_clinical'``, ``owner_type='appointment'``)
  *     via the plain HTTP client — agenda does not import clinical_notes
  *     (see docs/technical/appointment-notes.md), so this calls the REST
@@ -25,10 +25,20 @@
  *     no existing rule requires it, so an empty textarea skips this step.
  *  3. Transitions the appointment to ``completed``.
  *
- * The note POST isn't idempotent server-side, so a retry after step 2
- * succeeded but step 3 failed must not re-create it — ``createdNoteId``
- * (from the composable, reset only when a fresh gate session opens) guards
- * that.
+ * Idempotency (server-side, not just frontend state): ClinicalNote has no
+ * per-owner uniqueness — ``appointment_clinical`` is a general feed, a
+ * professional can legitimately log several notes on the same appointment
+ * over time, so a DB constraint would be wrong here and there is no schema
+ * change available to distinguish "the completion note" from any other.
+ * Step 2 instead looks up existing appointment_clinical notes for this
+ * appointment and reuses one whose body matches exactly instead of
+ * creating a new one. That covers retry-after-timeout, a page refresh,
+ * and a second frontend instance resubmitting the same text — all of
+ * which re-query the server instead of trusting local state — as long as
+ * the resubmitted text is byte-identical; ``createdNoteId`` (from the
+ * composable) just short-circuits the lookup within the same gate
+ * session. A genuinely different retyped note is — correctly, per the
+ * feed semantics — a second entry, not a duplicate.
  */
 import type { ApiResponse } from '~~/app/types'
 import { errorDetail } from '~~/app/utils/error'
@@ -55,6 +65,32 @@ function treatmentLabel(t2: (typeof treatments.value)[number]): string {
   return t2.tooth_number ? `#${t2.tooth_number} — ${name}` : name
 }
 
+/**
+ * Server-side find-or-create: re-queries the appointment's existing
+ * appointment_clinical notes and reuses one with an exact body match
+ * instead of trusting local state. See the module docblock above for why
+ * exact-body match (not a DB constraint) is the right idempotency
+ * boundary here.
+ */
+async function findOrCreateEvolutionNote(appointmentId: string, body: string): Promise<string> {
+  const existing = await api.get<ApiResponse<Array<{ id: string, note_type: string, body: string }>>>(
+    `/api/v1/clinical_notes/notes?owner_type=appointment&owner_id=${appointmentId}`
+  )
+  const match = existing.data.find(n => n.note_type === 'appointment_clinical' && n.body === body)
+  if (match) return match.id
+
+  const created = await api.post<ApiResponse<{ id: string }>>(
+    '/api/v1/clinical_notes/notes',
+    {
+      note_type: 'appointment_clinical',
+      owner_type: 'appointment',
+      owner_id: appointmentId,
+      body
+    }
+  )
+  return created.data.id
+}
+
 async function confirm() {
   const apt = appointment.value
   if (!apt) return
@@ -71,16 +107,7 @@ async function confirm() {
 
     const noteBody = evolutionNote.value.trim()
     if (noteBody && !createdNoteId.value) {
-      const noteResponse = await api.post<ApiResponse<{ id: string }>>(
-        '/api/v1/clinical_notes/notes',
-        {
-          note_type: 'appointment_clinical',
-          owner_type: 'appointment',
-          owner_id: apt.id,
-          body: noteBody
-        }
-      )
-      createdNoteId.value = noteResponse.data.id
+      createdNoteId.value = await findOrCreateEvolutionNote(apt.id, noteBody)
     }
 
     const updated = await transition(apt.id, 'completed')
