@@ -873,6 +873,15 @@
     "followup": {
       "title": "Acciones tras finalizar la cita"
     },
+    "completionGate": {
+      "title": "¿Qué tratamientos se realizaron?",
+      "description": "Marca los tratamientos del plan que se completaron en esta cita. Los que dejes sin marcar seguirán pendientes en el plan."
+    },
+    "noActivePlans": "No hay planes de tratamiento vigentes.",
+    "noPendingTreatmentsInPlan": "Este plan no tiene tratamientos pendientes.",
+    "selectPlan": "Plan de tratamiento",
+    "pendingTreatments": "Tratamientos pendientes",
+    "sessionN": "Sesión {n}",
     "created": "Cita creada",
     "saved": "Cita guardada",
     "updated": "Cita actualizada",

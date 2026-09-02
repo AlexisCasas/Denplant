@@ -779,6 +779,13 @@ watch(isMobile, async (mobile) => {
       @cancelled="handleCancelled"
     />
 
+    <!-- "Which treatments were done" gate, shown before an appointment
+         linked to treatment-plan items transitions to `completed`.
+         Triggered by `useAppointmentCompletionGate()` from QuickActions
+         and Kanban. Mounted before the follow-up host so its own
+         `completed` transition can chain into that modal. -->
+    <AppointmentCompletionGateModal />
+
     <!-- Renders the post-completion follow-up modal once for the
          whole agenda page. Triggered by `useCompletionFollowup()`
          from QuickActions and Kanban after a `completed` transition. -->

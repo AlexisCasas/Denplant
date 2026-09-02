@@ -349,6 +349,11 @@ watch(() => props.open, async (isOpen) => {
               names: t.names,
               default_price: t.default_price != null ? String(t.default_price) : null
             }
+          : undefined,
+        // Lets PlannedTreatmentSelector pre-select the originating plan
+        // in edit mode instead of leaving the picker unresolved.
+        treatment_plan: t.plan_id
+          ? { id: t.plan_id, plan_number: t.plan_number ?? '', status: 'active' }
           : undefined
       }))
     } else {
@@ -699,6 +704,7 @@ function openPatientFile() {
                 <PlannedTreatmentSelector
                   v-model="selectedTreatments"
                   :patient-id="selectedPatient?.id"
+                  :professionals="professionals"
                 />
               </div>
             </section>

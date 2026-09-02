@@ -852,6 +852,15 @@
     "followup": {
       "title": "Post-appointment actions"
     },
+    "completionGate": {
+      "title": "Which treatments were done?",
+      "description": "Check off the plan treatments that were completed at this appointment. Anything left unchecked stays pending on the plan."
+    },
+    "noActivePlans": "No active treatment plans.",
+    "noPendingTreatmentsInPlan": "This plan has no pending treatments.",
+    "selectPlan": "Treatment plan",
+    "pendingTreatments": "Pending treatments",
+    "sessionN": "Session {n}",
     "created": "Appointment created",
     "saved": "Appointment saved",
     "updated": "Appointment updated",

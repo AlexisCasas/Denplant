@@ -852,6 +852,15 @@
     "followup": {
       "title": "Actions post-rendez-vous"
     },
+    "completionGate": {
+      "title": "Quels traitements ont été réalisés ?",
+      "description": "Cochez les traitements du plan réalisés lors de ce rendez-vous. Ceux non cochés resteront en attente dans le plan."
+    },
+    "noActivePlans": "Aucun plan de traitement en cours.",
+    "noPendingTreatmentsInPlan": "Ce plan n'a aucun traitement en attente.",
+    "selectPlan": "Plan de traitement",
+    "pendingTreatments": "Traitements en attente",
+    "sessionN": "Séance {n}",
     "created": "Rendez-vous créé",
     "saved": "Rendez-vous enregistré",
     "updated": "Rendez-vous mis à jour",
