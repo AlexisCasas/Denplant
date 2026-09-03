@@ -31,7 +31,7 @@ class OdontogramModule(BaseModule):
             "dentist": ["*"],
             "hygienist": ["read", "write"],
             "assistant": ["read"],
-            "receptionist": [],
+            "receptionist": ["read", "treatments.read"],
         },
         "frontend": {
             "layer_path": "frontend",
