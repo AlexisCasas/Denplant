@@ -19,6 +19,8 @@ from .schemas import (
     HistoricalToothRecordResponse,
     HistoricalTreatmentResponse,
     HistoryEntryWithUser,
+    OdontogramPreferenceResponse,
+    OdontogramPreferenceUpdate,
     OdontogramResponse,
     TimelineDateEntry,
     TimelineResponse,
@@ -30,7 +32,12 @@ from .schemas import (
     TreatmentResponse,
     TreatmentUpdate,
 )
-from .service import OdontogramService, TreatmentService, build_treatment_response
+from .service import (
+    OdontogramPreferenceService,
+    OdontogramService,
+    TreatmentService,
+    build_treatment_response,
+)
 
 router = APIRouter()
 
@@ -471,3 +478,47 @@ async def get_tooth_with_treatments(
         TreatmentResponse.model_validate(build_treatment_response(t)) for t in treatments
     ]
     return ApiResponse(data=response)
+
+
+# ============================================================================
+# Odontogram profile preference (per user + clinic)
+# ============================================================================
+#
+# Deliberately gated by clinic membership only (``get_clinic_context``), not
+# by an odontogram clinical permission: picking which chart format you look
+# at is a personal UI choice, not a clinical operation. ``nts.*`` permissions
+# will arrive with the actual NTS clinical operations.
+
+
+@router.get("/preferences", response_model=ApiResponse[OdontogramPreferenceResponse])
+async def get_odontogram_preference(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[OdontogramPreferenceResponse]:
+    """Effective profile for the caller in the current clinic.
+
+    Returns the default (``original``) when nothing was ever chosen; the
+    read never creates a row.
+    """
+    profile = await OdontogramPreferenceService.get_profile(db, ctx.clinic_id, ctx.user_id)
+    return ApiResponse(data=OdontogramPreferenceResponse(profile=profile))
+
+
+@router.put("/preferences", response_model=ApiResponse[OdontogramPreferenceResponse])
+async def set_odontogram_preference(
+    data: OdontogramPreferenceUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[OdontogramPreferenceResponse]:
+    """Set the caller's own profile for the current clinic.
+
+    ``user_id`` / ``clinic_id`` come from the authenticated context, so a
+    caller can never write someone else's preference.
+    """
+    try:
+        profile = await OdontogramPreferenceService.set_profile(
+            db, ctx.clinic_id, ctx.user_id, data.profile
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    return ApiResponse(data=OdontogramPreferenceResponse(profile=profile))

@@ -5,6 +5,7 @@ Core entities:
 - Treatment: a clinical act (single or multi-tooth). May be backed by a catalog item.
 - TreatmentTooth: per-tooth member of a Treatment (holds role and surfaces).
 - OdontogramHistory: audit log of tooth-state changes.
+- OdontogramUserPreference: per-user, per-clinic odontogram profile choice.
 """
 
 from datetime import datetime
@@ -28,6 +29,8 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base, TimestampMixin
+
+from .constants import OdontogramProfile
 
 if TYPE_CHECKING:
     from app.core.auth.models import Clinic, User
@@ -190,6 +193,43 @@ class TreatmentTooth(Base, TimestampMixin):
         UniqueConstraint("treatment_id", "tooth_number", name="uq_treatment_tooth"),
         Index("idx_treatment_teeth_treatment", "treatment_id"),
         Index("idx_treatment_teeth_tooth_record", "tooth_record_id"),
+    )
+
+
+class OdontogramUserPreference(Base, TimestampMixin):
+    """Per-user, per-clinic odontogram profile choice.
+
+    Module-owned preference table, mirroring ``notification_preferences``:
+    core ``User`` / ``ClinicMembership`` stay untouched, and the choice stays
+    personal — putting it on ``Clinic.settings`` would impose one format on
+    every member of the clinic.
+
+    Absence of a row means :data:`DEFAULT_ODONTOGRAM_PROFILE` (``original``).
+    Rows are created lazily on first write; existing users are never
+    backfilled.
+    """
+
+    __tablename__ = "odontogram_user_preferences"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    profile: Mapped[str] = mapped_column(
+        String(30), default=OdontogramProfile.ORIGINAL.value
+    )
+
+    # Relationships
+    clinic: Mapped["Clinic"] = relationship()
+    user: Mapped["User"] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint("clinic_id", "user_id", name="uq_odontogram_pref_clinic_user"),
+        CheckConstraint(
+            "profile IN ('original', 'pe_nts_188_2022')",
+            name="ck_odontogram_pref_profile",
+        ),
+        Index("idx_odontogram_pref_clinic", "clinic_id"),
+        Index("idx_odontogram_pref_user", "user_id"),
     )
 
 

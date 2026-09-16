@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- feat(nts-01): per-user, per-clinic odontogram profile preference
+  (`original` | `pe_nts_188_2022`). New module-owned table
+  `odontogram_user_preferences` (migration `odo_0003`) mirroring
+  `notification_preferences` — core `User` / `ClinicMembership` are left
+  untouched and `Clinic.settings` is deliberately not used, since that
+  would impose one format on every member of the clinic. Endpoints
+  `GET/PUT /api/v1/odontogram/preferences` derive `user_id` / `clinic_id`
+  from the authenticated clinic context, so a caller can only read or
+  write their own preference. Absence of a row means `original`; reads
+  never create one and existing users are not backfilled. Gated by clinic
+  membership only — picking a chart format is a personal UI choice, not a
+  clinical operation, so no new `nts.*` permission is introduced yet.
+  No renderer, snapshots, findings or NTS catalog in this change.
+
 - security: enforce the central patient access policy for odontogram roots and treatment-ID routes.
 
 - fix(#184): the layer type-checks clean under `nuxt typecheck`. Real bugs behind the errors: treatment colour dots read `TREATMENT_COLORS` (a `{light,dark}` config) as a hex string — they now go through `getTreatmentColor()`; the toast undo action used the v3 `click` key (v4: `onClick`), `UPopover :ui.width` is `content`; `TreatmentBar` emitted a possibly-undefined fallback status; touch drags on the timeline guard an empty `touches` list. Tooth-position lookups are typed by `ToothPosition` (1–8) instead of `|| MAP[1]` fallbacks.
