@@ -91,16 +91,31 @@ function resetSelection() {
 // B/C: no patient → no plans. Patient change resets plan + selection.
 watch(() => props.patientId, async (newPatientId, oldPatientId) => {
   if (newPatientId === oldPatientId) return
+  // Only the very first invocation (component mount, `immediate: true`)
+  // may be an edit-mode hydration racing the `modelValue` watcher below —
+  // that one alone is allowed to keep an initial plan/selection alive.
+  // Every later invocation is a REAL patient swap (A→B, A→null, B→C)
+  // triggered by the user and must clear immediately, unconditionally.
+  const isInitialMount = oldPatientId === undefined
+
   plans.value = []
   planItems.value = []
   planItemsCache.clear()
-  if (!pendingInitialPlanId) {
+
+  if (isInitialMount) {
+    if (!pendingInitialPlanId) {
+      selectedPlanId.value = ''
+    }
+    if (!newPatientId) {
+      resetSelection()
+    }
+  } else {
     selectedPlanId.value = ''
-  }
-  if (!newPatientId) {
     resetSelection()
-    return
   }
+
+  if (!newPatientId) return
+
   await loadPlans(newPatientId)
   if (pendingInitialPlanId) {
     // Edit mode already pointed `selectedPlanId` at the appointment's
@@ -221,6 +236,20 @@ function getProfessionalName(item: PlannedTreatmentItem): string | null {
 
 const hasPlans = computed(() => plans.value.length > 0)
 const currentPlanHasItems = computed(() => planItems.value.length > 0)
+
+// QW-01 fix 2 (+ visual gap fix): items already linked to THIS appointment
+// (edit mode) whose status has since moved past `pending` (typically
+// `completed`). They must stay visible as a historical/read-only
+// association — never as a selectable option — regardless of whether the
+// originating plan still has any schedulable (active/draft) plan at all.
+// Deliberately independent of `hasPlans` / `selectedPlanId` / plan status:
+// a `pending` item can only ever reach `selectedItems` via `toggleItem()`
+// (sourced from `planItems`, always pending), so filtering on `status !==
+// 'pending'` alone is enough to isolate the historical ones — no plan-id
+// matching needed, and none of it can hide behind "no vigente plans".
+const historicalItems = computed(() =>
+  selectedItems.value.filter(item => item.status !== 'pending')
+)
 </script>
 
 <template>
@@ -233,88 +262,168 @@ const currentPlanHasItems = computed(() => planItems.value.length > 0)
       {{ t('appointments.selectPatientFirst') }}
     </div>
 
-    <!-- Loading plans -->
-    <div
-      v-else-if="isLoadingPlans"
-      class="flex items-center justify-center py-4"
-    >
-      <UIcon
-        name="i-lucide-loader-2"
-        class="w-5 h-5 animate-spin text-subtle"
-      />
-    </div>
-
-    <!-- No vigente plans -->
-    <div
-      v-else-if="!hasPlans"
-      class="text-sm text-muted text-center py-4 bg-surface-muted rounded-lg"
-    >
-      <UIcon
-        name="i-lucide-clipboard-list"
-        class="w-8 h-8 mx-auto mb-2 text-subtle"
-      />
-      <p>{{ t('appointments.noActivePlans') }}</p>
-      <p class="text-xs mt-1">
-        {{ t('appointments.createPlanFirst') }}
-      </p>
-    </div>
-
     <template v-else>
-      <UFormField :label="t('appointments.selectPlan')">
-        <USelect
-          v-model="selectedPlanId"
-          :items="plans.map(p => ({ value: p.id, label: planLabel(p) }))"
-          value-key="value"
-          label-key="label"
-          :placeholder="t('appointments.selectPlan')"
-          icon="i-lucide-clipboard-list"
+      <!-- Loading plans -->
+      <div
+        v-if="isLoadingPlans"
+        class="flex items-center justify-center py-4"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="w-5 h-5 animate-spin text-subtle"
         />
-      </UFormField>
+      </div>
 
-      <div v-if="selectedPlanId">
-        <p class="text-caption text-subtle mb-1.5">
-          {{ t('appointments.pendingTreatments') }}
+      <!-- No vigente plans -->
+      <div
+        v-else-if="!hasPlans"
+        class="text-sm text-muted text-center py-4 bg-surface-muted rounded-lg"
+      >
+        <UIcon
+          name="i-lucide-clipboard-list"
+          class="w-8 h-8 mx-auto mb-2 text-subtle"
+        />
+        <p>{{ t('appointments.noActivePlans') }}</p>
+        <p class="text-xs mt-1">
+          {{ t('appointments.createPlanFirst') }}
         </p>
+      </div>
 
-        <div
-          v-if="isLoadingItems"
-          class="flex items-center justify-center py-4"
-        >
-          <UIcon
-            name="i-lucide-loader-2"
-            class="w-5 h-5 animate-spin text-subtle"
+      <template v-else>
+        <UFormField :label="t('appointments.selectPlan')">
+          <USelect
+            v-model="selectedPlanId"
+            :items="plans.map(p => ({ value: p.id, label: planLabel(p) }))"
+            value-key="value"
+            label-key="label"
+            :placeholder="t('appointments.selectPlan')"
+            icon="i-lucide-clipboard-list"
           />
-        </div>
+        </UFormField>
 
-        <div
-          v-else-if="!currentPlanHasItems"
-          class="text-sm text-muted text-center py-4 bg-surface-muted rounded-lg"
-        >
-          {{ t('appointments.noPendingTreatmentsInPlan') }}
-        </div>
+        <div v-if="selectedPlanId">
+          <p class="text-caption text-subtle mb-1.5">
+            {{ t('appointments.pendingTreatments') }}
+          </p>
 
-        <div
-          v-else
-          class="space-y-2"
-        >
           <div
-            v-for="item in planItems"
-            :key="item.id"
-            class="flex items-start gap-2.5 p-2.5 rounded-lg border border-default hover:bg-elevated transition-colors cursor-pointer"
-            :class="selectedIds.has(item.id) ? 'border-primary bg-[var(--color-primary-soft)]' : ''"
-            @click="toggleItem(item)"
+            v-if="isLoadingItems"
+            class="flex items-center justify-center py-4"
           >
-            <UCheckbox
-              :model-value="selectedIds.has(item.id)"
-              class="mt-0.5"
-              @click.stop
-              @update:model-value="toggleItem(item)"
+            <UIcon
+              name="i-lucide-loader-2"
+              class="w-5 h-5 animate-spin text-subtle"
+            />
+          </div>
+
+          <div
+            v-else-if="!currentPlanHasItems"
+            class="text-sm text-muted text-center py-4 bg-surface-muted rounded-lg"
+          >
+            {{ t('appointments.noPendingTreatmentsInPlan') }}
+          </div>
+
+          <div
+            v-else
+            class="space-y-2"
+          >
+            <div
+              v-for="item in planItems"
+              :key="item.id"
+              class="flex items-start gap-2.5 p-2.5 rounded-lg border border-default hover:bg-elevated transition-colors cursor-pointer"
+              :class="selectedIds.has(item.id) ? 'border-primary bg-[var(--color-primary-soft)]' : ''"
+              @click="toggleItem(item)"
+            >
+              <UCheckbox
+                :model-value="selectedIds.has(item.id)"
+                class="mt-0.5"
+                @click.stop
+                @update:model-value="toggleItem(item)"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-default truncate">
+                  {{ getItemName(item) }}
+                </p>
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  <UBadge
+                    v-if="getToothInfo(item)"
+                    size="xs"
+                    color="neutral"
+                    variant="subtle"
+                  >
+                    {{ getToothInfo(item) }}
+                  </UBadge>
+                  <UBadge
+                    v-if="getSessionLabel(item)"
+                    size="xs"
+                    color="neutral"
+                    variant="subtle"
+                  >
+                    {{ getSessionLabel(item) }}
+                  </UBadge>
+                  <UBadge
+                    v-if="getProfessionalName(item)"
+                    size="xs"
+                    color="neutral"
+                    variant="subtle"
+                    icon="i-lucide-user"
+                  >
+                    {{ getProfessionalName(item) }}
+                  </UBadge>
+                </div>
+              </div>
+              <span
+                v-if="getItemPrice(item)"
+                class="text-sm font-semibold text-primary-accent whitespace-nowrap"
+              >
+                {{ formatPrice(getItemPrice(item)) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Historical: items already linked to this appointment whose status
+           moved past pending (e.g. completed). Read-only — no checkbox, not
+           part of the selectable pending list. Deliberately OUTSIDE the
+           hasPlans/selectedPlanId branching above — a plan that is no
+           longer schedulable (closed/completed/archived) must not hide an
+           association that already exists (#QW-01 visual gap). -->
+      <div v-if="historicalItems.length > 0">
+        <p class="text-caption text-subtle mb-1.5 mt-3">
+          {{ t('appointments.historicalTreatments') }}
+        </p>
+        <div class="space-y-2">
+          <div
+            v-for="item in historicalItems"
+            :key="item.id"
+            class="flex items-start gap-2.5 p-2.5 rounded-lg border border-default opacity-70"
+          >
+            <UIcon
+              name="i-lucide-check-circle-2"
+              class="w-4 h-4 mt-0.5 text-muted shrink-0"
             />
             <div class="min-w-0 flex-1">
               <p class="text-sm font-medium text-default truncate">
                 {{ getItemName(item) }}
               </p>
               <div class="flex items-center gap-2 mt-1 flex-wrap">
+                <UBadge
+                  size="xs"
+                  color="neutral"
+                  variant="subtle"
+                >
+                  {{ t('appointments.historicalTreatmentBadge') }}
+                </UBadge>
+                <UBadge
+                  v-if="item.treatment_plan?.title || item.treatment_plan?.plan_number"
+                  size="xs"
+                  color="neutral"
+                  variant="subtle"
+                  icon="i-lucide-clipboard-list"
+                >
+                  {{ item.treatment_plan?.title || item.treatment_plan?.plan_number }}
+                </UBadge>
                 <UBadge
                   v-if="getToothInfo(item)"
                   size="xs"
@@ -342,12 +451,6 @@ const currentPlanHasItems = computed(() => planItems.value.length > 0)
                 </UBadge>
               </div>
             </div>
-            <span
-              v-if="getItemPrice(item)"
-              class="text-sm font-semibold text-primary-accent whitespace-nowrap"
-            >
-              {{ formatPrice(getItemPrice(item)) }}
-            </span>
           </div>
         </div>
       </div>

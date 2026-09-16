@@ -862,6 +862,8 @@
     "noPendingTreatmentsInPlan": "This plan has no pending treatments.",
     "selectPlan": "Treatment plan",
     "pendingTreatments": "Pending treatments",
+    "historicalTreatments": "Treatments already linked to this appointment",
+    "historicalTreatmentBadge": "Completed",
     "sessionN": "Session {n}",
     "created": "Appointment created",
     "saved": "Appointment saved",

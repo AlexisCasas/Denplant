@@ -1181,3 +1181,405 @@ async def test_multi_session_sequential_mapping_is_unambiguous(
     assert item_final.status == "completed"
     treatment_final = await db_session.get(Treatment, UUID(treatment_id))
     assert treatment_final.status == "performed"
+
+
+# ---------------------------------------------------------------------------
+# QW-01: PUT /appointments/{id} planned_item_ids — historical-completed fix
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_appointment_preserves_planned_item_ids(
+    client: AsyncClient, auth_headers: dict, flow_world: dict
+):
+    """TEST A — UPDATE with the same planned_item_ids round-trips unchanged."""
+    world = flow_world
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Update round-trip"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, world, 16)
+    t2 = await _create_treatment(client, auth_headers, world, 17)
+    i1 = await _add_item(client, auth_headers, plan_id, t1)
+    i2 = await _add_item(client, auth_headers, plan_id, t2)
+
+    appt_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-12-01T09:00:00",
+            "end_time": "2026-12-01T09:30:00",
+            "planned_item_ids": [i1, i2],
+        },
+    )
+    assert appt_resp.status_code == 201, appt_resp.text
+    appointment_id = appt_resp.json()["data"]["id"]
+
+    put_resp = await client.put(
+        f"/api/v1/agenda/appointments/{appointment_id}",
+        headers=auth_headers,
+        json={
+            "start_time": "2026-12-01T09:00:00",
+            "end_time": "2026-12-01T09:30:00",
+            "planned_item_ids": [i1, i2],
+        },
+    )
+    assert put_resp.status_code == 200, put_resp.text
+    persisted = {t["planned_item_id"] for t in put_resp.json()["data"]["treatments"]}
+    assert persisted == {i1, i2}
+
+    get_resp = await client.get(
+        f"/api/v1/agenda/appointments/{appointment_id}", headers=auth_headers
+    )
+    assert get_resp.status_code == 200
+    got = {t["planned_item_id"] for t in get_resp.json()["data"]["treatments"]}
+    assert got == {i1, i2}
+
+
+@pytest.mark.asyncio
+async def test_update_appointment_keeps_historical_completed_item(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, flow_world: dict
+):
+    """TEST B — an item already linked to this appointment that later became
+    ``completed`` must NOT block editing an unrelated field (start/end time),
+    and must remain in ``planned_item_ids`` afterwards.
+
+    Mirrors the ticket's own example: appointment C has planned_item_ids =
+    [I1]; I1 later completes (out of band, same pattern the file already
+    uses for I4 in ``test_full_diagnosis_plan_appointment_flow``); editing
+    C's time and re-sending I1 in ``planned_item_ids`` must succeed and keep
+    I1 associated — never a 400, never a dropped association.
+    """
+    world = flow_world
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Historical completed"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, world, 18)
+    i1 = await _add_item(client, auth_headers, plan_id, t1)
+
+    appt_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-12-02T09:00:00",
+            "end_time": "2026-12-02T09:30:00",
+            "planned_item_ids": [i1],
+        },
+    )
+    assert appt_resp.status_code == 201, appt_resp.text
+    appointment_id = appt_resp.json()["data"]["id"]
+
+    # I1 completes out of band (e.g. a different appointment's completion
+    # gate, or a clinical decision made outside the agenda module).
+    item1 = await db_session.get(PlannedTreatmentItem, i1)
+    item1.status = "completed"
+    await db_session.commit()
+
+    # Edit an unrelated field (start/end time) while re-sending I1 — must
+    # succeed, not 400, and must not drop the historical association.
+    put_resp = await client.put(
+        f"/api/v1/agenda/appointments/{appointment_id}",
+        headers=auth_headers,
+        json={
+            "start_time": "2026-12-02T10:00:00",
+            "end_time": "2026-12-02T10:30:00",
+            "planned_item_ids": [i1],
+        },
+    )
+    assert put_resp.status_code == 200, put_resp.text
+    persisted = {t["planned_item_id"] for t in put_resp.json()["data"]["treatments"]}
+    assert persisted == {i1}
+    assert put_resp.json()["data"]["start_time"].startswith("2026-12-02T10:00:00")
+
+    get_resp = await client.get(
+        f"/api/v1/agenda/appointments/{appointment_id}", headers=auth_headers
+    )
+    assert get_resp.status_code == 200
+    got_treatments = get_resp.json()["data"]["treatments"]
+    assert {t["planned_item_id"] for t in got_treatments} == {i1}
+    assert got_treatments[0]["planned_item_status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_update_appointment_rejects_completed_item_not_previously_linked(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, flow_world: dict
+):
+    """TEST C — a completed item that was NEVER linked to this appointment
+    must still be rejected on UPDATE, even though completed items already
+    linked to it are now allowed (TEST B). ``existing_planned_item_ids``
+    must be scoped to THIS appointment, not "any completed item is fine".
+    """
+    world = flow_world
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Not previously linked"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, world, 26)
+    i1 = await _add_item(client, auth_headers, plan_id, t1)
+    item1 = await db_session.get(PlannedTreatmentItem, i1)
+    item1.status = "completed"
+    await db_session.commit()
+
+    # A different appointment that never had I1 associated.
+    appt_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-12-03T09:00:00",
+            "end_time": "2026-12-03T09:30:00",
+        },
+    )
+    assert appt_resp.status_code == 201, appt_resp.text
+    appointment_id = appt_resp.json()["data"]["id"]
+
+    put_resp = await client.put(
+        f"/api/v1/agenda/appointments/{appointment_id}",
+        headers=auth_headers,
+        json={"planned_item_ids": [i1]},
+    )
+    assert put_resp.status_code == 400, put_resp.text
+    assert "already completed" in put_resp.text
+
+    # CREATE must reject it too — the exemption never applies there.
+    appt2_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-12-04T09:00:00",
+            "end_time": "2026-12-04T09:30:00",
+            "planned_item_ids": [i1],
+        },
+    )
+    assert appt2_resp.status_code == 400, appt2_resp.text
+    assert "already completed" in appt2_resp.text
+
+
+@pytest.mark.asyncio
+async def test_update_appointment_rejects_cross_patient_planned_item(
+    client: AsyncClient, auth_headers: dict, flow_world: dict
+):
+    """TEST D — cross-patient rejection also holds on UPDATE, not just
+    CREATE (``test_cross_patient_planned_item_is_rejected`` only covers
+    CREATE). A plan item never linked to THIS appointment must still fail
+    the patient-ownership check on PUT even when ``existing_planned_item_ids``
+    is non-empty for other, unrelated ids.
+    """
+    world = flow_world
+
+    # Patient B, with its own plan + pending item.
+    patient_b_resp = await client.post(
+        "/api/v1/patients",
+        headers=auth_headers,
+        json={"first_name": "Diana", "last_name": "Otra", "phone": "+34600555666"},
+    )
+    patient_b_id = patient_b_resp.json()["data"]["id"]
+    treatment_b = await client.post(
+        f"/api/v1/odontogram/patients/{patient_b_id}/treatments",
+        headers=auth_headers,
+        json={
+            "catalog_item_id": world["catalog_item_id"],
+            "tooth_numbers": [22],
+            "status": "planned",
+        },
+    )
+    assert treatment_b.status_code == 201, treatment_b.text
+    plan_b_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": patient_b_id, "title": "Plan B (update path)"},
+    )
+    plan_b_id = plan_b_resp.json()["data"]["id"]
+    item_b_resp = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_b_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_b.json()["data"]["id"]},
+    )
+    item_b_id = item_b_resp.json()["data"]["id"]
+
+    # Patient A (Carlos)'s own appointment, with its own item already linked.
+    plan_a_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Plan A (update path)"},
+    )
+    plan_a_id = plan_a_resp.json()["data"]["id"]
+    t_a = await _create_treatment(client, auth_headers, world, 27)
+    i_a = await _add_item(client, auth_headers, plan_a_id, t_a)
+
+    appt_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-12-05T09:00:00",
+            "end_time": "2026-12-05T09:30:00",
+            "planned_item_ids": [i_a],
+        },
+    )
+    assert appt_resp.status_code == 201, appt_resp.text
+    appointment_id = appt_resp.json()["data"]["id"]
+
+    # Try to sneak in patient B's item alongside A's already-linked one.
+    put_resp = await client.put(
+        f"/api/v1/agenda/appointments/{appointment_id}",
+        headers=auth_headers,
+        json={"planned_item_ids": [i_a, item_b_id]},
+    )
+    assert put_resp.status_code == 400, put_resp.text
+    assert "does not belong to patient" in put_resp.text
+
+
+@pytest.mark.asyncio
+async def test_update_appointment_keeps_historical_item_when_plan_auto_completes(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, flow_world: dict
+):
+    """TEST E — existing item + auto-completed plan → UPDATE still allowed.
+
+    Reproduces the real production path (not the ``draft``-plan shortcut
+    TEST B uses): plan confirmed → budget accepted → ``active``; a single
+    appointment carries the plan's only pending item through the real
+    completion mechanism (PATCH completed_in_appointment + the full
+    confirmed→checked_in→in_treatment→completed transition chain), which
+    is exactly what ``on_appointment_completed`` (treatment_plan/events.py)
+    routes through ``complete_item(require_active_plan=False)`` →
+    ``_check_and_complete_plan`` (treatment_plan/service.py:1208-1226).
+    Because this is the plan's last pending item and the plan was
+    ``active``, the plan auto-completes to ``completed`` — a status
+    outside ``("active", "draft")``.
+
+    Editing the appointment afterwards (any unrelated field) while
+    re-sending the same, already-linked ``planned_item_id`` must still
+    succeed: the historical-association exemption in
+    ``validate_planned_items`` is keyed off ``existing_planned_item_ids``,
+    not off the plan's current status.
+    """
+    world = flow_world
+    plan_resp = await client.post(
+        "/api/v1/treatment_plan/treatment-plans",
+        headers=auth_headers,
+        json={"patient_id": world["patient_id"], "title": "Auto-completes on last item"},
+    )
+    plan_id = plan_resp.json()["data"]["id"]
+    t1 = await _create_treatment(client, auth_headers, world, 28)
+    i1 = await _add_item(client, auth_headers, plan_id, t1)
+
+    # draft -> pending (creates budget) -> active (patient accepts).
+    confirm_resp = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/confirm",
+        headers=auth_headers,
+        json={},
+    )
+    assert confirm_resp.status_code == 200, confirm_resp.text
+    budget_id = confirm_resp.json()["data"]["budget_id"]
+    assert budget_id
+
+    accept_resp = await client.post(
+        f"/api/v1/budget/budgets/{budget_id}/accept",
+        headers=auth_headers,
+        json={
+            "signature": {"signed_by_name": "Carlos Paciente", "relationship_to_patient": "patient"}
+        },
+    )
+    assert accept_resp.status_code == 200, accept_resp.text
+    await db_session.commit()
+    db_session.expire_all()
+
+    plan_active = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}", headers=auth_headers
+    )
+    assert plan_active.json()["data"]["status"] == "active"
+
+    appt_resp = await client.post(
+        "/api/v1/agenda/appointments",
+        headers=auth_headers,
+        json={
+            "patient_id": world["patient_id"],
+            "professional_id": world["dentist_id"],
+            "start_time": "2026-12-06T09:00:00",
+            "end_time": "2026-12-06T09:30:00",
+            "planned_item_ids": [i1],
+        },
+    )
+    assert appt_resp.status_code == 201, appt_resp.text
+    apt = appt_resp.json()["data"]
+    appointment_id = apt["id"]
+    at_id = apt["treatments"][0]["id"]
+
+    # Complete I1 through the real domain mechanism: mark the visit-level
+    # AppointmentTreatment as completed, then walk the appointment through
+    # its full status transition chain (mirrors
+    # test_evolution_note_captured_on_appointment_completion).
+    mark_resp = await client.patch(
+        f"/api/v1/agenda/appointment-treatments/{at_id}",
+        headers=auth_headers,
+        json={"completed_in_appointment": True},
+    )
+    assert mark_resp.status_code == 200, mark_resp.text
+
+    cabinet_id = await _create_cabinet(client, auth_headers, "Gabinete auto-complete")
+    await _complete_appointment(client, auth_headers, appointment_id, cabinet_id)
+
+    await db_session.commit()
+    db_session.expire_all()
+
+    item1 = await db_session.get(PlannedTreatmentItem, i1)
+    assert item1.status == "completed"
+
+    plan_after = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}", headers=auth_headers
+    )
+    assert plan_after.json()["data"]["status"] == "completed"
+
+    # Edit an unrelated field (start/end time) while re-sending I1 — must
+    # succeed even though the plan is now `completed`, not active/draft.
+    put_resp = await client.put(
+        f"/api/v1/agenda/appointments/{appointment_id}",
+        headers=auth_headers,
+        json={
+            "start_time": "2026-12-06T10:00:00",
+            "end_time": "2026-12-06T10:30:00",
+            "planned_item_ids": [i1],
+        },
+    )
+    assert put_resp.status_code == 200, put_resp.text
+    persisted = {t["planned_item_id"] for t in put_resp.json()["data"]["treatments"]}
+    assert persisted == {i1}
+
+    get_resp = await client.get(
+        f"/api/v1/agenda/appointments/{appointment_id}", headers=auth_headers
+    )
+    assert get_resp.status_code == 200
+    got_treatments = get_resp.json()["data"]["treatments"]
+    assert {t["planned_item_id"] for t in got_treatments} == {i1}
+    # No duplicate association was created by the delete+recreate cycle.
+    assert len(got_treatments) == 1
+
+    at_rows = (
+        (
+            await db_session.execute(
+                AppointmentTreatment.__table__.select().where(
+                    AppointmentTreatment.appointment_id == UUID(appointment_id)
+                )
+            )
+        )
+        .mappings()
+        .all()
+    )
+    assert len(at_rows) == 1
+    assert at_rows[0]["planned_treatment_item_id"] == UUID(i1)

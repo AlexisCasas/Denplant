@@ -862,6 +862,8 @@
     "noPendingTreatmentsInPlan": "Ce plan n'a aucun traitement en attente.",
     "selectPlan": "Plan de traitement",
     "pendingTreatments": "Traitements en attente",
+    "historicalTreatments": "Traitements déjà associés à ce rendez-vous",
+    "historicalTreatmentBadge": "Terminé",
     "sessionN": "Séance {n}",
     "created": "Rendez-vous créé",
     "saved": "Rendez-vous enregistré",

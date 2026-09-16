@@ -862,6 +862,8 @@
     "noPendingTreatmentsInPlan": "Este plano não tem tratamentos pendentes.",
     "selectPlan": "Plano de tratamento",
     "pendingTreatments": "Tratamentos pendentes",
+    "historicalTreatments": "Tratamentos já associados a esta consulta",
+    "historicalTreatmentBadge": "Concluído",
     "sessionN": "Sessão {n}",
     "created": "Consulta criada",
     "saved": "Consulta guardada",

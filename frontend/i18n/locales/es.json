@@ -883,6 +883,8 @@
     "noPendingTreatmentsInPlan": "Este plan no tiene tratamientos pendientes.",
     "selectPlan": "Plan de tratamiento",
     "pendingTreatments": "Tratamientos pendientes",
+    "historicalTreatments": "Tratamientos ya asociados a esta cita",
+    "historicalTreatmentBadge": "Completado",
     "sessionN": "Sesión {n}",
     "created": "Cita creada",
     "saved": "Cita guardada",

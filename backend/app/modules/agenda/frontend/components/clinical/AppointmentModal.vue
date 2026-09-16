@@ -323,9 +323,11 @@ watch(() => props.open, async (isOpen) => {
         completed_without_appointment: false,
         completed_at: undefined,
         completed_by: undefined,
+        assigned_professional_id: t.assigned_professional_id ?? null,
         notes: undefined,
         created_at: '',
         updated_at: '',
+        sessions: t.sessions,
         treatment: {
           id: '',
           clinical_type: 'crown',

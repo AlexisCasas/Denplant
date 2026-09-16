@@ -230,6 +230,10 @@ export interface AppointmentTreatmentBrief {
   plan_number?: string
   // Completion tracking
   completed_in_appointment: boolean
+  // QW-01 fix 3: lets edit-mode rehydration render "odontólogo" / "sesión"
+  // the same way CREATE mode does from PlannedTreatmentItemResponse.
+  assigned_professional_id?: string | null
+  sessions?: PlanItemSession[]
 }
 
 // Appointment types
