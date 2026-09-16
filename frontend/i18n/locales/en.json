@@ -454,6 +454,20 @@
   },
   "odontogram": {
     "title": "Dental Chart",
+    "profile": {
+      "label": "Chart format",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Peru"
+      },
+      "updateError": "Could not change the chart format",
+      "nts": {
+        "title": "MINSA Peru dental chart",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022",
+        "inPreparation": "Normative implementation in progress",
+        "hint": "This format is not available yet. Switch back to \"Original\" to keep recording findings."
+      }
+    },
     "tooth": "Tooth",
     "globals": {
       "category": "Whole mouth",

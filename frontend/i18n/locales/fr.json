@@ -454,6 +454,20 @@
   },
   "odontogram": {
     "title": "Odontogramme",
+    "profile": {
+      "label": "Format d'odontogramme",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Pérou"
+      },
+      "updateError": "Impossible de changer le format d'odontogramme",
+      "nts": {
+        "title": "Odontogramme MINSA Pérou",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022",
+        "inPreparation": "Mise en œuvre normative en préparation",
+        "hint": "Ce format n'est pas encore disponible. Revenez à « Original » pour continuer à enregistrer les constats."
+      }
+    },
     "tooth": "Dent",
     "globals": {
       "category": "Bouche complète",

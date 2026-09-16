@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- feat(nts-02): profile selector + profile-aware mount point. New
+  `useOdontogramProfile` composable reads/persists the NTS-01 preference
+  (`GET/PUT /api/v1/odontogram/preferences`); the local value changes only
+  after a successful PUT, so selector and backend cannot drift, and a failed
+  read falls back to `original`. `OdontogramProfileView` picks the renderer
+  (`OdontogramChart` for `original`, `NtsOdontogramPlaceholder` for
+  `pe_nts_188_2022`) and forwards props/listeners verbatim through `$attrs`;
+  `OdontogramChart` itself stays untouched and profile-unaware — no
+  `if (profile === ...)` inside it. `OdontogramProfileSelector` is wired into
+  the `DiagnosisMode` card header only; `HistoryMode` and the treatment-plan
+  chart keep rendering the original chart on purpose (swapping a working
+  chart for a placeholder there would remove function without adding any).
+  The backend remains the single source of truth — no localStorage mirror.
+  Placeholder only: no teeth, findings, snapshots, NTS catalog or graphic
+  rules yet.
+
 - feat(nts-01): per-user, per-clinic odontogram profile preference
   (`original` | `pe_nts_188_2022`). New module-owned table
   `odontogram_user_preferences` (migration `odo_0003`) mirroring

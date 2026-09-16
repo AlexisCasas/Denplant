@@ -221,6 +221,29 @@ export type TreatmentCategory = 'surface' | 'whole_tooth'
 export type ToothSurface = 'M' | 'D' | 'O' | 'V' | 'L'
 
 // ============================================================================
+// Odontogram profiles (NTS phase)
+// ============================================================================
+
+/**
+ * Which odontogram format a user works with inside a clinic. Mirrors the
+ * backend `OdontogramProfile` enum (`odontogram/constants.py`) and the
+ * `ck_odontogram_pref_profile` CHECK constraint — keep the three in sync.
+ *
+ * A profile is a representation/recording strategy only: patients, catalog,
+ * plans and budgets stay shared across profiles.
+ */
+export const ODONTOGRAM_PROFILES = ['original', 'pe_nts_188_2022'] as const
+
+export type OdontogramProfile = typeof ODONTOGRAM_PROFILES[number]
+
+/** Effective profile when the user has never chosen one (no row in DB). */
+export const DEFAULT_ODONTOGRAM_PROFILE: OdontogramProfile = 'original'
+
+export function isOdontogramProfile(value: unknown): value is OdontogramProfile {
+  return typeof value === 'string' && (ODONTOGRAM_PROFILES as readonly string[]).includes(value)
+}
+
+// ============================================================================
 // Legacy Treatment Mapping
 // ============================================================================
 

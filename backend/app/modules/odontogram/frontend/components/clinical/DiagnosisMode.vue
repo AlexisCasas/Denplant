@@ -153,16 +153,22 @@ async function handleTreatmentsChanged() {
         <!-- Odontogram with diagnosis mode -->
         <UCard>
           <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-stethoscope"
-                class="w-5 h-5 text-primary-accent"
-              />
-              <span class="font-medium">{{ t('clinical.diagnosis.registerConditions') }}</span>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-stethoscope"
+                  class="w-5 h-5 text-primary-accent"
+                />
+                <span class="font-medium">{{ t('clinical.diagnosis.registerConditions') }}</span>
+              </div>
+              <OdontogramProfileSelector />
             </div>
           </template>
 
-          <OdontogramChart
+          <!-- Profile-aware mount point: renders the original chart or the
+               MINSA placeholder. `OdontogramChart` itself stays untouched
+               and profile-unaware. -->
+          <OdontogramProfileView
             :patient-id="patientId"
             mode="diagnosis"
             :highlighted-teeth-prop="hoveredTeeth"

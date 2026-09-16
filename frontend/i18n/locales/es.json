@@ -482,6 +482,20 @@
   },
   "odontogram": {
     "title": "Odontograma",
+    "profile": {
+      "label": "Formato de odontograma",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Perú"
+      },
+      "updateError": "No se pudo cambiar el formato de odontograma",
+      "nts": {
+        "title": "Odontograma MINSA Perú",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022",
+        "inPreparation": "Implementación normativa en preparación",
+        "hint": "Este formato aún no está disponible. Cambia a «Original» para seguir registrando hallazgos."
+      }
+    },
     "tooth": "Diente",
     "globals": {
       "category": "Boca completa",
