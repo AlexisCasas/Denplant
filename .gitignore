@@ -66,3 +66,6 @@ proyecto_open_source_dental.docx
 *.dpm
 *.dpmf
 test-results/
+
+# PostgreSQL database dumps - may contain sensitive data
+*.dump
