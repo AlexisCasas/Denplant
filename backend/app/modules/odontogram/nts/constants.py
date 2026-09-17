@@ -38,6 +38,18 @@ class RecordStage(StrEnum):
     OTHER = "other"
 
 
+class DraftSeed(StrEnum):
+    """How a new draft is populated. Never implicit.
+
+    ``carry_forward`` copies findings from the current finalized record for
+    individual review; it never copies observations or general
+    specifications, which have no per-item provenance to review.
+    """
+
+    EMPTY = "empty"
+    CARRY_FORWARD = "carry_forward"
+
+
 class FindingProvenance(StrEnum):
     """Whether a finding was observed now or carried from a previous record."""
 

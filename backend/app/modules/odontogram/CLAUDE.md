@@ -51,9 +51,14 @@ five tables (`nts_odontogram_records`, `nts_findings`, `nts_finding_targets`,
 triggers. `nts/canonical.py` implements CanonicalSnapshotV1 (build →
 serialise → SHA-256).
 
-Still **not** implemented: router, endpoints, clinical service, finalize /
-discard / supersede, carry-forward, automatic audit-event generation,
-geometry capture, signature, NTS permissions.
+`nts/service.py` is the transactional clinical layer (`NtsRecordService`),
+with `nts/validation.py` (catalog-driven), `nts/audit.py` (audit-state
+serialization) and `nts/exceptions.py` (domain errors, mapped to HTTP by
+B.3). The service **flushes but never commits**: the transaction belongs to
+the caller.
+
+Still **not** implemented: router, endpoints, API schemas, geometry capture,
+signature, NTS permissions.
 
 See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
 [ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
@@ -88,6 +93,13 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   DELETE it.
 - **Every NTS mutation must compare-and-bump `records.version` first**, in the
   same transaction, and write one audit event. Zero rows updated → 409.
+  `NtsRecordService` already does this; go through it rather than writing to
+  the tables directly.
+- **Never branch on a `rule_id`.** Attributes, scopes, anchors, roles and
+  required Especificaciones all come from `get_nts_rule`. A missing piece of
+  normative metadata is a catalog ticket, not an `if` in the service.
+- **A cardinality the norm does not state is not a constraint.** `min_count` /
+  `max_count` of `None` mean silence; do not turn it into a requirement.
 - **Do not store geometry yet.** The column exists but
   `ck_nts_target_geometry_pending` (`geometry IS NULL`) and
   CanonicalSnapshotV1 both refuse a non-null value: GEOMETRY CONTRACT

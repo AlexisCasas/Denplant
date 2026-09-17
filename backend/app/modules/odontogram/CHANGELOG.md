@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+- feat(nts-04b.2): **transactional service** for NTS clinical records —
+  `nts/service.py`, `nts/validation.py`, `nts/audit.py`, `nts/exceptions.py`.
+  No router, no endpoints, no schema change: `odo_0004` is untouched.
+
+  Every mutation is compare-and-bump → validate → mutate → one audit event →
+  flush, and the transaction belongs to the caller: the service flushes but
+  never commits and never rolls back globally, so a caller's rollback loses
+  the mutation, the version bump and the audit event together. One user
+  operation is exactly one version bump, however many targets it moves. The
+  bump is a single `UPDATE ... WHERE version = :expected AND status='draft'
+  RETURNING version`, which also takes the parent row lock that serialises
+  concurrent child writers; the identity map is resynchronised with
+  `set_committed_value` so a stale ORM version can never be written back.
+
+  Validation is entirely catalog-driven — attributes, scopes, anchors, arch
+  cardinality, range grouping, target roles and required Especificaciones all
+  derive from `get_nts_rule`. There is **no `rule_id` branch** in the service
+  or the validators, and `notes` are never executable. A role cardinality the
+  norm does not state is not invented: `pilar` stays optional. A
+  `required=false` specification requirement (`crown_metal_colour`) is
+  surfaced but never blocks finalize.
+
+  Carry-forward copies findings, attributes, targets and finding-linked
+  specifications for individual review, and deliberately does **not** copy
+  observations or general specifications. Finalize is blocked while any
+  carried-forward finding remains, and there is no bulk confirm. Finalize
+  resolves the authorship snapshot of the *recorder*, sets the lifecycle
+  fields and the SHA-256 of CanonicalSnapshotV1 without an intervening flush,
+  and writes `supersession_recorded` against the **new** record — the
+  predecessor is never touched. `finalized` means DenPlant locked the record;
+  it does not mean the document is digitally signed and claims no compliance
+  or accreditation.
+
 - feat(nts-03.1): the catalog now expresses **target roles** and **required
   Especificaciones** structurally, so a consumer never branches on a `rule_id`.
   New `RoleDef` + `NtsRule.target_roles` replaces the `target_roles` *attribute*
