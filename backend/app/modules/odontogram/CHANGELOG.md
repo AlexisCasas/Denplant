@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- feat(nts-05a): **frontend data layer + lifecycle shell** for the MINSA
+  odontogram. The NTS-02 placeholder is replaced by
+  `NtsOdontogramShell.vue`, which talks to the B.3 API through
+  `useNtsApi` (transport only) and `useNtsOdontogramRecord` (state only).
+  This is **not** the clinical renderer: the chart region is explicitly
+  marked pending, and the finding editor, geometry capture and signature
+  are all still absent.
+
+  What the shell does: load the catalog, the record in force, the open
+  draft and the history; open an empty draft (`seed: 'empty'` always —
+  carry-forward is not offered until findings can be reviewed one by one);
+  finalize; discard with a reason. What it deliberately does not do:
+  retry a 409 (it refetches the authoritative state and says what
+  happened), infer `expected_version + 1` (every version comes from the
+  server), or keep clinical data in `localStorage`.
+
+  A load is guarded by a generation token and an `AbortController`, so a
+  response for the previous patient can never land on the new one, and
+  state is cleared before the first byte of the new patient arrives. The
+  composable takes its patient and norm version as reactive sources rather
+  than snapshots, so reusing the shell across patients reloads the right
+  one.
+
+  `types/nts.ts` mirrors `nts/schemas.py` and nothing else: the 38 rules
+  arrive from `GET /nts/catalogs/{norm_version}`, never from a second
+  hand-maintained copy in TypeScript.
+
+  `DiagnosisMode` hides its two Original-shaped panels under the MINSA
+  profile — the "registered conditions" card and the plan CTA are backed by
+  `Treatment` rows with `status = 'existing'`, and presenting those as NTS
+  findings would erase the distinction the norm draws between a *hallazgo*
+  and a *procedimiento*. Under the Original profile they are unchanged; the
+  data is untouched either way.
+
+  Stage (`diagnosis` / `evolution` / `discharge` / `other` + free label) is
+  product metadata, not a normative requirement.
+
 - feat(nts-04b.3): **HTTP API** for NTS clinical records, mounted at
   `/api/v1/odontogram/nts` as its own subrouter — 16 endpoints across catalog,
   patient records, findings, targets, specifications and lifecycle. The

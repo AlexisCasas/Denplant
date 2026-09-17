@@ -7,7 +7,7 @@
  * there is deliberately no `if (profile === ...)` inside `OdontogramChart`.
  *
  *   profile = original         -> <OdontogramChart>          (existing behaviour)
- *   profile = pe_nts_188_2022  -> <NtsOdontogramPlaceholder> (NTS-02 stand-in)
+ *   profile = pe_nts_188_2022  -> <NtsOdontogramShell>       (NTS-05A shell)
  *
  * Props/listeners are forwarded verbatim through `$attrs`, so this wrapper
  * can be dropped in front of any existing `OdontogramChart` usage without
@@ -20,7 +20,7 @@
 // explicit dependency and lets the component be mounted in the frontend test
 // suite, where the `module_layers` symlink does not resolve.
 import OdontogramChart from './OdontogramChart.vue'
-import NtsOdontogramPlaceholder from './NtsOdontogramPlaceholder.vue'
+import NtsOdontogramShell from './NtsOdontogramShell.vue'
 import { useOdontogramProfile } from '../../composables/useOdontogramProfile'
 
 defineOptions({ inheritAttrs: false })
@@ -51,7 +51,12 @@ onMounted(() => {
     />
   </div>
 
-  <NtsOdontogramPlaceholder v-else-if="profile === 'pe_nts_188_2022'" />
+  <!-- The profile value doubles as the record's norm version. -->
+  <NtsOdontogramShell
+    v-else-if="profile === 'pe_nts_188_2022'"
+    :patient-id="($attrs.patientId as string) ?? ($attrs['patient-id'] as string)"
+    norm-version="pe_nts_188_2022"
+  />
 
   <OdontogramChart
     v-else

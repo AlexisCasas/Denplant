@@ -62,8 +62,15 @@ gated by the existing `odontogram.read` / `odontogram.write`. The router never
 commits or rolls back — `get_db()` owns the transaction — and it re-raises
 domain errors as `HTTPException` so a 4xx actually rolls back.
 
-Still **not** implemented: frontend/renderer, geometry capture, signature,
-an audit-trail endpoint, NTS-specific permissions.
+`frontend/composables/useNtsApi.ts` (transport),
+`frontend/composables/useNtsOdontogramRecord.ts` (lifecycle state) and
+`frontend/components/odontogram/NtsOdontogramShell.vue` are the **data layer
+and lifecycle shell** (NTS-05A): catalog, record in force, draft, history,
+plus create-empty-draft / finalize / discard. `frontend/types/nts.ts` mirrors
+`nts/schemas.py` only — the rules come from the catalog endpoint.
+
+Still **not** implemented: the clinical renderer and finding editor, geometry
+capture, signature, an audit-trail endpoint, NTS-specific permissions.
 
 See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
 [ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
@@ -91,6 +98,15 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   cross-rule sigla collision is normative, not a data defect.
 - **`OdontogramChart.vue` stays profile-unaware.** Renderer selection lives
   in `OdontogramProfileView`; do not add `if (profile === ...)` to the chart.
+- **Never present a `Treatment` as an NTS finding.** The norm separates
+  *hallazgo* from *procedimiento*; `DiagnosisMode`'s conditions card and plan
+  CTA are `Treatment`-backed and are therefore hidden under the MINSA
+  profile, not reused.
+- **The frontend never hardcodes the norm.** No rule ids, siglas or scopes in
+  TypeScript: `GET /nts/catalogs/{norm_version}` is the only source, and a
+  `const NTS_RULES = [...]` would be a second manual copy of a legal norm.
+- **NTS clinical state never goes into `localStorage`.** The record lives on
+  the server; a browser copy would be a second truth.
 - **NTS records are never deleted and finalized ones never updated** — a DB
   trigger refuses both. Corrections are a new record with
   `supersedes_record_id`; abandonment is `status='discarded'`.

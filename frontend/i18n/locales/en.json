@@ -463,9 +463,73 @@
       "updateError": "Could not change the chart format",
       "nts": {
         "title": "MINSA Peru dental chart",
-        "norm": "NTS N.° 188-MINSA/DGIESP-2022",
-        "inPreparation": "Normative implementation in progress",
-        "hint": "This format is not available yet. Switch back to \"Original\" to keep recording findings."
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnosis",
+        "evolution": "Evolution",
+        "discharge": "Discharge",
+        "other": "Other"
+      },
+      "status": {
+        "draft": "Draft",
+        "finalized": "Finalized",
+        "discarded": "Discarded",
+        "superseded": "Corrected"
+      },
+      "field": {
+        "stage": "Stage",
+        "stageLabel": "Stage name",
+        "finalizedAt": "Finalized on",
+        "openedAt": "Opened on",
+        "recordedBy": "Recorded by",
+        "findings": "Findings",
+        "discardReason": "Reason"
+      },
+      "actions": {
+        "createDraft": "Create draft",
+        "finalize": "Finalize",
+        "discardDraft": "Discard draft"
+      },
+      "current": {
+        "title": "Record in force"
+      },
+      "draft": {
+        "title": "Draft in progress"
+      },
+      "history": {
+        "title": "Record history"
+      },
+      "empty": {
+        "title": "No MINSA odontogram has been recorded for this patient."
+      },
+      "create": {
+        "hint": "The stage is record metadata; the norm does not require a fixed set."
+      },
+      "discard": {
+        "explanation": "The draft is discarded and can no longer be edited. It is not deleted: it stays on record with its reason."
+      },
+      "carriedForward": {
+        "title": "{count} carried-forward finding(s) awaiting review",
+        "hint": "They were copied from an earlier record and must be reviewed one by one. Review arrives with the finding editor."
+      },
+      "conflict": {
+        "title": "The odontogram changed in another session",
+        "version": "The information was refreshed; review it before trying again.",
+        "draft": "A draft is already open for this patient.",
+        "state": "The draft was already finalized or discarded. The information was refreshed."
+      },
+      "error": {
+        "loadTitle": "Could not load the MINSA odontogram",
+        "clinicalTitle": "The operation could not be completed",
+        "normUnavailableTitle": "Norm version unavailable",
+        "normUnavailable": "This norm version is not available in this installation."
+      },
+      "shell": {
+        "rendererPending": "Chart in preparation",
+        "chartPending": "Odontogram area: next phase. The clinical record already persists; the normative chart is pending."
       }
     },
     "tooth": "Tooth",

@@ -491,9 +491,73 @@
       "updateError": "No se pudo cambiar el formato de odontograma",
       "nts": {
         "title": "Odontograma MINSA Perú",
-        "norm": "NTS N.° 188-MINSA/DGIESP-2022",
-        "inPreparation": "Implementación normativa en preparación",
-        "hint": "Este formato aún no está disponible. Cambia a «Original» para seguir registrando hallazgos."
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnóstico",
+        "evolution": "Evolución",
+        "discharge": "Alta",
+        "other": "Otra"
+      },
+      "status": {
+        "draft": "Borrador",
+        "finalized": "Finalizado",
+        "discarded": "Descartado",
+        "superseded": "Corregido"
+      },
+      "field": {
+        "stage": "Etapa",
+        "stageLabel": "Nombre de la etapa",
+        "finalizedAt": "Finalizado el",
+        "openedAt": "Abierto el",
+        "recordedBy": "Registrado por",
+        "findings": "Hallazgos",
+        "discardReason": "Motivo"
+      },
+      "actions": {
+        "createDraft": "Crear borrador",
+        "finalize": "Finalizar",
+        "discardDraft": "Descartar borrador"
+      },
+      "current": {
+        "title": "Registro vigente"
+      },
+      "draft": {
+        "title": "Borrador en edición"
+      },
+      "history": {
+        "title": "Historial de registros"
+      },
+      "empty": {
+        "title": "Este paciente no tiene ningún odontograma MINSA registrado."
+      },
+      "create": {
+        "hint": "La etapa es metadato del registro; la norma no exige un conjunto fijo."
+      },
+      "discard": {
+        "explanation": "El borrador se descarta y deja de ser editable. No se elimina: queda registrado con su motivo."
+      },
+      "carriedForward": {
+        "title": "{count} hallazgo(s) arrastrado(s) sin revisar",
+        "hint": "Se copiaron de un registro anterior y deben revisarse uno a uno. La revisión llega con el editor de hallazgos."
+      },
+      "conflict": {
+        "title": "El odontograma cambió en otra sesión",
+        "version": "Se actualizó la información; revísala antes de volver a intentarlo.",
+        "draft": "Ya existe un borrador abierto para este paciente.",
+        "state": "El borrador ya fue finalizado o descartado. Se actualizó la información."
+      },
+      "error": {
+        "loadTitle": "No se pudo cargar el odontograma MINSA",
+        "clinicalTitle": "No se pudo completar la operación",
+        "normUnavailableTitle": "Versión normativa no disponible",
+        "normUnavailable": "Esta versión normativa no está disponible en esta instalación."
+      },
+      "shell": {
+        "rendererPending": "Gráfico en preparación",
+        "chartPending": "Área del odontograma: próxima fase. El registro clínico ya se guarda; falta el gráfico normativo."
       }
     },
     "tooth": "Diente",

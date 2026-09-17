@@ -463,9 +463,73 @@
       "updateError": "Impossible de changer le format d'odontogramme",
       "nts": {
         "title": "Odontogramme MINSA Pérou",
-        "norm": "NTS N.° 188-MINSA/DGIESP-2022",
-        "inPreparation": "Mise en œuvre normative en préparation",
-        "hint": "Ce format n'est pas encore disponible. Revenez à « Original » pour continuer à enregistrer les constats."
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnostic",
+        "evolution": "Évolution",
+        "discharge": "Sortie",
+        "other": "Autre"
+      },
+      "status": {
+        "draft": "Brouillon",
+        "finalized": "Finalisé",
+        "discarded": "Abandonné",
+        "superseded": "Corrigé"
+      },
+      "field": {
+        "stage": "Étape",
+        "stageLabel": "Nom de l'étape",
+        "finalizedAt": "Finalisé le",
+        "openedAt": "Ouvert le",
+        "recordedBy": "Enregistré par",
+        "findings": "Constatations",
+        "discardReason": "Motif"
+      },
+      "actions": {
+        "createDraft": "Créer un brouillon",
+        "finalize": "Finaliser",
+        "discardDraft": "Abandonner le brouillon"
+      },
+      "current": {
+        "title": "Enregistrement en vigueur"
+      },
+      "draft": {
+        "title": "Brouillon en cours"
+      },
+      "history": {
+        "title": "Historique des enregistrements"
+      },
+      "empty": {
+        "title": "Aucun odontogramme MINSA enregistré pour ce patient."
+      },
+      "create": {
+        "hint": "L'étape est une métadonnée du dossier ; la norme n'impose pas d'ensemble fixe."
+      },
+      "discard": {
+        "explanation": "Le brouillon est abandonné et n'est plus modifiable. Il n'est pas supprimé : il reste enregistré avec son motif."
+      },
+      "carriedForward": {
+        "title": "{count} constatation(s) reportée(s) à revoir",
+        "hint": "Elles proviennent d'un enregistrement antérieur et doivent être revues une à une. La revue arrivera avec l'éditeur de constatations."
+      },
+      "conflict": {
+        "title": "L'odontogramme a changé dans une autre session",
+        "version": "Les informations ont été actualisées ; vérifiez-les avant de réessayer.",
+        "draft": "Un brouillon est déjà ouvert pour ce patient.",
+        "state": "Le brouillon a déjà été finalisé ou abandonné. Les informations ont été actualisées."
+      },
+      "error": {
+        "loadTitle": "Impossible de charger l'odontogramme MINSA",
+        "clinicalTitle": "L'opération n'a pas pu aboutir",
+        "normUnavailableTitle": "Version normative indisponible",
+        "normUnavailable": "Cette version normative n'est pas disponible dans cette installation."
+      },
+      "shell": {
+        "rendererPending": "Graphique en préparation",
+        "chartPending": "Zone de l'odontogramme : prochaine phase. L'enregistrement clinique est déjà conservé ; le graphique normatif reste à faire."
       }
     },
     "tooth": "Dent",

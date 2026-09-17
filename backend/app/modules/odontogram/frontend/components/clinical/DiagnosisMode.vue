@@ -26,6 +26,16 @@ const { t } = useI18n()
 
 const { treatments, fetchTreatments, loading: odontogramLoading } = useOdontogram()
 const { plans, fetchPatientPlans, loading: plansLoading } = useTreatmentPlans()
+const { profile } = useOdontogramProfile()
+
+// The two panels below the chart are Original-shaped: `conditions` are
+// `Treatment` rows with `status = 'existing'`, and the CTA turns them into a
+// treatment plan. Under the MINSA profile that would present a Treatment as
+// if it were an NTS finding — the one thing the norm separates (§5.8:
+// findings are not procedures). So they are hidden there, not removed:
+// Original keeps them exactly as before, and the NTS equivalent arrives with
+// the finding editor.
+const isNtsProfile = computed(() => profile.value === 'pe_nts_188_2022')
 
 // ============================================================================
 // State
@@ -177,8 +187,8 @@ async function handleTreatmentsChanged() {
           />
         </UCard>
 
-        <!-- Registered conditions list -->
-        <UCard>
+        <!-- Registered conditions list (Original semantics: Treatment rows) -->
+        <UCard v-if="!isNtsProfile">
           <template #header>
             <button
               type="button"
@@ -218,7 +228,7 @@ async function handleTreatmentsChanged() {
 
         <!-- Contextual CTA -->
         <DiagnosisCTA
-          v-if="!readonly && conditions.length > 0"
+          v-if="!isNtsProfile && !readonly && conditions.length > 0"
           :draft-plans="draftPlans"
           @create="emit('create-plan')"
           @continue="emit('continue-plan', $event)"

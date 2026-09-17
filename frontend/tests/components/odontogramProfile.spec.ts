@@ -16,7 +16,7 @@ import { defineComponent, h, nextTick } from 'vue'
 
 import OdontogramProfileView from '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramProfileView.vue'
 import OdontogramChart from '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramChart.vue'
-import NtsOdontogramPlaceholder from '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramPlaceholder.vue'
+import NtsOdontogramShell from '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramShell.vue'
 import { useOdontogramProfile } from '../../../backend/app/modules/odontogram/frontend/composables/useOdontogramProfile'
 
 const state = vi.hoisted(() => ({
@@ -104,7 +104,7 @@ async function mountView() {
 }
 
 describe('OdontogramProfileView (profile-aware mount point)', () => {
-  it('A — profile "original" mounts the existing chart, not the placeholder', async () => {
+  it('A — profile "original" mounts the existing chart, not the NTS shell', async () => {
     resolvesTo('original')
 
     const wrapper = await mountView()
@@ -112,17 +112,17 @@ describe('OdontogramProfileView (profile-aware mount point)', () => {
 
     expect(state.get).toHaveBeenCalledWith('/api/v1/odontogram/preferences')
     expect(wrapper.findComponent(OdontogramChart).exists()).toBe(true)
-    expect(wrapper.findComponent(NtsOdontogramPlaceholder).exists()).toBe(false)
+    expect(wrapper.findComponent(NtsOdontogramShell).exists()).toBe(false)
     expect(wrapper.find('[data-testid="odontogram-profile-loading"]').exists()).toBe(false)
   })
 
-  it('B — profile "pe_nts_188_2022" mounts the MINSA placeholder', async () => {
+  it('B — profile "pe_nts_188_2022" mounts the MINSA shell', async () => {
     resolvesTo('pe_nts_188_2022')
 
     const wrapper = await mountView()
     await settle()
 
-    expect(wrapper.findComponent(NtsOdontogramPlaceholder).exists()).toBe(true)
+    expect(wrapper.findComponent(NtsOdontogramShell).exists()).toBe(true)
     expect(wrapper.findComponent(OdontogramChart).exists()).toBe(false)
   })
 
@@ -131,7 +131,7 @@ describe('OdontogramProfileView (profile-aware mount point)', () => {
 
     const first = await mountView()
     await settle()
-    expect(first.findComponent(NtsOdontogramPlaceholder).exists()).toBe(true)
+    expect(first.findComponent(NtsOdontogramShell).exists()).toBe(true)
 
     // Simulate a page reload: in-memory state cleared, backend still MINSA.
     const api = await runInSetup(() => useOdontogramProfile())
@@ -142,7 +142,7 @@ describe('OdontogramProfileView (profile-aware mount point)', () => {
     await settle()
 
     expect(state.get).toHaveBeenCalledTimes(1)
-    expect(second.findComponent(NtsOdontogramPlaceholder).exists()).toBe(true)
+    expect(second.findComponent(NtsOdontogramShell).exists()).toBe(true)
   })
 
   it('renders neither chart while the preference is still loading', async () => {
@@ -154,7 +154,7 @@ describe('OdontogramProfileView (profile-aware mount point)', () => {
 
     expect(wrapper.find('[data-testid="odontogram-profile-loading"]').exists()).toBe(true)
     expect(wrapper.findComponent(OdontogramChart).exists()).toBe(false)
-    expect(wrapper.findComponent(NtsOdontogramPlaceholder).exists()).toBe(false)
+    expect(wrapper.findComponent(NtsOdontogramShell).exists()).toBe(false)
   })
 })
 
