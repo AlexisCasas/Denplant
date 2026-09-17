@@ -16,6 +16,7 @@
  */
 
 import { useNtsOdontogramRecord } from '../../composables/useNtsOdontogramRecord'
+import NtsOdontogramChart from './NtsOdontogramChart.vue'
 
 const props = defineProps<{
   patientId: string
@@ -74,6 +75,16 @@ const createStageLabel = ref('')
 
 const discardOpen = ref(false)
 const discardReason = ref('')
+
+/**
+ * Which record the chart stands for.
+ *
+ * A draft is what the clinician is working on, so it wins; with no draft the
+ * record in force is shown read-only; with neither, the chart is the blank
+ * official form and says so. Nothing is fabricated to fill the gap.
+ */
+const chartRecord = computed(() => draft.value ?? currentRecord.value)
+const chartReadonly = computed(() => !hasDraft.value)
 
 const canSubmitCreate = computed(
   () => createStage.value !== 'other' || createStageLabel.value.trim().length > 0
@@ -145,7 +156,7 @@ watch([() => props.patientId, normVersion], () => void load())
         variant="subtle"
         size="sm"
       >
-        {{ t('odontogram.nts.shell.rendererPending') }}
+        {{ t('odontogram.nts.chart.findingRendererPending') }}
       </UBadge>
     </div>
 
@@ -379,21 +390,11 @@ watch([() => props.patientId, normVersion], () => void load())
           />
         </UCard>
 
-        <!-- Where the normative chart will live -->
-        <div
-          class="flex flex-col items-center justify-center text-center gap-2 py-12 px-6
-                 rounded-token-md border border-dashed border-default bg-surface-muted"
-          data-testid="nts-chart-pending"
-        >
-          <UIcon
-            name="i-lucide-hard-hat"
-            class="w-8 h-8 text-subtle"
-            aria-hidden="true"
-          />
-          <p class="text-sm text-muted max-w-md">
-            {{ t('odontogram.nts.shell.chartPending') }}
-          </p>
-        </div>
+        <!-- The official dental layout. Findings are not drawn on it yet. -->
+        <NtsOdontogramChart
+          :record="chartRecord"
+          :readonly="chartReadonly"
+        />
 
         <!-- History -->
         <UCard

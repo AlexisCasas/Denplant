@@ -501,6 +501,24 @@
         "discharge": "Alta",
         "other": "Otra"
       },
+      "chart": {
+        "title": "Odontograma",
+        "tooth": "Diente {fdi}",
+        "deciduousTooth": "Diente deciduo {fdi}",
+        "permanentDentition": "Dentición permanente",
+        "deciduousDentition": "Dentición decidua",
+        "permanentUpper": "Permanente superior",
+        "deciduousUpper": "Decidua superior",
+        "deciduousLower": "Decidua inferior",
+        "permanentLower": "Permanente inferior",
+        "upper": "Superior",
+        "lower": "Inferior",
+        "readonly": "Solo lectura",
+        "noRecord": "Estructura del formato oficial. No corresponde a ningún registro clínico.",
+        "findingsPending": "{count} hallazgo(s) registrado(s)",
+        "findingsPendingHint": "Su representación gráfica sobre el odontograma llega en la siguiente fase.",
+        "findingRendererPending": "Representación de hallazgos pendiente"
+      },
       "status": {
         "draft": "Borrador",
         "finalized": "Finalizado",
@@ -554,10 +572,6 @@
         "clinicalTitle": "No se pudo completar la operación",
         "normUnavailableTitle": "Versión normativa no disponible",
         "normUnavailable": "Esta versión normativa no está disponible en esta instalación."
-      },
-      "shell": {
-        "rendererPending": "Gráfico en preparación",
-        "chartPending": "Área del odontograma: próxima fase. El registro clínico ya se guarda; falta el gráfico normativo."
       }
     },
     "tooth": "Diente",

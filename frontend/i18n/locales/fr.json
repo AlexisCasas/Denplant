@@ -473,6 +473,24 @@
         "discharge": "Sortie",
         "other": "Autre"
       },
+      "chart": {
+        "title": "Odontogramme",
+        "tooth": "Dent {fdi}",
+        "deciduousTooth": "Dent temporaire {fdi}",
+        "permanentDentition": "Denture permanente",
+        "deciduousDentition": "Denture temporaire",
+        "permanentUpper": "Permanente supérieure",
+        "deciduousUpper": "Temporaire supérieure",
+        "deciduousLower": "Temporaire inférieure",
+        "permanentLower": "Permanente inférieure",
+        "upper": "Supérieure",
+        "lower": "Inférieure",
+        "readonly": "Lecture seule",
+        "noRecord": "Structure du formulaire officiel. Elle ne correspond à aucun enregistrement clinique.",
+        "findingsPending": "{count} constatation(s) enregistrée(s)",
+        "findingsPendingHint": "Leur tracé sur l'odontogramme arrive à la prochaine phase.",
+        "findingRendererPending": "Tracé des constatations à venir"
+      },
       "status": {
         "draft": "Brouillon",
         "finalized": "Finalisé",
@@ -526,10 +544,6 @@
         "clinicalTitle": "L'opération n'a pas pu aboutir",
         "normUnavailableTitle": "Version normative indisponible",
         "normUnavailable": "Cette version normative n'est pas disponible dans cette installation."
-      },
-      "shell": {
-        "rendererPending": "Graphique en préparation",
-        "chartPending": "Zone de l'odontogramme : prochaine phase. L'enregistrement clinique est déjà conservé ; le graphique normatif reste à faire."
       }
     },
     "tooth": "Dent",

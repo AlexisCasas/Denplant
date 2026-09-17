@@ -2,6 +2,70 @@
 
 ## Unreleased
 
+- feat(nts-05b): **the official dental layout**. `NtsOdontogramChart` replaces
+  the shell's "renderer pending" region with the structure of the norm's own
+  *Anexo: Gráfico del odontograma* (NTS N.° 188-MINSA/DGIESP-2022, p. 22):
+  four rows stacked permanent upper → deciduous upper → deciduous lower →
+  permanent lower, all 52 teeth, each with its FDI number and the annotation
+  box the annex reserves beside it.
+
+  Findings are still **not** drawn. A record that already carries some says so
+  in words instead — an invented symbol on an odontogram is a false clinical
+  statement, while an absent one at least reads as absent.
+
+  Orientation comes from the annex, which prints 18 at the far left and 28 at
+  the far right: screen-left is the patient's right, in all four rows. The FDI
+  numbers are generated from the quadrants rather than listed by hand, and
+  `dentition`, `arch`, `side`, `quadrant` and tooth class are derived from the
+  number, never stored. There is no dentition toggle: the official format
+  prints both dentitions, so an adult patient still gets all 52 cells.
+
+  The tooth cell reproduces the annex's own geometry — a crown cut by its four
+  corner diagonals, with the centre halved on premolars and quartered on
+  molars, plus roots pointing away from the midline. Its regions are
+  addressable but named **positionally** (`outer-top`, `center-1`…): which
+  trapezoid is mesial depends on the quadrant, and that mapping belongs with
+  the surface-scoped rules.
+
+  Proportions are read off the annex and expressed as ratios, never as
+  dimensions the norm states — it is a 300dpi scan, so its pixels are raster
+  readings. Crown height is the same for every class while the width is not
+  (molar ≈ 88, premolar ≈ 82, front teeth ≈ 61 against a height of ≈ 68), and
+  the annex varies the whole column with it: the annotation box, the number
+  and the tooth share one class-dependent width, which is what keeps a box
+  over the tooth it belongs to. Roots run a little longer than the crown is
+  tall (≈ 1.2×). The six front teeth do not get the posterior's central
+  rectangle: the annex closes their diagonals onto a short segment, so their
+  centre is a sliver and they read as envelopes rather than boxes.
+
+  The deciduous arches are drawn at **the same size as the permanent ones**.
+  The annex measures a deciduous molar at the width of a permanent molar and a
+  deciduous incisor at the width of a permanent incisor; its deciduous rows
+  are shorter only because they hold ten teeth instead of sixteen. One scale
+  serves the whole chart, and the dentitions are told apart by position and by
+  their FDI numbers rather than by being miniaturised.
+
+  Upper premolars measure ~7% narrower than upper molars in the annex while
+  lower premolars measure the same as lower molars. One width per tooth class
+  is kept regardless: that difference is **raster/artwork variation tolerated,
+  not a normative distinction**, and nothing in the norm's text supports an
+  arch-dependent premolar.
+
+  Chromatically neutral on purpose — the norm gives red and blue meaning, and
+  spending them on decoration now would make them unreadable later. Stroke and
+  fill are SVG presentation attributes rather than a stylesheet rule, so the
+  outline cannot come back as a solid block if a CSS chunk fails to load.
+
+  One scroll container holds all four rows: rows that scrolled independently
+  would drift and put a deciduous tooth under the wrong permanent one. The
+  canvas keeps a deterministic minimum width, derived from the widest row
+  instead of shrinking teeth, so a narrow screen scrolls without the page
+  itself overflowing and without the clinical order ever reflowing.
+
+  No HTTP and no lifecycle state in the chart: the shell passes down the draft
+  if there is one, otherwise the record in force as read-only, otherwise the
+  blank form marked as standing for no clinical record.
+
 - feat(nts-05a): **frontend data layer + lifecycle shell** for the MINSA
   odontogram. The NTS-02 placeholder is replaced by
   `NtsOdontogramShell.vue`, which talks to the B.3 API through

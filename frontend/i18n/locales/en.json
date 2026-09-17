@@ -473,6 +473,24 @@
         "discharge": "Discharge",
         "other": "Other"
       },
+      "chart": {
+        "title": "Odontogram",
+        "tooth": "Tooth {fdi}",
+        "deciduousTooth": "Deciduous tooth {fdi}",
+        "permanentDentition": "Permanent dentition",
+        "deciduousDentition": "Deciduous dentition",
+        "permanentUpper": "Permanent upper",
+        "deciduousUpper": "Deciduous upper",
+        "deciduousLower": "Deciduous lower",
+        "permanentLower": "Permanent lower",
+        "upper": "Upper",
+        "lower": "Lower",
+        "readonly": "Read-only",
+        "noRecord": "Structure of the official form. It stands for no clinical record.",
+        "findingsPending": "{count} recorded finding(s)",
+        "findingsPendingHint": "Drawing them on the odontogram arrives in the next phase.",
+        "findingRendererPending": "Finding rendering pending"
+      },
       "status": {
         "draft": "Draft",
         "finalized": "Finalized",
@@ -526,10 +544,6 @@
         "clinicalTitle": "The operation could not be completed",
         "normUnavailableTitle": "Norm version unavailable",
         "normUnavailable": "This norm version is not available in this installation."
-      },
-      "shell": {
-        "rendererPending": "Chart in preparation",
-        "chartPending": "Odontogram area: next phase. The clinical record already persists; the normative chart is pending."
       }
     },
     "tooth": "Tooth",

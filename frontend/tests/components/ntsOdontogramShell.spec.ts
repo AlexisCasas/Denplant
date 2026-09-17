@@ -124,16 +124,147 @@ describe('NtsOdontogramShell', () => {
     expect(wrapper.find('[data-testid="nts-odontogram-shell"]').exists()).toBe(true)
   })
 
-  it('marks the chart area as pending instead of drawing a partial renderer', async () => {
+  it('renders the official dental layout in place of the old pending region', async () => {
     const wrapper = await mountShell()
-    // Nothing on screen may look like a working normative chart yet.
-    expect(wrapper.find('[data-testid="nts-chart-pending"]').exists()).toBe(true)
-    expect(wrapper.find('svg.odontogram-chart').exists()).toBe(false)
+
+    expect(wrapper.find('[data-testid="nts-chart-pending"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-fdi]')).toHaveLength(52)
+  })
+
+  it('still says the finding renderer is pending — the chart is layout only', async () => {
+    const wrapper = await mountShell()
+    // The layout existing is not the odontogram being finished.
+    expect(wrapper.text()).toContain('Finding rendering pending')
   })
 
   it('mounting never mutates: no POST is issued on load', async () => {
     await mountShell()
     expect(state.post).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05B §31 — which record the chart stands for
+// ---------------------------------------------------------------------------
+
+/** A record shaped like the API returns one, minimal for chart purposes. */
+function chartRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'rec-1',
+    clinic_id: 'clinic-a',
+    patient_id: 'p1',
+    norm_version: 'pe_nts_188_2022',
+    stage: 'diagnosis',
+    stage_label: null,
+    status: 'draft',
+    version: 3,
+    observations: null,
+    recorded_at: '2026-01-02T10:00:00Z',
+    recorded_by: 'u1',
+    finalized_at: null,
+    finalized_by: null,
+    discarded_at: null,
+    discarded_by: null,
+    discard_reason: null,
+    recorded_by_name: null,
+    recorded_by_role: null,
+    recorded_by_professional_id: null,
+    supersedes_record_id: null,
+    supersession_reason: null,
+    content_hash: null,
+    hash_algorithm: null,
+    canonicalization_version: null,
+    created_at: '2026-01-02T10:00:00Z',
+    updated_at: '2026-01-02T10:00:00Z',
+    findings: [],
+    specifications: [],
+    ...overrides
+  }
+}
+
+describe('NTS-05B §31 — chart / shell integration', () => {
+  function routeRecords(options: { current?: unknown, draft?: unknown }) {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: CATALOG }
+      if (url.endsWith('/current')) return { data: options.current ?? null }
+      if (url.endsWith('/draft')) return { data: options.draft ?? null }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        return { data: [], total: 0, page: 1, page_size: 20 }
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function mountShell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  it('an open draft is what the chart stands for, and it is not read-only', async () => {
+    routeRecords({
+      draft: chartRecord({ id: 'draft-1' }),
+      current: chartRecord({ id: 'cur-1', status: 'finalized' })
+    })
+
+    const wrapper = await mountShell()
+    const chart = wrapper.find('[data-testid="nts-odontogram-chart"]')
+
+    expect(chart.exists()).toBe(true)
+    expect(chart.attributes('data-readonly')).toBe('false')
+    expect(wrapper.find('[data-testid="nts-chart-readonly"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-chart-no-record"]').exists()).toBe(false)
+  })
+
+  it('with no draft, the record in force is shown read-only', async () => {
+    routeRecords({ current: chartRecord({ id: 'cur-1', status: 'finalized' }) })
+
+    const wrapper = await mountShell()
+    const chart = wrapper.find('[data-testid="nts-odontogram-chart"]')
+
+    expect(chart.attributes('data-readonly')).toBe('true')
+    expect(wrapper.find('[data-testid="nts-chart-readonly"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-chart-no-record"]').exists()).toBe(false)
+  })
+
+  it('with neither, the structure is shown and explicitly not a record', async () => {
+    routeRecords({})
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.findAll('[data-fdi]')).toHaveLength(52)
+    expect(wrapper.find('[data-testid="nts-chart-no-record"]').exists()).toBe(true)
+    // Nothing was fabricated to fill the gap.
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('findings on the shown record are surfaced, never silently omitted', async () => {
+    routeRecords({
+      draft: chartRecord({
+        findings: [
+          { id: 'f1', record_id: 'rec-1', norm_version: 'pe_nts_188_2022', rule_id: 'x', attributes: {}, provenance: 'observed', source_finding_id: null, sequence: 1, created_at: '', created_by: 'u1', targets: [] }
+        ]
+      })
+    })
+
+    const wrapper = await mountShell()
+    expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(true)
+  })
+
+  it('the lifecycle shell is intact around the chart', async () => {
+    routeRecords({ draft: chartRecord() })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-norm-label"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-draft"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-finalize-draft"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-discard-draft"]').exists()).toBe(true)
   })
 })
 
@@ -234,7 +365,11 @@ const NTS_SOURCES = [
   '../../../backend/app/modules/odontogram/frontend/composables/useNtsApi.ts',
   '../../../backend/app/modules/odontogram/frontend/composables/useNtsOdontogramRecord.ts',
   '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramShell.vue',
-  '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramProfileView.vue'
+  '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramProfileView.vue',
+  '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition.ts',
+  '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramChart.vue',
+  '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsDentitionRow.vue',
+  '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsToothCell.vue'
 ].map(relative => ({
   relative,
   source: readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8')

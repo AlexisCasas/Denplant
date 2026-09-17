@@ -69,8 +69,14 @@ and lifecycle shell** (NTS-05A): catalog, record in force, draft, history,
 plus create-empty-draft / finalize / discard. `frontend/types/nts.ts` mirrors
 `nts/schemas.py` only — the rules come from the catalog endpoint.
 
-Still **not** implemented: the clinical renderer and finding editor, geometry
-capture, signature, an audit-trail endpoint, NTS-specific permissions.
+`frontend/utils/ntsDentition.ts` +
+`frontend/components/odontogram/Nts{OdontogramChart,DentitionRow,ToothCell}.vue`
+are the **dental layout** (NTS-05B): the four rows of the norm's Anexo, all 52
+teeth, FDI numbering and per-tooth base geometry. Layout only — no finding is
+drawn on it.
+
+Still **not** implemented: the finding renderer and editor, geometry capture,
+signature, an audit-trail endpoint, NTS-specific permissions.
 
 See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
 [ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
@@ -98,6 +104,34 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   cross-rule sigla collision is normative, not a data defect.
 - **`OdontogramChart.vue` stays profile-unaware.** Renderer selection lives
   in `OdontogramProfileView`; do not add `if (profile === ...)` to the chart.
+- **The NTS chart always draws 52 teeth.** 32 permanent + 20 deciduous, no
+  dentition toggle: the norm's own format prints both, so an adult patient
+  still gets the full form. Do not reuse a helper that only admits 11–48.
+- **Screen-left is the patient's right.** The Anexo prints 18 at the far left
+  and 28 at the far right; `NTS_ROWS` encodes that and is the only place row
+  order may be defined.
+- **Crown regions are named positionally, not clinically.** `outer-top` is not
+  "vestibular": which trapezoid is which depends on the quadrant, and that
+  mapping belongs with the surface-scoped rules, not with the layout.
+- **Column width follows the tooth class, not a fixed grid.** The annex draws
+  molars widest, premolars narrower and the six front teeth narrowest, at a
+  constant crown height, and the annotation box and FDI number share that
+  width. `cellWidthFor()` is the single source; do not reintroduce a uniform
+  column.
+- **Anteriors are envelopes, not boxes.** Their diagonals close onto a short
+  central segment. Only premolars and molars get a real central rectangle.
+- **The annex's pixel measurements are raster readings, not legal
+  dimensions.** Use them as ratios; never write "the norm requires 88px".
+- **Deciduous teeth are the same size as permanent ones.** The annex scales
+  nothing down: its deciduous rows are shorter because they hold ten teeth.
+  One chart scale, no per-dentition factor.
+- **One premolar width for both arches.** The annex draws upper premolars
+  ~7% narrower than upper molars but lower premolars as wide as lower molars;
+  that is raster/artwork variation tolerated, not a normative distinction. Do
+  not add an arch-dependent rule without normative evidence.
+- **Red and blue belong to the findings.** The norm gives those two colours
+  meaning; the layout stays neutral so they still read when the finding
+  renderer needs them.
 - **Never present a `Treatment` as an NTS finding.** The norm separates
   *hallazgo* from *procedimiento*; `DiagnosisMode`'s conditions card and plan
   CTA are `Treatment`-backed and are therefore hidden under the MINSA
