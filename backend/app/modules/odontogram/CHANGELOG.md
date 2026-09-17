@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- feat(nts-03): versioned normative catalog for NTS N.° 188-MINSA/DGIESP-2022
+  under `nts/catalog/` — typed schema, structural validator, cached loader and
+  the 38 rules of §6.1 as data (`pe_nts_188_2022.json`). Each rule records its
+  scope, structured attributes, colour semantics, render marks, geometry source
+  and the page/section it came from; the two misprinted headings in the PDF
+  (6.1.15 as "6.115", 6.1.23 as "5.2.23") are preserved in `document_label`
+  rather than normalised away. 15 of the 38 rules are **not** tooth-scoped
+  (6 surface, 3 pair, 3 range, 3 arch), which is the constraint NTS-04 has to
+  design around. Identity is `norm_version + rule_id`, never the sigla — the
+  norm reuses "S" (6.1.26/6.1.35) and "M" (6.1.19/6.1.28), so cross-rule sigla
+  collisions are explicitly not validation errors. Three items the norm leaves
+  genuinely open (`rotation_sense`, `mobility_degree`, `dde_type=FLUOROSIS`)
+  are flagged `needs_clinical_review` instead of being filled in from general
+  dental knowledge. The catalog is cached (`functools.cache`) and therefore
+  shared process-wide, so it is immutable *all the way down*: every collection
+  is a tuple and `RenderMark.params` is a read-only mapping — without that, one
+  `mark.params[...] = ...` poisoned the cache for every later caller (found by
+  probe, fixed, regression-tested). Data only: no findings model, no persistence, no
+  migrations, no endpoints and no renderer — §5.6 digital immutability is
+  documented as an open NTS-04 gate, not implemented. Docs:
+  `docs/technical/odontogram/nts-188-catalog.md` (includes the `preview.html`
+  coverage matrix — 34/38, the 4 missing are the non-tooth-scoped prosthetic
+  rules — and the legacy-vocabulary matrix).
+
 - feat(nts-02): profile selector + profile-aware mount point. New
   `useOdontogramProfile` composable reads/persists the NTS-01 preference
   (`GET/PUT /api/v1/odontogram/preferences`); the local value changes only
