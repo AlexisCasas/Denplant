@@ -522,3 +522,16 @@ async def set_odontogram_preference(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     return ApiResponse(data=OdontogramPreferenceResponse(profile=profile))
+
+
+# ---------------------------------------------------------------------------
+# NTS profile (MINSA, Peru)
+#
+# Its own subrouter under /nts rather than more endpoints here: the two
+# profiles share no storage, no schemas and no lifecycle, and the Original
+# routes must keep their paths untouched.
+# ---------------------------------------------------------------------------
+
+from .nts.router import router as nts_router  # noqa: E402
+
+router.include_router(nts_router, prefix="/nts")

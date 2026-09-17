@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -78,6 +78,14 @@ class TargetSpec:
     group_index: int = 0
     position: int = 0
     geometry: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class RecordSummary:
+    """A record without its clinical aggregate, plus one derived flag."""
+
+    record: NtsOdontogramRecord
+    is_superseded: bool
 
 
 @dataclass(frozen=True)
@@ -159,6 +167,65 @@ class NtsRecordService:
             .limit(1)
         )
         return (await db.execute(stmt)).unique().scalar_one_or_none()
+
+    @staticmethod
+    async def list_records(
+        db: AsyncSession,
+        clinic_id: UUID,
+        patient_id: UUID,
+        *,
+        norm_version: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[RecordSummary], int]:
+        """A patient's records, newest first, without their aggregates.
+
+        History listings must not drag every finding and target along, so
+        this deliberately selects columns rather than entities.
+
+        ``is_superseded`` is derived here and never persisted: a record is
+        superseded when a *finalized* record names it as its predecessor.
+        """
+        successor = NtsOdontogramRecord.__table__.alias("successor")
+        superseded = (
+            select(successor.c.id)
+            .where(
+                successor.c.supersedes_record_id == NtsOdontogramRecord.id,
+                successor.c.status == RecordStatus.FINALIZED.value,
+            )
+            .exists()
+        )
+
+        filters = [
+            NtsOdontogramRecord.clinic_id == clinic_id,
+            NtsOdontogramRecord.patient_id == patient_id,
+        ]
+        if norm_version is not None:
+            filters.append(NtsOdontogramRecord.norm_version == norm_version)
+        if status is not None:
+            filters.append(NtsOdontogramRecord.status == status)
+
+        total = await db.scalar(
+            select(func.count()).select_from(NtsOdontogramRecord).where(*filters)
+        )
+
+        # Newest clinically first: a finalized record is dated by its
+        # finalize, everything else by when it was opened.
+        ordering = func.coalesce(NtsOdontogramRecord.finalized_at, NtsOdontogramRecord.recorded_at)
+        rows = (
+            await db.execute(
+                select(NtsOdontogramRecord, superseded.label("is_superseded"))
+                .where(*filters)
+                .order_by(ordering.desc(), NtsOdontogramRecord.recorded_at.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        ).all()
+
+        return [
+            RecordSummary(record=record, is_superseded=bool(flag)) for record, flag in rows
+        ], int(total or 0)
 
     # ------------------------------------------------------------------
     # create
@@ -356,11 +423,17 @@ class NtsRecordService:
         stage_label: str | None = None,
         observations: str | None = None,
         clear_stage_label: bool = False,
+        clear_observations: bool = False,
     ) -> NtsOdontogramRecord:
         """Change the three editable metadata fields, and nothing else.
 
         Identity, lifecycle, authorship, hashes and supersession are not
         reachable from here — each has its own operation or none at all.
+
+        ``None`` means *leave unchanged*, so clearing a nullable field needs
+        its own flag: ``clear_stage_label`` / ``clear_observations``. Without
+        them a caller could never distinguish "do not touch" from "set to
+        NULL".
         """
         record = await NtsRecordService.get_record(db, clinic_id, record_id)
         version = await NtsRecordService._compare_and_bump(db, clinic_id, record, expected_version)
@@ -372,7 +445,9 @@ class NtsRecordService:
             record.stage_label = None
         elif stage_label is not None:
             record.stage_label = stage_label
-        if observations is not None:
+        if clear_observations:
+            record.observations = None
+        elif observations is not None:
             record.observations = observations
 
         if record.stage == "other" and not record.stage_label:

@@ -57,8 +57,13 @@ serialization) and `nts/exceptions.py` (domain errors, mapped to HTTP by
 B.3). The service **flushes but never commits**: the transaction belongs to
 the caller.
 
-Still **not** implemented: router, endpoints, API schemas, geometry capture,
-signature, NTS permissions.
+`nts/router.py` + `nts/schemas.py` expose it at **`/api/v1/odontogram/nts`**,
+gated by the existing `odontogram.read` / `odontogram.write`. The router never
+commits or rolls back — `get_db()` owns the transaction — and it re-raises
+domain errors as `HTTPException` so a 4xx actually rolls back.
+
+Still **not** implemented: frontend/renderer, geometry capture, signature,
+an audit-trail endpoint, NTS-specific permissions.
 
 See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
 [ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
@@ -100,6 +105,11 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   normative metadata is a catalog ticket, not an `if` in the service.
 - **A cardinality the norm does not state is not a constraint.** `min_count` /
   `max_count` of `None` mean silence; do not turn it into a requirement.
+- **Never return a 4xx from an NTS handler without raising.** Returning it
+  normally would let `get_db()` commit a half-applied mutation. Go through
+  the router's `_guard` helper.
+- **Every NTS mutation takes `expected_version` in the body**, which is why
+  removals are `POST .../remove` and not `DELETE`.
 - **Do not store geometry yet.** The column exists but
   `ck_nts_target_geometry_pending` (`geometry IS NULL`) and
   CanonicalSnapshotV1 both refuse a non-null value: GEOMETRY CONTRACT

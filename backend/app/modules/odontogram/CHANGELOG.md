@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+- feat(nts-04b.3): **HTTP API** for NTS clinical records, mounted at
+  `/api/v1/odontogram/nts` as its own subrouter — 16 endpoints across catalog,
+  patient records, findings, targets, specifications and lifecycle. The
+  Original profile's routes are untouched. No schema change, no migration.
+
+  Permissions reuse `odontogram.read` / `odontogram.write`; no NTS-specific
+  permission is introduced. `get_db()` keeps owning the transaction: the
+  router never commits or rolls back, and a domain failure is re-raised as an
+  `HTTPException` so the dependency actually rolls back — returning a 4xx
+  normally would commit a half-applied mutation, and a test proves it does
+  not. Domain errors map centrally to 404 / 409 / 422 with machine-readable
+  codes (`nts_version_conflict`, `nts_state_conflict`, `nts_draft_conflict`,
+  `nts_clinical_validation`, `nts_record_not_found`), and a clinical
+  validation failure keeps its full list of problems instead of one string.
+
+  Every mutation carries `expected_version` in the body — which is why
+  removals are `POST .../remove` rather than `DELETE` with a body — and every
+  mutation response reports the version the server actually reached, so no
+  client infers `expected_version + 1`. Request schemas are `extra="forbid"`,
+  so `clinic_id`, `actor_id`, `status`, `version` and the hash fields cannot
+  be smuggled in. `PATCH` on a record distinguishes an absent key (leave
+  alone) from an explicit `null` (clear), and `PUT` on a specification
+  requires `finding_id` even when null so omitting it can never read as
+  "unlink". `GET current` / `GET draft` answer `200` with `data: null` when
+  there is none — only a named record that does not exist is a 404, and an
+  unknown `norm_version` is distinguishable from an empty history.
+
+  The catalog is served read-only (`GET /nts/catalogs`,
+  `GET /nts/catalogs/{norm_version}`) so no client re-types the 38 rules in
+  TypeScript; the catalog's own Pydantic models are the response schema.
+  Record history is paginated and never loads findings or targets.
+
+  Two read-only service additions this required: `list_records(...)` and a
+  `clear_observations` flag on `update_metadata` (`None` already meant "leave
+  unchanged", so clearing needed its own signal). The audit trail is **not**
+  exposed: its access model and volume need their own design. Nothing here
+  claims a digital signature, compliance or SIHCE accreditation.
+
 - feat(nts-04b.2): **transactional service** for NTS clinical records —
   `nts/service.py`, `nts/validation.py`, `nts/audit.py`, `nts/exceptions.py`.
   No router, no endpoints, no schema change: `odo_0004` is untouched.
