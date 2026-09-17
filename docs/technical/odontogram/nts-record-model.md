@@ -98,11 +98,17 @@ that a supersession target exists, is `finalized`, and shares
 | `sequence` | int, unique per record — deterministic render/print order |
 | `created_at`, `created_by` | who added this finding, and when |
 
-**Composite FK.** `nts_findings (record_id, norm_version)` references
-`nts_odontogram_records (id, norm_version)`, which carries a matching
-`UNIQUE (id, norm_version)`. The finding physically carries
-`norm_version` — indexable, no join — and divergence from its record is
-impossible by construction rather than by convention.
+**Composite FK, and only that one.** `nts_findings (record_id,
+norm_version)` references `nts_odontogram_records (id, norm_version)`, which
+carries a matching `UNIQUE (id, norm_version)`. The finding physically
+carries `norm_version` — indexable, no join — and divergence from its record
+is impossible by construction rather than by convention.
+
+There is deliberately **no separate FK on `record_id` alone**. Both columns
+are `NOT NULL`, so MATCH SIMPLE never short-circuits and the composite
+constraint already guarantees parent existence, version equality and the
+`ON DELETE CASCADE`. A second constraint would only duplicate the check,
+split the ORM join into two paths and widen the migration surface.
 
 **Not stored, deliberately:**
 
@@ -746,6 +752,12 @@ tooth figure the renderer draws is itself unversioned.
 > **GEOMETRY CONTRACT PENDING.** Capturing geometry before its coordinate
 > space is defined and versioned makes replay impossible, and that is the
 > one irreversible mistake available in this design.
+
+Two independent guards keep it shut. `ck_nts_target_geometry_pending`
+(`geometry IS NULL`) refuses a shape **at write time**, so a draft can never
+accumulate one that would later block finalizing it; and
+CanonicalSnapshotV1 refuses a non-null value at hash time. Enabling geometry
+means a migration dropping that CHECK *and* canonicalization version 2.
 
 CanonicalSnapshotV1 reserves the slot: `geometry` appears in the target
 object and serialises as `null` today. When the contract lands, it will

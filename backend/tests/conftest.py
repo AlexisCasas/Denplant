@@ -60,6 +60,13 @@ from app.modules.odontogram.models import (  # noqa: F401
     Treatment,
     TreatmentTooth,
 )
+from app.modules.odontogram.nts.models import (  # noqa: F401
+    NtsFinding,
+    NtsFindingTarget,
+    NtsOdontogramRecord,
+    NtsRecordAuditEvent,
+    NtsRecordSpecification,
+)
 from app.modules.patients.models import Patient  # noqa: F401
 from app.modules.payments.models import (  # noqa: F401
     PatientEarnedEntry,

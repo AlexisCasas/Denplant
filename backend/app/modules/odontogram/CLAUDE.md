@@ -45,9 +45,17 @@ It is **data only** — no findings model, no persistence, no endpoints, no
 renderer. Full reference:
 [`docs/technical/odontogram/nts-188-catalog.md`](../../../../docs/technical/odontogram/nts-188-catalog.md).
 
-The clinical record model that will consume it is **design/ADR only, not
-implemented**: no tables, no models, no migrations. See
-[`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
+`nts/models.py` + migration `odo_0004` are the **persistence foundation**:
+five tables (`nts_odontogram_records`, `nts_findings`, `nts_finding_targets`,
+`nts_record_specifications`, `nts_record_audit_events`) plus two structural
+triggers. `nts/canonical.py` implements CanonicalSnapshotV1 (build →
+serialise → SHA-256).
+
+Still **not** implemented: router, endpoints, clinical service, finalize /
+discard / supersede, carry-forward, automatic audit-event generation,
+geometry capture, signature, NTS permissions.
+
+See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
 [ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
 [ADR 0022](../../../../docs/adr/0022-nts-lifecycle-auditability-concurrency.md).
 
@@ -73,6 +81,21 @@ implemented**: no tables, no models, no migrations. See
   cross-rule sigla collision is normative, not a data defect.
 - **`OdontogramChart.vue` stays profile-unaware.** Renderer selection lives
   in `OdontogramProfileView`; do not add `if (profile === ...)` to the chart.
+- **NTS records are never deleted and finalized ones never updated** — a DB
+  trigger refuses both. Corrections are a new record with
+  `supersedes_record_id`; abandonment is `status='discarded'`.
+- **`nts_record_audit_events` is append-only** (trigger). Never UPDATE or
+  DELETE it.
+- **Every NTS mutation must compare-and-bump `records.version` first**, in the
+  same transaction, and write one audit event. Zero rows updated → 409.
+- **Do not store geometry yet.** The column exists but
+  `ck_nts_target_geometry_pending` (`geometry IS NULL`) and
+  CanonicalSnapshotV1 both refuse a non-null value: GEOMETRY CONTRACT
+  PENDING. Enabling it means a migration dropping that CHECK *and*
+  canonicalization version 2.
+- **`nts_findings` reaches its record through one composite FK**
+  (`record_id, norm_version`). Do not add a second FK on `record_id` alone —
+  it adds nothing and splits the ORM join into two paths.
 
 ## Related ADRs
 

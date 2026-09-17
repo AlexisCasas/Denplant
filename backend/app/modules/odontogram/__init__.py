@@ -13,6 +13,17 @@ from .models import (
     Treatment,
     TreatmentTooth,
 )
+
+# NTS clinical records (ADR 0021). Imported here so the classes register on
+# `Base.metadata` when the plugin loader imports this package — persistence
+# foundation only; no router, no service, no endpoints yet.
+from .nts.models import (
+    NtsFinding,
+    NtsFindingTarget,
+    NtsOdontogramRecord,
+    NtsRecordAuditEvent,
+    NtsRecordSpecification,
+)
 from .router import router
 
 logger = logging.getLogger(__name__)
@@ -51,6 +62,11 @@ class OdontogramModule(BaseModule):
             Treatment,
             TreatmentTooth,
             OdontogramUserPreference,
+            NtsOdontogramRecord,
+            NtsFinding,
+            NtsFindingTarget,
+            NtsRecordSpecification,
+            NtsRecordAuditEvent,
         ]
 
     def get_router(self) -> APIRouter:

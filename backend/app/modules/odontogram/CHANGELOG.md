@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- feat(nts-04b.1): NTS clinical record **persistence foundation**. Migration
+  `odo_0004` creates the five tables of ADR 0021 — `nts_odontogram_records`,
+  `nts_findings`, `nts_finding_targets`, `nts_record_specifications`,
+  `nts_record_audit_events` — with their structural constraints and the first
+  two triggers in the repo: `trg_nts_records_guard` (a finalized or discarded
+  record is terminal; no NTS record is ever physically deleted) and
+  `trg_nts_audit_append_only` (the audit trail takes INSERT only). Nothing in
+  the Original profile is touched and no data is backfilled.
+
+  Structure only: the DB enforces the lifecycle triples, `version >= 1`, the
+  one-draft and linear-supersession-chain partial indexes, FDI validity
+  (permanent *and* deciduous), target-kind column coherence with no sentinel
+  tooth numbers, and — via composite foreign keys — that a finding cannot
+  diverge from its record's `norm_version` and a specification cannot point at
+  a finding of another record. A finding reaches its record through that one
+  composite FK only: both its columns are NOT NULL, so it already guarantees
+  parent existence, version equality and the cascade. Normative meaning stays
+  in the catalog and the service, never in DDL.
+
+  Geometry is refused at write time too: `ck_nts_target_geometry_pending`
+  (`geometry IS NULL`) makes a stored shape structurally impossible while
+  canonicalization version 1 is the only one implemented, so a draft can never
+  accumulate a shape that would later block finalizing it. The future migration
+  that introduces version 2 drops the CHECK. The three nullable JSONB columns
+  use `none_as_null` so Python `None` becomes SQL NULL rather than the JSON
+  value `null`.
+
+  New `nts/canonical.py` implements **CanonicalSnapshotV1**: build → serialise
+  → SHA-256, with a hand-written JSON emitter so a library upgrade can never
+  change a stored record's digest. Version 1 refuses floats and any non-null
+  `geometry` (GEOMETRY CONTRACT PENDING) rather than dropping them silently.
+  Pinned by two golden vectors with literal expected bytes and digests.
+
+  **Not implemented here:** router, endpoints, API schemas, the clinical
+  service, operative compare-and-bump, carry-forward, finalize, discard,
+  supersede, automatic audit-event generation, geometry capture, digital
+  signature and NTS permissions. `finalized` means DenPlant locked the
+  snapshot — **not** that the document is digitally signed, and no compliance
+  or SIHCE accreditation is claimed.
+
 - docs(nts-04a.2): design/ADR for the NTS clinical record model. **No code,
   no tables, no migrations** — `docs/technical/odontogram/nts-record-model.md`
   plus ADR 0021 (five-table hybrid relational + JSONB persistence model) and
