@@ -269,6 +269,207 @@ describe('NTS-05B §31 — chart / shell integration', () => {
 })
 
 // ---------------------------------------------------------------------------
+// NTS-05C — the structured finding editor, seen from the shell
+// ---------------------------------------------------------------------------
+
+describe('NTS-05C — finding editor integration', () => {
+  function editorFinding(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'f1',
+      record_id: 'rec-1',
+      norm_version: 'pe_nts_188_2022',
+      rule_id: '6.1.20',
+      attributes: {},
+      provenance: 'observed',
+      source_finding_id: null,
+      sequence: 1,
+      created_at: '2026-01-02T10:00:00Z',
+      created_by: 'u1',
+      targets: [{
+        id: 't1',
+        group_index: 0,
+        position: 0,
+        participation: 'subject',
+        role: null,
+        target_kind: 'fdi_tooth',
+        tooth_number: 16,
+        arch: null,
+        local_ordinal: null,
+        geometry: null
+      }],
+      ...overrides
+    }
+  }
+
+  /** A catalog with one rule of each shape the editor must handle. */
+  const EDITOR_CATALOG = {
+    ...CATALOG,
+    rules: [
+      {
+        rule_id: '6.1.20',
+        ordinal: 20,
+        official_name: 'Pieza dentaria ausente',
+        scope: 'tooth',
+        target_identity: 'numbered',
+        anchor: null,
+        arch_cardinality: null,
+        range_grouping: null,
+        attributes: [],
+        target_roles: [],
+        specification_requirement: null,
+        status: 'verified'
+      },
+      {
+        rule_id: '6.1.2',
+        ordinal: 2,
+        official_name: 'Aparato ortodóntico removible',
+        scope: 'arch',
+        target_identity: 'numbered',
+        anchor: null,
+        arch_cardinality: 'one',
+        range_grouping: null,
+        attributes: [],
+        target_roles: [],
+        specification_requirement: null,
+        status: 'verified'
+      }
+    ]
+  }
+
+  function routeEditor(options: { current?: unknown, draft?: unknown, catalog?: unknown }) {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: options.catalog ?? EDITOR_CATALOG }
+      if (url.endsWith('/current')) return { data: options.current ?? null }
+      if (url.endsWith('/draft')) return { data: options.draft ?? null }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        return { data: [], total: 0, page: 1, page_size: 20 }
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function mountShell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  it('offers the editor over a draft and lists its findings', async () => {
+    routeEditor({ draft: chartRecord({ findings: [editorFinding()] }) })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-finding-list"]').exists()).toBe(true)
+    // The label is resolved through the catalog, not stored on the finding.
+    expect(wrapper.find('[data-testid="nts-finding-f1"]').text()).toContain('Pieza dentaria ausente')
+  })
+
+  it('a finalized record is read-only: no add, no edit, no remove, no confirm', async () => {
+    routeEditor({
+      current: chartRecord({ status: 'finalized', findings: [editorFinding()] })
+    })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-finding-list"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-edit-f1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-remove-f1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-confirm-f1"]').exists()).toBe(false)
+  })
+
+  it('the chart stays inert until a rule that needs teeth is open', async () => {
+    routeEditor({ draft: chartRecord() })
+
+    const wrapper = await mountShell()
+
+    // 52 permanent tab stops with nothing to select would be noise.
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(0)
+
+    await wrapper.find('[data-testid="nts-add-finding"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-rule-6.1.20"]').trigger('click')
+    await settle()
+
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+  })
+
+  it('an arch-scoped rule shows an arch selector and never a tooth range', async () => {
+    routeEditor({ draft: chartRecord() })
+
+    const wrapper = await mountShell()
+    await wrapper.find('[data-testid="nts-add-finding"]').trigger('click')
+    await settle()
+    // Chosen by scope: the component is never told which rule id this is.
+    await wrapper.find('[data-testid="nts-rule-6.1.2"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-arch-selector"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-target-editor"]').attributes('data-scope')).toBe('arch')
+    // Teeth are not selectable for it.
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(0)
+  })
+
+  it('a carried-forward finding shows its state and an individual confirm', async () => {
+    routeEditor({
+      draft: chartRecord({ findings: [editorFinding({ id: 'cf1', provenance: 'carried_forward' })] })
+    })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-finding-pending"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-confirm-cf1"]').exists()).toBe(true)
+    expect(wrapper.html()).not.toMatch(/confirmAll|confirm_all|confirm-all/)
+  })
+
+  it('an observed finding offers no confirm action', async () => {
+    routeEditor({ draft: chartRecord({ findings: [editorFinding()] }) })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-finding-pending"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-confirm-f1"]').exists()).toBe(false)
+  })
+
+  it('a draft with no findings still offers the editor', async () => {
+    routeEditor({ draft: chartRecord({ findings: [] }) })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-finding-list-empty"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(true)
+  })
+
+  it('without a catalog the editor never appears and nothing is mutated', async () => {
+    routeEditor({ draft: chartRecord(), catalog: { ...CATALOG, rules: [] } })
+
+    const wrapper = await mountShell()
+
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(false)
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+  })
+
+  it('a finding whose rule the catalog no longer serves degrades to its id', async () => {
+    routeEditor({
+      draft: chartRecord({ findings: [editorFinding({ id: 'gone', rule_id: '9.9.9' })] })
+    })
+
+    const wrapper = await mountShell()
+    const row = wrapper.find('[data-testid="nts-finding-gone"]')
+
+    expect(row.exists()).toBe(true)
+    expect(row.text()).toContain('9.9.9')
+    expect(wrapper.find('[data-testid="nts-finding-unknown-rule"]').exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // §38 — Original -> MINSA -> Original
 // ---------------------------------------------------------------------------
 
@@ -380,9 +581,15 @@ describe('§40 — no confirm-all', () => {
     expect(source).not.toMatch(/confirmAll|confirm_all|confirm-all/)
   })
 
-  it('offers no finding-level confirm either (that arrives with the editor)', () => {
-    const shell = NTS_SOURCES.find(f => f.relative.endsWith('NtsOdontogramShell.vue'))!
-    expect(shell.source).not.toMatch(/confirmFinding|reviewFinding|\/review\b/)
+  it('confirms one finding at a time — the editor added that, not a bulk action', () => {
+    // 05C introduced per-finding confirmation, which is what the norm's
+    // individual review needs. What must never appear is a bulk endpoint or
+    // a "confirm everything" control.
+    for (const { source } of NTS_SOURCES) {
+      expect(source).not.toMatch(/confirmAll|confirm_all|confirm-all/)
+    }
+    const api = NTS_SOURCES.find(f => f.relative.endsWith('useNtsApi.ts'))!
+    expect(api.source).toContain('/confirm')
   })
 })
 

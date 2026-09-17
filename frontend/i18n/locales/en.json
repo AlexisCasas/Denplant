@@ -491,6 +491,67 @@
         "findingsPendingHint": "Drawing them on the odontogram arrives in the next phase.",
         "findingRendererPending": "Finding rendering pending"
       },
+      "editor": {
+        "findings": "Findings",
+        "noFindings": "No findings recorded.",
+        "newFinding": "New finding",
+        "editFinding": "Edit finding",
+        "addFinding": "Add finding",
+        "saveFinding": "Save finding",
+        "confirmFinding": "Confirm finding",
+        "removeFinding": "Withdraw finding",
+        "removeExplanation": "The finding is withdrawn from this draft. The record keeps its audit trail.",
+        "partialTitle": "Edit partially applied",
+        "partialBody": "The attributes were saved but the targets were not. Review the finding's targets: the record has already changed and is not undone automatically.",
+        "edit": "Edit",
+        "searchFindings": "Search findings",
+        "noMatches": "No finding matches the search.",
+        "targets": "Target",
+        "selectedTeeth": "Selected teeth",
+        "selectedArches": "Arches",
+        "anchors": "References",
+        "rangeSpan": "Range",
+        "toothCount": "{count} tooth/teeth",
+        "roles": "Tooth roles",
+        "noRole": "No role",
+        "pickSubject": "Pick teeth",
+        "pickAnchor": "Pick references",
+        "unnumberedSubject": "This tooth has no FDI number: it is located by its neighbours.",
+        "unnumberedBetween": "Between {teeth}",
+        "pendingReview": "Awaiting review",
+        "unknownRule": "This build does not recognise this finding's rule.",
+        "unknownRuleShort": "Unknown rule",
+        "attributeRequired": "This value is required.",
+        "needsClinicalReview": "The catalog flags this value as awaiting clinical review.",
+        "specificationRequired": "This finding needs an Especificaciones entry before the odontogram can be finalized.",
+        "specificationAdvisory": "The catalog suggests recording further detail in Especificaciones.",
+        "pick": {
+          "tooth": "Select {count} tooth/teeth on the odontogram.",
+          "surface": "Select the tooth on the odontogram and mark its surfaces.",
+          "pair": "Select the two teeth on the odontogram.",
+          "range": "Select the first and last tooth of the range.",
+          "archOne": "Select the arch under treatment.",
+          "archOneOrBoth": "Select one arch or both.",
+          "unnumbered": "Select the {count} neighbouring teeth that locate the finding."
+        },
+        "problem": {
+          "subjectCount": "{expected} tooth/teeth required; {count} selected.",
+          "rangeRequired": "Select the range of teeth.",
+          "duplicateTooth": "A tooth is selected twice.",
+          "anchorCount": "{expected} reference(s) required; {count} selected.",
+          "anchorDistinct": "References must be distinct teeth.",
+          "archRequired": "Select an arch.",
+          "archExactlyOne": "This rule covers exactly one arch.",
+          "archOneOrBoth": "This rule covers one arch or both.",
+          "roleMin": "Role {role} needs at least {min} tooth/teeth.",
+          "roleMax": "Role {role} allows at most {max} tooth/teeth."
+        },
+        "a11y": {
+          "select": "Select {tooth}",
+          "selected": "{tooth}, selected",
+          "anchorSelected": "{tooth}, selected as a reference"
+        }
+      },
       "status": {
         "draft": "Draft",
         "finalized": "Finalized",
@@ -531,7 +592,7 @@
       },
       "carriedForward": {
         "title": "{count} carried-forward finding(s) awaiting review",
-        "hint": "They were copied from an earlier record and must be reviewed one by one. Review arrives with the finding editor."
+        "hint": "They were copied from an earlier record. Confirm each one in the findings list before finalizing."
       },
       "conflict": {
         "title": "The odontogram changed in another session",

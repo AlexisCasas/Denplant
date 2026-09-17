@@ -491,6 +491,67 @@
         "findingsPendingHint": "Leur tracé sur l'odontogramme arrive à la prochaine phase.",
         "findingRendererPending": "Tracé des constatations à venir"
       },
+      "editor": {
+        "findings": "Constatations",
+        "noFindings": "Aucune constatation enregistrée.",
+        "newFinding": "Nouvelle constatation",
+        "editFinding": "Modifier la constatation",
+        "addFinding": "Ajouter la constatation",
+        "saveFinding": "Enregistrer",
+        "confirmFinding": "Confirmer la constatation",
+        "removeFinding": "Retirer la constatation",
+        "removeExplanation": "La constatation est retirée de ce brouillon. L'enregistrement conserve sa piste d'audit.",
+        "partialTitle": "Modification partiellement appliquée",
+        "partialBody": "Les attributs ont été enregistrés, mais pas les cibles. Vérifiez les cibles de la constatation : l'enregistrement a déjà changé et n'est pas annulé automatiquement.",
+        "edit": "Modifier",
+        "searchFindings": "Rechercher une constatation",
+        "noMatches": "Aucune constatation ne correspond.",
+        "targets": "Cible",
+        "selectedTeeth": "Dents sélectionnées",
+        "selectedArches": "Arcades",
+        "anchors": "Références",
+        "rangeSpan": "Étendue",
+        "toothCount": "{count} dent(s)",
+        "roles": "Rôles des dents",
+        "noRole": "Aucun rôle",
+        "pickSubject": "Choisir les dents",
+        "pickAnchor": "Choisir les références",
+        "unnumberedSubject": "Cette dent n'a pas de numéro FDI : elle est située par ses voisines.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "À revoir",
+        "unknownRule": "Cette version ne reconnaît pas la règle de cette constatation.",
+        "unknownRuleShort": "Règle inconnue",
+        "attributeRequired": "Cette donnée est obligatoire.",
+        "needsClinicalReview": "Le catalogue signale cette donnée comme en attente de revue clinique.",
+        "specificationRequired": "Cette constatation exige une Especificación avant de finaliser l'odontogramme.",
+        "specificationAdvisory": "Le catalogue suggère de consigner un détail supplémentaire dans Especificaciones.",
+        "pick": {
+          "tooth": "Sélectionnez {count} dent(s) sur l'odontogramme.",
+          "surface": "Sélectionnez la dent puis indiquez les faces.",
+          "pair": "Sélectionnez les deux dents sur l'odontogramme.",
+          "range": "Sélectionnez la première et la dernière dent de l'étendue.",
+          "archOne": "Sélectionnez l'arcade traitée.",
+          "archOneOrBoth": "Sélectionnez une arcade ou les deux.",
+          "unnumbered": "Sélectionnez les {count} dents voisines qui situent la constatation."
+        },
+        "problem": {
+          "subjectCount": "{expected} dent(s) requise(s) ; {count} sélectionnée(s).",
+          "rangeRequired": "Sélectionnez l'étendue de dents.",
+          "duplicateTooth": "Une dent est sélectionnée deux fois.",
+          "anchorCount": "{expected} référence(s) requise(s) ; {count} sélectionnée(s).",
+          "anchorDistinct": "Les références doivent être des dents distinctes.",
+          "archRequired": "Sélectionnez une arcade.",
+          "archExactlyOne": "Cette règle couvre exactement une arcade.",
+          "archOneOrBoth": "Cette règle couvre une arcade ou les deux.",
+          "roleMin": "Le rôle {role} exige au moins {min} dent(s).",
+          "roleMax": "Le rôle {role} admet au plus {max} dent(s)."
+        },
+        "a11y": {
+          "select": "Sélectionner {tooth}",
+          "selected": "{tooth}, sélectionnée",
+          "anchorSelected": "{tooth}, sélectionnée comme référence"
+        }
+      },
       "status": {
         "draft": "Brouillon",
         "finalized": "Finalisé",
@@ -531,7 +592,7 @@
       },
       "carriedForward": {
         "title": "{count} constatation(s) reportée(s) à revoir",
-        "hint": "Elles proviennent d'un enregistrement antérieur et doivent être revues une à une. La revue arrivera avec l'éditeur de constatations."
+        "hint": "Elles proviennent d'un enregistrement antérieur. Confirmez-les une à une dans la liste avant de finaliser."
       },
       "conflict": {
         "title": "L'odontogramme a changé dans une autre session",

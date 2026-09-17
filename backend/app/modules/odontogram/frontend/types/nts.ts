@@ -59,16 +59,39 @@ export interface NtsRoleDef {
 }
 
 /**
- * One normative rule. Typed loosely on purpose: the renderer tickets read
- * these fields, 05A only needs identity and the norm label, and narrowing
- * them here would start duplicating the catalog's own schema.
+ * Clinical reach of a rule. The platform vocabulary; NTS N.° 188 uses every
+ * member except `mouth`, which is why the editor builds no UI for it.
+ */
+export type NtsScope = 'tooth' | 'surface' | 'pair' | 'range' | 'arch' | 'mouth'
+
+/** Whether the clinical subject carries an FDI number. A supernumerary
+ * tooth does not: it exists, but the chart has no cell for it. */
+export type NtsTargetIdentity = 'numbered' | 'unnumbered'
+
+/** A spatial reference that positions a mark and asserts nothing clinical. */
+export interface NtsAnchorDef {
+  kind: string
+  cardinality: number
+  role: string
+}
+
+/**
+ * One normative rule.
+ *
+ * These fields are what the editor reads to build itself; the index
+ * signature keeps the rest of the catalog reachable without this file
+ * becoming a second copy of the catalog's schema. Nothing here is a value
+ * *of* the norm — only the shape the catalog serves.
  */
 export interface NtsRule {
   rule_id: string
   ordinal: number
   official_name: string
-  scope: string
-  target_identity: string
+  scope: NtsScope
+  target_identity: NtsTargetIdentity
+  anchor: NtsAnchorDef | null
+  arch_cardinality: 'one' | 'one_or_both' | null
+  range_grouping: 'single_segment' | 'multi_segment' | null
   attributes: NtsRuleAttribute[]
   target_roles: NtsRoleDef[]
   specification_requirement: NtsSpecificationRequirement | null
@@ -206,6 +229,57 @@ export interface NtsDraftCreatePayload {
 export interface NtsDiscardPayload {
   expected_version: number
   reason: string
+}
+
+// --- findings ---------------------------------------------------------------
+
+/** Whether a target carries the finding or merely positions it. */
+export type NtsTargetParticipation = 'subject' | 'anchor'
+
+/** What kind of entity a target is. There are deliberately no fake FDIs. */
+export type NtsTargetKind = 'fdi_tooth' | 'unnumbered_tooth' | 'arch'
+
+/** One target, exactly as `NtsTargetInput` declares it. */
+export interface NtsTargetPayload {
+  participation: NtsTargetParticipation
+  target_kind: NtsTargetKind
+  tooth_number?: number | null
+  arch?: string | null
+  local_ordinal?: number | null
+  role?: string | null
+  group_index?: number
+  position?: number
+}
+
+/** A finding and its targets, created as one aggregate in one request. */
+export interface NtsFindingCreatePayload {
+  expected_version: number
+  rule_id: string
+  attributes: Record<string, unknown>
+  targets: NtsTargetPayload[]
+}
+
+export interface NtsAttributesReplacePayload {
+  expected_version: number
+  attributes: Record<string, unknown>
+}
+
+export interface NtsTargetsReplacePayload {
+  expected_version: number
+  targets: NtsTargetPayload[]
+}
+
+/**
+ * Every finding mutation answers with the version the record actually
+ * reached, so no client ever infers `expected_version + 1`.
+ */
+export interface NtsFindingMutationResult {
+  record_version: number
+  finding: NtsFinding
+}
+
+export interface NtsVersionMutationResult {
+  record_version: number
 }
 
 export interface NtsExpectedVersionPayload {

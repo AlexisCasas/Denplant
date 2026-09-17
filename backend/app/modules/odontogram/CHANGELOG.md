@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+- feat(nts-05c): **structured finding editor**. The chart becomes a capture
+  surface: pick a rule from the catalog, fill the attributes it declares,
+  select the targets its scope needs, and create the finding. Existing
+  findings can be edited, have their target set replaced, be confirmed one at
+  a time when carried forward, and be withdrawn.
+
+  Everything is **catalog-driven**. There is no `switch (rule.rule_id)`, no
+  list of the 38 findings in TypeScript and no clinical knowledge in a Vue
+  component: `scope` decides what must be picked, `attributes` generates the
+  controls, `target_roles` offers the roles, `anchor` asks for the spatial
+  references, and `required` decides what blocks saving. The tests use
+  **synthetic rules** with invented ids precisely so a pass cannot be
+  explained by the code recognising a real one.
+
+  Two consequences worth stating, because the visual reference gets them
+  wrong. A removable orthodontic appliance is **arch**-scoped, so the editor
+  shows an arch selector rather than a range picker — it reads `scope`, and
+  the catalog and the norm both say arch. And a supernumerary tooth has no FDI
+  cell, so its subject target is sent with `target_kind: unnumbered_tooth` and
+  no tooth number, located by the two interproximal anchors the rule declares.
+  Neither behaviour is coded per rule.
+
+  **Surfaces are an attribute, not a target.** The API has no surface target
+  kind, and the norm's own `surfaces` vocabulary (M/D/O/V/L) is carried by a
+  catalog-declared `enum_multi`. Nothing geometric is ever sent: no SVG region
+  id reaches the backend, and no region→surface mapping was invented, because
+  the norm labels no side of the drawn crown. The free-form shape §6.1.16 and
+  §6.1.33 describe is the pending geometry channel, not this.
+
+  A finding and its targets are created in **one request** — the API takes
+  them as one aggregate — so there is no half-created finding to reconcile and
+  no client-side pretence of atomicity. Editing attributes and targets are two
+  endpoints, and the second uses the version the first reported rather than the
+  version the editor opened with. A 409 closes the editor, refetches through
+  the same recovery 05A already had, and is never retried; a 422 stays open
+  with every problem the server listed.
+
+  The chart is interactive **only while a rule needs teeth**: outside that it
+  has no tab stops and no pressed state, so a reader never meets 52 controls
+  that lead nowhere. Selection styling uses interaction tokens — red and blue
+  stay reserved for what a finding means.
+
+  Still pending: the normative finding renderer (05D) and the Especificaciones
+  editor (05E). 05C surfaces a requirement when a rule activates one and never
+  marks it satisfied; only `required = true` is described as blocking, and the
+  backend remains the authority on finalizing.
+
 - feat(nts-05b): **the official dental layout**. `NtsOdontogramChart` replaces
   the shell's "renderer pending" region with the structure of the norm's own
   *Anexo: Gráfico del odontograma* (NTS N.° 188-MINSA/DGIESP-2022, p. 22):

@@ -491,6 +491,67 @@
         "findingsPendingHint": "O seu desenho sobre o odontograma chega na próxima fase.",
         "findingRendererPending": "Representação de achados pendente"
       },
+      "editor": {
+        "findings": "Achados",
+        "noFindings": "Sem achados registados.",
+        "newFinding": "Novo achado",
+        "editFinding": "Editar achado",
+        "addFinding": "Adicionar achado",
+        "saveFinding": "Guardar achado",
+        "confirmFinding": "Confirmar achado",
+        "removeFinding": "Retirar achado",
+        "removeExplanation": "O achado é retirado deste rascunho. O registo mantém a sua trilha de auditoria.",
+        "partialTitle": "Edição aplicada parcialmente",
+        "partialBody": "Os atributos foram guardados, mas os alvos não. Reveja os alvos do achado: o registo já mudou e não é revertido automaticamente.",
+        "edit": "Editar",
+        "searchFindings": "Procurar achado",
+        "noMatches": "Nenhum achado corresponde à procura.",
+        "targets": "Alvo",
+        "selectedTeeth": "Dentes selecionados",
+        "selectedArches": "Arcadas",
+        "anchors": "Referências",
+        "rangeSpan": "Intervalo",
+        "toothCount": "{count} dente(s)",
+        "roles": "Papéis dos dentes",
+        "noRole": "Sem papel",
+        "pickSubject": "Escolher dentes",
+        "pickAnchor": "Escolher referências",
+        "unnumberedSubject": "Este dente não tem número FDI: é localizado pelos dentes vizinhos.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "Por rever",
+        "unknownRule": "Esta versão não reconhece a regra deste achado.",
+        "unknownRuleShort": "Regra desconhecida",
+        "attributeRequired": "Este dado é obrigatório.",
+        "needsClinicalReview": "O catálogo marca este dado como pendente de revisão clínica.",
+        "specificationRequired": "Este achado exige uma Especificação antes de finalizar o odontograma.",
+        "specificationAdvisory": "O catálogo sugere registar informação adicional em Especificaciones.",
+        "pick": {
+          "tooth": "Selecione {count} dente(s) no odontograma.",
+          "surface": "Selecione o dente no odontograma e indique as superfícies.",
+          "pair": "Selecione os dois dentes no odontograma.",
+          "range": "Selecione o primeiro e o último dente do intervalo.",
+          "archOne": "Selecione a arcada em tratamento.",
+          "archOneOrBoth": "Selecione uma arcada ou ambas.",
+          "unnumbered": "Selecione os {count} dentes vizinhos que localizam o achado."
+        },
+        "problem": {
+          "subjectCount": "São necessários {expected} dente(s); há {count}.",
+          "rangeRequired": "Selecione o intervalo de dentes.",
+          "duplicateTooth": "Um dente está repetido.",
+          "anchorCount": "São necessárias {expected} referência(s); há {count}.",
+          "anchorDistinct": "As referências devem ser dentes distintos.",
+          "archRequired": "Selecione uma arcada.",
+          "archExactlyOne": "Esta regra cobre exatamente uma arcada.",
+          "archOneOrBoth": "Esta regra cobre uma arcada ou ambas.",
+          "roleMin": "O papel {role} exige pelo menos {min} dente(s).",
+          "roleMax": "O papel {role} admite no máximo {max} dente(s)."
+        },
+        "a11y": {
+          "select": "Selecionar {tooth}",
+          "selected": "{tooth}, selecionado",
+          "anchorSelected": "{tooth}, selecionado como referência"
+        }
+      },
       "status": {
         "draft": "Rascunho",
         "finalized": "Finalizado",
@@ -531,7 +592,7 @@
       },
       "carriedForward": {
         "title": "{count} achado(s) transferido(s) por rever",
-        "hint": "Foram copiados de um registo anterior e devem ser revistos um a um. A revisão chega com o editor de achados."
+        "hint": "Foram copiados de um registo anterior. Confirme cada um na lista de achados antes de finalizar."
       },
       "conflict": {
         "title": "O odontograma mudou noutra sessão",

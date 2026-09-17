@@ -15,11 +15,20 @@
 import type { NtsDentitionRow } from '../../utils/ntsDentition'
 import NtsToothCell from './NtsToothCell.vue'
 
-defineProps<{
-  row: NtsDentitionRow
-  /** Pixels per layout unit. The same for every row, deciduous included. */
-  scale: number
-}>()
+withDefaults(
+  defineProps<{
+    row: NtsDentitionRow
+    /** Pixels per layout unit. The same for every row, deciduous included. */
+    scale: number
+    /** True while a rule needs teeth picked; the row is inert otherwise. */
+    selectable?: boolean
+    selectedTeeth?: readonly number[]
+    anchorTeeth?: readonly number[]
+  }>(),
+  { selectable: false, selectedTeeth: () => [], anchorTeeth: () => [] }
+)
+
+const emit = defineEmits<{ select: [fdi: number, rowOrder: number[]] }>()
 </script>
 
 <template>
@@ -35,6 +44,10 @@ defineProps<{
       :key="tooth.fdi"
       :tooth="tooth"
       :scale="scale"
+      :selectable="selectable"
+      :selected="selectedTeeth.includes(tooth.fdi)"
+      :anchor="anchorTeeth.includes(tooth.fdi)"
+      @select="emit('select', $event, row.teeth.map(t => t.fdi))"
     />
   </div>
 </template>

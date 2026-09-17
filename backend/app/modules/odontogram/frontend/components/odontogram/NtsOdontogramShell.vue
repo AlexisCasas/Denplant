@@ -15,8 +15,12 @@
  * so the layer's auto-imports are unavailable there.
  */
 
+import type { NtsFinding } from '../../types/nts'
 import { useNtsOdontogramRecord } from '../../composables/useNtsOdontogramRecord'
 import NtsOdontogramChart from './NtsOdontogramChart.vue'
+import NtsFindingEditor from './NtsFindingEditor.vue'
+import NtsFindingList from './NtsFindingList.vue'
+import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 
 const props = defineProps<{
   patientId: string
@@ -52,6 +56,8 @@ const {
   pendingCarriedForward,
   hasPendingCarriedForward,
   load,
+  reload,
+  recoverFromConflict,
   createDraft,
   finalizeDraft,
   discardDraft,
@@ -85,6 +91,49 @@ const discardReason = ref('')
  */
 const chartRecord = computed(() => draft.value ?? currentRecord.value)
 const chartReadonly = computed(() => !hasDraft.value)
+
+/**
+ * The structured finding editor.
+ *
+ * It is given the draft, the catalog's rules and a way to reload; it never
+ * reaches into the lifecycle state itself, and the lifecycle composable knows
+ * nothing about editing. A 409 is routed to the same recovery 05A already
+ * uses, so there is one conflict policy rather than two.
+ */
+const editor = useNtsFindingEditor({
+  record: () => (draft.value?.status === 'draft' ? draft.value : null),
+  rules: () => catalog.value?.rules ?? [],
+  reload: () => reload(),
+  onConflict: kind => recoverFromConflict(kind)
+})
+
+/** Teeth may only be picked while a rule that needs them is open. */
+const chartSelectable = computed(
+  () => editor.isOpen.value && editor.pickMode.value !== 'none'
+)
+const selectedTeeth = computed(() =>
+  editor.pickMode.value === 'anchor' && editor.selection.value.teeth.length === 0
+    ? []
+    : editor.selection.value.teeth
+)
+
+const removing = ref<NtsFinding | null>(null)
+
+async function confirmRemove(): Promise<void> {
+  const finding = removing.value
+  if (!finding) return
+  const ok = await editor.removeFinding(finding)
+  if (ok) removing.value = null
+}
+
+function saveEditor(): void {
+  if (editor.isCreating.value) {
+    void editor.createFinding()
+    return
+  }
+  const original = draft.value?.findings.find(f => f.id === editor.editing.value)
+  if (original) void editor.saveFinding(original)
+}
 
 const canSubmitCreate = computed(
   () => createStage.value !== 'other' || createStageLabel.value.trim().length > 0
@@ -394,6 +443,78 @@ watch([() => props.patientId, normVersion], () => void load())
         <NtsOdontogramChart
           :record="chartRecord"
           :readonly="chartReadonly"
+          :selectable="chartSelectable"
+          :selected-teeth="selectedTeeth"
+          :anchor-teeth="editor.selection.value.anchors"
+          @tooth-select="(fdi, rowOrder) => editor.pickTooth(fdi, rowOrder)"
+        />
+
+        <!-- Half of a two-step edit reached the server. Never "saved
+             successfully", and never undone behind the clinician's back. -->
+        <UAlert
+          v-if="editor.partialUpdate.value"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          :title="t('odontogram.nts.editor.partialTitle')"
+          :description="t('odontogram.nts.editor.partialBody')"
+          :close="true"
+          data-testid="nts-partial-update"
+          @update:open="editor.dismissPartialUpdate()"
+        />
+
+        <!-- Structured capture. Only a draft is editable; a finalized record
+             is a locked clinical document and is shown read-only. -->
+        <div
+          v-if="editor.isOpen.value"
+          data-testid="nts-editor-panel"
+        >
+          <NtsFindingEditor
+            :rules="catalog?.rules ?? []"
+            :rule="editor.rule.value"
+            :is-creating="editor.isCreating.value"
+            :attributes="editor.attributes.value"
+            :selection="editor.selection.value"
+            :pick-mode="editor.pickMode.value"
+            :problems="editor.problems.value"
+            :missing-attributes="editor.missingAttributes.value"
+            :specification-requirements="editor.specificationRequirements.value"
+            :can-save="editor.canSave.value"
+            :is-saving="editor.isSaving.value"
+            :clinical-errors="editor.clinicalErrors.value"
+            @select-rule="editor.selectRule"
+            @update:attributes="editor.attributes.value = $event"
+            @pick-mode="editor.setPickMode"
+            @toggle-arch="editor.toggleArch"
+            @set-role="(tooth, role) => editor.setRole(tooth, role)"
+            @save="saveEditor"
+            @cancel="editor.close"
+          />
+        </div>
+
+        <div
+          v-else-if="editor.canEdit.value"
+          class="flex justify-end"
+        >
+          <UButton
+            icon="i-lucide-plus"
+            size="sm"
+            data-testid="nts-add-finding"
+            @click="editor.startCreate"
+          >
+            {{ t('odontogram.nts.editor.addFinding') }}
+          </UButton>
+        </div>
+
+        <NtsFindingList
+          v-if="chartRecord"
+          :findings="chartRecord.findings"
+          :rules="catalog?.rules ?? []"
+          :readonly="!editor.canEdit.value"
+          :busy-id="editor.isSaving.value ? editor.editing.value : null"
+          @edit="editor.startEdit"
+          @confirm="editor.confirmFinding"
+          @remove="removing = $event"
         />
 
         <!-- History -->
@@ -534,6 +655,39 @@ watch([() => props.patientId, normVersion], () => void load())
             @click="submitDiscard()"
           >
             {{ t('odontogram.nts.actions.discardDraft') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Withdraw a finding. Not "delete permanently": the record keeps its
+         audit trail, and the wording must not promise otherwise. -->
+    <UModal
+      :open="removing !== null"
+      :title="t('odontogram.nts.editor.removeFinding')"
+      @update:open="$event || (removing = null)"
+    >
+      <template #body>
+        <p class="text-sm">
+          {{ t('odontogram.nts.editor.removeExplanation') }}
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="removing = null"
+          >
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton
+            color="warning"
+            :loading="editor.isSaving.value"
+            data-testid="nts-remove-confirm"
+            @click="confirmRemove()"
+          >
+            {{ t('odontogram.nts.editor.removeFinding') }}
           </UButton>
         </div>
       </template>

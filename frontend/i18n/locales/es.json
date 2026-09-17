@@ -519,6 +519,67 @@
         "findingsPendingHint": "Su representación gráfica sobre el odontograma llega en la siguiente fase.",
         "findingRendererPending": "Representación de hallazgos pendiente"
       },
+      "editor": {
+        "findings": "Hallazgos",
+        "noFindings": "Sin hallazgos registrados.",
+        "newFinding": "Nuevo hallazgo",
+        "editFinding": "Editar hallazgo",
+        "addFinding": "Agregar hallazgo",
+        "saveFinding": "Guardar hallazgo",
+        "confirmFinding": "Confirmar hallazgo",
+        "removeFinding": "Retirar hallazgo",
+        "removeExplanation": "El hallazgo se retira de este borrador. El registro conserva su traza de auditoría.",
+        "partialTitle": "Edición aplicada parcialmente",
+        "partialBody": "Los atributos se guardaron, pero los objetivos no. Revisa los objetivos del hallazgo: el registro ya cambió y no se deshace automáticamente.",
+        "edit": "Editar",
+        "searchFindings": "Buscar hallazgo",
+        "noMatches": "Ningún hallazgo coincide con la búsqueda.",
+        "targets": "Objetivo",
+        "selectedTeeth": "Piezas seleccionadas",
+        "selectedArches": "Arcadas",
+        "anchors": "Referencias",
+        "rangeSpan": "Rango",
+        "toothCount": "{count} pieza(s)",
+        "roles": "Roles de las piezas",
+        "noRole": "Sin rol",
+        "pickSubject": "Elegir piezas",
+        "pickAnchor": "Elegir referencias",
+        "unnumberedSubject": "Esta pieza no tiene número FDI: se ubica mediante las piezas vecinas.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "Por revisar",
+        "unknownRule": "Esta versión no reconoce la regla de este hallazgo.",
+        "unknownRuleShort": "Regla desconocida",
+        "attributeRequired": "Este dato es obligatorio.",
+        "needsClinicalReview": "El catálogo marca este dato como pendiente de revisión clínica.",
+        "specificationRequired": "Este hallazgo requiere una Especificación antes de finalizar el odontograma.",
+        "specificationAdvisory": "El catálogo sugiere registrar información adicional en Especificaciones.",
+        "pick": {
+          "tooth": "Selecciona {count} pieza(s) en el odontograma.",
+          "surface": "Selecciona la pieza en el odontograma e indica las superficies.",
+          "pair": "Selecciona las dos piezas en el odontograma.",
+          "range": "Selecciona la pieza inicial y la final del rango.",
+          "archOne": "Selecciona la arcada en tratamiento.",
+          "archOneOrBoth": "Selecciona una arcada o ambas.",
+          "unnumbered": "Selecciona las {count} piezas vecinas que ubican el hallazgo."
+        },
+        "problem": {
+          "subjectCount": "Se requieren {expected} pieza(s); hay {count}.",
+          "rangeRequired": "Selecciona el rango de piezas.",
+          "duplicateTooth": "Una pieza está repetida.",
+          "anchorCount": "Se requieren {expected} referencia(s); hay {count}.",
+          "anchorDistinct": "Las referencias deben ser piezas distintas.",
+          "archRequired": "Selecciona una arcada.",
+          "archExactlyOne": "Esta regla cubre exactamente una arcada.",
+          "archOneOrBoth": "Esta regla cubre una arcada o ambas.",
+          "roleMin": "El rol {role} requiere al menos {min} pieza(s).",
+          "roleMax": "El rol {role} admite como máximo {max} pieza(s)."
+        },
+        "a11y": {
+          "select": "Seleccionar {tooth}",
+          "selected": "{tooth}, seleccionado",
+          "anchorSelected": "{tooth}, seleccionado como referencia"
+        }
+      },
       "status": {
         "draft": "Borrador",
         "finalized": "Finalizado",
@@ -559,7 +620,7 @@
       },
       "carriedForward": {
         "title": "{count} hallazgo(s) arrastrado(s) sin revisar",
-        "hint": "Se copiaron de un registro anterior y deben revisarse uno a uno. La revisión llega con el editor de hallazgos."
+        "hint": "Se copiaron de un registro anterior. Confirma cada uno en la lista de hallazgos antes de finalizar."
       },
       "conflict": {
         "title": "El odontograma cambió en otra sesión",

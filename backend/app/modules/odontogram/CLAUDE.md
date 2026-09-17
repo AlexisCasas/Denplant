@@ -75,8 +75,16 @@ are the **dental layout** (NTS-05B): the four rows of the norm's Anexo, all 52
 teeth, FDI numbering and per-tooth base geometry. Layout only — no finding is
 drawn on it.
 
-Still **not** implemented: the finding renderer and editor, geometry capture,
-signature, an audit-trail endpoint, NTS-specific permissions.
+`frontend/utils/ntsFindingModel.ts`,
+`frontend/composables/useNtsFindingEditor.ts` and
+`frontend/components/odontogram/Nts{FindingEditor,FindingPicker,AttributeEditor,TargetEditor,FindingList}.vue`
+are the **structured finding editor** (NTS-05C): rule picking, generated
+attribute controls, target selection for all five scopes, create / edit /
+replace-targets / confirm / remove, all driven by catalog metadata.
+
+Still **not** implemented: the normative finding renderer (symbols, siglas,
+red/blue), the Especificaciones editor, geometry capture, signature, an
+audit-trail endpoint, NTS-specific permissions.
 
 See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
 [ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
@@ -130,8 +138,22 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   that is raster/artwork variation tolerated, not a normative distinction. Do
   not add an arch-dependent rule without normative evidence.
 - **Red and blue belong to the findings.** The norm gives those two colours
-  meaning; the layout stays neutral so they still read when the finding
-  renderer needs them.
+  meaning; the layout and the editor's selection styling stay neutral so they
+  still read when the finding renderer needs them.
+- **A surface is an attribute, never a target.** `TargetKind` has no surface
+  member; surface-scoped rules take one `fdi_tooth` target plus the catalog's
+  `surfaces` enum (M/D/O/V/L). Never send an SVG region id, and do not invent
+  a region→surface mapping: the norm labels no side of the drawn crown.
+- **A finding and its targets are created in one request.** `POST
+  .../findings` takes both. Do not split it and do not simulate a rollback.
+- **Editing attributes then targets costs two version bumps.** Use the
+  `record_version` the first response reports for the second call.
+- **The editor reads metadata, never a rule id.** `scope`, `attributes`,
+  `required`, `target_roles`, `anchor`, `arch_cardinality` and
+  `target_identity` are the whole contract. Test it with synthetic rules, or
+  the test cannot tell metadata from recognition.
+- **A carried-forward finding is confirmed one at a time.** There is no bulk
+  endpoint and no "confirm all" control, by design.
 - **Never present a `Treatment` as an NTS finding.** The norm separates
   *hallazgo* from *procedimiento*; `DiagnosisMode`'s conditions card and plan
   CTA are `Treatment`-backed and are therefore hidden under the MINSA

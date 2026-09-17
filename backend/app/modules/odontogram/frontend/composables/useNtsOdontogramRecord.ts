@@ -322,6 +322,8 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     // actions
     load,
     reload,
+    /** Exposed so the finding editor shares one conflict policy, not two. */
+    recoverFromConflict,
     createDraft,
     finalizeDraft,
     discardDraft,

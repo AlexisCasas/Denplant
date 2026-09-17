@@ -18,15 +18,28 @@
 import type { NtsTooth } from '../../utils/ntsDentition'
 import { NTS_CELL_HEIGHT, cellWidthFor, toothGeometry } from '../../utils/ntsDentition'
 
-const props = defineProps<{
-  tooth: NtsTooth
-  /**
-   * Pixels per layout unit. Every row shares one, so a deciduous molar comes
-   * out the size of a permanent one — as the annex draws it — and a narrow
-   * incisor lands on the same baseline as a wide molar.
-   */
-  scale: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    tooth: NtsTooth
+    /**
+     * Pixels per layout unit. Every row shares one, so a deciduous molar comes
+     * out the size of a permanent one — as the annex draws it — and a narrow
+     * incisor lands on the same baseline as a wide molar.
+     */
+    scale: number
+    /**
+     * True only while a rule actually needs teeth picked. The chart is inert
+     * otherwise, so a reader never meets 52 tab stops that lead nowhere.
+     */
+    selectable?: boolean
+    selected?: boolean
+    /** Picked as a spatial reference rather than as the clinical subject. */
+    anchor?: boolean
+  }>(),
+  { selectable: false, selected: false, anchor: false }
+)
+
+const emit = defineEmits<{ select: [fdi: number] }>()
 
 const { t } = useI18n()
 
@@ -53,11 +66,40 @@ const label = computed(() =>
     ? t('odontogram.nts.chart.deciduousTooth', { fdi: props.tooth.fdi })
     : t('odontogram.nts.chart.tooth', { fdi: props.tooth.fdi })
 )
+
+/**
+ * What a screen reader is told, which is never just "selected": the label
+ * says what clicking does and what state the tooth is already in, because
+ * highlight alone carries none of that.
+ */
+const actionLabel = computed(() => {
+  if (props.selected) {
+    return t('odontogram.nts.editor.a11y.selected', { tooth: label.value })
+  }
+  if (props.anchor) {
+    return t('odontogram.nts.editor.a11y.anchorSelected', { tooth: label.value })
+  }
+  return t('odontogram.nts.editor.a11y.select', { tooth: label.value })
+})
+
+/**
+ * Selection styling uses interaction tokens, never red or blue: the norm
+ * gives those two colours clinical meaning and the finding renderer needs
+ * them intact.
+ */
+const stateClass = computed(() => {
+  if (props.selected) return 'bg-primary-accent/10 ring-2 ring-primary-accent'
+  if (props.anchor) return 'bg-surface-sunken ring-1 ring-strong ring-dashed'
+  return props.selectable ? 'hover:bg-surface-muted' : ''
+})
 </script>
 
 <template>
-  <div
-    class="flex flex-col shrink-0"
+  <component
+    :is="selectable ? 'button' : 'div'"
+    :type="selectable ? 'button' : undefined"
+    class="flex flex-col shrink-0 rounded-token-xs transition-colors"
+    :class="stateClass"
     :style="{ width: `${widthPx}px` }"
     :data-testid="`nts-tooth-${tooth.fdi}`"
     :data-fdi="tooth.fdi"
@@ -65,6 +107,11 @@ const label = computed(() =>
     :data-arch="tooth.arch"
     :data-side="tooth.side"
     :data-quadrant="tooth.quadrant"
+    :data-selected="selected ? 'true' : undefined"
+    :data-anchor="anchor ? 'true' : undefined"
+    :aria-pressed="selectable ? selected || anchor : undefined"
+    :aria-label="selectable ? actionLabel : undefined"
+    @click="selectable && emit('select', tooth.fdi)"
   >
     <!-- Annotation box. The annex puts it on the outer side of every row —
          above the upper arches, below the lower ones — and that is where the
@@ -96,8 +143,8 @@ const label = computed(() =>
     <svg
       class="w-full"
       :viewBox="geometry.viewBox"
-      role="img"
-      :aria-label="label"
+      :role="selectable ? 'presentation' : 'img'"
+      :aria-label="selectable ? undefined : label"
       preserveAspectRatio="xMidYMid meet"
       fill="none"
       stroke="currentColor"
@@ -133,5 +180,5 @@ const label = computed(() =>
       data-region="annotation"
       aria-hidden="true"
     />
-  </div>
+  </component>
 </template>

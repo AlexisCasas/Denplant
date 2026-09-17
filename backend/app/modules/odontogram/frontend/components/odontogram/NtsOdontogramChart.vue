@@ -31,9 +31,19 @@ const props = withDefaults(
      * finding editor can be gated on it without re-plumbing the chart.
      */
     readonly?: boolean
+    /**
+     * True only while the editor has a rule that needs teeth. The chart
+     * itself decides nothing clinical: it reports clicks and paints the
+     * selection it is given.
+     */
+    selectable?: boolean
+    selectedTeeth?: readonly number[]
+    anchorTeeth?: readonly number[]
   }>(),
-  { record: null, readonly: false }
+  { record: null, readonly: false, selectable: false, selectedTeeth: () => [], anchorTeeth: () => [] }
 )
+
+const emit = defineEmits<{ toothSelect: [fdi: number, rowOrder: number[]] }>()
 
 const { t } = useI18n()
 
@@ -123,7 +133,11 @@ const findingCount = computed(() => props.record?.findings.length ?? 0)
           :key="row.id"
           :row="row"
           :scale="CHART_SCALE"
+          :selectable="selectable"
+          :selected-teeth="selectedTeeth"
+          :anchor-teeth="anchorTeeth"
           :class="row.id === 'deciduousUpper' ? 'pt-3' : row.id === 'permanentLower' ? 'pt-3' : ''"
+          @select="(fdi, rowOrder) => emit('toothSelect', fdi, rowOrder)"
         />
       </div>
     </div>
