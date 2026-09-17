@@ -45,6 +45,12 @@ It is **data only** — no findings model, no persistence, no endpoints, no
 renderer. Full reference:
 [`docs/technical/odontogram/nts-188-catalog.md`](../../../../docs/technical/odontogram/nts-188-catalog.md).
 
+The clinical record model that will consume it is **design/ADR only, not
+implemented**: no tables, no models, no migrations. See
+[`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-model.md),
+[ADR 0021](../../../../docs/adr/0021-nts-record-persistence-model.md) and
+[ADR 0022](../../../../docs/adr/0022-nts-lifecycle-auditability-concurrency.md).
+
 ## Gotchas
 
 - **FDI numbering is strict** (11–48 permanent, 51–85 deciduous).

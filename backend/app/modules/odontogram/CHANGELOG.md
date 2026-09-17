@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- docs(nts-04a.2): design/ADR for the NTS clinical record model. **No code,
+  no tables, no migrations** — `docs/technical/odontogram/nts-record-model.md`
+  plus ADR 0021 (five-table hybrid relational + JSONB persistence model) and
+  ADR 0022 (draft/discarded/finalized lifecycle, no hard delete, supersession
+  instead of mutation, append-only audit trail, optimistic locking,
+  carry-forward with individual review, `content_hash` over
+  CanonicalSnapshotV1). ADR 0022 is written to be reviewable on its own by a
+  legal/clinical reader. Records the explicit non-claims: `finalized` is not a
+  digitally signed document and no compliance or SIHCE accreditation is
+  asserted; the signature workstream is separate. Geometry storage stays
+  **GEOMETRY CONTRACT PENDING** until the anatomical coordinate space is
+  versioned. Implementation lands in NTS-04B.
+
 - feat(nts-03): versioned normative catalog for NTS N.° 188-MINSA/DGIESP-2022
   under `nts/catalog/` — typed schema, structural validator, cached loader and
   the 38 rules of §6.1 as data (`pe_nts_188_2022.json`). Each rule records its

@@ -331,7 +331,10 @@ Two deserve attention:
   procedure for correcting a material error. **NTS-03 documents this; it
   does not implement it.** Designing a digital immutability workflow
   against an undefined "moment of registration" would be inventing
-  compliance, so it is an explicit NTS-04 gate.
+  compliance, so it is an explicit NTS-04 gate. *(Resolved in design by
+  [ADR 0022](../../adr/0022-nts-lifecycle-auditability-concurrency.md) as a
+  product decision — draft/discarded/finalized with traceability from the
+  first persisted write — explicitly not as a reading of the norm.)*
 
 ## 14. Matrix A — `preview.html` coverage
 
@@ -447,6 +450,14 @@ Carried in `catalog.pending_decisions` so they travel with the data:
 4. What is the storage shape for the six clinician-defined geometries?
 5. Closed vocabularies for the three items in §12 — a clinical question, not
    an engineering one.
+
+Items 1 and 3 are now answered by the record model — see
+[`nts-record-model.md`](./nts-record-model.md) §3 and §2.3, and
+[ADR 0022](../../adr/0022-nts-lifecycle-auditability-concurrency.md).
+Item 4 remains open: **GEOMETRY CONTRACT PENDING**
+([`nts-record-model.md`](./nts-record-model.md) §11).
+`catalog.pending_decisions` still lists all five and is updated in NTS-04B,
+when the data change ships with its tests.
 
 ## 18. Consuming the catalog from the frontend (open, not implemented)
 
