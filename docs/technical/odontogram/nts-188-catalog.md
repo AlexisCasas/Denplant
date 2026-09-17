@@ -217,6 +217,58 @@ Naming decisions worth keeping straight:
 - **6.1.24/6.1.25 have no direction attribute.** Extrusion and intrusion
   arrows follow from the rule plus the FDI quadrant. Direction is
   renderer-derived; asking the clinician for it would invent an input.
+- **A target's role is not an attribute.** See §7.1.
+
+### 7.1 Target roles
+
+`NtsRule.target_roles` carries the roles a *target* of a finding may hold.
+NTS N.° 188 defines exactly one: `pilar`, on 6.1.29, whose §6.1.29
+draws "una línea recta horizontal ... con líneas verticales **sobre los
+pilares**" — being a pilar is a property of one tooth inside the span, not
+a datum of the finding.
+
+It lives on the rule and **never also as an attribute**; the validator
+refuses an attribute named `target_roles` precisely so a target's role
+cannot acquire two sources.
+
+`min_count` / `max_count` are `None` when **the norm states no
+cardinality** — which is the case for `pilar`. `0` would be a stated lower
+bound, never a stand-in for silence. The role is flagged
+`needs_clinical_review` because §6.1.29 mandates marking the pilares but
+never says how many there must be, nor which teeth of the span may be one.
+
+Role codes and siglas are **separate namespaces**: a role code equal to a
+sigla is not a collision, because nothing ever reads one as the other.
+
+### 7.2 Especificaciones requirements
+
+Three rules route data to the *Especificaciones* item (§5.14), and each now
+says so structurally rather than in prose, so a consumer never branches on a
+`rule_id`:
+
+| Where | Rule | `code` | `required` | Evidence |
+|---|---|---|---|---|
+| rule level | 6.1.3 | `crown_metal_colour` | **false**, flagged | §6.1.3 (p.6-7) states it for the rule and names no crown_type condition |
+| rule level | 6.1.4 | `temporary_crown_material` | true | §6.1.4 (p.7) "se coloca la característica o material utilizado" |
+| variant level | 6.1.5 `dde_type=FLUOROSIS` | `fluorosis_classification` | true | §6.1.5 (p.8) "Se detalla en el ítem especificaciones ... acompañada de la clasificación utilizada" |
+
+**Why 6.1.3 is not per-variant.** The norm's sentence is rule-level and
+lists no condition; the crown-type list appears afterwards and is about
+what goes in the box. A blanket obligation would also be wrong, since
+`CLM` is metal-free and has no metal colour. It is therefore declared once,
+`required=false`, and flagged `needs_clinical_review` until a clinical
+reading closes which variants demand it. Nothing was inferred per variant.
+
+`NtsRule.active_specification_requirements(attributes)` returns the
+rule-level requirement plus the requirement of every selected variant, so
+the question *"does this finding need an Especificaciones entry?"* is
+answered from the catalog alone.
+
+A requirement can be declared at rule level **or** at variant level, never
+both: `nts_record_specifications` stores no requirement code, so with two
+active requirements nothing could show which one a linked entry satisfied.
+The validator rejects that combination, and also rejects two requirements
+on one `enum_multi` attribute for the same reason.
 
 ## 8. Colour
 

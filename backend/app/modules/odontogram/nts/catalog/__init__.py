@@ -22,7 +22,11 @@ from app.modules.odontogram.nts.catalog.schema import (
     NtsRule,
     RenderKind,
     ReviewStatus,
+    RoleAppliesTo,
+    RoleDef,
     Scope,
+    SpecificationRequirement,
+    VariantValue,
 )
 from app.modules.odontogram.nts.catalog.validator import (
     CatalogValidationError,
@@ -42,7 +46,11 @@ __all__ = [
     "NtsRule",
     "RenderKind",
     "ReviewStatus",
+    "RoleAppliesTo",
+    "RoleDef",
     "Scope",
+    "SpecificationRequirement",
+    "VariantValue",
     "available_norm_versions",
     "get_nts_catalog",
     "get_nts_rule",

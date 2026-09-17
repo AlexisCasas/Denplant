@@ -179,6 +179,72 @@ class RelationKind(StrEnum):
     COMPANION_WHEN_PRESENT = "companion_when_present"
 
 
+class RoleAppliesTo(StrEnum):
+    """Which kind of participant may carry a normative role.
+
+    Deliberately declared here rather than imported from the persistence
+    vocabulary: the catalog describes the norm and must not depend on how
+    DentalPin happens to store a target. The consumer maps these onto its
+    own ``participation`` values.
+    """
+
+    SUBJECT = "subject"
+    ANCHOR = "anchor"
+
+
+class RoleDef(BaseModel):
+    """A normative role a *target* of a finding may carry.
+
+    NTS §6.1.29 draws "una línea recta horizontal ... con líneas verticales
+    **sobre los pilares**": being a *pilar* is a property of one tooth
+    inside the span, not a datum of the finding as a whole. It therefore
+    lives here, as metadata for the target's role, and never as an
+    attribute of the finding — there must be exactly one source.
+
+    ``min_count`` / ``max_count`` are ``None`` when **the norm does not
+    state a cardinality**. ``0`` is a stated lower bound, never a stand-in
+    for silence.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str = Field(min_length=1, max_length=30)
+    name: str = Field(min_length=1)
+    applies_to: RoleAppliesTo = RoleAppliesTo.SUBJECT
+    min_count: int | None = Field(default=None, ge=0)
+    max_count: int | None = Field(default=None, ge=1)
+    status: ReviewStatus = ReviewStatus.VERIFIED
+    notes: str | None = None
+
+
+class SpecificationRequirement(BaseModel):
+    """Data the norm routes to the *Especificaciones* item (NTS §5.14).
+
+    Declared on a rule when the norm states it for every occurrence, or on
+    a :class:`VariantValue` when only that variant triggers it.
+
+    ``required=True`` means: a finding that activates this requirement
+    cannot finalize its record without at least one
+    ``nts_record_specifications`` row **linked to that finding**. A general
+    specification (``finding_id`` NULL) never satisfies it.
+
+    The only thing that can be verified is that such a linked entry exists
+    and is not empty. Whether its prose actually states the metal colour or
+    the fluorosis classification is a clinical judgement the software does
+    not make.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: Stable semantic key, safe to branch on. Not a UI string.
+    code: str = Field(min_length=1, max_length=50)
+    #: Clinical prompt shown to the professional.
+    label: str = Field(min_length=1)
+    required: bool = True
+    status: ReviewStatus = ReviewStatus.VERIFIED
+    notes: str | None = None
+
+
 class VariantValue(BaseModel):
     """One admissible value of an attribute (a sigla, a position, ...)."""
 
@@ -186,6 +252,8 @@ class VariantValue(BaseModel):
 
     code: str = Field(min_length=1, max_length=20)
     name: str = Field(min_length=1)
+    #: Set when choosing *this* value is what triggers the requirement.
+    specification_requirement: SpecificationRequirement | None = None
     status: ReviewStatus = ReviewStatus.VERIFIED
     notes: str | None = None
 
@@ -270,12 +338,58 @@ class NtsRule(BaseModel):
     arch_cardinality: ArchCardinality | None = None
     range_grouping: RangeGrouping | None = None
     attributes: tuple[AttributeDef, ...] = ()
+    #: Roles a *target* of this finding may carry. Single source — a role
+    #: is never also modelled as an attribute.
+    target_roles: tuple[RoleDef, ...] = ()
+    #: Set when the norm states the requirement for every occurrence of the
+    #: rule. Mutually exclusive with per-variant requirements (see the
+    #: validator): the specifications table stores no requirement code, so a
+    #: consumer could not tell which of two requirements an entry satisfied.
+    specification_requirement: SpecificationRequirement | None = None
     render: Render
     geometry_input: GeometryInput
     related_rules: tuple[RelatedRule, ...] = ()
     status: ReviewStatus = ReviewStatus.VERIFIED
     source: Source
     notes: str | None = None
+
+    def role(self, code: str) -> RoleDef | None:
+        """The role definition for ``code``, or ``None`` if not allowed."""
+        return next((r for r in self.target_roles if r.code == code), None)
+
+    def active_specification_requirements(
+        self, attributes: Mapping[str, object]
+    ) -> tuple[SpecificationRequirement, ...]:
+        """Requirements a finding with these ``attributes`` activates.
+
+        The rule-level requirement, if any, plus the requirement of every
+        selected variant value. This is what lets a consumer ask *"does this
+        finding need an Especificaciones entry?"* without ever branching on
+        a ``rule_id``.
+
+        ``attributes`` maps attribute name to the selected code, or to a
+        collection of codes for ``enum_multi``. Unknown names are ignored —
+        validating them is the caller's job, not this lookup's.
+        """
+        active: list[SpecificationRequirement] = []
+        if self.specification_requirement is not None:
+            active.append(self.specification_requirement)
+
+        for attribute in self.attributes:
+            if attribute.name not in attributes:
+                continue
+            selected = attributes[attribute.name]
+            codes = (
+                {selected}
+                if isinstance(selected, str)
+                else set(selected)
+                if isinstance(selected, (list, tuple, set, frozenset))
+                else set()
+            )
+            for value in attribute.values:
+                if value.code in codes and value.specification_requirement:
+                    active.append(value.specification_requirement)
+        return tuple(active)
 
 
 class GlobalRule(BaseModel):

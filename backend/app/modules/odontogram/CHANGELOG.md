@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- feat(nts-03.1): the catalog now expresses **target roles** and **required
+  Especificaciones** structurally, so a consumer never branches on a `rule_id`.
+  New `RoleDef` + `NtsRule.target_roles` replaces the `target_roles` *attribute*
+  on 6.1.29 — a pilar is a property of one tooth inside the span, and having it
+  in both places gave a target's role two sources; the validator now refuses an
+  attribute by that name. New `SpecificationRequirement`, declarable on a rule
+  or on a single `VariantValue`, plus
+  `NtsRule.active_specification_requirements(attributes)`.
+
+  Mapped from a fresh reading of the PDF: 6.1.4 rule-level and required
+  (§6.1.4 p.7); 6.1.5 `dde_type=FLUOROSIS` variant-level and required (§6.1.5
+  p.8); 6.1.3 rule-level but **`required=false` and flagged
+  `needs_clinical_review`** — §6.1.3 (p.6-7) states it for the rule and names
+  no crown_type condition, and `CLM` is metal-free, so no per-variant
+  obligation was inferred. `pilar` is likewise flagged: §6.1.29 (p.16) mandates
+  "líneas verticales sobre los pilares" but states no cardinality, so
+  `min_count`/`max_count` stay unset — `None` means the norm is silent, never
+  `0`. Rule-level and variant-level requirements are mutually exclusive because
+  `nts_record_specifications` stores no requirement code. 38/38 rules intact;
+  no schema, migration or persistence change.
+
 - feat(nts-04b.1): NTS clinical record **persistence foundation**. Migration
   `odo_0004` creates the five tables of ADR 0021 — `nts_odontogram_records`,
   `nts_findings`, `nts_finding_targets`, `nts_record_specifications`,

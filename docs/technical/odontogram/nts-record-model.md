@@ -143,7 +143,7 @@ integer kind); that `surfaces` ⊆ the codes the rule declares.
 | `group_index` | int — segments of one finding (§3 below) |
 | `position` | int — order within a group |
 | `participation` | `subject \| anchor` |
-| `role` | nullable normative role, e.g. `pilar` |
+| `role` | nullable normative role, validated against `NtsRule.target_roles` |
 | `target_kind` | `fdi_tooth \| unnumbered_tooth \| arch` |
 | `tooth_number` | FDI; NULL unless `target_kind='fdi_tooth'` |
 | `arch` | `upper \| lower`; NULL unless `target_kind='arch'` |
@@ -181,8 +181,9 @@ per-kind column coherence in the table above; FDI validity when
 `target_kind='fdi_tooth'`; `UNIQUE (finding_id, group_index, position)`;
 `arch IN ('upper','lower')`; cascade from the finding.
 
-**Service + catalog enforce:** scope coherence (target kinds, counts and
-grouping matching the rule's `scope`); `arch_cardinality` `one` ⇒ exactly
+**Service + catalog enforce:** that `role`, when set, is one the rule's
+`target_roles` declares (NTS-03.1 — no rule-id branch); scope coherence
+(target kinds, counts and grouping matching the rule's `scope`); `arch_cardinality` `one` ⇒ exactly
 one arch target, `one_or_both` ⇒ one or two; `range_grouping`
 `single_segment` ⇒ exactly one group; exactly two `anchor` targets for
 6.1.26 and none elsewhere; geometry present **iff** the rule's
@@ -216,7 +217,18 @@ that a referenced finding belongs to the same record is *not* expressible
 in a CHECK — see below.
 
 **Service enforces:** that `finding_id`, when set, belongs to `record_id`;
-that rules requiring a specification have one at finalize.
+that every requirement a finding activates is satisfied at finalize.
+
+Which requirements a finding activates is **catalog metadata**, not a
+rule-id branch: `NtsRule.specification_requirement`,
+`VariantValue.specification_requirement` and the helper
+`NtsRule.active_specification_requirements(attributes)` answer it
+(NTS-03.1; see [`nts-188-catalog.md`](./nts-188-catalog.md) §7.2). A
+requirement with `required=True` needs at least one **finding-linked**
+specification row; a general entry (`finding_id` NULL) never satisfies one.
+Only the existence and non-emptiness of that entry can be checked — whether
+its prose truly states the metal colour or the fluorosis classification is a
+clinical judgement the software does not make.
 
 ### 2.5 `nts_record_audit_events`
 
@@ -325,7 +337,7 @@ service validates every write against `get_nts_rule(rule_id, norm_version)`.
 | | PostgreSQL | Service + catalog |
 |---|---|---|
 | Responsibility | **shape** | **normative meaning** |
-| Checks | `jsonb_typeof(attributes) = 'object'`, GIN index for containment queries | required keys present; enum membership; `enum_multi` subset; `fixed` value; `integer` kind; `surfaces` ⊆ the rule's codes |
+| Checks | `jsonb_typeof(attributes) = 'object'` | required keys present; enum membership; `enum_multi` subset; `fixed` value; `integer` kind; `surfaces` ⊆ the rule's codes |
 
 **Why not columns** (`crown_type`, `caries_type`, `absence_type`, …):
 
@@ -338,7 +350,9 @@ service validates every write against `get_nts_rule(rule_id, norm_version)`.
 3. **Sparsity.** Each rule uses one to three attributes, so ~10 columns
    would be almost entirely NULL on every row.
 4. `rule_id` stays a real column, so the common queries ("all caries
-   findings", "findings by rule") need no JSONB at all.
+   findings", "findings by rule") need no JSONB at all. A GIN index on
+   `attributes` is **deferred** until a real containment query justifies its
+   write cost.
 
 The choice is made **for versioning and single-source**, not for
 convenience — and it matches how the repo already stores catalog-shaped

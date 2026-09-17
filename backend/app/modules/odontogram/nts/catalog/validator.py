@@ -66,6 +66,8 @@ def validate_nts_catalog(catalog: NtsCatalog) -> None:
         _check_render(rule, errors)
         _check_condition_state(rule, errors)
         _check_geometry(rule, errors)
+        _check_target_roles(rule, errors)
+        _check_specification_requirements(rule, errors)
         _check_review_status(rule, errors)
         _check_source(rule, errors)
 
@@ -234,6 +236,81 @@ def _check_geometry(rule: NtsRule, errors: list[str]) -> None:
             f"{rule.rule_id}: geometry mode 'none' cannot carry constraints "
             f"({', '.join(c.value for c in rule.geometry_input.constraints)})"
         )
+
+
+def _check_target_roles(rule: NtsRule, errors: list[str]) -> None:
+    """14. Role definitions are well formed and unique within their rule.
+
+    Role codes live in their own namespace: a role code that happens to
+    equal a sigla is **not** an error. Siglas are written in the tooth's
+    box, roles describe a target's part in the finding, and nothing reads
+    one as the other.
+    """
+    for code, count in Counter(r.code for r in rule.target_roles).items():
+        if count > 1:
+            errors.append(f"{rule.rule_id}: target role {code!r} defined {count} times")
+
+    for role in rule.target_roles:
+        where = f"{rule.rule_id}.role[{role.code}]"
+        if role.min_count is not None and role.max_count is not None:
+            if role.max_count < role.min_count:
+                errors.append(
+                    f"{where}: max_count {role.max_count} is below min_count {role.min_count}"
+                )
+        if role.status is ReviewStatus.NEEDS_CLINICAL_REVIEW and not role.notes:
+            errors.append(f"{where}: needs_clinical_review without notes")
+
+    # A role must never also be modelled as an attribute: one source only.
+    for attribute in rule.attributes:
+        if attribute.name == "target_roles":
+            errors.append(
+                f"{rule.rule_id}: 'target_roles' is a rule field, not an attribute; "
+                "modelling it twice would give a target's role two sources"
+            )
+
+
+def _check_specification_requirements(rule: NtsRule, errors: list[str]) -> None:
+    """15. Especificaciones requirements are unambiguous for the current model.
+
+    ``nts_record_specifications`` stores no requirement code, so a consumer
+    can only observe *that* a finding-linked entry exists — not which
+    requirement it satisfies. A rule that could activate two requirements
+    at once would therefore be unverifiable, and is rejected.
+    """
+    variant_requirements = [
+        (attribute.name, value.code, value.specification_requirement)
+        for attribute in rule.attributes
+        for value in attribute.values
+        if value.specification_requirement is not None
+    ]
+
+    if rule.specification_requirement is not None and variant_requirements:
+        named = ", ".join(f"{a}={c}" for a, c, _ in variant_requirements)
+        errors.append(
+            f"{rule.rule_id}: declares a rule-level specification requirement and "
+            f"variant-level ones ({named}); the specifications table stores no "
+            "requirement code, so which one an entry satisfies would be ambiguous"
+        )
+
+    # Two variants of the *same* attribute may each require a specification
+    # only if they cannot both be selected, i.e. the attribute is single-valued.
+    per_attribute = Counter(name for name, _, _ in variant_requirements)
+    for attribute in rule.attributes:
+        if attribute.kind is AttributeKind.ENUM_MULTI and per_attribute[attribute.name] > 1:
+            errors.append(
+                f"{rule.rule_id}.{attribute.name}: {per_attribute[attribute.name]} "
+                "values carry a specification requirement on a multi-valued "
+                "attribute, so two could be active at once and neither could be "
+                "shown to be satisfied"
+            )
+
+    requirements = [r for _, _, r in variant_requirements]
+    if rule.specification_requirement is not None:
+        requirements.append(rule.specification_requirement)
+    for requirement in requirements:
+        where = f"{rule.rule_id}.specification[{requirement.code}]"
+        if requirement.status is ReviewStatus.NEEDS_CLINICAL_REVIEW and (not requirement.notes):
+            errors.append(f"{where}: needs_clinical_review without notes")
 
 
 def _check_review_status(rule: NtsRule, errors: list[str]) -> None:

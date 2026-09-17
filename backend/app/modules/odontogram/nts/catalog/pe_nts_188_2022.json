@@ -148,6 +148,13 @@
           { "kind": "box_siglas", "params": { "case": "uppercase" } }
         ]
       },
+      "specification_requirement": {
+        "code": "crown_metal_colour",
+        "label": "Color del metal de la corona (dorada o plateada), o cualquier característica clínica adicional del hallazgo",
+        "required": false,
+        "status": "needs_clinical_review",
+        "notes": "§6.1.3 states it at rule level - 'En el ítem especificaciones del odontograma se registra el color del metal de la corona, dorada o plateada, o cualquier característica clínica adicional del hallazgo clínico' - and never says which crown_type values make it mandatory. CLM is metal-free, so a blanket obligation would be wrong. Non-blocking until a clinical reading closes which variants require it."
+      },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
       "source": { "page": 7, "section": "6.1.3" },
       "notes": "The norm calls these 'tipo de corona', not material. Metal colour (dorada/plateada) is routed to Especificaciones, so it is deliberately not an attribute."
@@ -172,6 +179,11 @@
           { "kind": "box_siglas", "params": { "case": "uppercase" } }
         ]
       },
+      "specification_requirement": {
+        "code": "temporary_crown_material",
+        "label": "Característica o material utilizado, así como cualquier característica adicional",
+        "required": true
+      },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
       "source": { "page": 7, "section": "6.1.4" },
       "notes": "Always red (temporary by definition). The material used is routed to Especificaciones, so it is not an attribute here."
@@ -194,6 +206,11 @@
             {
               "code": "FLUOROSIS",
               "name": "Fluorosis",
+              "specification_requirement": {
+                "code": "fluorosis_classification",
+                "label": "Clasificación de fluorosis utilizada",
+                "required": true
+              },
               "status": "needs_clinical_review",
               "notes": "Detailed in Especificaciones with the classification used; the norm defines no code vocabulary."
             }
@@ -714,12 +731,15 @@
             { "code": "good", "name": "Buen estado" },
             { "code": "bad", "name": "Mal estado" }
           ]
-        },
+        }
+      ],
+      "target_roles": [
         {
-          "name": "target_roles",
-          "kind": "enum_multi",
-          "is_sigla": false,
-          "values": [{ "code": "pilar", "name": "Pilar" }]
+          "code": "pilar",
+          "name": "Pilar",
+          "applies_to": "subject",
+          "status": "needs_clinical_review",
+          "notes": "§6.1.29 mandates 'una línea recta horizontal ... con líneas verticales sobre los pilares', so a pilar is a marked target inside the span, not a datum of the finding. The norm states no cardinality and does not say which teeth of the span may be pilares, so min_count/max_count stay unset; the figure happens to mark both endpoints of a 13-23 span."
         }
       ],
       "render": {

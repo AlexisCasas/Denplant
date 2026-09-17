@@ -11,12 +11,15 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.odontogram.nts.catalog import (
+    AttributeDef,
     AttributeKind,
     ColorSemantics,
     GeometryMode,
     RenderKind,
     ReviewStatus,
     Scope,
+    SpecificationRequirement,
+    VariantValue,
     get_nts_catalog,
     get_nts_rule,
     validate_nts_catalog,
@@ -469,3 +472,221 @@ def _codes(catalog, rule_id: str, name: str) -> set[str]:
 def _sigla_codes(catalog, rule_id: str) -> set[str]:
     rule = catalog.rule(rule_id)
     return {v.code for a in rule.attributes if a.is_sigla for v in a.values}
+
+
+# --- 10. NTS-03.1: target roles and specification requirements -------------
+#
+# Evidence is the PDF, read for this amendment:
+#   6.1.3 (p.6-7) "En el item especificaciones del odontograma se registra el
+#     color del metal de la corona, dorada o plateada, o cualquier
+#     caracteristica clinica adicional del hallazgo clinico."  -> rule level,
+#     with NO per-variant condition stated anywhere.
+#   6.1.4 (p.7)  "En el item especificaciones del odontograma, se coloca la
+#     caracteristica o material utilizado, asi como cualquier caracteristica
+#     adicional."  -> rule level, unconditional.
+#   6.1.5 (p.8)  "Fluorosis: Se detalla en el item especificaciones por ser una
+#     caracteristica clinica generalizada acompanada de la clasificacion
+#     utilizada."  -> variant level, only for FLUOROSIS.
+#   6.1.29 (p.16) "Se dibuja una linea recta horizontal ... con lineas
+#     verticales sobre los pilares."  -> a pilar is a marked target, and no
+#     cardinality is stated.
+
+
+def test_a_role_is_never_also_modelled_as_an_attribute(catalog):
+    """One source: `target_roles` is a rule field, never a finding attribute."""
+    for rule in catalog.rules:
+        assert "target_roles" not in {a.name for a in rule.attributes}, rule.rule_id
+
+
+def test_fixed_bridge_declares_pilar_as_a_target_role(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    assert [r.code for r in rule.target_roles] == ["pilar"]
+    pilar = rule.role("pilar")
+    assert pilar.applies_to.value == "subject"
+    # The norm mandates marking the pilares but states no cardinality, so
+    # neither bound is asserted. None means "the norm does not say"; 0 would
+    # be a claim.
+    assert pilar.min_count is None
+    assert pilar.max_count is None
+    assert pilar.status is ReviewStatus.NEEDS_CLINICAL_REVIEW
+    assert pilar.notes
+
+
+def test_roles_are_retrievable_generically_without_rule_id_branching(catalog):
+    with_roles = {
+        r.rule_id: [x.code for x in r.target_roles] for r in catalog.rules if r.target_roles
+    }
+    assert with_roles == {"6.1.29": ["pilar"]}
+    # Every other rule answers the same question with an empty tuple rather
+    # than needing a special case.
+    assert all(r.role("pilar") is None for r in catalog.rules if r.rule_id != "6.1.29")
+
+
+def test_temporary_crown_requires_its_material_in_especificaciones(catalog):
+    requirement = get_nts_rule("6.1.4", NORM).specification_requirement
+    assert requirement is not None
+    assert requirement.code == "temporary_crown_material"
+    assert requirement.required is True
+    assert requirement.status is ReviewStatus.VERIFIED
+    assert requirement.label
+
+
+def test_fluorosis_requires_its_classification_at_variant_level(catalog):
+    dde = _attr(catalog, "6.1.5", "dde_type")
+    fluorosis = next(v for v in dde.values if v.code == "FLUOROSIS")
+    assert fluorosis.specification_requirement is not None
+    assert fluorosis.specification_requirement.code == "fluorosis_classification"
+    assert fluorosis.specification_requirement.required is True
+    # ...and no other DDE variant inherits it by inference.
+    assert all(v.specification_requirement is None for v in dde.values if v.code != "FLUOROSIS")
+    assert get_nts_rule("6.1.5", NORM).specification_requirement is None
+
+
+def test_crown_metal_colour_is_rule_level_and_left_open(catalog):
+    """6.1.3 never says which crown_type values make the entry mandatory.
+
+    CLM is metal-free, so a blanket obligation would be demonstrably wrong.
+    The requirement is therefore declared once, non-blocking, and flagged.
+    """
+    rule = get_nts_rule("6.1.3", NORM)
+    requirement = rule.specification_requirement
+    assert requirement is not None
+    assert requirement.code == "crown_metal_colour"
+    assert requirement.required is False
+    assert requirement.status is ReviewStatus.NEEDS_CLINICAL_REVIEW
+    assert requirement.notes
+    # No crown_type variant carries one: nothing was inferred per variant.
+    assert all(v.specification_requirement is None for a in rule.attributes for v in a.values)
+
+
+def test_no_other_rule_gains_a_requirement_by_inference(catalog):
+    carrying = {
+        r.rule_id
+        for r in catalog.rules
+        if r.specification_requirement
+        or any(v.specification_requirement for a in r.attributes for v in a.values)
+    }
+    assert carrying == {"6.1.3", "6.1.4", "6.1.5"}
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "attributes", "expected"),
+    [
+        ("6.1.4", {"sigla": "CT"}, ["temporary_crown_material"]),
+        ("6.1.3", {"crown_type": "CM"}, ["crown_metal_colour"]),
+        ("6.1.3", {"crown_type": "CLM"}, ["crown_metal_colour"]),
+        (
+            "6.1.5",
+            {"dde_type": "FLUOROSIS", "surfaces": ["V"]},
+            ["fluorosis_classification"],
+        ),
+        ("6.1.5", {"dde_type": "O", "surfaces": ["V"]}, []),
+        ("6.1.16", {"caries_type": "CDP", "surfaces": ["O"]}, []),
+        ("6.1.29", {"condition_state": "good"}, []),
+    ],
+)
+def test_active_requirements_resolve_from_rule_plus_selected_values(rule_id, attributes, expected):
+    """What NTS-04B.2 will call: no rule_id branch, no manual map, no notes."""
+    active = get_nts_rule(rule_id, NORM).active_specification_requirements(attributes)
+    assert [r.code for r in active] == expected
+
+
+def test_validator_rejects_a_duplicate_role_within_a_rule(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    broken_rule = rule.model_copy(update={"target_roles": rule.target_roles + rule.target_roles})
+    with pytest.raises(CatalogValidationError, match="defined 2 times"):
+        validate_nts_catalog(_with(catalog, broken_rule))
+
+
+def test_validator_rejects_incoherent_role_cardinality(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    pilar = rule.target_roles[0].model_copy(update={"min_count": 3, "max_count": 2})
+    broken_rule = rule.model_copy(update={"target_roles": (pilar,)})
+    with pytest.raises(CatalogValidationError, match="below min_count"):
+        validate_nts_catalog(_with(catalog, broken_rule))
+
+
+def test_validator_rejects_a_role_flagged_without_notes(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    pilar = rule.target_roles[0].model_copy(update={"notes": None})
+    broken_rule = rule.model_copy(update={"target_roles": (pilar,)})
+    with pytest.raises(CatalogValidationError, match="needs_clinical_review"):
+        validate_nts_catalog(_with(catalog, broken_rule))
+
+
+def test_validator_rejects_a_role_modelled_as_an_attribute(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    smuggled = AttributeDef(
+        name="target_roles",
+        kind=AttributeKind.ENUM_MULTI,
+        values=(VariantValue(code="pilar", name="Pilar"),),
+    )
+    broken_rule = rule.model_copy(update={"attributes": rule.attributes + (smuggled,)})
+    with pytest.raises(CatalogValidationError, match="not an attribute"):
+        validate_nts_catalog(_with(catalog, broken_rule))
+
+
+def test_validator_rejects_rule_and_variant_requirements_at_once(catalog):
+    """The specifications table stores no requirement code.
+
+    With two requirements active on one finding, nothing could show which
+    one a linked entry satisfied, so the combination is refused.
+    """
+    rule = get_nts_rule("6.1.3", NORM)
+    crown_type = next(a for a in rule.attributes if a.name == "crown_type")
+    cm = crown_type.values[0].model_copy(
+        update={
+            "specification_requirement": SpecificationRequirement(
+                code="metal_colour_cm", label="Color del metal"
+            )
+        }
+    )
+    patched_attr = crown_type.model_copy(update={"values": (cm,) + crown_type.values[1:]})
+    broken_rule = rule.model_copy(
+        update={
+            "attributes": tuple(
+                patched_attr if a.name == "crown_type" else a for a in rule.attributes
+            )
+        }
+    )
+    with pytest.raises(CatalogValidationError, match="ambiguous"):
+        validate_nts_catalog(_with(catalog, broken_rule))
+
+
+def test_validator_rejects_two_requirements_on_one_multi_valued_attribute(catalog):
+    """Two surfaces could be chosen at once; neither could be shown satisfied."""
+    rule = get_nts_rule("6.1.16", NORM)
+    surfaces = next(a for a in rule.attributes if a.name == "surfaces")
+    flagged = tuple(
+        v.model_copy(
+            update={
+                "specification_requirement": SpecificationRequirement(
+                    code=f"detail_{v.code}", label=f"Detalle {v.code}"
+                )
+            }
+        )
+        if v.code in {"M", "D"}
+        else v
+        for v in surfaces.values
+    )
+    patched_attr = surfaces.model_copy(update={"values": flagged})
+    broken_rule = rule.model_copy(
+        update={
+            "attributes": tuple(
+                patched_attr if a.name == "surfaces" else a for a in rule.attributes
+            )
+        }
+    )
+    with pytest.raises(CatalogValidationError, match="multi-valued"):
+        validate_nts_catalog(_with(catalog, broken_rule))
+
+
+def _with(catalog, replacement):
+    """The bundled catalog with one rule swapped for a mutated copy."""
+    return catalog.model_copy(
+        update={
+            "rules": tuple(
+                replacement if r.rule_id == replacement.rule_id else r for r in catalog.rules
+            )
+        }
+    )
