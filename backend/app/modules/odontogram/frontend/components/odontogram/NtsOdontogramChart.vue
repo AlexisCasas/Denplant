@@ -19,7 +19,13 @@
  */
 
 import type { NtsRecord } from '../../types/nts'
-import { NTS_ROWS, rowWidthFor } from '../../utils/ntsDentition'
+import { NTS_ROWS } from '../../utils/ntsDentition'
+import {
+  NTS_CHART_HEIGHT,
+  NTS_CHART_SCALE,
+  NTS_CHART_VIEWBOX,
+  NTS_CHART_WIDTH
+} from '../../utils/ntsChartGeometry'
 import NtsDentitionRow from './NtsDentitionRow.vue'
 
 const props = withDefaults(
@@ -48,30 +54,22 @@ const emit = defineEmits<{ toothSelect: [fdi: number, rowOrder: number[]] }>()
 const { t } = useI18n()
 
 /**
- * Pixels per layout unit — one scale for the whole chart.
+ * Scale and dimensions now come from `ntsChartGeometry`, which is the one
+ * place that knows how the chart is laid out.
  *
- * The annex draws a deciduous molar the same size as a permanent one: its
- * deciduous rows are shorter because they hold ten teeth instead of sixteen,
- * not because the teeth are miniaturised. Scaling them down would be this
- * renderer inventing a distinction the norm does not draw, so the dentitions
- * are told apart by position and by their FDI numbers alone.
+ * They used to be computed here, which was fine while nothing else needed
+ * them. Anything that draws across teeth needs the same numbers, and two
+ * copies of a coordinate system is two coordinate systems.
  *
- * Tooth *widths* are not set here: each class carries its own, so a narrow
- * incisor and a wide molar keep the annex's proportions.
+ * The values are unchanged: one scale for the whole chart (the annex draws a
+ * deciduous molar the size of a permanent one), and a deterministic minimum
+ * width taken from the widest row, so rows never reflow and the chart prints
+ * as it renders.
  */
-const CHART_SCALE = 0.484
+const CHART_SCALE = NTS_CHART_SCALE
+const CHART_MIN_WIDTH = NTS_CHART_WIDTH
 
 const rows = NTS_ROWS
-
-/**
- * A fixed inner width rather than a fluid one: the row must not reflow into a
- * different tooth order on a narrow screen, and a deterministic width is also
- * what makes the chart printable later. It comes from the widest row so the
- * deciduous arches stay centred inside the permanent ones.
- */
-const CHART_MIN_WIDTH = Math.round(
-  Math.max(...rows.map(row => rowWidthFor(row.teeth))) * CHART_SCALE
-)
 
 const findingCount = computed(() => props.record?.findings.length ?? 0)
 </script>
@@ -124,7 +122,7 @@ const findingCount = computed(() => props.record?.findings.length ?? 0)
       data-testid="nts-chart-scroll"
     >
       <div
-        class="mx-auto py-2 space-y-1"
+        class="relative mx-auto py-2 space-y-1"
         :style="{ minWidth: `${CHART_MIN_WIDTH}px` }"
         data-testid="nts-chart-canvas"
       >
@@ -138,6 +136,35 @@ const findingCount = computed(() => props.record?.findings.length ?? 0)
           :anchor-teeth="anchorTeeth"
           :class="row.id === 'deciduousUpper' ? 'pt-3' : row.id === 'permanentLower' ? 'pt-3' : ''"
           @select="(fdi, rowOrder) => emit('toothSelect', fdi, rowOrder)"
+        />
+
+        <!--
+          The shared coordinate space for everything that spans teeth.
+
+          Empty in 05D.1 — no finding is drawn yet. It exists so the space is
+          real and testable rather than a promise: it carries the deterministic
+          viewBox from `ntsChartGeometry`, it is centred exactly as the rows
+          are, and being inside the canvas it scrolls with them on a narrow
+          screen instead of drifting off the teeth.
+
+          Placed last, and with its own margin zeroed, because the canvas
+          separates its children with `space-y-1`: as a first child it would
+          have pushed every row down by the gap, and as a later one it would
+          have taken that gap onto itself and landed 4px below the teeth.
+
+          `pointer-events-none` is not a detail. The chart's hit areas are the
+          tooth buttons underneath, and an overlay that swallowed a click would
+          silently break every selection flow the finding editor depends on.
+        -->
+        <svg
+          class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2"
+          :viewBox="NTS_CHART_VIEWBOX"
+          :width="NTS_CHART_WIDTH"
+          :height="NTS_CHART_HEIGHT"
+          :style="{ marginTop: '0' }"
+          aria-hidden="true"
+          focusable="false"
+          data-testid="nts-chart-overlay"
         />
       </div>
     </div>

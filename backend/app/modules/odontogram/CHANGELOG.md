@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- feat(nts-05d.1): **global chart geometry foundation; no clinical findings
+  rendered yet**. 05B gave every tooth its own `<svg>` and its own viewBox,
+  which is all a row of independent drawings needs — and not enough for
+  anything that spans teeth. A span from 13 to 23, an arch-wide appliance, a
+  mark between two crowns or between two apices had nowhere to be drawn,
+  because there was no shared origin.
+
+  `ntsChartGeometry.ts` supplies one. It is pure — no Vue, no DOM, no
+  `getBoundingClientRect` — and answers, for any FDI number, where that tooth's
+  column, crown, annotation box, number strip, roots and apices land on a
+  single chart-wide canvas, plus the bands and spans marks are anchored to
+  (`apexBand`, `occlusalBand`, `rangeSpan`, `archSpan`, `interproximalPoint`).
+  Spans follow row order rather than FDI arithmetic, so 11 → 21 is contiguous;
+  an interproximal point between teeth that are not neighbours returns `null`
+  instead of a midpoint that means nothing.
+
+  `ntsDentition.ts` gained `rootShapes`: the base, apex and flanks that
+  `rootPaths` used to compute and discard. The emitted `d` strings are derived
+  from exactly those points, so nothing drawn changed.
+
+  The chart now takes its scale and width from the geometry module instead of
+  keeping a second copy, and carries an **empty** overlay `<svg>` with the
+  deterministic viewBox, `pointer-events-none` and `aria-hidden`. It draws
+  nothing: it exists so the coordinate space is real and testable, and so a
+  later ticket has somewhere to put marks that scrolls with the teeth.
+
+  Visually inert, and checked rather than asserted: the rendered chart markup
+  was diffed against the previous commit and is byte-identical apart from the
+  overlay element and a `relative` class on its positioning context.
+
 - feat(nts-05d.0b): **render metadata is now declarative end to end**. The
   05D.0 audit found that a renderer could not build a single one of the 38
   findings from metadata alone — it would have had to know that 6.1.29's

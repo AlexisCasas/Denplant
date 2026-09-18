@@ -29,6 +29,10 @@ import {
   rowWidthFor,
   toothGeometry
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
+import {
+  NTS_CHART_VIEWBOX,
+  NTS_CHART_WIDTH
+} from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
 import type { NtsRecord } from '../../../backend/app/modules/odontogram/frontend/types/nts'
 
 // ---------------------------------------------------------------------------
@@ -706,6 +710,9 @@ describe('§17 — accessibility', () => {
 
 const CHART_SOURCES = [
   '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition.ts',
+  // 05D.1's coordinate model is held to the same standard: it says where a
+  // mark goes, never which finding goes there.
+  '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry.ts',
   '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramChart.vue',
   '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsDentitionRow.vue',
   '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsToothCell.vue'
@@ -713,6 +720,54 @@ const CHART_SOURCES = [
   relative,
   source: readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8')
 }))
+
+// ---------------------------------------------------------------------------
+// NTS-05D.1 — the overlay exists, and is inert
+// ---------------------------------------------------------------------------
+
+describe('NTS-05D.1 — the shared coordinate space is present and harmless', () => {
+  it('carries the deterministic viewBox and is centred like the rows', async () => {
+    const wrapper = await mountChart()
+    const overlay = wrapper.find('[data-testid="nts-chart-overlay"]')
+
+    expect(overlay.exists()).toBe(true)
+    expect(overlay.attributes('viewBox')).toBe(NTS_CHART_VIEWBOX)
+    expect(Number(overlay.attributes('width'))).toBe(NTS_CHART_WIDTH)
+    expect(overlay.classes()).toContain('absolute')
+    expect(overlay.classes()).toContain('left-1/2')
+    expect(overlay.classes()).toContain('-translate-x-1/2')
+    // The canvas has to be the positioning context, or `absolute` escapes it.
+    expect(wrapper.find('[data-testid="nts-chart-canvas"]').classes()).toContain('relative')
+  })
+
+  it('cannot swallow a click, and is invisible to assistive tech', async () => {
+    const wrapper = await mountChart()
+    const overlay = wrapper.find('[data-testid="nts-chart-overlay"]')
+
+    // The chart's hit areas are the tooth buttons underneath. An overlay that
+    // took pointer events would break every selection flow silently.
+    expect(overlay.classes()).toContain('pointer-events-none')
+    expect(overlay.attributes('aria-hidden')).toBe('true')
+    expect(overlay.attributes('focusable')).toBe('false')
+    // It draws nothing yet: 05D.1 is geometry, not findings.
+    expect(overlay.element.children).toHaveLength(0)
+  })
+
+  it('does not take the row gap onto itself, which would drop it off the teeth', async () => {
+    const wrapper = await mountChart()
+    const overlay = wrapper.find('[data-testid="nts-chart-overlay"]')
+    expect(overlay.attributes('style')).toMatch(/margin-top:\s*0/)
+  })
+
+  it('selecting a tooth still works with the overlay mounted', async () => {
+    const wrapper = await mountChart({ selectable: true })
+    await wrapper.find('[data-testid="nts-tooth-16"]').trigger('click')
+
+    expect(wrapper.emitted('toothSelect')).toBeTruthy()
+    expect(wrapper.emitted('toothSelect')![0]![0]).toBe(16)
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+  })
+})
 
 describe('§25 — the renderer hardcodes no normative content', () => {
   it.each(CHART_SOURCES)('$relative carries no rule ids', ({ source }) => {

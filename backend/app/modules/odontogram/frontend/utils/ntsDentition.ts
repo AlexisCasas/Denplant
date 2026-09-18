@@ -212,6 +212,16 @@ const BLEED = 4
 export const NTS_CELL_HEIGHT = CELL_HEIGHT
 
 /**
+ * The bleed, exported so the chart-level coordinate model can undo it.
+ *
+ * A tooth is drawn inside a viewBox that is `2 × BLEED` larger than the cell in
+ * both axes, so mapping a local point onto the chart means accounting for it.
+ * Anything that needs to place a mark next to a tooth needs this number; there
+ * must not be a second copy of it.
+ */
+export const NTS_BLEED = BLEED
+
+/**
  * Width of one tooth's column in layout units — crown plus its gutter.
  *
  * The annotation box, the FDI number and the tooth all share this width, which
@@ -240,12 +250,37 @@ export interface NtsCrownRegion {
   d: string
 }
 
+/**
+ * One root, as both a drawing and a measurable shape.
+ *
+ * `rootPaths` used to compute the base line, the apex and the two flanks and
+ * then throw all of it away, keeping only the path string. Anything that has
+ * to be placed *on* a root, or level with the apices, needs those numbers, and
+ * recovering them by parsing the `d` back would be a second, divergent source
+ * for the same geometry.
+ *
+ * `d` is still emitted from exactly these points, so nothing drawn changes.
+ */
+export interface NtsRootGeometry {
+  d: string
+  /** Where the root meets the crown: the midpoint of its base edge. */
+  base: { x: number, y: number }
+  /** The apex. */
+  tip: { x: number, y: number }
+  /** The base edge, for a root's own bounding box. */
+  left: number
+  right: number
+}
+
 export interface NtsToothGeometry {
   viewBox: string
   /** Outline of the crown, centred in its column. */
   crown: { x: number, y: number, width: number, height: number }
   regions: NtsCrownRegion[]
+  /** Path strings only — what the cell renders. Derived from `rootShapes`. */
   roots: string[]
+  /** The same roots, measurable. Added by 05D.1; `roots` is unchanged. */
+  rootShapes: NtsRootGeometry[]
 }
 
 /**
@@ -331,7 +366,7 @@ function centralRegions(box: CrownBox, count: number): NtsCrownRegion[] {
   ]
 }
 
-function rootPaths(tooth: NtsTooth, box: CrownBox): string[] {
+function rootShapes(tooth: NtsTooth, box: CrownBox): NtsRootGeometry[] {
   const count = rootCountFor(tooth)
   const width = box.right - box.left
   const slice = width / count
@@ -344,7 +379,13 @@ function rootPaths(tooth: NtsTooth, box: CrownBox): string[] {
     const left = r(box.left + i * slice + pad)
     const right = r(box.left + (i + 1) * slice - pad)
     const apex = r(box.left + i * slice + slice / 2)
-    return `M${left},${base} L${apex},${tip} L${right},${base} Z`
+    return {
+      d: `M${left},${base} L${apex},${tip} L${right},${base} Z`,
+      base: { x: apex, y: base },
+      tip: { x: apex, y: tip },
+      left,
+      right
+    }
   })
 }
 
@@ -363,6 +404,7 @@ export function toothGeometry(tooth: NtsTooth): NtsToothGeometry {
   const box = crownBox(tooth)
   const cellWidth = cellWidthFor(tooth)
   const { left, right, top, bottom, innerLeft, innerRight, innerTop, innerBottom } = box
+  const shapes = rootShapes(tooth, box)
 
   return {
     viewBox: `${-BLEED} ${-BLEED} ${cellWidth + BLEED * 2} ${CELL_HEIGHT + BLEED * 2}`,
@@ -379,6 +421,7 @@ export function toothGeometry(tooth: NtsTooth): NtsToothGeometry {
       { id: 'outer-left', d: `M${left},${bottom} L${left},${top} L${innerLeft},${innerTop} L${innerLeft},${innerBottom} Z` },
       ...centralRegions(box, centralRegionCountFor(tooth))
     ],
-    roots: rootPaths(tooth, box)
+    roots: shapes.map(shape => shape.d),
+    rootShapes: shapes
   }
 }
