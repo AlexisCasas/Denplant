@@ -89,11 +89,17 @@ class RenderKind(StrEnum):
 
 
 class MarkPlacement(StrEnum):
-    """Where a mark sits, as the norm words it (``at``).
+    """**Where** a mark sits, as the norm words it (``at``).
 
     These name *anatomical or chart landmarks*, never coordinates. Turning one
     into a position is the renderer's job and needs the chart geometry, which
     the catalog deliberately knows nothing about.
+
+    Strictly a location. *Which* targets a mark applies to is a different
+    question with its own field — see :class:`TargetSelector` and
+    :attr:`RenderMark.role`. ``endpoints`` used to live here and answered the
+    second question while pretending to answer the first, which left §6.1.1's
+    symbol with no stated height at all.
     """
 
     #: Between the apices of the two adjacent teeth (§6.1.26).
@@ -101,8 +107,6 @@ class MarkPlacement(StrEnum):
     #: Between two crowns (§6.1.6).
     BETWEEN_TEETH = "between_teeth"
     CROWN = "crown"
-    #: The two extremes of a range (§6.1.1 "los extremos").
-    ENDPOINTS = "endpoints"
     NEAR_ROOTS = "near_roots"
     TOOTH_NUMBER = "tooth_number"
     TOOTH_NUMBERS = "tooth_numbers"
@@ -121,6 +125,28 @@ class MarkPlacement(StrEnum):
     ROOT = "root"
     #: The coronal pulp chamber (§6.1.27).
     CORONAL_PULP = "coronal_pulp"
+
+
+class TargetSelector(StrEnum):
+    """**Which** of a finding's targets a mark applies to.
+
+    Deliberately separate from :class:`MarkPlacement`: a mark can be drawn on
+    some targets rather than all of them, and that is not a statement about
+    height or landmark. §6.1.1 draws its crossed squares on "las piezas
+    dentarias que correspondan a **los extremos** del aparato" and, separately,
+    "**a nivel de los ápices**" — two facts, two fields.
+
+    :attr:`RenderMark.role` answers the same question a different way, by
+    naming a normative role the target carries (§6.1.29's *pilares*). The
+    difference is who decides: a role is recorded by the clinician on the
+    target, a selector is a property of the span itself.
+
+    One member, because the norm states one such subset. A selector nothing
+    uses would be a promise the norm never made.
+    """
+
+    #: The first and last target of the range, in row order.
+    RANGE_ENDPOINTS = "range_endpoints"
 
 
 class SymbolShape(StrEnum):
@@ -207,7 +233,7 @@ MARK_PARAMS: Final[Mapping[RenderKind, Mapping[str, type[StrEnum]]]] = MappingPr
         RenderKind.LINE: MappingProxyType(
             {"style": LineStyle, "at": MarkPlacement, "meaning": LineMeaning}
         ),
-        RenderKind.CONNECTOR: MappingProxyType({"style": ConnectorStyle}),
+        RenderKind.CONNECTOR: MappingProxyType({"style": ConnectorStyle, "at": MarkPlacement}),
         RenderKind.ARROW: MappingProxyType(
             {"style": ArrowStyle, "at": MarkPlacement, "toward": ArrowDirection}
         ),
@@ -471,6 +497,10 @@ class RenderMark(BaseModel):
     #: with its endpoints — so the role is read from the targets, never
     #: guessed from their position.
     role: str | None = Field(default=None, min_length=1)
+    #: A subset of the finding's targets, chosen by the span's own shape
+    #: rather than by anything the clinician recorded (§6.1.1's extremes).
+    #: Orthogonal to ``params["at"]``, which says where the mark is drawn.
+    target_selector: TargetSelector | None = None
 
 
 class Render(BaseModel):

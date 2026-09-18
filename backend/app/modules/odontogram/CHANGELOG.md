@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+- feat(nts-05d.3a): **where a mark goes and which targets it applies to are now
+  two questions**. The 05D.3 pre-flight found four marks with no stated height:
+  §6.1.1's symbol and connector, and §6.1.29's line and connector. The norm
+  states it for both — "a nivel de los ápices", p.6 and p.16 — and the catalog
+  carried it only in `geometry_input.constraints`.
+
+  Constraints cannot do that job, and §6.1.8 is the standing proof: one rule,
+  two marks, `root_area, crown_area`, a line on the root and a square on the
+  crown. Whichever area a renderer picked would be wrong for one of them.
+  Placement is per mark, and the validator now requires it of every connector
+  and of every line the clinician does not draw freehand.
+
+  The placement token `endpoints` was the root of it: it answered *which
+  targets* while occupying the field for *where*. It is retired, and
+  `RenderMark.target_selector` (`range_endpoints`) answers that question in its
+  own typed field — the same separation `role` already gives §6.1.29's pilares,
+  differing only in who decides, the span's shape or the clinician.
+
+  Metadata only. The clinical drawing is byte-identical, coverage stays at
+  18 complete / 7 partial / 13 unsupported, and §6.1.1 remains deferred until
+  the span primitives land: its placement is now known, what is missing is the
+  connector that joins the squares.
+
+  Also recorded: the **root-line micro-gap (G8) is closed by the PDF**.
+  Magnified, p.19 draws tooth 74 — a two-rooted deciduous molar — with a single
+  vertical line down the centre of the tooth, passing *between* the roots, and
+  p.9 draws tooth 26 with three roots and one line. It is **one line per tooth
+  on its vertical centre, not one per root**, which is what the catalog already
+  said: one mark is one line. No change was needed.
+
+  Still open and untouched: G6 (freehand fracture shape), G9 (multi-segment
+  registration), G10 (fissure anatomy), CLINICAL-02 (pilar cardinality),
+  CLINICAL-03 (giroversión direction).
+
 - feat(nts-05d.2): **siglas and symbols are drawn on the chart**. The first
   clinically visible layer: `ntsRenderModel.ts` turns a finding plus its
   catalog rule plus the chart geometry into `RenderInstruction[]`, and

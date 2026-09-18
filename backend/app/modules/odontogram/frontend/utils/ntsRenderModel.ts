@@ -244,6 +244,8 @@ interface CatalogMark {
   text_from: string | null
   suffix_from: string | null
   role: string | null
+  /** A subset of the finding's targets, chosen by the span's own shape. */
+  target_selector: string | null
 }
 
 function marksOf(rule: NtsRule): CatalogMark[] {
@@ -253,7 +255,8 @@ function marksOf(rule: NtsRule): CatalogMark[] {
     params: mark.params ?? {},
     text_from: mark.text_from ?? null,
     suffix_from: mark.suffix_from ?? null,
-    role: mark.role ?? null
+    role: mark.role ?? null,
+    target_selector: mark.target_selector ?? null
   }))
 }
 
@@ -415,12 +418,6 @@ function placeSymbol(
       return { at: point, bounds: squareAround(point, reference, 0.85) }
     }
 
-    case 'endpoints':
-      // The extremes of a span, drawn at a level the mark does not state and
-      // joined by a connector this slice does not draw. Placing the squares
-      // alone would show half a mark and imply the other half was absent.
-      return { reason: 'needs_range_orchestration' }
-
     default:
       return { reason: 'unknown_placement' }
   }
@@ -576,6 +573,13 @@ function resolveSymbol(
   })
 
   if (!shape || !KNOWN_SHAPES.has(shape)) return fail('unknown_symbol_shape')
+
+  // A mark drawn on only some of the finding's targets needs the span resolved
+  // before it can be placed, and the span primitives belong to a later slice.
+  // The placement itself is now stated (`at`), so this is a missing primitive
+  // rather than missing metadata — and drawing the marks without the connector
+  // that joins them would show half a mark.
+  if (mark.target_selector !== null) return fail('needs_range_orchestration')
 
   const placed = placeSymbol(shape as NtsSymbolShape, mark.params.at, finding)
   if ('reason' in placed) return fail(placed.reason)

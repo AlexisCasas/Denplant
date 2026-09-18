@@ -39,6 +39,7 @@ from app.modules.odontogram.nts.catalog.schema import (
     SiglaCase,
     SpecificationRequirement,
     SymbolShape,
+    TargetSelector,
     VariantValue,
 )
 from app.modules.odontogram.nts.catalog.validator import (
@@ -76,6 +77,7 @@ __all__ = [
     "SiglaCase",
     "SpecificationRequirement",
     "SymbolShape",
+    "TargetSelector",
     "VariantValue",
     "available_norm_versions",
     "get_nts_catalog",

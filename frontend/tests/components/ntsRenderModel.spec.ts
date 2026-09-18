@@ -138,15 +138,17 @@ const boxMark = (textFrom: string, suffixFrom?: string) => ({
   params: { case: 'uppercase' },
   text_from: textFrom,
   suffix_from: suffixFrom ?? null,
-  role: null
+  role: null,
+  target_selector: null
 })
 
-const symbolMark = (shape: string, at?: string, textFrom?: string) => ({
+const symbolMark = (shape: string, at?: string, textFrom?: string, selector?: string) => ({
   kind: 'symbol',
   params: at ? { shape, at } : { shape },
   text_from: textFrom ?? null,
   suffix_from: null,
-  role: null
+  role: null,
+  target_selector: selector ?? null
 })
 
 const texts = (r: ReturnType<typeof resolveFinding>) =>
@@ -508,15 +510,35 @@ describe('every declared symbol shape resolves to real geometry', () => {
     expect(unsupported(result)[0]!.reason).toBe('targets_not_adjacent')
   })
 
-  it('a span symbol is deferred, not approximated', () => {
-    // Placing the endpoint squares without the connector that joins them would
-    // show half a mark and imply the other half was absent.
+  it('a symbol drawn on a subset of the targets is deferred, not approximated', () => {
+    // Since NTS-05D.3a the mark states where it goes (`at`) and which targets
+    // it applies to (`target_selector`) separately. The placement is known;
+    // what is missing is the span primitive, and drawing the squares without
+    // the connector that joins them would show half a mark.
     const r = rule({
       rule_id: 'X.35',
-      render: { color_semantics: 'good_or_non_pathological', marks: [symbolMark('square_with_cross', 'endpoints')] }
+      scope: 'range',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [symbolMark('square_with_cross', 'apex_level', undefined, 'range_endpoints')]
+      }
     })
     expect(unsupported(resolveFinding(finding({ rule_id: 'X.35' }), r))[0]!.reason)
       .toBe('needs_range_orchestration')
+  })
+
+  it('a band placement with no selector is still an unknown placement for a symbol', () => {
+    // `apex_level` positions a span, not a lone symbol: without a selector the
+    // renderer has nothing to anchor the shape to, and says so.
+    const r = rule({
+      rule_id: 'X.36',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [symbolMark('square_with_cross', 'apex_level')]
+      }
+    })
+    expect(unsupported(resolveFinding(finding({ rule_id: 'X.36' }), r))[0]!.reason)
+      .toBe('unknown_placement')
   })
 })
 
@@ -892,9 +914,9 @@ describe('the real catalog drives the same generic paths', () => {
     //
     // 18 complete: every rule whose marks are only siglas and symbols.
     //  7 partial: a symbol or a sigla beside a line, fill or outline.
-    // 13 unsupported: nothing drawable at all, which includes the two range
-    //    rules whose symbols sit on endpoints — placing those without the
-    //    connector that joins them would show half a mark.
+    // 13 unsupported: nothing drawable at all, which includes the range rule
+    //    whose symbol applies to the span's endpoints — placing those without
+    //    the connector that joins them would show half a mark.
     expect(counts).toEqual({ complete: 18, partial: 7, unsupported: 13 })
     expect(counts.complete + counts.partial + counts.unsupported).toBe(38)
   })

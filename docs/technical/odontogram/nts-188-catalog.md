@@ -323,6 +323,22 @@ the validator:
 | `text_from` | attribute whose selected value is the text written | 6.1.3 → `crown_type` |
 | `suffix_from` | attribute appended after that text | 6.1.19 → `mobility_degree` |
 | `role` | `target_roles` code selecting which targets carry the mark | 6.1.29 → `pilar` |
+| `target_selector` | a subset of targets chosen by the span's own shape | 6.1.1 → `range_endpoints` |
+
+**`at` says where, `target_selector` and `role` say which targets.** They are
+separate because a mark can state both: §6.1.1 draws its crossed squares on
+"las piezas dentarias que correspondan a **los extremos** del aparato" and
+"**a nivel de los ápices**". Until NTS-05D.3a the placement token `endpoints`
+was answering the second question while occupying the field for the first,
+which left that symbol with no stated height at all.
+
+**`geometry_input.constraints` is not a placement source.** It is declared once
+per *rule* while marks are many. §6.1.8 constrains itself to `root_area,
+crown_area` for a line on the root and a square on the crown, so a renderer
+reading constraints to place either would find two candidate areas and no way
+to choose. Every mark that needs a position states its own `at`; the validator
+requires it of connectors always, and of lines unless the clinician draws the
+shape.
 
 Bindings are declared rather than inferred because the obvious inferences are
 wrong. "The rule's one `is_sigla` attribute" looks like a safe answer for
@@ -526,6 +542,8 @@ in one pass, not one error per run.
 | 15 | Especificaciones requirements cannot be ambiguous for the current model |
 | 16 | every mark param is declared for its kind, with a value from that key's vocabulary; required params are present |
 | 17 | every `box_siglas` declares `text_from`; `text_from`/`suffix_from`/`role` resolve within the rule; no `is_sigla` attribute is left unread |
+| 18 | every connector, and every non-freehand line, declares its own `at` |
+| 19 | a `target_selector` is used on a mark drawn per target, and `range_endpoints` only on a numbered range |
 
 Checks 16 and 17 are what make a rule-id-free renderer possible: after them, a
 mark's text source, suffix source, target role and placement are all answerable

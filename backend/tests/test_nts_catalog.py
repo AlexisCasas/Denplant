@@ -17,11 +17,13 @@ from app.modules.odontogram.nts.catalog import (
     AttributeKind,
     ColorSemantics,
     GeometryMode,
+    MarkPlacement,
     RenderKind,
     ReviewStatus,
     RoleAppliesTo,
     Scope,
     SpecificationRequirement,
+    TargetSelector,
     VariantValue,
     get_nts_catalog,
     get_nts_rule,
@@ -790,8 +792,12 @@ def test_the_bridge_connector_selects_its_targets_by_role(catalog):
     assert connector.role == "pilar"
     assert rule.role(connector.role) is not None
     assert rule.role(connector.role).applies_to is RoleAppliesTo.SUBJECT
-    # Nothing restates the role as a placement token.
-    assert "at" not in connector.params
+    # The mark does carry an `at` since NTS-05D.3a, but it is a band — where
+    # the connector is drawn — and never a restatement of which teeth it
+    # applies to. That question has exactly one answer, and it is the role.
+    assert connector.params["at"] == "apex_level"
+    assert "pillars" not in connector.params.values()
+    assert connector.target_selector is None
     # ...and CLINICAL-02 is still open: no cardinality was invented.
     assert rule.role("pilar").min_count is None
     assert rule.role("pilar").max_count is None
@@ -998,3 +1004,191 @@ def test_validator_rejects_a_sigla_no_mark_reads(catalog):
     broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (box,)})})
     with pytest.raises(CatalogValidationError, match="no mark reads it via text_from"):
         validate_nts_catalog(_with(catalog, broken))
+
+
+# --- 13. NTS-05D.3a: where a mark goes vs which targets it applies to -------
+#
+# The 05D.3 pre-flight found four marks with no stated height: 6.1.1's symbol
+# and connector and 6.1.29's line and connector. The norm states it for both
+# rules -- "a nivel de los apices" on p.6 and p.16 -- and the catalog carried
+# it only in `geometry_input.constraints`, which is per-rule and therefore
+# cannot say where an individual mark goes.
+#
+# The fix separates two questions that `at` had been answering at once:
+#   at              -> where the mark is drawn
+#   target_selector -> which of the finding's targets it applies to
+# `endpoints` was the second wearing the clothes of the first.
+
+
+def test_endpoint_symbols_state_both_where_and_which(catalog):
+    """A/B. 6.1.1 draws crossed squares on the extremes, at apex level."""
+    rule = get_nts_rule("6.1.1", NORM)
+    symbol = next(m for m in rule.render.marks if m.kind is RenderKind.SYMBOL)
+
+    assert symbol.params["at"] == "apex_level"
+    assert symbol.target_selector is TargetSelector.RANGE_ENDPOINTS
+    # The two facts live in two fields; neither stands in for the other.
+    assert symbol.params["at"] != "endpoints"
+
+
+def test_every_connector_states_where_it_is_drawn(catalog):
+    """C/E/J. A connector is two points and nothing else; it must say where."""
+    connectors = [
+        (rule, mark)
+        for rule in catalog.rules
+        for mark in rule.render.marks
+        if mark.kind is RenderKind.CONNECTOR
+    ]
+    assert len(connectors) == 2
+
+    for rule, mark in connectors:
+        assert mark.params["at"] == "apex_level", rule.rule_id
+
+
+def test_the_three_prosthesis_rules_agree_on_their_band(catalog):
+    """D. 6.1.29 used to omit what 6.1.30 and 6.1.31 declared."""
+    bands = set()
+    for rule_id in ("6.1.29", "6.1.30", "6.1.31"):
+        rule = get_nts_rule(rule_id, NORM)
+        line = next(m for m in rule.render.marks if m.kind is RenderKind.LINE)
+        bands.add(line.params["at"])
+    assert bands == {"apex_level"}
+
+
+def test_the_bridge_connector_still_selects_its_targets_by_role(catalog):
+    """F. Placement was added; the role that picks the pilares is untouched.
+
+    CLINICAL-02 stays open: no cardinality is stated or implied.
+    """
+    rule = get_nts_rule("6.1.29", NORM)
+    connector = next(m for m in rule.render.marks if m.kind is RenderKind.CONNECTOR)
+
+    assert connector.role == "pilar"
+    assert connector.target_selector is None
+    assert rule.role("pilar").min_count is None
+    assert rule.role("pilar").max_count is None
+
+
+def test_the_endpoints_placement_token_is_gone(catalog):
+    """G. It answered the wrong question, and nothing else ever used it."""
+    assert "endpoints" not in {m.value for m in MarkPlacement}
+    raw = (CATALOG_DIR / f"{NORM}.json").read_text(encoding="utf-8")
+    assert '"endpoints"' not in raw
+
+    for rule in catalog.rules:
+        for mark in rule.render.marks:
+            assert mark.params.get("at") != "endpoints", rule.rule_id
+
+
+def test_only_the_span_rule_selects_a_subset_of_its_targets(catalog):
+    with_selector = {
+        rule.rule_id: mark.target_selector.value
+        for rule in catalog.rules
+        for mark in rule.render.marks
+        if mark.target_selector is not None
+    }
+    assert with_selector == {"6.1.1": "range_endpoints"}
+
+
+def test_placement_never_has_to_be_inferred_from_geometry_constraints(catalog):
+    """6.1.8 is the standing proof that constraints cannot place a mark.
+
+    One rule, two marks, two areas: a line on the root and a square on the
+    crown. Whichever area a renderer picked from `constraints` would be wrong
+    for one of them, so every mark that needs a position states its own.
+    """
+    espigo = get_nts_rule("6.1.8", NORM)
+    assert {c.value for c in espigo.geometry_input.constraints} == {"root_area", "crown_area"}
+    assert len(espigo.render.marks) == 2
+
+    for rule in catalog.rules:
+        freehand = rule.geometry_input.mode is GeometryMode.CLINICIAN_DEFINED_SHAPE
+        for mark in rule.render.marks:
+            if mark.kind is RenderKind.CONNECTOR:
+                assert "at" in mark.params, rule.rule_id
+            if mark.kind is RenderKind.LINE and not freehand:
+                assert "at" in mark.params, rule.rule_id
+
+
+def test_validator_rejects_a_connector_without_a_placement(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    connector = next(m for m in rule.render.marks if m.kind is RenderKind.CONNECTOR)
+    stripped = connector.model_copy(update={"params": {"style": "vertical_marks"}})
+    marks = tuple(stripped if m is connector else m for m in rule.render.marks)
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": marks})})
+
+    with pytest.raises(CatalogValidationError, match="must declare an 'at' placement"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_standard_line_without_a_placement(catalog):
+    rule = get_nts_rule("6.1.30", NORM)
+    line = rule.render.marks[0].model_copy(update={"params": {"style": "two_parallel_horizontal"}})
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (line,)})})
+
+    with pytest.raises(CatalogValidationError, match="must declare an 'at' placement"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_a_freehand_line_needs_no_band(catalog):
+    """The clinician draws the shape, so there is no band to name."""
+    for rule_id in ("6.1.10", "6.1.35"):
+        rule = get_nts_rule(rule_id, NORM)
+        assert rule.geometry_input.mode is GeometryMode.CLINICIAN_DEFINED_SHAPE
+        line = next(m for m in rule.render.marks if m.kind is RenderKind.LINE)
+        assert "at" not in line.params
+    validate_nts_catalog(catalog)  # ...and that is not an error
+
+
+def test_validator_rejects_range_endpoints_outside_a_range(catalog):
+    """H. Endpoints need a span to be the extremes of."""
+    rule = get_nts_rule("6.1.20", NORM)  # tooth-scoped
+    symbol = next(m for m in rule.render.marks if m.kind is RenderKind.SYMBOL)
+    patched = symbol.model_copy(update={"target_selector": TargetSelector.RANGE_ENDPOINTS})
+    marks = tuple(patched if m is symbol else m for m in rule.render.marks)
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": marks})})
+
+    with pytest.raises(CatalogValidationError, match="needs a range to have endpoints of"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_selector_on_a_mark_drawn_as_one_extent(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    line = next(m for m in rule.render.marks if m.kind is RenderKind.LINE)
+    patched = line.model_copy(update={"target_selector": TargetSelector.RANGE_ENDPOINTS})
+    marks = tuple(patched if m is line else m for m in rule.render.marks)
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": marks})})
+
+    with pytest.raises(CatalogValidationError, match="meaningless on a mark drawn as one"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_an_unknown_target_selector_is_refused_by_the_schema():
+    """I. Pydantic closes the vocabulary before the validator ever runs."""
+    from app.modules.odontogram.nts.catalog.schema import RenderMark
+
+    # `params` is passed explicitly: the field's default is a shared read-only
+    # mapping, and letting pydantic deep-copy it raises before validation runs.
+    with pytest.raises(ValidationError):
+        RenderMark(kind=RenderKind.SYMBOL, params={}, target_selector="both_ends")
+
+    # ...and the one declared member is accepted.
+    assert (
+        RenderMark(
+            kind=RenderKind.SYMBOL, params={}, target_selector="range_endpoints"
+        ).target_selector
+        is TargetSelector.RANGE_ENDPOINTS
+    )
+
+
+def test_target_selector_serialises_flat_for_the_api(catalog):
+    dumped = catalog.model_dump(mode="json")
+    rule = next(r for r in dumped["rules"] if r["rule_id"] == "6.1.1")
+    symbol = next(m for m in rule["render"]["marks"] if m["kind"] == "symbol")
+
+    assert symbol["target_selector"] == "range_endpoints"
+    assert symbol["params"]["at"] == "apex_level"
+    # Every other mark carries the field as null rather than omitting it.
+    for r in dumped["rules"]:
+        for mark in r["render"]["marks"]:
+            assert "target_selector" in mark

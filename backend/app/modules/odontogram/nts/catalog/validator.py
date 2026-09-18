@@ -33,6 +33,8 @@ from app.modules.odontogram.nts.catalog.schema import (
     ReviewStatus,
     RoleAppliesTo,
     Scope,
+    TargetIdentity,
+    TargetSelector,
 )
 
 #: Attribute that carries the good/bad state a condition-dependent colour
@@ -50,6 +52,19 @@ _VALUED_KINDS = frozenset({AttributeKind.ENUM, AttributeKind.ENUM_MULTI, Attribu
 #: already carries it). ``enum_multi`` would resolve to several and there is no
 #: normative rule for joining them.
 _SIGLA_SOURCE_KINDS = frozenset({AttributeKind.ENUM, AttributeKind.FIXED})
+
+#: Mark kinds drawn once per target, so choosing a subset of targets means
+#: something. A line, a fill and an outline are drawn as one continuous extent
+#: or region instead, and "draw this region on the first and last tooth" states
+#: nothing a renderer could act on.
+_PER_TARGET_KINDS = frozenset(
+    {RenderKind.SYMBOL, RenderKind.ARROW, RenderKind.BOX_SIGLAS, RenderKind.CONNECTOR}
+)
+
+#: Mark kinds whose position is not implied by anything else they carry, so the
+#: catalog has to state it. A connector is two points and nothing else; a line
+#: is a band, unless the clinician draws the shape and there is no band to give.
+_PLACEMENT_REQUIRED_KINDS = frozenset({RenderKind.CONNECTOR, RenderKind.LINE})
 
 #: Attribute kinds a mark may append as a suffix: anything that is one scalar.
 _SUFFIX_SOURCE_KINDS = frozenset(
@@ -82,6 +97,8 @@ def validate_nts_catalog(catalog: NtsCatalog) -> None:
         _check_siglas_unique_within_rule(rule, errors)
         _check_render(rule, errors)
         _check_mark_vocabulary(rule, errors)
+        _check_mark_placement(rule, errors)
+        _check_target_selectors(rule, errors)
         _check_mark_bindings(rule, errors)
         _check_condition_state(rule, errors)
         _check_geometry(rule, errors)
@@ -255,6 +272,68 @@ def _check_mark_vocabulary(rule: NtsRule, errors: list[str]) -> None:
                 errors.append(
                     f"{where}: param {key}={value!r} is not in the declared vocabulary "
                     f"({sorted(member.value for member in vocabulary)})"
+                )
+
+
+def _check_mark_placement(rule: NtsRule, errors: list[str]) -> None:
+    """18. A mark that cannot imply its own position must state one.
+
+    ``geometry_input.constraints`` is **not** an answer. It is declared once
+    per *rule* while marks are many: §6.1.8 constrains itself to
+    ``root_area, crown_area`` for a line on the root and a square on the crown,
+    so a renderer reading constraints to place either one would find two
+    candidate areas and no way to choose. Placement is therefore a property of
+    the mark, and the check below is what stops it drifting back.
+
+    A ``clinician_defined_shape`` line is the one exception, and not a special
+    case: the clinician draws the shape, so there is no band for the catalog to
+    name.
+    """
+    freehand = rule.geometry_input.mode is GeometryMode.CLINICIAN_DEFINED_SHAPE
+
+    for index, mark in enumerate(rule.render.marks):
+        if mark.kind not in _PLACEMENT_REQUIRED_KINDS:
+            continue
+        if mark.kind is RenderKind.LINE and freehand:
+            continue
+        if "at" not in mark.params:
+            errors.append(
+                f"{rule.rule_id}.render.marks[{index}]({mark.kind.value}): must declare an "
+                "'at' placement; geometry_input.constraints is per-rule and cannot say "
+                "where an individual mark goes"
+            )
+
+
+def _check_target_selectors(rule: NtsRule, errors: list[str]) -> None:
+    """19. A target selector is meaningful for the scope it is used on.
+
+    ``range_endpoints`` names the extremes of a span, so it needs a span to
+    have extremes of, and teeth the chart can identify. Both are read off the
+    rule's own scope and target identity — no rule is named here.
+    """
+    for index, mark in enumerate(rule.render.marks):
+        selector = mark.target_selector
+        if selector is None:
+            continue
+        where = f"{rule.rule_id}.render.marks[{index}]({mark.kind.value})"
+
+        if mark.kind not in _PER_TARGET_KINDS:
+            errors.append(
+                f"{where}: target_selector is meaningless on a mark drawn as one "
+                f"extent rather than per target "
+                f"({', '.join(sorted(k.value for k in _PER_TARGET_KINDS))} may carry one)"
+            )
+
+        if selector is TargetSelector.RANGE_ENDPOINTS:
+            if rule.scope is not Scope.RANGE:
+                errors.append(
+                    f"{where}: target_selector 'range_endpoints' needs a range to have "
+                    f"endpoints of, but the rule's scope is {rule.scope.value!r}"
+                )
+            if rule.target_identity is not TargetIdentity.NUMBERED:
+                errors.append(
+                    f"{where}: target_selector 'range_endpoints' needs targets the chart "
+                    "can identify, but this rule's subject carries no FDI number"
                 )
 
 

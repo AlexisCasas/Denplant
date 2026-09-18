@@ -81,8 +81,12 @@
       "render": {
         "color_semantics": "condition_dependent",
         "marks": [
-          { "kind": "symbol", "params": { "shape": "square_with_cross", "at": "endpoints" } },
-          { "kind": "connector", "params": { "style": "straight_line" } }
+          {
+            "kind": "symbol",
+            "params": { "shape": "square_with_cross", "at": "apex_level" },
+            "target_selector": "range_endpoints"
+          },
+          { "kind": "connector", "params": { "style": "straight_line", "at": "apex_level" } }
         ]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
@@ -746,8 +750,8 @@
       "render": {
         "color_semantics": "condition_dependent",
         "marks": [
-          { "kind": "line", "params": { "style": "straight_horizontal", "meaning": "bridge_extension" } },
-          { "kind": "connector", "params": { "style": "vertical_marks" }, "role": "pilar" }
+          { "kind": "line", "params": { "style": "straight_horizontal", "meaning": "bridge_extension", "at": "apex_level" } },
+          { "kind": "connector", "params": { "style": "vertical_marks", "at": "apex_level" }, "role": "pilar" }
         ]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
