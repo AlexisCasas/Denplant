@@ -302,7 +302,36 @@ enum silently.
 | `shape_fill` | a filled region (caries, restorations, pulpotomy, wear) |
 | `outline` | contour without fill (temporary restoration) |
 
-`params` are descriptive tokens (`{"shape": "x_cross"}`), never coordinates.
+A mark carries two kinds of information, kept deliberately apart.
+
+**`params` say how it looks.** Descriptive tokens (`{"shape": "x_cross"}`),
+never coordinates, and never free strings: each key has a closed vocabulary
+declared in `MARK_PARAMS` (`MarkPlacement`, `SymbolShape`, `LineStyle`,
+`ArrowStyle`, `ArrowDirection`, `ConnectorStyle`, `FillStyle`,
+`OutlineStyle`, `SiglaCase`, `LineMeaning`), so a renderer switches over an
+enum rather than matching strings it hopes exist. An arrow must declare both
+`style` and `at` (`REQUIRED_MARK_PARAMS`): §6.1.23 draws its arrow *on* the
+tooth and §6.1.24/6.1.25 draw theirs *outside* it, and neither placement
+follows from `toward`.
+
+**`text_from` / `suffix_from` / `role` say what data it reads.** They are
+references into the rule's own `attributes` and `target_roles`, resolved by
+the validator:
+
+| Field | Meaning | Example |
+|---|---|---|
+| `text_from` | attribute whose selected value is the text written | 6.1.3 → `crown_type` |
+| `suffix_from` | attribute appended after that text | 6.1.19 → `mobility_degree` |
+| `role` | `target_roles` code selecting which targets carry the mark | 6.1.29 → `pilar` |
+
+Bindings are declared rather than inferred because the obvious inferences are
+wrong. "The rule's one `is_sigla` attribute" looks like a safe answer for
+`text_from`, but 6.1.26 carries a sigla that goes **inside a circle** and never
+into the box — `is_sigla` says a sigla exists, not that a box is drawn. And
+§6.1.29's verticals sit on the *pilares*, which the norm never equates with the
+span's endpoints, so the connector reads a role off the targets instead of
+guessing from position.
+
 The catalog ships **no SVG, no path data, no hex colours** — a test asserts
 this against the raw JSON.
 
@@ -320,6 +349,12 @@ this against the raw JSON.
 `constraints` (`surface_regions`, `fissure_anatomy`, `crown_area`,
 `root_area`, `apex_level`, `interproximal`) bound the mode; mode `none`
 cannot carry any.
+
+Mode `surface_regions` is **platform vocabulary that NTS N.° 188 does not
+use**. 6.1.5 (DDE) declared it until NTS-05D.0b, but the norm asks which
+surfaces are affected and then only writes the siglas in the box (p.7-8), so
+the mode promised a drawing the norm never describes. Do not implement it
+speculatively: no rule exercises it, and no test can therefore cover it.
 
 **Six rules require clinician-defined shapes**: 6.1.10 (fracture), 6.1.16
 (caries), 6.1.33 (definitive restoration), 6.1.34 (temporary restoration),
@@ -487,6 +522,16 @@ in one pass, not one error per run.
 | 11 | geometry mode `none` carries no constraints |
 | 12 | `needs_clinical_review` items explain themselves, and the flag propagates to the rule |
 | 13 | every rule cites its section; a divergent printed heading is recorded as `document_label` |
+| 14 | role definitions are well formed, unique, and never also modelled as an attribute |
+| 15 | Especificaciones requirements cannot be ambiguous for the current model |
+| 16 | every mark param is declared for its kind, with a value from that key's vocabulary; required params are present |
+| 17 | every `box_siglas` declares `text_from`; `text_from`/`suffix_from`/`role` resolve within the rule; no `is_sigla` attribute is left unread |
+
+Checks 16 and 17 are what make a rule-id-free renderer possible: after them, a
+mark's text source, suffix source, target role and placement are all answerable
+from metadata alone. Retiring a token is also enough to make its old spelling a
+hard error, which is how the `apex_height` / `vertical` / `square_enclosing_crown`
+synonyms and the prose `at: "pillars"` stay retired.
 
 Deliberate non-errors, restated because they look like bugs: the same sigla
 in different rules (§4), and the presence of `needs_clinical_review` items

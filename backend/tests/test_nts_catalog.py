@@ -11,12 +11,15 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.odontogram.nts.catalog import (
+    MARK_PARAMS,
+    REQUIRED_MARK_PARAMS,
     AttributeDef,
     AttributeKind,
     ColorSemantics,
     GeometryMode,
     RenderKind,
     ReviewStatus,
+    RoleAppliesTo,
     Scope,
     SpecificationRequirement,
     VariantValue,
@@ -690,3 +693,308 @@ def _with(catalog, replacement):
             )
         }
     )
+
+
+# --- 11. NTS-05D.0b: render metadata is resolvable without a rule_id --------
+#
+# The 05D.0 audit found that a renderer could not build any of the 38 findings
+# from metadata alone: it would have had to know that 6.1.29's "pillars" means
+# the `pilar` role, that 6.1.19's degree comes from `mobility_degree`, that
+# 6.1.26's sigla goes in a circle rather than the box, and that 6.1.23 draws
+# its arrow on the tooth while 6.1.24 draws one outside it. Every one of those
+# is now declared. These tests pin the declarations and, more importantly, pin
+# that they are *resolvable generically* — the property the renderer depends on.
+#
+# Evidence read for this amendment (the scanned PDF, rotated to read):
+#   6.1.3  (p.6)  "Se dibuja un cuadrado bordeando la corona clinica..."
+#   6.1.4  (p.7)  "Se dibuja un cuadrado de color rojo que encierre la corona..."
+#   6.1.5  (p.7-8) "Se colocan en el recuadro correspondiente ... las siglas del
+#     hallazgo clinico identificado en la(s) superficie(s) dentaria(s)."
+#   6.1.23 (p.14) "Se dibuja sobre la grafica de la pieza dentaria una flecha..."
+#   6.1.24 (p.14) "Se dibuja fuera del grafico de la pieza dentaria una flecha
+#     recta vertical ... dirigida en sentido externo en incisal u oclusal."
+#   6.1.25 (p.14) "Se dibuja fuera del grafico de la pieza dentaria, una flecha
+#     recta vertical ... dirigida hacia la zona incisal u oclusal."
+#   6.1.29 (p.16) "...con lineas verticales sobre los pilares."
+
+
+def test_every_box_siglas_mark_declares_where_its_text_comes_from(catalog):
+    """C3. 19 rules write in the box; not one of them leaves the source implied."""
+    boxes = [
+        (rule, mark)
+        for rule in catalog.rules
+        for mark in rule.render.marks
+        if mark.kind is RenderKind.BOX_SIGLAS
+    ]
+    assert len(boxes) == 19
+
+    for rule, mark in boxes:
+        assert mark.text_from, rule.rule_id
+        source = next(a for a in rule.attributes if a.name == mark.text_from)
+        assert source.is_sigla, f"{rule.rule_id}.{mark.text_from}"
+        assert source.kind in (AttributeKind.ENUM, AttributeKind.FIXED), rule.rule_id
+
+
+def test_a_sigla_can_live_outside_the_box(catalog):
+    """C2. `is_sigla` says a sigla exists, never that a box is drawn.
+
+    6.1.26 writes its "S" inside the circumference between the two apices
+    (p.15), so a renderer that keyed the annotation box off `is_sigla` would
+    print a stray S in the box of a tooth that is not even the subject.
+    """
+    rule = get_nts_rule("6.1.26", NORM)
+    assert any(a.is_sigla for a in rule.attributes)
+    assert not any(m.kind is RenderKind.BOX_SIGLAS for m in rule.render.marks)
+
+    symbol = rule.render.marks[0]
+    assert symbol.kind is RenderKind.SYMBOL
+    assert symbol.params["shape"] == "circle_enclosing_sigla"
+    assert symbol.text_from == "sigla"
+
+
+def test_no_declared_sigla_is_left_unread(catalog):
+    """The same invariant from the other side: dead sigla data is a defect."""
+    for rule in catalog.rules:
+        read = {m.text_from for m in rule.render.marks if m.text_from}
+        for attribute in rule.attributes:
+            if attribute.is_sigla:
+                assert attribute.name in read, f"{rule.rule_id}.{attribute.name}"
+
+
+def test_mobility_degree_is_bound_not_inferred(catalog):
+    """C4. The degree is a second datum, and the catalog names which one.
+
+    CLINICAL-04 stays open: no scale and no bounds are invented here.
+    """
+    mark = get_nts_rule("6.1.19", NORM).render.marks[0]
+    assert mark.text_from == "sigla"
+    assert mark.suffix_from == "mobility_degree"
+    # The old `suffix: "degree"` token only restated the attribute's own name.
+    assert "suffix" not in mark.params
+
+    degree = _attr(catalog, "6.1.19", "mobility_degree")
+    assert degree.kind is AttributeKind.INTEGER
+    assert degree.values == ()
+
+
+def test_the_bridge_connector_selects_its_targets_by_role(catalog):
+    """C5. `pilar` is the persisted role code, not prose about pillars.
+
+    §6.1.29 marks the pilares of the span. The norm never says they are the
+    endpoints — the figure's bridge just happens to have them there — so the
+    renderer must read the role off the targets.
+    """
+    rule = get_nts_rule("6.1.29", NORM)
+    connector = next(m for m in rule.render.marks if m.kind is RenderKind.CONNECTOR)
+
+    assert connector.role == "pilar"
+    assert rule.role(connector.role) is not None
+    assert rule.role(connector.role).applies_to is RoleAppliesTo.SUBJECT
+    # Nothing restates the role as a placement token.
+    assert "at" not in connector.params
+    # ...and CLINICAL-02 is still open: no cardinality was invented.
+    assert rule.role("pilar").min_count is None
+    assert rule.role("pilar").max_count is None
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "placement", "toward"),
+    [
+        ("6.1.23", "on_figure", "occlusal_plane"),
+        ("6.1.24", "outside_occlusal", "outward"),
+        ("6.1.25", "outside_occlusal", "incisal_occlusal"),
+    ],
+)
+def test_arrow_placement_is_declared_separately_from_direction(rule_id, placement, toward):
+    """C6. Where the arrow sits and which way it points are two facts.
+
+    6.1.24 and 6.1.25 share a placement and oppose in direction; 6.1.23 shares
+    6.1.24's screen direction and sits somewhere else entirely. Neither fact
+    can be derived from the other.
+    """
+    mark = get_nts_rule(rule_id, NORM).render.marks[0]
+    assert mark.kind is RenderKind.ARROW
+    assert mark.params["at"] == placement
+    assert mark.params["toward"] == toward
+
+
+def test_every_arrow_declares_a_style_and_a_placement(catalog):
+    for rule in catalog.rules:
+        for mark in rule.render.marks:
+            if mark.kind is RenderKind.ARROW:
+                assert "style" in mark.params, rule.rule_id
+                assert "at" in mark.params, rule.rule_id
+
+
+def test_the_crown_square_is_one_token(catalog):
+    """C7. 6.1.3 and 6.1.4 draw the same rectangle; the wording differs, not the figure."""
+    shapes = {
+        get_nts_rule(rule_id, NORM).render.marks[0].params["shape"]
+        for rule_id in ("6.1.3", "6.1.4")
+    }
+    assert shapes == {"square_bordering_crown"}
+
+
+def test_dde_writes_a_sigla_and_draws_nothing_on_the_tooth(catalog):
+    """C1. The surfaces stay clinical data; they are not a drawing instruction.
+
+    §6.1.5 asks which surfaces are affected and then only writes the siglas in
+    the box, so a mode of `surface_regions` promised a drawing the norm never
+    describes.
+    """
+    rule = get_nts_rule("6.1.5", NORM)
+    assert rule.geometry_input.mode is GeometryMode.NONE
+    assert rule.geometry_input.constraints == ()
+    assert [m.kind for m in rule.render.marks] == [RenderKind.BOX_SIGLAS]
+    # The clinical contract is untouched: the norm does ask for the surfaces.
+    surfaces = _attr(catalog, "6.1.5", "surfaces")
+    assert surfaces.kind is AttributeKind.ENUM_MULTI
+    assert {v.code for v in surfaces.values} == {"M", "D", "O", "V", "L"}
+    assert rule.notes
+
+
+@pytest.mark.parametrize("legacy", ["apex_height", "pillars", "square_enclosing_crown"])
+def test_retired_tokens_are_gone_from_the_catalog(legacy):
+    """C8 + C5 + C7. A synonym left in the data is a second spelling to support."""
+    raw = (CATALOG_DIR / f"{NORM}.json").read_text(encoding="utf-8")
+    assert legacy not in raw
+
+
+def test_the_vertical_line_synonym_is_gone(catalog):
+    """C8. 6.1.8 and 6.1.37 both draw a vertical line down the root."""
+    styles = {
+        mark.params["style"]
+        for rule_id in ("6.1.8", "6.1.37")
+        for mark in get_nts_rule(rule_id, NORM).render.marks
+        if mark.kind is RenderKind.LINE
+    }
+    assert styles == {"straight_vertical"}
+
+
+def test_every_mark_param_is_declared_vocabulary(catalog):
+    """G. Nothing a renderer must switch on is an undeclared string."""
+    for rule in catalog.rules:
+        for mark in rule.render.marks:
+            allowed = MARK_PARAMS[mark.kind]
+            for key, value in mark.params.items():
+                assert key in allowed, f"{rule.rule_id}: {mark.kind.value}.{key}"
+                assert value in {m.value for m in allowed[key]}, (
+                    f"{rule.rule_id}: {mark.kind.value}.{key}={value}"
+                )
+
+
+def test_the_whole_render_contract_resolves_for_all_38_rules(catalog):
+    """The coverage test: every binding on every rule resolves from metadata.
+
+    This is what 05D.1-05D.4 will rely on. If it passes, a renderer can be
+    written with a `match mark.kind` and nothing else — no rule_id anywhere.
+    """
+    assert len(catalog.rules) == 38
+    seen_kinds = set()
+
+    for rule in catalog.rules:
+        assert rule.render.marks, rule.rule_id
+        for mark in rule.render.marks:
+            seen_kinds.add(mark.kind)
+            names = {a.name for a in rule.attributes}
+
+            if mark.text_from is not None:
+                assert mark.text_from in names, f"{rule.rule_id}: {mark.text_from}"
+            if mark.suffix_from is not None:
+                assert mark.suffix_from in names, f"{rule.rule_id}: {mark.suffix_from}"
+                assert mark.suffix_from != mark.text_from, rule.rule_id
+            if mark.role is not None:
+                assert rule.role(mark.role) is not None, f"{rule.rule_id}: {mark.role}"
+            if mark.kind is RenderKind.BOX_SIGLAS:
+                assert mark.text_from is not None, rule.rule_id
+            if mark.kind is RenderKind.ARROW:
+                assert set(REQUIRED_MARK_PARAMS[RenderKind.ARROW]) <= set(mark.params)
+
+    assert seen_kinds == set(RenderKind)
+
+
+# --- 12. the validator rejects each way the contract can be broken ---------
+
+
+def test_validator_rejects_a_box_without_a_text_source(catalog):
+    rule = get_nts_rule("6.1.9", NORM)
+    box = rule.render.marks[0].model_copy(update={"text_from": None})
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (box,)})})
+    with pytest.raises(CatalogValidationError, match="must declare text_from"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_text_source_that_does_not_exist(catalog):
+    rule = get_nts_rule("6.1.9", NORM)
+    box = rule.render.marks[0].model_copy(update={"text_from": "no_such_attribute"})
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (box,)})})
+    with pytest.raises(CatalogValidationError, match="is not an attribute of this rule"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_text_source_that_is_not_the_sigla(catalog):
+    """6.1.16 could point its box at `surfaces`; a box holds one sigla."""
+    rule = get_nts_rule("6.1.16", NORM)
+    box = next(m for m in rule.render.marks if m.kind is RenderKind.BOX_SIGLAS)
+    patched = box.model_copy(update={"text_from": "surfaces"})
+    marks = tuple(patched if m is box else m for m in rule.render.marks)
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": marks})})
+    with pytest.raises(CatalogValidationError, match="not the rule's sigla attribute"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_suffix_source_that_does_not_exist(catalog):
+    rule = get_nts_rule("6.1.19", NORM)
+    box = rule.render.marks[0].model_copy(update={"suffix_from": "grade"})
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (box,)})})
+    with pytest.raises(CatalogValidationError, match="suffix_from 'grade' is not an attribute"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_connector_role_that_is_not_declared(catalog):
+    rule = get_nts_rule("6.1.29", NORM)
+    connector = next(m for m in rule.render.marks if m.kind is RenderKind.CONNECTOR)
+    patched = connector.model_copy(update={"role": "pillar"})
+    marks = tuple(patched if m is connector else m for m in rule.render.marks)
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": marks})})
+    with pytest.raises(CatalogValidationError, match="is not declared in target_roles"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_an_arrow_without_a_placement(catalog):
+    rule = get_nts_rule("6.1.24", NORM)
+    arrow = rule.render.marks[0].model_copy(
+        update={"params": {"style": "straight_vertical", "toward": "outward"}}
+    )
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (arrow,)})})
+    with pytest.raises(CatalogValidationError, match="param 'at' is required"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "params", "message"),
+    [
+        # A retired synonym is now simply not vocabulary.
+        ("6.1.2", {"style": "zigzag", "at": "apex_height"}, "not in the declared vocabulary"),
+        ("6.1.2", {"style": "vertical", "at": "apex_level"}, "not in the declared vocabulary"),
+        # ...as is a param invented for a kind that has no such notion.
+        ("6.1.2", {"style": "zigzag", "at": "apex_level", "shape": "circle"}, "is not declared"),
+    ],
+)
+def test_validator_rejects_undeclared_mark_vocabulary(catalog, rule_id, params, message):
+    rule = get_nts_rule(rule_id, NORM)
+    mark = rule.render.marks[0].model_copy(update={"params": params})
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (mark,)})})
+    with pytest.raises(CatalogValidationError, match=message):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_sigla_no_mark_reads(catalog):
+    """A rule that declares a sigla and draws no text would lose it silently."""
+    rule = get_nts_rule("6.1.9", NORM)
+    box = rule.render.marks[0].model_copy(
+        update={"kind": RenderKind.OUTLINE, "params": {"style": "contour"}, "text_from": None}
+    )
+    broken = rule.model_copy(update={"render": rule.render.model_copy(update={"marks": (box,)})})
+    with pytest.raises(CatalogValidationError, match="no mark reads it via text_from"):
+        validate_nts_catalog(_with(catalog, broken))

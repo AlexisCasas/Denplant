@@ -108,7 +108,7 @@
       ],
       "render": {
         "color_semantics": "condition_dependent",
-        "marks": [{ "kind": "line", "params": { "style": "zigzag", "at": "apex_height" } }]
+        "marks": [{ "kind": "line", "params": { "style": "zigzag", "at": "apex_level" } }]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
       "source": { "page": 6, "section": "6.1.2" }
@@ -145,7 +145,7 @@
         "color_semantics": "condition_dependent",
         "marks": [
           { "kind": "symbol", "params": { "shape": "square_bordering_crown" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "crown_type" }
         ]
       },
       "specification_requirement": {
@@ -175,8 +175,8 @@
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
         "marks": [
-          { "kind": "symbol", "params": { "shape": "square_enclosing_crown" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "symbol", "params": { "shape": "square_bordering_crown" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
         ]
       },
       "specification_requirement": {
@@ -186,7 +186,7 @@
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
       "source": { "page": 7, "section": "6.1.4" },
-      "notes": "Always red (temporary by definition). The material used is routed to Especificaciones, so it is not an attribute here."
+      "notes": "Always red (temporary by definition). The material used is routed to Especificaciones, so it is not an attribute here. §6.1.4 (p.7) words the square as 'que encierre la corona' where §6.1.3 (p.6) says 'bordeando la corona'; the two figures draw the same rectangle on the crown, so both use one shape token."
     },
     {
       "rule_id": "6.1.5",
@@ -231,11 +231,12 @@
       ],
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "dde_type" }]
       },
-      "geometry_input": { "mode": "surface_regions", "constraints": ["surface_regions"] },
+      "geometry_input": { "mode": "none" },
       "status": "needs_clinical_review",
-      "source": { "page": 8, "section": "6.1.5" }
+      "source": { "page": 8, "section": "6.1.5" },
+      "notes": "§6.1.5 (p.7-8) places the siglas 'en el recuadro correspondiente ... del hallazgo clínico identificado en la(s) superficie(s) dentaria(s)': the affected surfaces are clinical data the norm asks for, but the only drawing act is writing the siglas in the box. Nothing is drawn on the crown, so geometry mode is 'none' while the surfaces attribute stays part of the clinical contract."
     },
     {
       "rule_id": "6.1.6",
@@ -281,7 +282,7 @@
       "render": {
         "color_semantics": "condition_dependent",
         "marks": [
-          { "kind": "line", "params": { "style": "vertical", "at": "root" } },
+          { "kind": "line", "params": { "style": "straight_vertical", "at": "root" } },
           { "kind": "symbol", "params": { "shape": "square", "at": "crown" } }
         ]
       },
@@ -304,7 +305,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 9, "section": "6.1.9" }
@@ -386,7 +387,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 11, "section": "6.1.14" },
@@ -416,7 +417,7 @@
       ],
       "render": {
         "color_semantics": "condition_dependent",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 11, "section": "6.1.15", "document_label": "6.115" },
@@ -456,7 +457,7 @@
         "color_semantics": "bad_temporary_or_pathological",
         "marks": [
           { "kind": "shape_fill", "params": { "fill": "solid" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "caries_type" }
         ]
       },
       "geometry_input": {
@@ -481,7 +482,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 12, "section": "6.1.17" }
@@ -501,7 +502,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 12, "section": "6.1.18" }
@@ -528,7 +529,7 @@
       ],
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase", "suffix": "degree" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla", "suffix_from": "mobility_degree" }]
       },
       "geometry_input": { "mode": "none" },
       "status": "needs_clinical_review",
@@ -556,7 +557,7 @@
         "color_semantics": "good_or_non_pathological",
         "marks": [
           { "kind": "symbol", "params": { "shape": "x_cross" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "absence_type" }
         ]
       },
       "geometry_input": { "mode": "standard_geometry" },
@@ -590,7 +591,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 13, "section": "6.1.22" }
@@ -602,7 +603,7 @@
       "scope": "tooth",
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "arrow", "params": { "style": "zigzag", "toward": "occlusal_plane" } }]
+        "marks": [{ "kind": "arrow", "params": { "style": "zigzag", "at": "on_figure", "toward": "occlusal_plane" } }]
       },
       "geometry_input": { "mode": "standard_geometry" },
       "source": { "page": 14, "section": "6.1.23", "document_label": "5.2.23" },
@@ -615,7 +616,7 @@
       "scope": "tooth",
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "arrow", "params": { "style": "straight_vertical", "toward": "outward" } }]
+        "marks": [{ "kind": "arrow", "params": { "style": "straight_vertical", "at": "outside_occlusal", "toward": "outward" } }]
       },
       "geometry_input": { "mode": "standard_geometry" },
       "source": { "page": 14, "section": "6.1.24" },
@@ -628,7 +629,7 @@
       "scope": "tooth",
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "arrow", "params": { "style": "straight_vertical", "toward": "incisal_occlusal" } }]
+        "marks": [{ "kind": "arrow", "params": { "style": "straight_vertical", "at": "outside_occlusal", "toward": "incisal_occlusal" } }]
       },
       "geometry_input": { "mode": "standard_geometry" },
       "source": { "page": 14, "section": "6.1.25" },
@@ -651,7 +652,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "symbol", "params": { "shape": "circle_enclosing_sigla", "at": "between_apices" } }]
+        "marks": [{ "kind": "symbol", "params": { "shape": "circle_enclosing_sigla", "at": "between_apices" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["interproximal"] },
       "source": { "page": 15, "section": "6.1.26" },
@@ -683,7 +684,7 @@
         "color_semantics": "condition_dependent",
         "marks": [
           { "kind": "shape_fill", "params": { "at": "coronal_pulp" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
         ]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
@@ -710,7 +711,7 @@
       ],
       "render": {
         "color_semantics": "good_or_non_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "abnormal_position" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 15, "section": "6.1.28" },
@@ -746,7 +747,7 @@
         "color_semantics": "condition_dependent",
         "marks": [
           { "kind": "line", "params": { "style": "straight_horizontal", "meaning": "bridge_extension" } },
-          { "kind": "connector", "params": { "style": "vertical_marks", "at": "pillars" } }
+          { "kind": "connector", "params": { "style": "vertical_marks" }, "role": "pilar" }
         ]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
@@ -818,7 +819,7 @@
       ],
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
-        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" } }]
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
       },
       "geometry_input": { "mode": "none" },
       "source": { "page": 17, "section": "6.1.32" }
@@ -869,7 +870,7 @@
         "color_semantics": "condition_dependent",
         "marks": [
           { "kind": "shape_fill", "params": { "fill": "solid" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "restoration_material" }
         ]
       },
       "geometry_input": {
@@ -933,7 +934,7 @@
         "color_semantics": "condition_dependent",
         "marks": [
           { "kind": "line", "params": { "style": "sealant_path" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
         ]
       },
       "geometry_input": {
@@ -979,7 +980,7 @@
         "color_semantics": "bad_temporary_or_pathological",
         "marks": [
           { "kind": "shape_fill", "params": { "fill": "solid" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
         ]
       },
       "geometry_input": {
@@ -1017,7 +1018,7 @@
         "color_semantics": "condition_dependent",
         "marks": [
           { "kind": "line", "params": { "style": "straight_vertical", "at": "root" } },
-          { "kind": "box_siglas", "params": { "case": "uppercase" } }
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "endodontic_treatment_type" }
         ]
       },
       "geometry_input": { "mode": "standard_geometry", "constraints": ["root_area"] },

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- feat(nts-05d.0b): **render metadata is now declarative end to end**. The
+  05D.0 audit found that a renderer could not build a single one of the 38
+  findings from metadata alone — it would have had to know that 6.1.29's
+  `at: "pillars"` meant the `pilar` role, that 6.1.19's degree came from
+  `mobility_degree`, that 6.1.26's sigla belongs in a circle and not in the
+  box, and that 6.1.23 draws its arrow on the tooth while 6.1.24 draws one
+  outside it. Each of those would have become an `if (rule_id === …)`.
+
+  Marks now separate **how it looks** (`params`, drawn from closed enums) from
+  **what data it reads** (`text_from`, `suffix_from`, `role` — references the
+  validator resolves). Every `box_siglas` names its text source (19 of them),
+  no `is_sigla` attribute may be left unread, every arrow declares its
+  placement as well as its direction, and every param key and value must be
+  declared vocabulary for its kind.
+
+  Three token pairs collapsed to one spelling each — `apex_height`/`apex_level`,
+  `vertical`/`straight_vertical`, and `square_bordering_crown`/
+  `square_enclosing_crown` (§6.1.3 says "bordeando la corona", §6.1.4 "que
+  encierre la corona", and pp. 6-7 draw the same rectangle). 6.1.5 dropped
+  `geometry_input.mode: surface_regions`: the norm asks which surfaces are
+  affected and then only writes the siglas in the box, so the mode promised a
+  drawing that does not exist. The `surfaces` attribute stays — it is clinical
+  data the norm requests, not a drawing instruction.
+
+  Catalog metadata only. No record, no hash and no migration is touched:
+  `canonical.py` never reads the catalog, so no finalized record can move.
+  CLINICAL-01 to CLINICAL-05 all stay open; in particular no pilar cardinality,
+  no mobility scale and no rotation vocabulary was invented.
+
 - feat(nts-05c): **structured finding editor**. The chart becomes a capture
   surface: pick a rule from the catalog, fill the attributes it declares,
   select the targets its scope needs, and create the finding. Existing

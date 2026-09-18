@@ -79,6 +79,154 @@ class RenderKind(StrEnum):
     OUTLINE = "outline"
 
 
+# --- mark vocabulary -------------------------------------------------------
+#
+# Every token a mark may carry is enumerated below, so a renderer can switch
+# exhaustively over a closed set instead of matching strings it hopes exist.
+# The members are the ones the 38 rules actually use: this is a description of
+# NTS N.° 188, not a general drawing language, and a token nothing uses would
+# be a promise the norm never made.
+
+
+class MarkPlacement(StrEnum):
+    """Where a mark sits, as the norm words it (``at``).
+
+    These name *anatomical or chart landmarks*, never coordinates. Turning one
+    into a position is the renderer's job and needs the chart geometry, which
+    the catalog deliberately knows nothing about.
+    """
+
+    #: Between the apices of the two adjacent teeth (§6.1.26).
+    BETWEEN_APICES = "between_apices"
+    #: Between two crowns (§6.1.6).
+    BETWEEN_TEETH = "between_teeth"
+    CROWN = "crown"
+    #: The two extremes of a range (§6.1.1 "los extremos").
+    ENDPOINTS = "endpoints"
+    NEAR_ROOTS = "near_roots"
+    TOOTH_NUMBER = "tooth_number"
+    TOOTH_NUMBERS = "tooth_numbers"
+    #: The occlusal/incisal edge of the crown (§6.1.13).
+    OCCLUSAL_ZONE = "occlusal_zone"
+    #: Drawn over the tooth figure itself (§6.1.23 "sobre la gráfica").
+    ON_FIGURE = "on_figure"
+    #: Outside the figure, on the occlusal/incisal side (§6.1.24, §6.1.25
+    #: "fuera del gráfico"). The screen direction follows from
+    #: :class:`ArrowDirection` plus the tooth's arch, never from this token.
+    OUTSIDE_OCCLUSAL = "outside_occlusal"
+    #: At the level of the root apices (§6.1.2, §6.1.30, §6.1.31).
+    APEX_LEVEL = "apex_level"
+    #: Across the crowns (§6.1.7 "sobre las coronas").
+    OVER_CROWNS = "over_crowns"
+    ROOT = "root"
+    #: The coronal pulp chamber (§6.1.27).
+    CORONAL_PULP = "coronal_pulp"
+
+
+class SymbolShape(StrEnum):
+    CIRCLE = "circle"
+    #: A circle with the rule's sigla written inside it (§6.1.26).
+    CIRCLE_ENCLOSING_SIGLA = "circle_enclosing_sigla"
+    INVERTED_PARENTHESIS = "inverted_parenthesis"
+    SQUARE = "square"
+    #: A square drawn round the clinical crown. §6.1.3 words it "bordeando la
+    #: corona" and §6.1.4 "que encierre la corona"; the figures on pp. 6-7 draw
+    #: the same rectangle, so one token serves both.
+    SQUARE_BORDERING_CROWN = "square_bordering_crown"
+    SQUARE_WITH_CROSS = "square_with_cross"
+    TRIANGLE = "triangle"
+    TWO_INTERSECTING_CIRCLES = "two_intersecting_circles"
+    X_CROSS = "x_cross"
+
+
+class LineStyle(StrEnum):
+    FRACTURE_TRACE = "fracture_trace"
+    SEALANT_PATH = "sealant_path"
+    STRAIGHT_HORIZONTAL = "straight_horizontal"
+    STRAIGHT_VERTICAL = "straight_vertical"
+    TWO_PARALLEL_HORIZONTAL = "two_parallel_horizontal"
+    ZIGZAG = "zigzag"
+
+
+class LineMeaning(StrEnum):
+    """What a line stands for, where the norm names it."""
+
+    #: §6.1.29: the horizontal states the extent of the bridge.
+    BRIDGE_EXTENSION = "bridge_extension"
+
+
+class ArrowStyle(StrEnum):
+    CURVED = "curved"
+    STRAIGHT_VERTICAL = "straight_vertical"
+    TWO_CROSSED_CURVED = "two_crossed_curved"
+    ZIGZAG = "zigzag"
+
+
+class ArrowDirection(StrEnum):
+    """Which way an arrow points, relative to the tooth (``toward``).
+
+    Never a screen direction: an upper and a lower tooth with the same finding
+    point opposite ways. The renderer combines this with the tooth's arch.
+    """
+
+    #: Toward the occlusal plane (§6.1.23).
+    OCCLUSAL_PLANE = "occlusal_plane"
+    #: Away from the tooth, out of the arch (§6.1.24 "en sentido externo").
+    OUTWARD = "outward"
+    #: Toward the tooth's incisal/occlusal zone (§6.1.25).
+    INCISAL_OCCLUSAL = "incisal_occlusal"
+
+
+class ConnectorStyle(StrEnum):
+    STRAIGHT_LINE = "straight_line"
+    VERTICAL_MARKS = "vertical_marks"
+
+
+class FillStyle(StrEnum):
+    SOLID = "solid"
+
+
+class OutlineStyle(StrEnum):
+    CONTOUR = "contour"
+
+
+class SiglaCase(StrEnum):
+    UPPERCASE = "uppercase"
+
+
+#: Params each mark kind may carry, and the closed vocabulary of each.
+#:
+#: A key absent from a mark is fine — many marks need no placement. A key that
+#: is *not* listed for its kind, or a value outside its enum, is a catalog
+#: error: the renderer would have to guess, and guessing on an odontogram is
+#: how a wrong clinical statement gets drawn.
+MARK_PARAMS: Final[Mapping[RenderKind, Mapping[str, type[StrEnum]]]] = MappingProxyType(
+    {
+        RenderKind.BOX_SIGLAS: MappingProxyType({"case": SiglaCase}),
+        RenderKind.SYMBOL: MappingProxyType({"shape": SymbolShape, "at": MarkPlacement}),
+        RenderKind.LINE: MappingProxyType(
+            {"style": LineStyle, "at": MarkPlacement, "meaning": LineMeaning}
+        ),
+        RenderKind.CONNECTOR: MappingProxyType({"style": ConnectorStyle}),
+        RenderKind.ARROW: MappingProxyType(
+            {"style": ArrowStyle, "at": MarkPlacement, "toward": ArrowDirection}
+        ),
+        RenderKind.SHAPE_FILL: MappingProxyType({"fill": FillStyle, "at": MarkPlacement}),
+        RenderKind.OUTLINE: MappingProxyType({"style": OutlineStyle}),
+    }
+)
+
+#: Params a mark of this kind cannot be drawn without.
+#:
+#: An arrow is the one mark whose meaning collapses without both: §6.1.23 draws
+#: its arrow *on* the tooth and §6.1.24/6.1.25 draw theirs *outside* it, so a
+#: renderer that had to infer placement would be inferring it from ``toward``,
+#: which says something else entirely.
+REQUIRED_MARK_PARAMS: Final[Mapping[RenderKind, frozenset[str]]] = MappingProxyType(
+    {RenderKind.ARROW: frozenset({"style", "at"})}
+)
+
+
 class ColorSemantics(StrEnum):
     """Normative colour meaning (NTS N.° 188 §5.12-5.13).
 
@@ -291,12 +439,38 @@ class Anchor(BaseModel):
 
 
 class RenderMark(BaseModel):
-    """One drawing operation. ``params`` are descriptive tokens only."""
+    """One drawing operation.
+
+    Two kinds of information, deliberately kept apart:
+
+    * ``params`` say **how it looks** — shape, style, case, placement. They are
+      descriptive tokens from the enums above, never coordinates.
+    * ``text_from`` / ``suffix_from`` / ``role`` say **what data it reads**.
+      They are references into the rule's own ``attributes`` and
+      ``target_roles``, and the validator resolves every one of them.
+
+    The split exists so a renderer never has to infer a binding. With a single
+    ``is_sigla`` attribute per rule the text source *looks* inferable today,
+    but that is an accident of NTS N.° 188 rather than a contract, and §6.1.26
+    already breaks the neighbouring assumption: it carries a sigla that goes
+    inside a circle and never into the annotation box.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: RenderKind
     params: FrozenStrMap = _EMPTY_PARAMS
+    #: Attribute whose selected value supplies this mark's text.
+    text_from: str | None = Field(default=None, min_length=1)
+    #: Attribute appended to that text (§6.1.19 writes the mobility degree
+    #: after the "M"). Separate from ``text_from`` because it is a second
+    #: datum, not a second rendering of the first.
+    suffix_from: str | None = Field(default=None, min_length=1)
+    #: ``target_roles`` code selecting *which* targets carry this mark.
+    #: §6.1.29 marks the pilares of the span, which the norm does not equate
+    #: with its endpoints — so the role is read from the targets, never
+    #: guessed from their position.
+    role: str | None = Field(default=None, min_length=1)
 
 
 class Render(BaseModel):
