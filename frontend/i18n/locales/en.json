@@ -487,9 +487,11 @@
         "lower": "Lower",
         "readonly": "Read-only",
         "noRecord": "Structure of the official form. It stands for no clinical record.",
-        "findingsPending": "{count} recorded finding(s)",
-        "findingsPendingHint": "Drawing them on the odontogram arrives in the next phase.",
-        "findingRendererPending": "Finding rendering pending"
+        "findingsPending": "{count} finding(s) not fully drawn",
+        "findingsPendingHint": "Their marks need drawing primitives that arrive in a later phase. Every finding stays on the list below.",
+        "findingRendererPending": "Finding rendering pending",
+        "siglasHidden": "{count} sigla(s) do not fit their box",
+        "siglasHiddenHint": "The box shows \"+n\" where there is no room. Nothing is removed from the record; the full list is below."
       },
       "editor": {
         "findings": "Findings",

@@ -487,9 +487,11 @@
         "lower": "Inferior",
         "readonly": "Apenas leitura",
         "noRecord": "Estrutura do formulário oficial. Não corresponde a nenhum registo clínico.",
-        "findingsPending": "{count} achado(s) registado(s)",
-        "findingsPendingHint": "O seu desenho sobre o odontograma chega na próxima fase.",
-        "findingRendererPending": "Representação de achados pendente"
+        "findingsPending": "{count} achado(s) não desenhado(s) por completo",
+        "findingsPendingHint": "As suas marcas precisam de primitivas de desenho que chegam numa fase posterior. Todos permanecem na lista abaixo.",
+        "findingRendererPending": "Representação de achados pendente",
+        "siglasHidden": "{count} sigla(s) não cabem na sua caixa",
+        "siglasHiddenHint": "A caixa mostra «+n» onde não há espaço. Nada é removido do registo; a lista completa está abaixo."
       },
       "editor": {
         "findings": "Achados",

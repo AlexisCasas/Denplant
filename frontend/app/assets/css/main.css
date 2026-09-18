@@ -342,3 +342,43 @@ body {
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
+
+/* ============================================================================
+   NTS N.° 188 clinical findings — the only two colours the norm allows
+   ============================================================================
+   §5.12-5.13: blue marks a finding in good state or a non-pathological
+   characteristic; red marks a bad state, a temporary one, or a pathological
+   characteristic. §5.17 adds that the chart itself prints in black and that
+   red and blue belong exclusively to the findings.
+
+   These are deliberately NOT --color-success-* / --color-danger-*. Those are
+   product status colours and someone will re-tune them one day; here blue
+   means "good", which inverts the usual convention, and a well-meant change to
+   an error token must never be able to repaint a clinical record. They are
+   also not tied to --color-primary for the same reason.
+
+   The norm states the two colour names and no RGB, so the exact values are a
+   UI decision: chosen to stay legible on both grounds and to survive printing.
+   They do not change with the theme beyond what legibility requires — a red
+   finding is red in dark mode too.
+   ============================================================================ */
+
+:root {
+  --color-nts-finding-good: #1D4ED8;
+  --color-nts-finding-bad: #C81E1E;
+}
+
+.dark {
+  /* Lifted for contrast against the dark canvas; still unmistakably blue/red. */
+  --color-nts-finding-good: #60A5FA;
+  --color-nts-finding-bad: #F87171;
+}
+
+@media print {
+  /* Print is monochrome-hostile territory: pin the ink regardless of theme. */
+  :root,
+  .dark {
+    --color-nts-finding-good: #0000CC;
+    --color-nts-finding-bad: #CC0000;
+  }
+}

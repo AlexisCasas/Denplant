@@ -487,9 +487,11 @@
         "lower": "Inférieure",
         "readonly": "Lecture seule",
         "noRecord": "Structure du formulaire officiel. Elle ne correspond à aucun enregistrement clinique.",
-        "findingsPending": "{count} constatation(s) enregistrée(s)",
-        "findingsPendingHint": "Leur tracé sur l'odontogramme arrive à la prochaine phase.",
-        "findingRendererPending": "Tracé des constatations à venir"
+        "findingsPending": "{count} constatation(s) non entièrement dessinée(s)",
+        "findingsPendingHint": "Leurs marques nécessitent des primitives de dessin prévues pour une phase ultérieure. Toutes restent dans la liste ci-dessous.",
+        "findingRendererPending": "Tracé des constatations à venir",
+        "siglasHidden": "{count} sigle(s) ne tiennent pas dans leur case",
+        "siglasHiddenHint": "La case affiche « +n » lorsqu'il n'y a plus de place. Rien n'est retiré du dossier ; la liste complète est ci-dessous."
       },
       "editor": {
         "findings": "Constatations",

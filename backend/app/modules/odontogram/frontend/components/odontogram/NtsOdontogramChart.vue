@@ -18,7 +18,7 @@
  * passes down the one record to display.
  */
 
-import type { NtsRecord } from '../../types/nts'
+import type { NtsCatalog, NtsRecord } from '../../types/nts'
 import { NTS_ROWS } from '../../utils/ntsDentition'
 import {
   NTS_CHART_HEIGHT,
@@ -26,7 +26,9 @@ import {
   NTS_CHART_VIEWBOX,
   NTS_CHART_WIDTH
 } from '../../utils/ntsChartGeometry'
+import { resolveChart } from '../../utils/ntsRenderModel'
 import NtsDentitionRow from './NtsDentitionRow.vue'
+import NtsFindingLayer from './NtsFindingLayer.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -45,8 +47,23 @@ const props = withDefaults(
     selectable?: boolean
     selectedTeeth?: readonly number[]
     anchorTeeth?: readonly number[]
+    /**
+     * The catalog the record's findings cite.
+     *
+     * Without it the chart draws the blank form: a finding cannot be rendered
+     * from the record alone, because what it looks like is the norm's business
+     * and the norm lives in the catalog.
+     */
+    catalog?: NtsCatalog | null
   }>(),
-  { record: null, readonly: false, selectable: false, selectedTeeth: () => [], anchorTeeth: () => [] }
+  {
+    record: null,
+    readonly: false,
+    selectable: false,
+    selectedTeeth: () => [],
+    anchorTeeth: () => [],
+    catalog: null
+  }
 )
 
 const emit = defineEmits<{ toothSelect: [fdi: number, rowOrder: number[]] }>()
@@ -72,6 +89,35 @@ const CHART_MIN_WIDTH = NTS_CHART_WIDTH
 const rows = NTS_ROWS
 
 const findingCount = computed(() => props.record?.findings.length ?? 0)
+
+/**
+ * The drawing, resolved from the record and the catalog.
+ *
+ * All of the clinical reasoning happens in `resolveChart`, which is pure: this
+ * component passes data in and hands instructions to the layer.
+ */
+const render = computed(() =>
+  props.catalog && props.record
+    ? resolveChart(props.record.findings, props.catalog.rules)
+    : null
+)
+
+/**
+ * Findings this build can only draw in part, or not at all.
+ *
+ * Reported in words next to the chart rather than approximated on it: half a
+ * mark reads as a different finding, and an absent one at least reads as
+ * absent. The notice shrinks as the remaining mark kinds land.
+ */
+const incomplete = computed(() => {
+  if (!render.value) return 0
+  return render.value.partial.length + render.value.unsupported.length
+})
+
+/** Siglas that have no room in their box. Counted, never dropped. */
+const hiddenSiglas = computed(() =>
+  render.value?.overflows.reduce((total, overflow) => total + overflow.hidden, 0) ?? 0
+)
 </script>
 
 <template>
@@ -141,11 +187,10 @@ const findingCount = computed(() => props.record?.findings.length ?? 0)
         <!--
           The shared coordinate space for everything that spans teeth.
 
-          Empty in 05D.1 — no finding is drawn yet. It exists so the space is
-          real and testable rather than a promise: it carries the deterministic
-          viewBox from `ntsChartGeometry`, it is centred exactly as the rows
-          are, and being inside the canvas it scrolls with them on a narrow
-          screen instead of drifting off the teeth.
+          It carries the deterministic viewBox from `ntsChartGeometry`, it is
+          centred exactly as the rows are, and being inside the canvas it
+          scrolls with them on a narrow screen instead of drifting off the
+          teeth.
 
           Placed last, and with its own margin zeroed, because the canvas
           separates its children with `space-y-1`: as a first child it would
@@ -165,13 +210,47 @@ const findingCount = computed(() => props.record?.findings.length ?? 0)
           aria-hidden="true"
           focusable="false"
           data-testid="nts-chart-overlay"
-        />
+        >
+          <NtsFindingLayer
+            v-if="render"
+            :instructions="render.instructions"
+            :overflows="render.overflows"
+          />
+        </svg>
       </div>
     </div>
 
-    <!-- Findings exist but cannot be drawn yet. Never silently omitted. -->
+    <!--
+      What is on the record but not yet on the drawing.
+
+      Two separate counts, because they are different problems. `incomplete` is
+      this build not yet knowing how to draw a mark kind; `hiddenSiglas` is a
+      box physically too small for every sigla on that tooth. Neither is ever
+      resolved by inventing a symbol, and neither is ever left unsaid.
+    -->
     <UAlert
-      v-if="findingCount > 0"
+      v-if="incomplete > 0"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-shapes"
+      :title="t('odontogram.nts.chart.findingsPending', { count: incomplete })"
+      :description="t('odontogram.nts.chart.findingsPendingHint')"
+      data-testid="nts-chart-findings-pending"
+    />
+
+    <UAlert
+      v-if="hiddenSiglas > 0"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-layers"
+      :title="t('odontogram.nts.chart.siglasHidden', { count: hiddenSiglas })"
+      :description="t('odontogram.nts.chart.siglasHiddenHint')"
+      data-testid="nts-chart-siglas-hidden"
+    />
+
+    <!-- A record whose findings cannot be drawn at all still says so. -->
+    <UAlert
+      v-if="!catalog && findingCount > 0"
       color="neutral"
       variant="subtle"
       icon="i-lucide-shapes"

@@ -515,9 +515,11 @@
         "lower": "Inferior",
         "readonly": "Solo lectura",
         "noRecord": "Estructura del formato oficial. No corresponde a ningún registro clínico.",
-        "findingsPending": "{count} hallazgo(s) registrado(s)",
-        "findingsPendingHint": "Su representación gráfica sobre el odontograma llega en la siguiente fase.",
-        "findingRendererPending": "Representación de hallazgos pendiente"
+        "findingsPending": "{count} hallazgo(s) no dibujado(s) por completo",
+        "findingsPendingHint": "Sus marcas requieren primitivas de dibujo que llegan en una fase posterior. Todos los hallazgos siguen en la lista inferior.",
+        "findingRendererPending": "Representación de hallazgos pendiente",
+        "siglasHidden": "{count} sigla(s) no caben en su recuadro",
+        "siglasHiddenHint": "El recuadro muestra «+n» donde no hay espacio. No se elimina nada del registro; la lista completa está abajo."
       },
       "editor": {
         "findings": "Hallazgos",

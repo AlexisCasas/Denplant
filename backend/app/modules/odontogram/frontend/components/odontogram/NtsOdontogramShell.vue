@@ -451,9 +451,16 @@ watch([() => props.patientId, normVersion], () => void load())
           />
         </UCard>
 
-        <!-- The official dental layout. Findings are not drawn on it yet. -->
+        <!--
+          The official dental layout, with the findings drawn on it.
+
+          The catalog goes down with the record because a finding cannot be
+          drawn from the record alone: what a mark looks like is the norm's
+          business, and the norm lives in the catalog.
+        -->
         <NtsOdontogramChart
           :record="chartRecord"
+          :catalog="catalog"
           :readonly="chartReadonly"
           :selectable="chartSelectable"
           :selected-teeth="selectedTeeth"

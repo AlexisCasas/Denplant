@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- feat(nts-05d.2): **siglas and symbols are drawn on the chart**. The first
+  clinically visible layer: `ntsRenderModel.ts` turns a finding plus its
+  catalog rule plus the chart geometry into `RenderInstruction[]`, and
+  `NtsFindingLayer.vue` draws them inside the shared overlay. The model is
+  pure — no Vue, no DOM — and the layer decides nothing.
+
+  Every decision is read from the mark: which attribute supplies the text
+  (`text_from`), what is appended (`suffix_from`), which shape
+  (`params.shape`), where it sits (`params.at`, falling back to what the shape
+  itself names). There is no `rule_id` in either file and a test asserts there
+  never will be. That is what pays off for the supernumerary tooth: its sigla
+  goes inside a circumference between two apices instead of into a box, and
+  the renderer gets it right without knowing which rule that is.
+
+  Colour stops at meaning. The model emits `paint: 'good' | 'bad'` and no hex;
+  two new tokens, `--color-nts-finding-good` / `--color-nts-finding-bad`, hold
+  the values. They are deliberately **not** the product's success/danger
+  colours: blue means *good* here, which inverts the usual convention, and a
+  well-meant retune of an error token must not be able to repaint a clinical
+  record. A print block pins both regardless of theme.
+
+  **Nothing is dropped silently.** A finding whose marks this slice cannot
+  draw reports `partial` or `unsupported` and is announced next to the chart
+  rather than approximated on it. Where several findings share one annotation
+  box the siglas stack one per line as the annex draws them (p.15 writes "D"
+  over "L"); beyond two, the box shows "+n" — a UI overflow indicator, not an
+  NTS symbol — and every instruction stays in the model.
+
+  Of the 38 rules: **18 complete, 7 partial, 13 unsupported**. Lines,
+  connectors, arrows, fills and outlines arrive in later slices; span symbols
+  drawn on range endpoints are deferred with them, because placing the squares
+  without the connector that joins them would show half a mark.
+
+  Draft and finalized render byte-for-byte identically, and so do carried-forward
+  and observed findings — both verified, not asserted.
+
 - feat(nts-05d.1): **global chart geometry foundation; no clinical findings
   rendered yet**. 05B gave every tooth its own `<svg>` and its own viewBox,
   which is all a row of independent drawings needs — and not enough for

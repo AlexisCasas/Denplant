@@ -15,6 +15,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { nextTick } from 'vue'
 
@@ -766,6 +767,110 @@ describe('NTS-05D.1 — the shared coordinate space is present and harmless', ()
     expect(wrapper.emitted('toothSelect')).toBeTruthy()
     expect(wrapper.emitted('toothSelect')![0]![0]).toBe(16)
     expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.2 — findings reach the drawing
+// ---------------------------------------------------------------------------
+
+describe('NTS-05D.2 — the finding layer draws inside the shared space', () => {
+  // Resolved from the working directory, like the render-model spec does:
+  // `import.meta.url` is not always a file: URL under the Nuxt test runtime.
+  const REAL_CATALOG = JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), '../backend/app/modules/odontogram/nts/catalog/pe_nts_188_2022.json'),
+      'utf8'
+    )
+  )
+
+  const boxOnly = (fdi: number, id: string) => ({
+    id,
+    record_id: 'rec-1',
+    norm_version: 'pe_nts_188_2022',
+    rule_id: '6.1.9',
+    attributes: {},
+    provenance: 'observed' as const,
+    source_finding_id: null,
+    sequence: 1,
+    created_at: '2026-01-02T10:00:00Z',
+    created_by: 'u1',
+    targets: [{
+      id: `t-${id}`, group_index: 0, position: 0, participation: 'subject', role: null,
+      target_kind: 'fdi_tooth', tooth_number: fdi, arch: null, local_ordinal: null, geometry: null
+    }]
+  })
+
+  it('a sigla is drawn, inside the overlay and nowhere else', async () => {
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: [boxOnly(16, 'f1')] as never }),
+      catalog: REAL_CATALOG
+    })
+    const overlay = wrapper.find('[data-testid="nts-chart-overlay"]')
+
+    expect(overlay.find('[data-testid="nts-finding-layer"]').exists()).toBe(true)
+    const sigla = wrapper.find('[data-testid="nts-sigla-f1"]')
+    expect(sigla.exists()).toBe(true)
+    expect(sigla.text()).toBe('FFP')
+    // It lives in the overlay, not loose in the tooth cells.
+    expect(overlay.find('[data-testid="nts-sigla-f1"]').exists()).toBe(true)
+  })
+
+  it('the layer cannot take a click away from the teeth', async () => {
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: [boxOnly(16, 'f1')] as never }),
+      catalog: REAL_CATALOG,
+      selectable: true
+    })
+    const layer = wrapper.find('[data-testid="nts-finding-layer"]')
+
+    expect(layer.classes()).toContain('pointer-events-none')
+    expect(layer.attributes('aria-hidden')).toBe('true')
+
+    await wrapper.find('[data-testid="nts-tooth-16"]').trigger('click')
+    expect(wrapper.emitted('toothSelect')![0]![0]).toBe(16)
+  })
+
+  it('without a catalog nothing is drawn, and the record still says so', async () => {
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: [boxOnly(16, 'f1')] as never })
+    })
+
+    expect(wrapper.find('[data-testid="nts-finding-layer"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(true)
+  })
+
+  it('a finding this slice cannot draw is announced instead of omitted', async () => {
+    // 6.1.30 is drawn with two parallel lines; no line primitive exists yet.
+    const arch = {
+      ...boxOnly(16, 'f9'),
+      rule_id: '6.1.30',
+      attributes: { condition_state: 'good' },
+      targets: [{
+        id: 'ta', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'arch', tooth_number: null, arch: 'upper', local_ordinal: null, geometry: null
+      }]
+    }
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: [arch] as never }),
+      catalog: REAL_CATALOG
+    })
+
+    expect(wrapper.find('[data-testid="nts-sigla-f9"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(true)
+  })
+
+  it('a box with more siglas than it can hold shows the count, and says so', async () => {
+    const crowded = [1, 2, 3, 4].map(n => boxOnly(16, `c${n}`))
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: crowded as never }),
+      catalog: REAL_CATALOG
+    })
+
+    expect(wrapper.find('[data-testid="nts-box-overflow-16"]').text()).toBe('+3')
+    expect(wrapper.find('[data-testid="nts-chart-siglas-hidden"]').exists()).toBe(true)
+    // ...and the ones that did not fit were never rendered as text.
+    expect(wrapper.findAll('[data-testid^="nts-sigla-c"]')).toHaveLength(1)
   })
 })
 
