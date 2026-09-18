@@ -66,6 +66,16 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
   const history = ref<NtsRecordSummary[]>([])
 
   const isLoading = ref(false)
+  /**
+   * An authoritative refetch over the *same* patient, norm and record.
+   *
+   * Kept apart from `isLoading` because the shell replaces its whole clinical
+   * surface while `isLoading` is true. Doing that after a mutation unmounted
+   * the chart, the finding editor and its select popovers mid-save and then
+   * rebuilt them, which is how a successful create ended up looking like a
+   * stuck button. A refresh in place keeps the DOM and swaps the data.
+   */
+  const isRefreshing = ref(false)
   const isMutating = ref(false)
   /** Transport/unknown failure. Clinical problems go to `clinicalErrors`. */
   const error = ref<NtsApiError | null>(null)
@@ -138,7 +148,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    * must not render a clinical shell at all, so an unknown norm short-circuits
    * instead of showing an empty chart.
    */
-  async function load(): Promise<void> {
+  async function load(options: { background?: boolean } = {}): Promise<boolean> {
     const token = ++generation
     inFlight?.abort()
     const controller = new AbortController()
@@ -146,10 +156,16 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
 
     // Clear before awaiting: the previous patient's record must not stay on
     // screen while the new one loads.
-    if (loadedKey !== stateKey.value) clearState()
+    const contextChanged = loadedKey !== stateKey.value
+    if (contextChanged) clearState()
     loadedKey = stateKey.value
 
-    isLoading.value = true
+    // A background refresh only stays background while the context holds. A
+    // different patient or norm is a real load and must show as one.
+    const background = options.background === true && !contextChanged
+    const busy = background ? isRefreshing : isLoading
+
+    busy.value = true
     error.value = null
     normUnavailable.value = false
 
@@ -158,7 +174,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
         normVersion.value,
         controller.signal
       )
-      if (token !== generation) return
+      if (token !== generation) return true
       catalog.value = loadedCatalog
 
       const [current, openDraft, records] = await Promise.all([
@@ -166,29 +182,37 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
         nts.getDraft(patientId.value, normVersion.value, controller.signal),
         nts.listRecords(patientId.value, normVersion.value, {}, controller.signal)
       ])
-      if (token !== generation) return
+      if (token !== generation) return true
 
       currentRecord.value = current
       draft.value = openDraft
       history.value = records.data
+      return true
     } catch (raw) {
-      if (token !== generation) return
+      // A superseded load is not a failure: a newer one owns the outcome.
+      if (token !== generation) return true
       const failure = toNtsApiError(raw)
       if (failure.code === 'nts_norm_version_unknown') {
         // Never fall back to the Original chart: that would silently record
         // under a different format than the clinician selected.
         normUnavailable.value = true
-        return
+        return false
       }
       error.value = failure
+      return false
     } finally {
-      if (token === generation) isLoading.value = false
+      if (token === generation) busy.value = false
     }
   }
 
-  /** Re-read the authoritative state, keeping any conflict notice visible. */
-  async function reload(): Promise<void> {
-    await load()
+  /**
+   * Re-read the authoritative state, keeping any conflict notice visible.
+   *
+   * In place: the surface stays mounted, which is what a refresh after a
+   * mutation needs. Only a context change tears anything down.
+   */
+  async function reload(): Promise<boolean> {
+    return await load({ background: true })
   }
 
   /**
@@ -305,6 +329,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     draft,
     history,
     isLoading,
+    isRefreshing,
     isMutating,
     error,
     clinicalErrors,

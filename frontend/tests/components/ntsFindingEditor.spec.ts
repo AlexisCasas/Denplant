@@ -16,6 +16,7 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 
 import type { NtsFinding, NtsRecord, NtsRule } from '../../../backend/app/modules/odontogram/frontend/types/nts'
 import { useNtsFindingEditor } from '../../../backend/app/modules/odontogram/frontend/composables/useNtsFindingEditor'
+import { buildTargets } from '../../../backend/app/modules/odontogram/frontend/utils/ntsFindingModel'
 
 const state = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
 
@@ -489,6 +490,317 @@ describe('attributes saved, targets rejected', () => {
     expect(editor.partialUpdate.value).toBeNull()
     expect(reload).toHaveBeenCalledTimes(1)
     expect(editor.isOpen.value).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// retargeting an existing finding (MANUAL-QA-05C)
+// ---------------------------------------------------------------------------
+
+/**
+ * Manual QA on the migrated dev database found that an existing finding's
+ * target could not be changed at all: `startEdit` leaves `pickMode` at
+ * `'none'`, the chart is only selectable while it is not `'none'`, and the
+ * only control that could change it was rendered solely for rules declaring
+ * anchors — which is one rule in the whole norm.
+ *
+ * The chart staying inert on open is deliberate and kept: a finding already
+ * recorded must not move to another tooth because of a stray click. What was
+ * missing is the explicit way out, which these tests pin down.
+ */
+describe('changing the targets of an existing finding', () => {
+  const PAIR_RULE = makeRule({ rule_id: 'X.5', scope: 'pair' })
+  const SURFACE_RULE = makeRule({
+    rule_id: 'X.6',
+    scope: 'surface',
+    attributes: [{
+      name: 'surfaces',
+      kind: 'enum_multi',
+      required: true,
+      is_sigla: false,
+      status: 'verified',
+      notes: null,
+      values: [
+        { code: 'M', name: 'Mesial', status: 'verified', notes: null, specification_requirement: null },
+        { code: 'O', name: 'Oclusal/Incisal', status: 'verified', notes: null, specification_requirement: null }
+      ]
+    }]
+  })
+  const ROLE_RULE = makeRule({
+    rule_id: 'X.7',
+    scope: 'range',
+    range_grouping: 'single_segment',
+    target_roles: [{
+      code: 'pilar', name: 'Pilar', applies_to: 'subject',
+      min_count: null, max_count: null, status: 'needs_clinical_review', notes: null
+    }]
+  })
+  const ANCHOR_RULE = makeRule({
+    rule_id: 'X.8',
+    target_identity: 'unnumbered',
+    anchor: { kind: 'interproximal', cardinality: 2, role: 'spatial_reference_only' }
+  })
+
+  const ALL_RULES = [...RULES, PAIR_RULE, SURFACE_RULE, ROLE_RULE, ANCHOR_RULE]
+
+  /** A finding whose subject targets are the given teeth, in order. */
+  function findingOn(ruleId: string, teeth: number[], roles: Record<number, string> = {}) {
+    return makeFinding({
+      rule_id: ruleId,
+      targets: teeth.map((tooth, index) => ({
+        id: `t${index}`,
+        group_index: 0,
+        position: index,
+        participation: 'subject' as const,
+        role: roles[tooth] ?? null,
+        target_kind: 'fdi_tooth' as const,
+        tooth_number: tooth,
+        arch: null,
+        local_ordinal: null,
+        geometry: null
+      }))
+    })
+  }
+
+  async function openEdit(finding: NtsFinding) {
+    const harness = await makeEditor({
+      record: makeRecord({ version: 3, findings: [finding] }),
+      rules: ALL_RULES
+    })
+    harness.editor.startEdit(finding)
+    return harness
+  }
+
+  it('A — opening an edit leaves the chart inert with the stored targets shown', async () => {
+    const finding = findingOn('X.1', [16])
+    const { editor } = await openEdit(finding)
+
+    expect(editor.isOpen.value).toBe(true)
+    expect(editor.selection.value.teeth).toEqual([16])
+    // Inert: a click on the chart cannot move a recorded finding.
+    expect(editor.pickMode.value).toBe('none')
+  })
+
+  it('B — "change selection" is what activates the chart', async () => {
+    const { editor } = await openEdit(findingOn('X.1', [16]))
+
+    editor.startRetargetSubject()
+
+    expect(editor.pickMode.value).toBe('subject')
+    // The old subject is cleared, so the next click cannot land beside it.
+    expect(editor.selection.value.teeth).toEqual([])
+  })
+
+  it('C — a tooth finding is replaced, never accumulated', async () => {
+    const { editor } = await openEdit(findingOn('X.1', [16]))
+
+    editor.startRetargetSubject()
+    editor.pickTooth(26, UPPER_ROW)
+
+    expect(editor.selection.value.teeth).toEqual([26])
+    expect(editor.selection.value.teeth).not.toContain(16)
+  })
+
+  it('D — a range is re-drawn from its new endpoints', async () => {
+    const LOWER_ROW = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
+    const finding = findingOn('X.3', [48, 47, 46, 45, 44, 43])
+    const { editor } = await openEdit(finding)
+
+    expect(editor.selection.value.teeth).toEqual([48, 47, 46, 45, 44, 43])
+
+    editor.startRetargetSubject()
+    editor.pickTooth(46, LOWER_ROW) // new start
+    expect(editor.selection.value.teeth).toEqual([46])
+    editor.pickTooth(42, LOWER_ROW) // new end
+
+    // The new span only, never the old one blended into it.
+    expect(editor.selection.value.teeth).toEqual([46, 45, 44, 43, 42])
+  })
+
+  it('E — a pair is replaced as a pair, with no leftover from the old one', async () => {
+    const { editor } = await openEdit(findingOn('X.5', [11, 21]))
+
+    editor.startRetargetSubject()
+    editor.pickTooth(12, UPPER_ROW)
+    editor.pickTooth(22, UPPER_ROW)
+
+    expect(editor.selection.value.teeth).toEqual([12, 22])
+    expect(editor.problems.value).toEqual([])
+  })
+
+  it('F — a surface finding changes its tooth and its surfaces independently', async () => {
+    const finding = makeFinding({
+      rule_id: 'X.6',
+      attributes: { surfaces: ['M', 'O'] },
+      targets: [{
+        id: 't0', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'fdi_tooth', tooth_number: 16, arch: null, local_ordinal: null, geometry: null
+      }]
+    })
+    const { editor } = await openEdit(finding)
+
+    // Surfaces alone: the tooth is untouched.
+    editor.attributes.value = { surfaces: ['M'] }
+    expect(editor.selection.value.teeth).toEqual([16])
+
+    // Tooth alone: the surfaces survive it.
+    editor.startRetargetSubject()
+    editor.pickTooth(26, UPPER_ROW)
+    expect(editor.selection.value.teeth).toEqual([26])
+    expect(editor.attributes.value).toEqual({ surfaces: ['M'] })
+  })
+
+  it('G — cancelling after local target changes sends nothing', async () => {
+    const { editor } = await openEdit(findingOn('X.1', [16]))
+
+    editor.startRetargetSubject()
+    editor.pickTooth(26, UPPER_ROW)
+    editor.close()
+
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+    expect(editor.isOpen.value).toBe(false)
+  })
+
+  it('H — saving an unchanged target sends no targets PUT', async () => {
+    const finding = findingOn('X.1', [16])
+    state.put.mockResolvedValue({ data: { record_version: 4, finding } })
+    const { editor } = await openEdit(finding)
+
+    // Retarget mode entered, then the same tooth picked again.
+    editor.startRetargetSubject()
+    editor.pickTooth(16, UPPER_ROW)
+    expect(await editor.saveFinding(finding)).toBe(true)
+
+    expect(state.put).toHaveBeenCalledTimes(1)
+    expect(state.put.mock.calls[0]![0]).toBe('/api/v1/odontogram/nts/records/rec-1/findings/f1')
+  })
+
+  it('I — saving a changed target sends exactly one full-replacement PUT', async () => {
+    const finding = findingOn('X.1', [16])
+    state.put
+      .mockResolvedValueOnce({ data: { record_version: 4, finding } })
+      .mockResolvedValueOnce({ data: { record_version: 5, finding } })
+    const { editor } = await openEdit(finding)
+
+    editor.startRetargetSubject()
+    editor.pickTooth(26, UPPER_ROW)
+    expect(await editor.saveFinding(finding)).toBe(true)
+
+    expect(state.put).toHaveBeenCalledTimes(2)
+    const [url, body] = state.put.mock.calls[1]!
+    expect(url).toBe('/api/v1/odontogram/nts/records/rec-1/findings/f1/targets')
+    expect(body.expected_version).toBe(4)
+    // Full replacement: the whole set, not a patch.
+    expect(body.targets).toHaveLength(1)
+    expect(body.targets[0].tooth_number).toBe(26)
+  })
+
+  it('J — a role the norm gives no bounds never blocks saving', async () => {
+    const LOWER_ROW = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
+    const { editor } = await openEdit(findingOn('X.7', [46, 45, 44]))
+
+    expect(editor.rule.value?.target_roles[0]?.min_count).toBeNull()
+    expect(editor.rule.value?.target_roles[0]?.max_count).toBeNull()
+    // No role assigned at all, and the selection is still valid.
+    expect(editor.selection.value.roles).toEqual({})
+    expect(editor.problems.value).toEqual([])
+
+    editor.startRetargetSubject()
+    editor.pickTooth(46, LOWER_ROW)
+    editor.pickTooth(44, LOWER_ROW)
+    expect(editor.problems.value).toEqual([])
+  })
+
+  it('K — a role survives while its tooth stays selected', async () => {
+    const { editor } = await openEdit(findingOn('X.7', [46, 45, 44], { 46: 'pilar' }))
+
+    expect(editor.selection.value.roles).toEqual({ 46: 'pilar' })
+
+    editor.setRole(45, 'pilar')
+    expect(editor.selection.value.roles).toEqual({ 46: 'pilar', 45: 'pilar' })
+  })
+
+  it('L — a role is dropped when its tooth leaves the selection', async () => {
+    const PAIR_WITH_ROLE = makeRule({
+      rule_id: 'X.9',
+      scope: 'pair',
+      target_roles: [{
+        code: 'pilar', name: 'Pilar', applies_to: 'subject',
+        min_count: null, max_count: null, status: 'verified', notes: null
+      }]
+    })
+    const finding = findingOn('X.9', [11, 21], { 11: 'pilar' })
+    const harness = await makeEditor({
+      record: makeRecord({ version: 3, findings: [finding] }),
+      rules: [...ALL_RULES, PAIR_WITH_ROLE]
+    })
+    const { editor } = harness
+    editor.startEdit(finding)
+    expect(editor.selection.value.roles).toEqual({ 11: 'pilar' })
+
+    // A third pick pushes 11 out of a two-subject rule; its role goes with it.
+    editor.setPickMode('subject')
+    editor.pickTooth(12, UPPER_ROW)
+
+    expect(editor.selection.value.teeth).toEqual([21, 12])
+    expect(editor.selection.value.roles).toEqual({})
+
+    // And nothing is sent for a tooth that is no longer part of the finding.
+    const targets = buildTargets(editor.rule.value!, editor.selection.value)
+    expect(targets.every(target => target.role === null)).toBe(true)
+  })
+
+  it('M — an arch finding still edits through its own selector', async () => {
+    const finding = makeFinding({
+      rule_id: 'X.2',
+      targets: [{
+        id: 't0', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'arch', tooth_number: null, arch: 'upper', local_ordinal: null, geometry: null
+      }]
+    })
+    state.put
+      .mockResolvedValueOnce({ data: { record_version: 4, finding } })
+      .mockResolvedValueOnce({ data: { record_version: 5, finding } })
+    const { editor } = await openEdit(finding)
+
+    expect(editor.selection.value.arches).toEqual(['upper'])
+    // No tooth selection is ever offered for an arch-scoped rule.
+    expect(editor.pickMode.value).toBe('none')
+
+    editor.toggleArch('upper')
+    editor.toggleArch('lower')
+    expect(editor.selection.value.arches).toEqual(['lower'])
+    expect(await editor.saveFinding(finding)).toBe(true)
+
+    const [url, body] = state.put.mock.calls[1]!
+    expect(url).toBe('/api/v1/odontogram/nts/records/rec-1/findings/f1/targets')
+    expect(body.targets).toEqual([
+      { participation: 'subject', target_kind: 'arch', arch: 'lower', group_index: 0, position: 0 }
+    ])
+  })
+
+  it('anchors and subject are replaced independently', async () => {
+    const finding = makeFinding({
+      rule_id: 'X.8',
+      targets: [
+        { id: 's0', group_index: 0, position: 0, participation: 'subject', role: null, target_kind: 'unnumbered_tooth', tooth_number: null, arch: null, local_ordinal: null, geometry: null },
+        { id: 'a0', group_index: 0, position: 1, participation: 'anchor', role: null, target_kind: 'fdi_tooth', tooth_number: 11, arch: null, local_ordinal: null, geometry: null },
+        { id: 'a1', group_index: 0, position: 2, participation: 'anchor', role: null, target_kind: 'fdi_tooth', tooth_number: 12, arch: null, local_ordinal: null, geometry: null }
+      ]
+    })
+    const { editor } = await openEdit(finding)
+
+    expect(editor.selection.value.anchors).toEqual([11, 12])
+
+    editor.startRetargetAnchors()
+    expect(editor.pickMode.value).toBe('anchor')
+    expect(editor.selection.value.anchors).toEqual([])
+
+    editor.pickTooth(21, UPPER_ROW)
+    editor.pickTooth(22, UPPER_ROW)
+    expect(editor.selection.value.anchors).toEqual([21, 22])
+    expect(editor.problems.value).toEqual([])
   })
 })
 

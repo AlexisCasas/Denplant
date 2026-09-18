@@ -33,7 +33,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  pickMode: [mode: NtsPickMode]
+  retargetSubject: []
+  retargetAnchors: []
+  stopRetarget: []
   toggleArch: [arch: NtsArchCode]
   setRole: [tooth: number, role: string | null]
 }>()
@@ -63,12 +65,67 @@ const instruction = computed(() => {
   return t('odontogram.nts.editor.pick.tooth', { count: expected ?? 1 })
 })
 
-function roleOptions(tooth: number) {
-  return [
-    { label: t('odontogram.nts.editor.noRole'), value: '' },
-    ...roles.value.map(role => ({ label: role.name, value: role.code }))
-  ].map(option => ({ ...option, tooth }))
+/**
+ * True when the norm states no cardinality for any role this rule declares.
+ *
+ * `min_count`/`max_count` of null mean the norm is silent, and silence is not
+ * a requirement — so the control must not look like one.
+ */
+const rolesAreOptional = computed(() =>
+  roles.value.every(role => role.min_count === null && role.max_count === null)
+)
+
+/**
+ * Stands for "no role" inside the select, and nowhere else.
+ *
+ * The combobox underneath refuses an item whose value is the empty string —
+ * it reserves that for clearing a selection — so "no role" needs a value of
+ * its own. It is deliberately not a word: `null` is what the absence of a
+ * role means in the model, and the norm's role vocabulary must never gain a
+ * member that only exists because a widget needed one. It is converted back
+ * to `null` the moment it leaves the select.
+ */
+const NO_ROLE = '__nts_no_role__'
+
+/**
+ * The rows the role editor shows.
+ *
+ * Derived once, from the selection that will actually be persisted, so the
+ * summary above and the controls below cannot possibly describe different
+ * sets of teeth. Manual QA reported seeing exactly that, and although it
+ * could not be reproduced, an invariant this important is worth making
+ * structural rather than incidental.
+ */
+const roleRows = computed(() =>
+  props.selection.teeth.map(tooth => ({
+    tooth,
+    role: props.selection.roles[tooth] ?? NO_ROLE
+  }))
+)
+
+/** "No role" plus whatever roles the catalog declares. */
+const roleOptions = computed(() => [
+  { label: t('odontogram.nts.editor.noRole'), value: NO_ROLE },
+  ...roles.value.map(role => ({ label: role.name, value: role.code }))
+])
+
+/**
+ * Normalise what the select reports, in both directions.
+ *
+ * `value-key` is expected to hand back the code, but a select that hands back
+ * the whole option instead would otherwise store an object where the API
+ * requires a string, and the failure would only surface as a 422. The
+ * sentinel is mapped back to `null` here, so it can never reach the model,
+ * the payload or the server.
+ */
+function emitRole(tooth: number, raw: unknown): void {
+  const code = typeof raw === 'string'
+    ? raw
+    : (raw as { value?: string } | null)?.value ?? ''
+  emit('setRole', tooth, !code || code === NO_ROLE ? null : code)
 }
+
+defineExpose({ NO_ROLE })
 </script>
 
 <template>
@@ -112,31 +169,59 @@ function roleOptions(tooth: number) {
       {{ t('odontogram.nts.editor.unnumberedSubject') }}
     </p>
 
-    <!-- Subject / anchor switch, shown only when the rule declares anchors. -->
+    <!--
+      Retargeting is explicit. The chart is inert until one of these is
+      pressed, so opening a finding to read it — or to change an attribute —
+      can never move it to another tooth by a stray click.
+    -->
     <div
-      v-if="anchors > 0 && needsTeeth"
-      class="flex gap-2"
+      v-if="needsTeeth || anchors > 0"
+      class="flex gap-2 flex-wrap"
       data-testid="nts-pick-mode"
     >
       <UButton
+        v-if="needsTeeth"
         size="xs"
         :variant="pickMode === 'subject' ? 'solid' : 'outline'"
         color="neutral"
         :aria-pressed="pickMode === 'subject'"
-        @click="emit('pickMode', 'subject')"
+        data-testid="nts-retarget-subject"
+        @click="emit('retargetSubject')"
       >
-        {{ t('odontogram.nts.editor.pickSubject') }}
+        {{ t('odontogram.nts.editor.changeSelection') }}
       </UButton>
       <UButton
+        v-if="anchors > 0"
         size="xs"
         :variant="pickMode === 'anchor' ? 'solid' : 'outline'"
         color="neutral"
         :aria-pressed="pickMode === 'anchor'"
-        @click="emit('pickMode', 'anchor')"
+        data-testid="nts-retarget-anchors"
+        @click="emit('retargetAnchors')"
       >
-        {{ t('odontogram.nts.editor.pickAnchor') }}
+        {{ t('odontogram.nts.editor.changeReferences') }}
+      </UButton>
+      <UButton
+        v-if="pickMode !== 'none'"
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        data-testid="nts-stop-retarget"
+        @click="emit('stopRetarget')"
+      >
+        {{ t('odontogram.nts.editor.doneSelecting') }}
       </UButton>
     </div>
+
+    <p
+      v-if="pickMode !== 'none'"
+      class="text-caption text-subtle"
+      data-testid="nts-retarget-hint"
+    >
+      {{ pickMode === 'anchor'
+        ? t('odontogram.nts.editor.retargetAnchorHint')
+        : t('odontogram.nts.editor.retargetSubjectHint') }}
+    </p>
 
     <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
       <template v-if="needsTeeth">
@@ -182,27 +267,37 @@ function roleOptions(tooth: number) {
     <!-- Roles belong to a target, never to the finding's attributes. A role
          the norm gives no cardinality is offered, never demanded. -->
     <div
-      v-if="roles.length > 0 && selection.teeth.length > 0"
+      v-if="roles.length > 0 && roleRows.length > 0"
       class="space-y-2"
       data-testid="nts-role-editor"
     >
       <p class="text-caption text-subtle">
-        {{ t('odontogram.nts.editor.roles') }}
+        {{ rolesAreOptional
+          ? t('odontogram.nts.editor.rolesOptional')
+          : t('odontogram.nts.editor.roles') }}
+      </p>
+      <p
+        v-if="rolesAreOptional"
+        class="text-caption text-subtle"
+        data-testid="nts-roles-optional-hint"
+      >
+        {{ t('odontogram.nts.editor.rolesOptionalHint') }}
       </p>
       <div
-        v-for="tooth in selection.teeth"
-        :key="tooth"
+        v-for="(row, index) in roleRows"
+        :key="`${row.tooth}-${index}`"
         class="flex items-center gap-2"
+        :data-role-row="row.tooth"
       >
-        <span class="text-sm tabular-nums w-8">{{ tooth }}</span>
+        <span class="text-sm tabular-nums w-8">{{ row.tooth }}</span>
         <USelectMenu
-          :model-value="selection.roles[tooth] ?? ''"
-          :items="roleOptions(tooth)"
+          :model-value="row.role"
+          :items="roleOptions"
           value-key="value"
           size="xs"
           class="w-48"
-          :data-testid="`nts-role-${tooth}`"
-          @update:model-value="emit('setRole', tooth, $event || null)"
+          :data-testid="`nts-role-${row.tooth}`"
+          @update:model-value="emitRole(row.tooth, $event)"
         />
       </div>
     </div>

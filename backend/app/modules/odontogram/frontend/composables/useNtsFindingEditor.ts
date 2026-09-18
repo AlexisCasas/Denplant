@@ -63,8 +63,13 @@ export interface UseNtsFindingEditorOptions {
   record: () => NtsRecord | null
   /** Rules the catalog served. Empty means the editor cannot open. */
   rules: () => readonly NtsRule[]
-  /** Called after every successful mutation; must refetch authoritatively. */
-  reload: () => Promise<void>
+  /**
+   * Called after every successful mutation; must refetch authoritatively.
+   *
+   * Returning `false` means the refetch itself failed — which is a different
+   * fact from the mutation failing, and is reported as such.
+   */
+  reload: () => Promise<boolean | void>
   /** Called when a mutation hits a 409, with the kind of conflict. */
   onConflict: (kind: 'version' | 'draft' | 'state') => Promise<void>
 }
@@ -96,6 +101,16 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
    * It deliberately survives the editor closing, because a 409 closes it.
    */
   const partialUpdate = ref<{ findingId: string } | null>(null)
+  /**
+   * Set when a mutation was accepted but the refetch after it failed.
+   *
+   * These are different facts and must never be conflated. Once the server
+   * answers 201 the finding exists; a later network failure says only that
+   * this client could not re-read it. Reporting that as "not saved" would
+   * invite the clinician to submit the same finding again, so the retry
+   * offered here refetches and never re-sends the mutation.
+   */
+  const refreshFailed = ref(false)
 
   const isOpen = computed(() => editing.value !== null)
   const isCreating = computed(() => editing.value === 'new')
@@ -197,6 +212,34 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     pickMode.value = mode
   }
 
+  /**
+   * Begin replacing the subject targets.
+   *
+   * Opening an existing finding leaves the chart inert on purpose — a stray
+   * click must never silently move a recorded finding to another tooth — so
+   * retargeting is an explicit act. It clears the subject selection first
+   * because the alternative is worse: a pair whose old second tooth survives
+   * next to a newly clicked one reads as a deliberate pair and is not.
+   *
+   * Anchors and arches are untouched: replacing the subject is not replacing
+   * the spatial references.
+   */
+  function startRetargetSubject(): void {
+    selection.value = { ...selection.value, teeth: [], roles: {} }
+    pickMode.value = 'subject'
+  }
+
+  /** The same, for the spatial references of a rule that declares anchors. */
+  function startRetargetAnchors(): void {
+    selection.value = { ...selection.value, anchors: [] }
+    pickMode.value = 'anchor'
+  }
+
+  /** Leave selection mode; the chart goes inert again. Nothing is sent. */
+  function stopRetarget(): void {
+    pickMode.value = 'none'
+  }
+
   function toggleArch(arch: NtsArchCode): void {
     const arches = selection.value.arches
     selection.value = {
@@ -257,6 +300,12 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     // At the limit a new pick replaces the oldest, so the chart never gets
     // stuck refusing clicks with no way to tell the user why.
     const next = limit === null ? [...teeth, tooth] : [...teeth, tooth].slice(-limit)
+    // A role belongs to a target. A tooth pushed out of the selection takes
+    // its role with it, so no role is ever sent for a tooth that is no longer
+    // part of the finding.
+    for (const dropped of teeth) {
+      if (!next.includes(dropped)) delete roles[dropped]
+    }
     selection.value = { ...selection.value, teeth: next, roles }
   }
 
@@ -276,8 +325,45 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
    * finding are stale, so keeping the form open would invite the clinician to
    * press save again against a record that has moved.
    */
+  /**
+   * Refetch without letting the refetch's own failure look like the
+   * mutation's. Never throws.
+   */
+  async function refresh(): Promise<void> {
+    try {
+      // `false` is a reported failure; a rejection is an unreported one.
+      refreshFailed.value = (await options.reload()) === false
+    } catch {
+      refreshFailed.value = true
+    }
+  }
+
+  /** Re-read after a refresh failure. Refetch only — never a mutation. */
+  async function retryRefresh(): Promise<void> {
+    isSaving.value = true
+    try {
+      await refresh()
+    } finally {
+      isSaving.value = false
+    }
+  }
+
+  /**
+   * Run one mutation, then refresh.
+   *
+   * The two phases are deliberately separate. Up to `await mutate` a failure
+   * means the server rejected the change; after it, the change is applied and
+   * anything that goes wrong is a display problem. `onApplied` runs in
+   * between, so the editor closes once — before the refresh — instead of
+   * being unmounted mid-save and rebuilt by a loading state.
+   *
+   * On a 409 the editor closes: its `expected_version` and quite possibly its
+   * finding are stale, so keeping the form open would invite the clinician to
+   * press save again against a record that has moved.
+   */
   async function run<T>(
-    mutate: (record: NtsRecord, progress: MutationProgress) => Promise<T>
+    mutate: (record: NtsRecord, progress: MutationProgress) => Promise<T>,
+    onApplied?: () => void
   ): Promise<boolean> {
     const record = options.record()
     if (!record) return false
@@ -286,11 +372,10 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     isSaving.value = true
     clearFeedback()
     partialUpdate.value = null
+    refreshFailed.value = false
 
     try {
       await mutate(record, progress)
-      await options.reload()
-      return true
     } catch (raw) {
       const failure = toNtsApiError(raw)
       const kind = conflictKind(failure)
@@ -312,7 +397,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
       // A conflict-free failure does not refetch on its own, so a partially
       // applied edit has to ask for one: the screen must never keep showing a
       // draft the server has already left behind.
-      if (progress.appliedTo !== null) await options.reload()
+      if (progress.appliedTo !== null) await refresh()
 
       if (failure.code === 'nts_clinical_validation' || failure.status === 422) {
         clinicalErrors.value = failure.errors
@@ -323,6 +408,12 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     } finally {
       isSaving.value = false
     }
+
+    // The server accepted it. Close first so the editor unmounts once, then
+    // re-read; a refresh failure from here is never reported as a lost save.
+    onApplied?.()
+    await refresh()
+    return true
   }
 
   /** Create the finding and its targets in one request. */
@@ -330,16 +421,16 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     const current = rule.value
     if (!current || !canSave.value) return false
 
-    const ok = await run(record =>
-      nts.createFinding(record.id, {
-        expected_version: record.version,
-        rule_id: current.rule_id,
-        attributes: attributes.value,
-        targets: buildTargets(current, selection.value)
-      })
+    return await run(
+      record =>
+        nts.createFinding(record.id, {
+          expected_version: record.version,
+          rule_id: current.rule_id,
+          attributes: attributes.value,
+          targets: buildTargets(current, selection.value)
+        }),
+      close
     )
-    if (ok) close()
-    return ok
   }
 
   /**
@@ -359,7 +450,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     const targetsChanged
       = JSON.stringify(nextTargets) !== JSON.stringify(buildTargets(current, selectionFromTargets(original.targets)))
 
-    const ok = await run(async (record, progress) => {
+    return await run(async (record, progress) => {
       const result = await nts.replaceFindingAttributes(record.id, original.id, {
         expected_version: record.version,
         attributes: attributes.value
@@ -374,9 +465,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
           targets: nextTargets
         })
       }
-    })
-    if (ok) close()
-    return ok
+    }, close)
   }
 
   /** Confirm one carried-forward finding. Never in bulk. */
@@ -388,11 +477,12 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
 
   /** Withdraw a finding from the draft. The API takes no reason. */
   async function removeFinding(finding: NtsFinding): Promise<boolean> {
-    const ok = await run(record =>
-      nts.removeFinding(record.id, finding.id, { expected_version: record.version })
+    return await run(
+      record => nts.removeFinding(record.id, finding.id, { expected_version: record.version }),
+      () => {
+        if (editing.value === finding.id) close()
+      }
     )
-    if (ok && editing.value === finding.id) close()
-    return ok
   }
 
   /**
@@ -420,6 +510,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     clinicalErrors,
     error,
     partialUpdate,
+    refreshFailed,
 
     // derived
     isOpen,
@@ -437,11 +528,15 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     selectRule,
     close,
     setPickMode,
+    startRetargetSubject,
+    startRetargetAnchors,
+    stopRetarget,
     pickTooth,
     toggleArch,
     setRole,
 
     dismissPartialUpdate,
+    retryRefresh,
 
     // mutations
     createFinding,

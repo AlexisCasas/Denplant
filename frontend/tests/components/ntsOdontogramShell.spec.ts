@@ -470,6 +470,669 @@ describe('NTS-05C — finding editor integration', () => {
 })
 
 // ---------------------------------------------------------------------------
+// MANUAL-QA-05C — the target of a saved finding must be reachable from the UI
+// ---------------------------------------------------------------------------
+
+/**
+ * Reproduces the defect manual QA found on the migrated database: a saved
+ * finding could be re-opened and its attributes changed, but its tooth could
+ * not, because nothing on screen could make the chart selectable again.
+ */
+describe('MANUAL-QA-05C — retargeting a saved finding from the UI', () => {
+  const TOOTH_RULE = {
+    rule_id: '6.1.20',
+    ordinal: 20,
+    official_name: 'Pieza dentaria ausente',
+    scope: 'tooth',
+    target_identity: 'numbered',
+    anchor: null,
+    arch_cardinality: null,
+    range_grouping: null,
+    attributes: [],
+    target_roles: [],
+    specification_requirement: null,
+    status: 'verified'
+  }
+
+  const RETARGET_CATALOG = { ...CATALOG, rules: [TOOTH_RULE] }
+
+  function savedFinding() {
+    return {
+      id: 'f1',
+      record_id: 'rec-1',
+      norm_version: 'pe_nts_188_2022',
+      rule_id: '6.1.20',
+      attributes: {},
+      provenance: 'observed',
+      source_finding_id: null,
+      sequence: 1,
+      created_at: '2026-01-02T10:00:00Z',
+      created_by: 'u1',
+      targets: [{
+        id: 't1', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'fdi_tooth', tooth_number: 16, arch: null, local_ordinal: null, geometry: null
+      }]
+    }
+  }
+
+  function routeRetarget() {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: RETARGET_CATALOG }
+      if (url.endsWith('/current')) return { data: null }
+      if (url.endsWith('/draft')) return { data: chartRecord({ findings: [savedFinding()] }) }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        return { data: [], total: 0, page: 1, page_size: 20 }
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function mountShell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  it('opens the editor with the chart inert, then offers a way to change it', async () => {
+    routeRetarget()
+    const wrapper = await mountShell()
+
+    await wrapper.find('[data-testid="nts-edit-f1"]').trigger('click')
+    await settle()
+
+    // The stored target is shown...
+    expect(wrapper.find('[data-testid="nts-selected-teeth"]').text()).toContain('16')
+    // ...and the chart is inert, so a stray click cannot move the finding.
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(0)
+
+    // This control is what was missing entirely.
+    const change = wrapper.find('[data-testid="nts-retarget-subject"]')
+    expect(change.exists()).toBe(true)
+
+    await change.trigger('click')
+    await settle()
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+  })
+
+  it('a click then moves the finding to the new tooth, locally only', async () => {
+    routeRetarget()
+    const wrapper = await mountShell()
+
+    await wrapper.find('[data-testid="nts-edit-f1"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-retarget-subject"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-tooth-26"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-selected-teeth"]').text()).toContain('26')
+    expect(wrapper.find('[data-testid="nts-selected-teeth"]').text()).not.toContain('16')
+    // Nothing is persisted until Save.
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('cancelling leaves the server untouched', async () => {
+    routeRetarget()
+    const wrapper = await mountShell()
+
+    await wrapper.find('[data-testid="nts-edit-f1"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-retarget-subject"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-tooth-26"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-editor-cancel"]').trigger('click')
+    await settle()
+
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// MANUAL-QA-05C #2 — stale role rows and Cancel, reproduced through the DOM
+// ---------------------------------------------------------------------------
+
+/**
+ * The first fix passed its unit tests and still failed in the browser, so
+ * these drive the real component tree: the shell renders the editor, the
+ * editor renders the target panel, and every interaction is a DOM click.
+ *
+ * Both rules are synthetic. The role one mirrors the shape the catalog serves
+ * for the fixed-bridge rule — a single `subject` role with no cardinality —
+ * without the production code ever seeing a real rule id.
+ */
+describe('MANUAL-QA-05C #2 — role rows and Cancel through the DOM', () => {
+  const RANGE_ROLE_RULE = {
+    rule_id: 'X.29',
+    ordinal: 29,
+    official_name: 'Synthetic fixed bridge',
+    scope: 'range',
+    target_identity: 'numbered',
+    anchor: null,
+    arch_cardinality: null,
+    range_grouping: 'single_segment',
+    attributes: [],
+    target_roles: [{
+      code: 'pilar',
+      name: 'Pilar',
+      applies_to: 'subject',
+      min_count: null,
+      max_count: null,
+      status: 'needs_clinical_review',
+      notes: null
+    }],
+    specification_requirement: null,
+    status: 'verified'
+  }
+
+  const TOOTH_RULE = {
+    rule_id: 'X.20',
+    ordinal: 20,
+    official_name: 'Synthetic tooth rule',
+    scope: 'tooth',
+    target_identity: 'numbered',
+    anchor: null,
+    arch_cardinality: null,
+    range_grouping: null,
+    attributes: [],
+    target_roles: [],
+    specification_requirement: null,
+    status: 'verified'
+  }
+
+  const QA_CATALOG = { ...CATALOG, rules: [TOOTH_RULE, RANGE_ROLE_RULE] }
+
+  function findingOn(ruleId: string, teeth: number[], roles: Record<number, string> = {}) {
+    return {
+      id: 'f1',
+      record_id: 'rec-1',
+      norm_version: 'pe_nts_188_2022',
+      rule_id: ruleId,
+      attributes: {},
+      provenance: 'observed',
+      source_finding_id: null,
+      sequence: 1,
+      created_at: '2026-01-02T10:00:00Z',
+      created_by: 'u1',
+      targets: teeth.map((tooth, index) => ({
+        id: `t${index}`,
+        group_index: 0,
+        position: index,
+        participation: 'subject',
+        role: roles[tooth] ?? null,
+        target_kind: 'fdi_tooth',
+        tooth_number: tooth,
+        arch: null,
+        local_ordinal: null,
+        geometry: null
+      }))
+    }
+  }
+
+  function routeQa(finding: unknown) {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: QA_CATALOG }
+      if (url.endsWith('/current')) return { data: null }
+      if (url.endsWith('/draft')) return { data: chartRecord({ findings: [finding] }) }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        return { data: [], total: 0, page: 1, page_size: 20 }
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function mountShell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  type Wrapper = Awaited<ReturnType<typeof mountShell>>
+
+  /** The teeth the role editor currently offers a control for. */
+  function roleRowTeeth(wrapper: Wrapper): number[] {
+    return wrapper.findAll('[data-testid^="nts-role-"]')
+      .map(el => el.attributes('data-testid')!)
+      .filter(id => /^nts-role-\d+$/.test(id))
+      .map(id => Number(id.replace('nts-role-', '')))
+  }
+
+  /**
+   * The role select of row `index`.
+   *
+   * Matched by DOM order rather than by test id: the id lands on the
+   * component's rendered button, not on its root, and the rows are emitted in
+   * `selection.teeth` order.
+   */
+  function roleSelect(wrapper: Wrapper, index: number) {
+    return wrapper.findAllComponents({ name: 'USelectMenu' })[index]!
+  }
+
+  /** The teeth the summary says are selected. */
+  function summaryTeeth(wrapper: Wrapper): number[] {
+    const text = wrapper.find('[data-testid="nts-selected-teeth"]').text()
+    return text.split('·').map(part => Number(part.trim())).filter(n => !Number.isNaN(n))
+  }
+
+  async function click(wrapper: Wrapper, testid: string) {
+    const el = wrapper.find(`[data-testid="${testid}"]`)
+    expect(el.exists(), `missing [data-testid="${testid}"]`).toBe(true)
+    await el.trigger('click')
+    await settle()
+  }
+
+  // --- roles ---------------------------------------------------------------
+
+  it('C/D — after retargeting a range, the role rows follow the new teeth', async () => {
+    routeQa(findingOn('X.29', [46, 45, 44, 43, 42]))
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    expect(roleRowTeeth(wrapper)).toEqual([46, 45, 44, 43, 42])
+
+    await click(wrapper, 'nts-retarget-subject')
+    await click(wrapper, 'nts-tooth-32')
+    await click(wrapper, 'nts-tooth-37')
+
+    // The summary and the role rows must read the same selection.
+    expect(summaryTeeth(wrapper)).toEqual([32, 33, 34, 35, 36, 37])
+    expect(roleRowTeeth(wrapper)).toEqual([32, 33, 34, 35, 36, 37])
+    // Not one control for a tooth that is no longer part of the finding.
+    for (const gone of [46, 45, 44, 43, 42]) {
+      expect(roleRowTeeth(wrapper)).not.toContain(gone)
+    }
+  })
+
+  it('A/B — each role control offers "no role" plus the catalog role', async () => {
+    routeQa(findingOn('X.29', [46, 45]))
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    const control = wrapper.find('[data-testid="nts-role-46"]')
+    expect(control.exists()).toBe(true)
+
+    // A select menu renders only its current value; the offered options live
+    // on the component. They must come from the catalog, in row order.
+    const items = roleSelect(wrapper, 0).props('items') as Array<{ label: string, value: string }>
+
+    expect(items.map(i => i.label)).toEqual(['No role', 'Pilar'])
+    expect(items[1]!.value).toBe('pilar')
+    // "No role" carries a sentinel, never an empty value: the combobox
+    // underneath reserves the empty string for clearing a selection and
+    // throws on an item that uses it.
+    expect(items[0]!.value).not.toBe('')
+    expect(wrapper.find('[data-testid="nts-roles-optional-hint"]').exists()).toBe(true)
+  })
+
+  it('E/F — a role assigned after retargeting rides only on its own tooth', async () => {
+    const finding = findingOn('X.29', [46, 45, 44, 43, 42])
+    routeQa(finding)
+    state.put
+      .mockResolvedValueOnce({ data: { record_version: 4, finding } })
+      .mockResolvedValueOnce({ data: { record_version: 5, finding } })
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    await click(wrapper, 'nts-retarget-subject')
+    await click(wrapper, 'nts-tooth-32')
+    await click(wrapper, 'nts-tooth-37')
+    // Row 0 is tooth 32, the first of the new span.
+    expect(roleRowTeeth(wrapper)[0]).toBe(32)
+    roleSelect(wrapper, 0).vm.$emit('update:modelValue', 'pilar')
+    await settle()
+
+    await click(wrapper, 'nts-editor-save')
+
+    const [url, body] = state.put.mock.calls[1]!
+    expect(url).toBe('/api/v1/odontogram/nts/records/rec-1/findings/f1/targets')
+    expect(body.targets.map((t: { tooth_number: number, role: string | null }) => [t.tooth_number, t.role]))
+      .toEqual([[32, 'pilar'], [33, null], [34, null], [35, null], [36, null], [37, null]])
+  })
+
+  it('a select handing back the whole option still stores a plain code', async () => {
+    const finding = findingOn('X.29', [46, 45])
+    routeQa(finding)
+    state.put
+      .mockResolvedValueOnce({ data: { record_version: 4, finding } })
+      .mockResolvedValueOnce({ data: { record_version: 5, finding } })
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    // Some select builds report the option object rather than its value; the
+    // API takes a string, so the boundary must not pass an object through.
+    roleSelect(wrapper, 0).vm.$emit('update:modelValue', { label: 'Pilar', value: 'pilar' })
+    await settle()
+    await click(wrapper, 'nts-editor-save')
+
+    const [, body] = state.put.mock.calls[1]!
+    expect(body.targets[0].role).toBe('pilar')
+    expect(typeof body.targets[0].role).toBe('string')
+  })
+
+  // --- cancel ---------------------------------------------------------------
+
+  it.each([
+    ['header', 'nts-editor-cancel'],
+    ['footer', 'nts-editor-cancel-footer']
+  ])('%s Cancel closes the editor and discards the local retarget', async (_where, testid) => {
+    routeQa(findingOn('X.20', [16]))
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    await click(wrapper, 'nts-retarget-subject')
+    await click(wrapper, 'nts-tooth-26')
+    expect(summaryTeeth(wrapper)).toEqual([26])
+
+    await click(wrapper, testid)
+
+    // Panel gone, chart inert again.
+    expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(0)
+
+    // Reopening without a reload shows the persisted target, not the cancelled one.
+    await click(wrapper, 'nts-edit-f1')
+    expect(summaryTeeth(wrapper)).toEqual([16])
+
+    // And nothing was ever sent.
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('cancelling a retargeted range restores its persisted span and role rows', async () => {
+    routeQa(findingOn('X.29', [46, 45, 44, 43, 42]))
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    await click(wrapper, 'nts-retarget-subject')
+    await click(wrapper, 'nts-tooth-32')
+    await click(wrapper, 'nts-tooth-37')
+    expect(summaryTeeth(wrapper)).toEqual([32, 33, 34, 35, 36, 37])
+
+    await click(wrapper, 'nts-editor-cancel')
+    await click(wrapper, 'nts-edit-f1')
+
+    expect(summaryTeeth(wrapper)).toEqual([46, 45, 44, 43, 42])
+    expect(roleRowTeeth(wrapper)).toEqual([46, 45, 44, 43, 42])
+    expect(state.put).not.toHaveBeenCalled()
+  })
+
+  it('"Done selecting" keeps the new selection and only leaves pick mode', async () => {
+    routeQa(findingOn('X.20', [16]))
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    await click(wrapper, 'nts-retarget-subject')
+    await click(wrapper, 'nts-tooth-26')
+    await click(wrapper, 'nts-stop-retarget')
+
+    // Unlike Cancel: the editor stays open with the new target ready to save.
+    expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(true)
+    expect(summaryTeeth(wrapper)).toEqual([26])
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(0)
+    expect(state.put).not.toHaveBeenCalled()
+  })
+
+  it('A (regression) — the tooth path that already worked still works', async () => {
+    const finding = findingOn('X.20', [16])
+    routeQa(finding)
+    state.put
+      .mockResolvedValueOnce({ data: { record_version: 4, finding } })
+      .mockResolvedValueOnce({ data: { record_version: 5, finding } })
+    const wrapper = await mountShell()
+
+    await click(wrapper, 'nts-edit-f1')
+    await click(wrapper, 'nts-retarget-subject')
+    await click(wrapper, 'nts-tooth-26')
+    await click(wrapper, 'nts-editor-save')
+
+    const [url, body] = state.put.mock.calls[1]!
+    expect(url).toBe('/api/v1/odontogram/nts/records/rec-1/findings/f1/targets')
+    expect(body.targets).toHaveLength(1)
+    expect(body.targets[0].tooth_number).toBe(26)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// MANUAL-QA-05C #3 — saving must not tear the clinical surface down
+// ---------------------------------------------------------------------------
+
+/**
+ * Manual QA reported a create that looked stuck: the button stayed loading,
+ * the UI crawled, the browser logged `nextSibling of null` and
+ * `emitsOptions … component is null`, and a hard refresh showed the finding
+ * had in fact been saved.
+ *
+ * The cause was structural. `reload()` called `load()`, `load()` raised
+ * `isLoading`, and the shell replaces its whole clinical surface while that
+ * is true — so the chart, the editor and its select popovers were unmounted
+ * *during* the save and rebuilt afterwards, with `close()` unmounting the
+ * editor a second time. These tests hold the refetch open and assert the
+ * surface stays put.
+ */
+describe('MANUAL-QA-05C #3 — save, refresh and the surface', () => {
+  const SAVE_RULE = {
+    rule_id: 'X.40',
+    ordinal: 40,
+    official_name: 'Synthetic save rule',
+    scope: 'tooth',
+    target_identity: 'numbered',
+    anchor: null,
+    arch_cardinality: null,
+    range_grouping: null,
+    attributes: [],
+    target_roles: [],
+    specification_requirement: null,
+    status: 'verified'
+  }
+
+  const SAVE_CATALOG = { ...CATALOG, rules: [SAVE_RULE] }
+
+  function createdFinding() {
+    return {
+      id: 'new-1',
+      record_id: 'rec-1',
+      norm_version: 'pe_nts_188_2022',
+      rule_id: 'X.40',
+      attributes: {},
+      provenance: 'observed',
+      source_finding_id: null,
+      sequence: 1,
+      created_at: '2026-01-02T10:00:00Z',
+      created_by: 'u1',
+      targets: [{
+        id: 't1', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'fdi_tooth', tooth_number: 16, arch: null, local_ordinal: null, geometry: null
+      }]
+    }
+  }
+
+  /**
+   * Routes the GETs. `phase.refetching` flips once the mutation starts, so a
+   * test can hold the refresh open or make it fail without touching the
+   * first load.
+   */
+  function routeSave(phase: { refetching: boolean, gate?: Promise<void>, fail?: boolean }) {
+    let findings: unknown[] = []
+    state.get.mockImplementation(async (url: string) => {
+      if (phase.refetching) {
+        if (phase.gate) await phase.gate
+        if (phase.fail) throw new Error('offline')
+        findings = [createdFinding()]
+      }
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: SAVE_CATALOG }
+      if (url.endsWith('/current')) return { data: null }
+      if (url.endsWith('/draft')) return { data: chartRecord({ version: 3, findings }) }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        return { data: [], total: 0, page: 1, page_size: 20 }
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function mountShell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  type Wrapper = Awaited<ReturnType<typeof mountShell>>
+
+  /** Open the editor and select a rule and a tooth, ready to submit. */
+  async function composeFinding(wrapper: Wrapper) {
+    await wrapper.find('[data-testid="nts-add-finding"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-rule-X.40"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-tooth-16"]').trigger('click')
+    await settle()
+  }
+
+  it('§18 — a normal create issues one POST, closes the editor and lists it', async () => {
+    const phase = { refetching: false }
+    routeSave(phase)
+    state.post.mockResolvedValue({ data: { record_version: 4, finding: createdFinding() } })
+
+    const wrapper = await mountShell()
+    await composeFinding(wrapper)
+    expect(wrapper.find('[data-testid="nts-finding-list-empty"]').exists()).toBe(true)
+
+    phase.refetching = true
+    await wrapper.find('[data-testid="nts-editor-save"]').trigger('click')
+    await settle()
+
+    // Exactly one create, no retry, no duplicate.
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(state.post.mock.calls[0]![0]).toBe('/api/v1/odontogram/nts/records/rec-1/findings')
+    // Editor gone, list updated, nothing stuck.
+    expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-finding-new-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-refresh-failed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(false)
+  })
+
+  it('§15 — the clinical surface stays mounted while the refetch is in flight', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const phase = { refetching: false, gate }
+    routeSave(phase)
+    state.post.mockResolvedValue({ data: { record_version: 4, finding: createdFinding() } })
+
+    const wrapper = await mountShell()
+    await composeFinding(wrapper)
+
+    phase.refetching = true
+    void wrapper.find('[data-testid="nts-editor-save"]').trigger('click')
+    await settle()
+
+    // This is the regression: the surface used to be replaced by the loading
+    // state here, unmounting the chart and the editor mid-save.
+    expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-fdi]')).toHaveLength(52)
+    // The editor closed once, before the refresh — not unmounted and rebuilt.
+    expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(false)
+    expect(state.post).toHaveBeenCalledTimes(1)
+
+    release()
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-finding-new-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+  })
+
+  it('§16 — a create that saved but could not refresh is never reported as lost', async () => {
+    const phase = { refetching: false, fail: true }
+    routeSave(phase)
+    state.post.mockResolvedValue({ data: { record_version: 4, finding: createdFinding() } })
+
+    const wrapper = await mountShell()
+    await composeFinding(wrapper)
+
+    phase.refetching = true
+    await wrapper.find('[data-testid="nts-editor-save"]').trigger('click')
+    await settle()
+
+    // One create only, and no way to blindly send it again.
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(false)
+
+    // The warning says the save landed and the view did not refresh.
+    const warning = wrapper.find('[data-testid="nts-refresh-failed"]')
+    expect(warning.exists()).toBe(true)
+    expect(warning.text()).toContain('saved')
+    expect(warning.text()).not.toContain('not saved')
+    expect(wrapper.find('[data-testid="nts-refresh-retry"]').exists()).toBe(true)
+  })
+
+  it('§17 — retry refetches only, and never repeats the mutation', async () => {
+    const phase = { refetching: false, fail: true }
+    routeSave(phase)
+    state.post.mockResolvedValue({ data: { record_version: 4, finding: createdFinding() } })
+
+    const wrapper = await mountShell()
+    await composeFinding(wrapper)
+
+    phase.refetching = true
+    await wrapper.find('[data-testid="nts-editor-save"]').trigger('click')
+    await settle()
+    expect(wrapper.find('[data-testid="nts-refresh-failed"]').exists()).toBe(true)
+
+    const postsBefore = state.post.mock.calls.length
+    const getsBefore = state.get.mock.calls.length
+
+    phase.fail = false
+    await wrapper.find('[data-testid="nts-refresh-retry"]').trigger('click')
+    await settle()
+
+    // Reads only: not one further create, update, remove or confirm.
+    expect(state.post).toHaveBeenCalledTimes(postsBefore)
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.get.mock.calls.length).toBeGreaterThan(getsBefore)
+
+    // Warning cleared and the server's finding is now on screen.
+    expect(wrapper.find('[data-testid="nts-refresh-failed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-finding-new-1"]').exists()).toBe(true)
+  })
+
+  it('a change of patient still replaces the surface with the loading state', async () => {
+    const phase = { refetching: false }
+    routeSave(phase)
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+
+    // A different patient is a real load: its GETs never settle here, so the
+    // previous patient's surface must be gone rather than lingering.
+    state.get.mockImplementation(() => new Promise(() => {}))
+    await wrapper.setProps({ patientId: 'patient-b' })
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // §38 — Original -> MINSA -> Original
 // ---------------------------------------------------------------------------
 

@@ -45,6 +45,7 @@ const {
   draft,
   history,
   isLoading,
+  isRefreshing,
   isMutating,
   error,
   clinicalErrors,
@@ -200,13 +201,22 @@ watch([() => props.patientId, normVersion], () => void load())
           {{ catalog?.norm_label ?? t('odontogram.profile.nts.norm') }}
         </p>
       </div>
-      <UBadge
-        color="warning"
-        variant="subtle"
-        size="sm"
-      >
-        {{ t('odontogram.nts.chart.findingRendererPending') }}
-      </UBadge>
+      <div class="flex items-center gap-2">
+        <UIcon
+          v-if="isRefreshing"
+          name="i-lucide-loader-2"
+          class="w-4 h-4 animate-spin text-subtle"
+          :aria-label="t('odontogram.nts.editor.refreshing')"
+          data-testid="nts-refreshing"
+        />
+        <UBadge
+          color="warning"
+          variant="subtle"
+          size="sm"
+        >
+          {{ t('odontogram.nts.chart.findingRendererPending') }}
+        </UBadge>
+      </div>
     </div>
 
     <!-- Norm version this build cannot interpret: never fall back silently -->
@@ -222,6 +232,8 @@ watch([() => props.patientId, normVersion], () => void load())
 
     <template v-else>
       <!-- Loading -->
+      <!-- Only the first load, or a change of patient or norm, replaces the
+           surface. A refetch after a mutation refreshes it in place. -->
       <div
         v-if="isLoading"
         class="flex items-center justify-center py-12"
@@ -449,6 +461,30 @@ watch([() => props.patientId, normVersion], () => void load())
           @tooth-select="(fdi, rowOrder) => editor.pickTooth(fdi, rowOrder)"
         />
 
+        <!-- The change is on the server; only re-reading it failed. Saying
+             "not saved" here would invite sending the same finding twice. -->
+        <UAlert
+          v-if="editor.refreshFailed.value"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-refresh-cw"
+          :title="t('odontogram.nts.editor.refreshFailedTitle')"
+          :description="t('odontogram.nts.editor.refreshFailedBody')"
+          data-testid="nts-refresh-failed"
+        >
+          <template #actions>
+            <UButton
+              size="xs"
+              color="neutral"
+              :loading="editor.isSaving.value"
+              data-testid="nts-refresh-retry"
+              @click="editor.retryRefresh()"
+            >
+              {{ t('odontogram.nts.editor.refreshRetry') }}
+            </UButton>
+          </template>
+        </UAlert>
+
         <!-- Half of a two-step edit reached the server. Never "saved
              successfully", and never undone behind the clinician's back. -->
         <UAlert
@@ -484,7 +520,9 @@ watch([() => props.patientId, normVersion], () => void load())
             :clinical-errors="editor.clinicalErrors.value"
             @select-rule="editor.selectRule"
             @update:attributes="editor.attributes.value = $event"
-            @pick-mode="editor.setPickMode"
+            @retarget-subject="editor.startRetargetSubject"
+            @retarget-anchors="editor.startRetargetAnchors"
+            @stop-retarget="editor.stopRetarget"
             @toggle-arch="editor.toggleArch"
             @set-role="(tooth, role) => editor.setRole(tooth, role)"
             @save="saveEditor"

@@ -36,7 +36,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectRule: [rule: NtsRule]
   'update:attributes': [value: Record<string, unknown>]
-  pickMode: [mode: NtsPickMode]
+  retargetSubject: []
+  retargetAnchors: []
+  stopRetarget: []
   toggleArch: [arch: NtsArchCode]
   setRole: [tooth: number, role: string | null]
   save: []
@@ -110,7 +112,9 @@ const advisory = computed(() => props.specificationRequirements.filter(r => !r.r
           :selection="selection"
           :pick-mode="pickMode"
           :problems="problems"
-          @pick-mode="emit('pickMode', $event)"
+          @retarget-subject="emit('retargetSubject')"
+          @retarget-anchors="emit('retargetAnchors')"
+          @stop-retarget="emit('stopRetarget')"
           @toggle-arch="emit('toggleArch', $event)"
           @set-role="(tooth, role) => emit('setRole', tooth, role)"
         />
@@ -172,6 +176,7 @@ const advisory = computed(() => props.specificationRequirements.filter(r => !r.r
         <UButton
           color="neutral"
           variant="ghost"
+          data-testid="nts-editor-cancel-footer"
           @click="emit('cancel')"
         >
           {{ t('common.cancel') }}
