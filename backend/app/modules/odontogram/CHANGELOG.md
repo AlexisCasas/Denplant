@@ -2,6 +2,74 @@
 
 ## Unreleased
 
+- feat(nts-05d.4b): **surface codes become geometry, and three roots become a
+  trifurcation**. 05D.4a declared *which attribute* a `shape_fill` or `outline`
+  reads its regions from; it said nothing about what a surface code looks like,
+  because the norm does not. A dentist has now ruled on that, and the ruling is
+  implemented as a pure policy module — `ntsSurfaceGeometry.ts` — kept
+  deliberately outside the catalog.
+
+  Mesial follows the quadrant, so a fixed left-is-mesial rule (wrong for half
+  the mouth) cannot creep in. **Vestibular faces outward in both arches** —
+  upper V at the top, lower V at the bottom. A pre-implementation design note
+  had this reversed; the clinician's ruling overrides it, and an explicit
+  regression guard fails if a future reader of that superseded note flips it
+  back. Occlusal is the whole central table however many tiles it is drawn in;
+  an anterior's incisal surface is a centred horizontal band spanning that
+  tooth's central zone edge to edge, inset vertically so it never sits on the
+  vestibular/lingual divide.
+
+  The band's width is **derived, not chosen** — and one geometry, not two. An
+  earlier revision widened it to a flat 50% of the crown for legibility, which
+  pushed it over the mesial and distal trapezoids: it claimed surfaces nobody
+  had recorded, and it overlapped its neighbours instead of meeting them, so it
+  could not tile and had to be carried beside the regions as a second,
+  "visual" shape. Two shapes for one surface agree until an outline is drawn
+  from one and a fill from the other. Legibility is now height and, later,
+  stroke; the band is one of the tiles, and `resolveSurfaceRegions`,
+  `resolveSurfaceComponents` and `resolveSurfaces().incisal` all hand out the
+  same polygon by reference.
+
+  Two consequences are recorded rather than papered over. On an anterior,
+  **V+O and L+O are two figures** — the inset that keeps the band off the
+  divide also keeps it from touching those trapezoids, and bridging the gap
+  would paint sound enamel. And an anterior with all five surfaces **has two
+  holes**, the slivers above and below the band; boundary loops are now wound
+  by nesting depth so rim and hole draw correctly as one path and their signed
+  areas sum to the area actually covered.
+
+  Contiguous surfaces merge into one continuous figure with no internal
+  divider, by robust boundary extraction — collinear subdivision, then
+  cancellation of shared edges, then chaining into closed loops. Naive
+  duplicate-edge cancellation is not enough: an outer trapezoid meets the
+  central table along one long edge that the table's own tiles split in two, so
+  without subdividing first nothing cancels. Surfaces that do not touch stay
+  separate; bridging them would claim the sound surface between was affected.
+
+  Root geometry: a three-rooted tooth was drawn as three triangles standing
+  side by side with gaps between them. They now leave a common trunk — bases
+  overlapping, apices spread far enough apart to be counted. One- and
+  two-rooted teeth are byte-identical, and every apex height on the chart is
+  unchanged, so the apex band, range and arch overlays and the supernumerary
+  anchor all stay put. `rootBox` was measuring only the base edges, which was
+  equivalent while a tip always fell between its own two flanks; it now
+  accounts for the apices, and widens only for the ten trifurcated teeth.
+
+  **G5 is closed as DenPlant clinically validated product policy — not as
+  norm.** NTS N.° 188 supplies the surface vocabulary and says the mark is
+  drawn "según la forma que se observa"; it defines no correspondence between
+  M/D/O/V/L and parts of a figure, and nothing here may be cited as if it did.
+  A catalog test still asserts that no region id or geometric word appears in
+  the JSON.
+
+  Geometry only. Nothing new is drawn: `shape_fill` and `outline` are still the
+  two mark kinds nothing renders, and coverage stays at 30 complete / 5 partial
+  / 3 unsupported.
+
+  Still open and untouched: G6 (freehand fracture shape), G9 (multi-segment
+  registration), G10 (fissure anatomy), CLINICAL-02 (pilar cardinality),
+  CLINICAL-03 (giroversión direction).
+
 - feat(nts-05d.4a): **an area mark declares where its area comes from**.
   `box_siglas` has said which attribute supplies its text since NTS-05D.0b;
   `shape_fill` and `outline` said nothing about which attribute supplies their

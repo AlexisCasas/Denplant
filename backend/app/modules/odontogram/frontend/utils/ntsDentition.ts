@@ -248,6 +248,32 @@ export function rowWidthFor(teeth: readonly NtsTooth[]): number {
 export interface NtsCrownRegion {
   id: string
   d: string
+  /**
+   * The same outline as an ordered ring of points.
+   *
+   * Added by NTS-05D.4b. `d` is still emitted from exactly these points and is
+   * unchanged, so nothing drawn moves; what the ring buys is a shape that can
+   * be *reasoned* about — merged with a neighbour, walked for a boundary —
+   * without parsing a path string back into numbers.
+   */
+  points: NtsPoint[]
+}
+
+/** A point in a tooth's own layout units. */
+export interface NtsPoint {
+  x: number
+  y: number
+}
+
+/** `M…L…Z` for a closed ring. The one place a region's `d` is written. */
+function ringPath(points: readonly NtsPoint[]): string {
+  const [first, ...rest] = points
+  if (!first) return ''
+  return `M${first.x},${first.y} ${rest.map(p => `L${p.x},${p.y}`).join(' ')} Z`
+}
+
+function region(id: string, points: NtsPoint[]): NtsCrownRegion {
+  return { id, d: ringPath(points), points }
 }
 
 /**
@@ -305,7 +331,13 @@ export function centralRegionCountFor(tooth: NtsTooth): number {
   return 1
 }
 
-function isAnterior(tooth: NtsTooth): boolean {
+/**
+ * Incisors and canines — the teeth at the front of the arch.
+ *
+ * Exported by 05D.4b so the surface policy asks this module rather than
+ * re-deriving it from the tooth class and drifting later.
+ */
+export function isAnterior(tooth: NtsTooth): boolean {
   return tooth.toothClass === 'incisor' || tooth.toothClass === 'canine'
 }
 
@@ -349,31 +381,60 @@ function centralRegions(box: CrownBox, count: number): NtsCrownRegion[] {
   const midX = r((a + b) / 2)
   const midY = r((y0 + y1) / 2)
 
+  const box4 = (x0: number, x1: number, top: number, bottom: number): NtsPoint[] =>
+    [{ x: x0, y: top }, { x: x1, y: top }, { x: x1, y: bottom }, { x: x0, y: bottom }]
+
   if (count === 1) {
-    return [{ id: 'center', d: `M${a},${y0} L${b},${y0} L${b},${y1} L${a},${y1} Z` }]
+    return [region('center', box4(a, b, y0, y1))]
   }
   if (count === 2) {
     return [
-      { id: 'center-1', d: `M${a},${y0} L${b},${y0} L${b},${midY} L${a},${midY} Z` },
-      { id: 'center-2', d: `M${a},${midY} L${b},${midY} L${b},${y1} L${a},${y1} Z` }
+      region('center-1', box4(a, b, y0, midY)),
+      region('center-2', box4(a, b, midY, y1))
     ]
   }
   return [
-    { id: 'center-1', d: `M${a},${y0} L${midX},${y0} L${midX},${midY} L${a},${midY} Z` },
-    { id: 'center-2', d: `M${midX},${y0} L${b},${y0} L${b},${midY} L${midX},${midY} Z` },
-    { id: 'center-3', d: `M${a},${midY} L${midX},${midY} L${midX},${y1} L${a},${y1} Z` },
-    { id: 'center-4', d: `M${midX},${midY} L${b},${midY} L${b},${y1} L${midX},${y1} Z` }
+    region('center-1', box4(a, midX, y0, midY)),
+    region('center-2', box4(midX, b, y0, midY)),
+    region('center-3', box4(a, midX, midY, y1)),
+    region('center-4', box4(midX, b, midY, y1))
   ]
 }
+
+/**
+ * How a trifurcated root is spread, as fractions of the crown's width.
+ *
+ * Clinically validated for DenPlant: a three-rooted tooth is not three
+ * separate triangles standing side by side. The roots leave a common trunk, so
+ * their bases sit close together and overlap, while the apices stay far enough
+ * apart to be counted. The middle root is the one read first, and the two
+ * lateral ones cross behind it.
+ *
+ * Only the horizontal spread is described here. Base and apex *heights* are
+ * shared with every other root on the chart and are deliberately untouched:
+ * the apex band, the range and arch overlays and the supernumerary anchor are
+ * all measured from them.
+ */
+const TRIFURCATED = {
+  /** Half-width of one root's base. */
+  baseHalf: 0.13,
+  /** How far the outer bases sit from the centre. */
+  baseSpread: 0.12,
+  /** How far the outer apices sit from the centre. */
+  tipSpread: 0.28
+} as const
 
 function rootShapes(tooth: NtsTooth, box: CrownBox): NtsRootGeometry[] {
   const count = rootCountFor(tooth)
   const width = box.right - box.left
-  const slice = width / count
-  // A single root is a narrow spike; a set of them fills the crown's width.
-  const pad = count === 1 ? width * 0.18 : width * 0.05
   const base = tooth.arch === 'upper' ? box.top : box.bottom
   const tip = tooth.arch === 'upper' ? BLEED / 2 : CELL_HEIGHT - BLEED / 2
+
+  if (count === 3) return trifurcated(box, width, base, tip)
+
+  const slice = width / count
+  // A single root is a narrow spike; a pair of them fills the crown's width.
+  const pad = count === 1 ? width * 0.18 : width * 0.05
 
   return Array.from({ length: count }, (_, i) => {
     const left = r(box.left + i * slice + pad)
@@ -382,6 +443,42 @@ function rootShapes(tooth: NtsTooth, box: CrownBox): NtsRootGeometry[] {
     return {
       d: `M${left},${base} L${apex},${tip} L${right},${base} Z`,
       base: { x: apex, y: base },
+      tip: { x: apex, y: tip },
+      left,
+      right
+    }
+  })
+}
+
+/**
+ * Three roots leaving a common trunk.
+ *
+ * Emitted left to right, as every other tooth is. Drawing order carries no
+ * visual meaning here: the cell strokes its roots with `fill="none"`, so an
+ * overlapping outline crosses its neighbour rather than hiding it, and the
+ * middle root reads as the front one because it is the one drawn whole.
+ */
+function trifurcated(
+  box: CrownBox,
+  width: number,
+  base: number,
+  tip: number
+): NtsRootGeometry[] {
+  const centre = box.left + width / 2
+  const half = width * TRIFURCATED.baseHalf
+  const baseSpread = width * TRIFURCATED.baseSpread
+  const tipSpread = width * TRIFURCATED.tipSpread
+
+  return [-1, 0, 1].map(side => {
+    const baseCentre = centre + baseSpread * side
+    const apex = r(centre + tipSpread * side)
+    const left = r(baseCentre - half)
+    const right = r(baseCentre + half)
+    return {
+      d: `M${left},${base} L${apex},${tip} L${right},${base} Z`,
+      // The base midpoint stays the root's own, so a mark placed on a root
+      // lands on that root and not on the trunk they share.
+      base: { x: r(baseCentre), y: base },
       tip: { x: apex, y: tip },
       left,
       right
@@ -415,10 +512,22 @@ export function toothGeometry(tooth: NtsTooth): NtsToothGeometry {
       height: CROWN_HEIGHT
     },
     regions: [
-      { id: 'outer-top', d: `M${left},${top} L${right},${top} L${innerRight},${innerTop} L${innerLeft},${innerTop} Z` },
-      { id: 'outer-right', d: `M${right},${top} L${right},${bottom} L${innerRight},${innerBottom} L${innerRight},${innerTop} Z` },
-      { id: 'outer-bottom', d: `M${right},${bottom} L${left},${bottom} L${innerLeft},${innerBottom} L${innerRight},${innerBottom} Z` },
-      { id: 'outer-left', d: `M${left},${bottom} L${left},${top} L${innerLeft},${innerTop} L${innerLeft},${innerBottom} Z` },
+      region('outer-top', [
+        { x: left, y: top }, { x: right, y: top },
+        { x: innerRight, y: innerTop }, { x: innerLeft, y: innerTop }
+      ]),
+      region('outer-right', [
+        { x: right, y: top }, { x: right, y: bottom },
+        { x: innerRight, y: innerBottom }, { x: innerRight, y: innerTop }
+      ]),
+      region('outer-bottom', [
+        { x: right, y: bottom }, { x: left, y: bottom },
+        { x: innerLeft, y: innerBottom }, { x: innerRight, y: innerBottom }
+      ]),
+      region('outer-left', [
+        { x: left, y: bottom }, { x: left, y: top },
+        { x: innerLeft, y: innerTop }, { x: innerLeft, y: innerBottom }
+      ]),
       ...centralRegions(box, centralRegionCountFor(tooth))
     ],
     roots: shapes.map(shape => shape.d),

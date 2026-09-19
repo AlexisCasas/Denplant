@@ -1364,11 +1364,18 @@ def test_region_source_serialises_flat_for_the_api(catalog):
 
 
 def test_the_catalog_still_says_nothing_about_what_a_surface_looks_like():
-    """G5 is a product decision, and the catalog does not pre-empt it.
+    """G5 is a product decision, and the catalog does not absorb it.
 
-    No region id, no side, no geometric word: the norm defines none of it, and
-    the orientation of V/L plus the representation of O on an anterior are
-    still open clinical questions.
+    No region id, no side, no geometric word. The norm defines none of it: it
+    names the surfaces and says the mark is drawn "según la forma que se
+    observa", and stops there.
+
+    A dentist has since settled the orientation of V/L and how an anterior's
+    occlusal surface should read, and 05D.4b implemented both — in the
+    frontend's surface policy module, as **clinically validated product
+    policy**. That is exactly why this test still has to hold: a decision
+    DenPlant made must not end up living somewhere that makes it look
+    normative.
     """
     raw = (CATALOG_DIR / f"{NORM}.json").read_text(encoding="utf-8")
     for geometric in ("outer-top", "outer-right", "outer-bottom", "outer-left", "center-"):

@@ -237,8 +237,13 @@ function placementFor(tooth: NtsTooth): NtsToothPlacement {
     tip: toGlobal(shape.tip.x, shape.tip.y)
   }))
 
-  const rootLeft = Math.min(...local.rootShapes.map(s => s.left))
-  const rootRight = Math.max(...local.rootShapes.map(s => s.right))
+  // The apex counts toward the width, not just the base edge. While every root
+  // was a triangle standing on its own base the tip was always between the two
+  // flanks and this made no difference; once roots lean outward from a shared
+  // trunk, a tip can reach past the base it grew from, and a box measured from
+  // the bases alone would cut the outermost apices off.
+  const rootLeft = Math.min(...local.rootShapes.map(s => Math.min(s.left, s.tip.x)))
+  const rootRight = Math.max(...local.rootShapes.map(s => Math.max(s.right, s.tip.x)))
   const rootTopLocal = Math.min(...local.rootShapes.flatMap(s => [s.base.y, s.tip.y]))
   const rootBottomLocal = Math.max(...local.rootShapes.flatMap(s => [s.base.y, s.tip.y]))
   const rootTopLeft = toGlobal(rootLeft, rootTopLocal)

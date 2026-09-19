@@ -614,3 +614,65 @@ structures (§3.1), so serving or generating needs no special casing.
 4. Assert its invariants in `tests/test_nts_catalog.py`.
 
 The loader discovers files automatically; nothing else needs registering.
+
+## 20. What a surface looks like is **not** in this catalog
+
+NTS N.° 188 supplies the surface vocabulary — `M`, `D`, `O`, `V`, `L` — and
+`regions_from` (§9) says which attribute a `shape_fill` or `outline` reads it
+from. That is the whole of the normative contract. The norm then says the mark
+is drawn "según la forma que se observa" (pp. 11, 17) and **never states which
+part of a drawn crown a surface code corresponds to**.
+
+So the correspondence is a **DenPlant clinically validated product policy**,
+not a normative mapping, and it deliberately lives outside the catalog — in
+`odontogram/frontend/utils/ntsSurfaceGeometry.ts`, pinned by
+`tests/components/ntsSurfaceGeometry.spec.ts`. A catalog test asserts that no
+region id, side or geometric word appears in the JSON at all, so the boundary
+cannot erode by accident.
+
+What a dentist validated, and which this documentation records as product
+policy rather than norm:
+
+| Surface | Resolves to | Because |
+|---|---|---|
+| `M` | the trapezoid facing the midline | mesial is toward the midline, so it follows the quadrant, not a fixed side |
+| `D` | the opposite trapezoid | |
+| `V` | upper: top · lower: bottom | "vestibular hacia afuera en ambas arcadas" — the two arches mirror each other |
+| `L` | upper: bottom · lower: top | lingual/palatal takes the side opposite vestibular |
+| `O` (posterior) | every central polygon | clinically one table, however many tiles it is drawn in |
+| `O` (anterior) | a centred horizontal incisal band | spans the anterior central zone edge to edge, inset vertically so it never sits on the vestibular/lingual divide |
+
+Contiguous affected surfaces merge into **one continuous figure with no
+internal divider**; surfaces that do not touch stay separate rather than being
+bridged, because one shape spanning them would claim the sound surface between
+was affected too.
+
+The incisal band's width is **derived from the central zone, never chosen**.
+It spans `innerLeft → innerRight` exactly — 34% of the crown on the present
+geometry, but read off that geometry rather than written down. Visibility is
+bought with height (60% of the zone, leaving positive clearance above and
+below) and, later, with stroke and fill in the renderer. It is deliberately not
+bought by widening: a band pushed past the zone would cover the mesial and
+distal trapezoids, claiming surfaces nobody recorded, and would overlap its
+neighbours instead of meeting them, so it could not take part in the tiling.
+
+Because the band is one of the tiles, **there is exactly one geometry for an
+anterior's occlusal surface** — the same polygon that `resolveSurfaceRegions`
+returns, that `resolveSurfaceComponents` merges, and that
+`resolveSurfaces().incisal` points at. A separate "visual" shape beside a
+"logical" one would agree today and diverge the first time an outline was
+drawn from one and a fill from the other.
+
+Two consequences worth stating, because neither is a defect to be fixed:
+
+- On an anterior, **V+O and L+O are two figures**, not one. The band is inset
+  from the vestibular and lingual boundaries precisely so it never sits on the
+  divide; the price is that it does not reach them either. Bridging the gap
+  would paint sound enamel.
+- An anterior with **all five surfaces has two holes** — the slivers above and
+  below the band, which were never recorded as affected. Rim and hole loops are
+  wound oppositely so the set draws correctly as one path under either fill
+  rule.
+
+**G5 is now closed as product policy, not as norm.** Nothing above may be
+cited as something NTS N.° 188 defines.
