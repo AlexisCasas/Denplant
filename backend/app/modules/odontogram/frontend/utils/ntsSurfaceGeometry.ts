@@ -33,7 +33,7 @@
  */
 
 import type { NtsPoint, NtsTooth } from './ntsDentition'
-import { isAnterior, NTS_ALL_TEETH, toothGeometry } from './ntsDentition'
+import { centralRegionsOf, isAnterior, NTS_ALL_TEETH, toothGeometry } from './ntsDentition'
 
 /** The norm's own surface vocabulary. */
 export type NtsSurfaceCode = 'M' | 'D' | 'O' | 'V' | 'L'
@@ -47,9 +47,14 @@ export interface NtsSurfaceRegion {
   points: NtsPoint[]
 }
 
-export interface NtsSurfaceComponent {
-  /** The surfaces that merged into this figure. */
-  surfaces: NtsSurfaceCode[]
+/**
+ * A continuous figure: the rings that make it up, and its outline.
+ *
+ * Deliberately says nothing about surfaces. Merging adjacent rings and walking
+ * their common rim is plain geometry, and a second consumer needs it without
+ * inheriting a clinical meaning it does not have — see {@link mergeRegions}.
+ */
+export interface NtsRegionFigure {
   /** The rings that make it up — filled together, they show no seam. */
   polygons: NtsPoint[][]
   /**
@@ -63,6 +68,11 @@ export interface NtsSurfaceComponent {
    * signed areas sum to the area actually covered.
    */
   boundary: NtsPoint[][]
+}
+
+export interface NtsSurfaceComponent extends NtsRegionFigure {
+  /** The surfaces that merged into this figure. */
+  surfaces: NtsSurfaceCode[]
 }
 
 // ---------------------------------------------------------------------------
@@ -270,10 +280,8 @@ export function resolveSurfaceRegions(
           break
         }
         // A posterior's occlusal table, however many polygons it is drawn in.
-        for (const region of geometry.regions) {
-          if (region.id === 'center' || region.id.startsWith('center-')) {
-            resolved.push({ id: region.id, surface: 'O', points: region.points })
-          }
+        for (const region of centralRegionsOf(tooth)) {
+          resolved.push({ id: region.id, surface: 'O', points: region.points })
         }
         break
       }
@@ -486,6 +494,31 @@ function chain(edges: readonly NtsPoint[][]): NtsPoint[][] {
 }
 
 /**
+ * Merge a set of rings into continuous figures, and outline each one.
+ *
+ * Rings that share an edge become one figure with one rim and no internal
+ * divider; rings that only touch at a point, or not at all, stay separate.
+ * Nothing is ever bridged across a gap.
+ *
+ * Exposed as plain geometry because a second consumer needs exactly this and
+ * nothing clinical: a mark anchored to a landmark inside the crown is drawn
+ * from the tiles that landmark covers, and merging those is the same problem.
+ * Giving it its own copy of the algorithm is how two answers start to drift.
+ *
+ * Order-independent given a stable input order, and it does not reorder the
+ * rings it is given.
+ */
+export function mergeRegions(rings: readonly NtsPoint[][]): NtsRegionFigure[] {
+  if (rings.length === 0) return []
+  const edgesPerRing = subdivide(rings)
+
+  return groupByAdjacency(edgesPerRing).map(indices => ({
+    polygons: indices.map(i => rings[i]!),
+    boundary: boundaryOf(indices.map(i => edgesPerRing[i]!))
+  }))
+}
+
+/**
  * The figures a set of surfaces makes on one tooth.
  *
  * Contiguous surfaces merge into a single component with one outline; surfaces
@@ -505,13 +538,14 @@ export function resolveSurfaceComponents(
   if (regions.length === 0) return []
 
   const rings = regions.map(region => region.points)
-  const edgesPerRing = subdivide(rings)
+  const surfaceOf = new Map(rings.map((ring, index) => [ring, regions[index]!.surface]))
 
-  return groupByAdjacency(edgesPerRing)
-    .map(indices => ({
-      surfaces: CANONICAL.filter(code => indices.some(i => regions[i]!.surface === code)),
-      polygons: indices.map(i => rings[i]!),
-      boundary: boundaryOf(indices.map(i => edgesPerRing[i]!))
+  return mergeRegions(rings)
+    .map(figure => ({
+      surfaces: CANONICAL.filter(
+        code => figure.polygons.some(ring => surfaceOf.get(ring) === code)
+      ),
+      ...figure
     }))
     .sort((a, b) => (a.surfaces.join() < b.surfaces.join() ? -1 : 1))
 }

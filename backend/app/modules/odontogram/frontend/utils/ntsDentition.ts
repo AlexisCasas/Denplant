@@ -322,6 +322,22 @@ export function rootCountFor(tooth: NtsTooth): number {
 }
 
 /**
+ * The tiles that make up the middle of the crown, as the annex draws it.
+ *
+ * A neutral accessor, added by 05D.4: it says which polygons are central and
+ * nothing about what being central *means*. Two unrelated consumers need
+ * exactly that and must not learn it from each other — the surface policy
+ * resolves a posterior's occlusal table here, and a landmark anchored inside
+ * the crown resolves its own anatomy here. Letting either read the other's
+ * answer is how a landmark would silently acquire a surface's shape.
+ */
+export function centralRegionsOf(tooth: NtsTooth): NtsCrownRegion[] {
+  return toothGeometry(tooth).regions.filter(
+    region => region.id === 'center' || region.id.startsWith('center-')
+  )
+}
+
+/**
  * How the annex subdivides the central region: anteriors leave it whole,
  * premolars split it in two, molars in four.
  */

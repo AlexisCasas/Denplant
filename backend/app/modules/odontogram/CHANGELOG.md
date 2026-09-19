@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+- feat(nts-05d.4): **filled and contoured surfaces reach the chart**, and the
+  render vocabulary is complete. `shape_fill` and `outline` were the last two
+  mark kinds nothing drew; both now resolve through metadata that already
+  existed, with no new decision taken inside the renderer.
+
+  Geometry is read from the mark, never guessed. `regions_from` names the
+  attribute supplying the codes, which go to the clinically validated surface
+  policy; the renderer never reads `finding.attributes.surfaces` by name, which
+  is the accident 05D.4a existed to prevent. A binding that cannot resolve —
+  absent attribute, a value that is not a set of codes, an empty set, codes
+  naming no geometry — is reported with its own reason rather than
+  approximated.
+
+  **A landmark is not a surface.** A mark anchored at `coronal_pulp` resolves
+  through the dentition's neutral central-tile accessor, not through the
+  surface policy. On a front tooth those are materially different polygons —
+  the whole central zone against the inset incisal band — and giving the
+  landmark the surface's shape would be a wrong clinical statement. The merge
+  algorithm is shared (one implementation, `mergeRegions`); the meaning is not.
+
+  **Multi-loop figures survive.** A component's boundary is one or more closed
+  loops, and a figure enclosing ground the finding does not cover has a rim and
+  holes wound against each other. Every loop reaches the SVG as one closed
+  subpath of a single path, under an explicit `fill-rule="nonzero"` chosen
+  because that is what the opposite windings mean. Keeping only the first loop
+  would fill a hole in and claim an area nobody recorded — the exact defect
+  05D.4b uncovered, now pinned by a test at both the model and the DOM.
+
+  Two findings covering the same region are both drawn, never merged across
+  findings, in the record's own order; the situation is reported beside the
+  chart as `overlaps`, flagged `silent` when one of them writes no sigla and so
+  could be hidden completely.
+
+  Coverage goes from 30/5/3 to **35 complete, 1 partial, 2 unsupported**.
+  6.1.16, 6.1.33 and 6.1.36 go partial → complete, 6.1.27 partial → complete,
+  and 6.1.34 unsupported → complete. What remains is not a renderer gap:
+  6.1.35 needs fissure anatomy the chart does not model (G10), 6.1.10 needs the
+  shape the clinician observed (G6), and 6.1.13 needs a direction the norm
+  never enumerates (CLINICAL-03).
+
+  One fixture bug fixed on the way: the catalog census synthesised a
+  multi-valued attribute as a bare string, which the record model rejects — so
+  it was measuring the renderer against data no stored finding could have.
+
 - feat(nts-05d.4b): **surface codes become geometry, and three roots become a
   trifurcation**. 05D.4a declared *which attribute* a `shape_fill` or `outline`
   reads its regions from; it said nothing about what a surface code looks like,

@@ -44,6 +44,7 @@ import {
   archSpan,
   crownBox,
   interproximalPoint,
+  localToGlobal,
   numberAnchor,
   occlusalBand,
   occlusalDirection,
@@ -51,6 +52,13 @@ import {
   rootBox,
   toothPlacement
 } from './ntsChartGeometry'
+import type { NtsTooth } from './ntsDentition'
+import { centralRegionsOf } from './ntsDentition'
+import {
+  mergeRegions,
+  resolveSurfaceComponents,
+  resolveSurfaceRegions
+} from './ntsSurfaceGeometry'
 
 /**
  * Re-exported because they are part of this module's own contract: every
@@ -223,6 +231,16 @@ export type NtsUnsupportedReason =
   | 'unknown_arrow_style'
   | 'unknown_arrow_direction'
   | 'no_targets'
+  | 'unknown_fill_style'
+  | 'unknown_outline_style'
+  /** The mark says which attribute supplies its regions; the mark has none. */
+  | 'missing_region_source'
+  /** The bound attribute is there but is not a set of codes. */
+  | 'invalid_region_source'
+  /** The codes are well formed and name no geometry on this tooth. */
+  | 'unresolved_regions'
+  /** The mark is anchored to a landmark this chart does not model. */
+  | 'unknown_landmark'
   /**
    * The norm ties this rule's colour to a good/bad state the finding does not
    * carry, or carries as something the catalog does not enumerate. Both
@@ -237,12 +255,68 @@ export interface NtsUnsupportedInstruction extends NtsInstructionBase {
   markKind: string
 }
 
+export type NtsFillStyle = 'solid'
+export type NtsOutlineStyle = 'contour'
+
+/**
+ * One continuous figure on one tooth, already in chart coordinates.
+ *
+ * `polygons` is what gets filled and `boundary` is what gets stroked, and the
+ * two are **not** interchangeable: the boundary has had every edge shared
+ * between two polygons removed, which is what makes a merged area read as one
+ * figure instead of a grid of tiles.
+ *
+ * Both are arrays of closed rings, and `boundary` legitimately holds more than
+ * one: a figure that encloses an unaffected area has a rim *and* holes, wound
+ * against each other. Drawing only the first ring would quietly fill in a hole
+ * and claim an area nobody recorded, so a consumer must emit all of them —
+ * together, in one path, so the winding still relates them.
+ */
+export interface NtsAreaFigure {
+  polygons: NtsPoint[][]
+  boundary: NtsPoint[][]
+}
+
+/**
+ * An area the finding covers, painted solid.
+ *
+ * The geometry arrives resolved. This module does not know which part of a
+ * crown a surface code means, and the layer below knows even less — it is
+ * handed rings and fills them.
+ */
+export interface NtsShapeFillInstruction extends NtsInstructionBase {
+  kind: 'shape_fill'
+  /** Narrowed: nothing is drawn without a colour. */
+  paint: NtsPaint
+  style: NtsFillStyle
+  fdi: number
+  components: NtsAreaFigure[]
+  /**
+   * The geometry ids the figures were built from, for traceability and for
+   * spotting two findings that cover the same ground. Positional ids from the
+   * drawing, never a clinical code.
+   */
+  regions: string[]
+}
+
+/** The same area, contoured instead of filled. */
+export interface NtsOutlineInstruction extends NtsInstructionBase {
+  kind: 'outline'
+  paint: NtsPaint
+  style: NtsOutlineStyle
+  fdi: number
+  components: NtsAreaFigure[]
+  regions: string[]
+}
+
 export type NtsRenderInstruction =
   | NtsTextInstruction
   | NtsSymbolInstruction
   | NtsLineInstruction
   | NtsConnectorInstruction
   | NtsArrowInstruction
+  | NtsShapeFillInstruction
+  | NtsOutlineInstruction
   | NtsUnsupportedInstruction
 
 /** How much of a finding this slice can actually draw. */
@@ -268,11 +342,35 @@ export interface NtsBoxOverflow {
   line: number
 }
 
+/**
+ * Two or more findings covering the same ground on one tooth.
+ *
+ * Not a clinical judgement and not an error: a lesion and the restoration that
+ * treats it legitimately occupy the same surface, and the chart draws both.
+ * What it costs is legibility — whichever is painted second sits on top — and
+ * that is worth saying out loud, outside the drawing.
+ *
+ * `silent` is the case that actually loses information: a finding whose only
+ * representation is the area itself, with no sigla in the annotation box to
+ * fall back on, can be completely hidden by whatever is drawn over it.
+ */
+export interface NtsAreaOverlap {
+  fdi: number
+  /** The findings sharing a region. Two or more, in the record's own order. */
+  findingIds: string[]
+  /** The geometry ids they have in common. Never empty. */
+  regions: string[]
+  /** True when at least one of them writes no sigla anywhere. */
+  silent: boolean
+}
+
 export interface NtsChartRender {
   findings: NtsFindingRender[]
   /** Everything drawable, in painting order. */
   instructions: NtsRenderInstruction[]
   overflows: NtsBoxOverflow[]
+  /** Reported alongside the chart, never drawn on it. */
+  overlaps: NtsAreaOverlap[]
   partial: string[]
   unsupported: string[]
 }
@@ -327,6 +425,8 @@ interface CatalogMark {
   role: string | null
   /** A subset of the finding's targets, chosen by the span's own shape. */
   target_selector: string | null
+  /** Which attribute supplies the regions an area mark covers. */
+  regions_from: string | null
 }
 
 function marksOf(rule: NtsRule): CatalogMark[] {
@@ -337,7 +437,8 @@ function marksOf(rule: NtsRule): CatalogMark[] {
     text_from: mark.text_from ?? null,
     suffix_from: mark.suffix_from ?? null,
     role: mark.role ?? null,
-    target_selector: mark.target_selector ?? null
+    target_selector: mark.target_selector ?? null,
+    regions_from: mark.regions_from ?? null
   }))
 }
 
@@ -1008,18 +1109,208 @@ function crossedArrows(
 // one finding
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// areas: shape_fill and outline
+// ---------------------------------------------------------------------------
+
 /**
- * Mark kinds this slice can draw. The rest are deferred, never dropped.
+ * The closed style vocabularies, each of which currently has one member.
  *
- * `shape_fill` and `outline` are the two left: both need the shape the
- * clinician observed, which has no channel to arrive through yet.
+ * The catalog makes these params optional — only an arrow is required to carry
+ * its own — so a mark may legitimately declare none, and one area mark in this
+ * norm does. Falling back to the single declared style is therefore reading
+ * the contract rather than guessing: with one value in the vocabulary there is
+ * nothing else the mark could have meant.
+ *
+ * That stops being true the moment a second style exists, so a test pins the
+ * size of both sets. If one grows, the fallback has to become an explicit
+ * default in the catalog before this can keep working.
+ */
+const FILL_STYLES: ReadonlySet<string> = new Set<NtsFillStyle>(['solid'])
+const OUTLINE_STYLES: ReadonlySet<string> = new Set<NtsOutlineStyle>(['contour'])
+
+function soleStyle(styles: ReadonlySet<string>): string | null {
+  return styles.size === 1 ? [...styles][0]! : null
+}
+
+/**
+ * Landmarks a mark can be anchored to, each resolved to the rings it covers.
+ *
+ * A landmark is anatomy, not a surface. The rings come from the drawing's own
+ * tiles and are read through the dentition's neutral accessor, so a mark
+ * anchored inside the crown can never inherit the shape a *surface* would have
+ * had there — which on a front tooth is a materially different polygon.
+ *
+ * Keyed by the token the catalog declares, so adding one is catalog work plus
+ * a line here, never a branch on which rule is being drawn.
+ */
+const LANDMARK_RINGS: Readonly<Record<string, (tooth: NtsTooth) => NtsPoint[][]>> = {
+  coronal_pulp: tooth => centralRegionsOf(tooth).map(region => region.points)
+}
+
+interface ResolvedArea {
+  components: NtsAreaFigure[]
+  regions: string[]
+}
+
+/**
+ * The regions a mark covers on one tooth, read strictly through its binding.
+ *
+ * Never `finding.attributes.surfaces`: the attribute happens to be called that
+ * in every rule this norm has, and a renderer that hardcoded the name would be
+ * right by accident until a norm named it otherwise. 05D.4a made the binding
+ * explicit precisely so this could not drift.
+ */
+function surfaceArea(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  fdi: number
+): ResolvedArea | { reason: NtsUnsupportedReason } {
+  const binding = mark.regions_from
+  if (!binding) return { reason: 'missing_region_source' }
+
+  const value = finding.attributes[binding]
+  if (value === undefined || value === null) return { reason: 'missing_attribute_value' }
+
+  // A set of codes, and nothing else. The record model refuses a bare string
+  // for a multi-valued attribute, so one arriving here is foreign or damaged
+  // data — and guessing that it meant a set of one would be inventing part of
+  // a clinical finding.
+  if (!Array.isArray(value) || value.length === 0) return { reason: 'invalid_region_source' }
+  if (value.some(code => typeof code !== 'string')) return { reason: 'invalid_region_source' }
+
+  const codes = value as string[]
+  const regions = resolveSurfaceRegions(fdi, codes)
+  const components = resolveSurfaceComponents(fdi, codes)
+  // Well-formed codes that name nothing drawable — every one unrecognised.
+  // Reported rather than drawn as an empty area, which would look like a
+  // finding with no lesion.
+  if (components.length === 0) return { reason: 'unresolved_regions' }
+
+  return { components, regions: regions.map(region => region.id) }
+}
+
+/** The rings a landmark-anchored mark covers, merged the same way surfaces are. */
+function landmarkArea(
+  mark: CatalogMark,
+  tooth: NtsTooth
+): ResolvedArea | { reason: NtsUnsupportedReason } {
+  const at = mark.params.at
+  const rings = at ? LANDMARK_RINGS[at] : undefined
+  if (!rings) return { reason: at ? 'unknown_landmark' : 'unknown_placement' }
+
+  const figures = mergeRegions(rings(tooth))
+  if (figures.length === 0) return { reason: 'unresolved_regions' }
+  return { components: figures, regions: centralRegionsOf(tooth).map(region => region.id) }
+}
+
+/** Move a figure from a tooth's own units onto the chart. */
+function toChart(fdi: number, figure: NtsAreaFigure): NtsAreaFigure | null {
+  const move = (rings: NtsPoint[][]): NtsPoint[][] | null => {
+    const moved: NtsPoint[][] = []
+    for (const ring of rings) {
+      const points: NtsPoint[] = []
+      for (const point of ring) {
+        const placed = localToGlobal(fdi, point)
+        if (!placed) return null
+        points.push(placed)
+      }
+      moved.push(points)
+    }
+    return moved
+  }
+
+  const polygons = move(figure.polygons)
+  const boundary = move(figure.boundary)
+  if (!polygons || !boundary) return null
+  return { polygons, boundary }
+}
+
+/**
+ * `shape_fill` and `outline`: the same geometry, painted two ways.
+ *
+ * One instruction per tooth, carrying every figure that tooth has. The two
+ * kinds differ only in which style token they read, which layer they sit on
+ * and whether the layer below fills or strokes them — so they share a resolver
+ * rather than drifting apart in two.
+ */
+function resolveArea(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  base: DrawableBase,
+  kind: 'shape_fill' | 'outline'
+): NtsRenderInstruction[] {
+  const layer = kind === 'shape_fill' ? NTS_LAYERS.fill : NTS_LAYERS.outline
+  const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [{
+    ...base,
+    kind: 'unsupported',
+    layer,
+    reason,
+    markKind: mark.kind
+  }]
+
+  const known = kind === 'shape_fill' ? FILL_STYLES : OUTLINE_STYLES
+  const declared = kind === 'shape_fill' ? mark.params.fill : mark.params.style
+  const style = declared ?? soleStyle(known)
+  if (!style || !known.has(style)) {
+    return fail(kind === 'shape_fill' ? 'unknown_fill_style' : 'unknown_outline_style')
+  }
+
+  const teeth = numberedSubjects(finding)
+  if (teeth.length === 0) return fail('no_targets')
+
+  const produced: NtsRenderInstruction[] = []
+  for (const fdi of teeth) {
+    const tooth = toothPlacement(fdi)?.tooth
+    if (!tooth) {
+      produced.push(...fail('tooth_not_on_chart'))
+      continue
+    }
+
+    // Exactly one source of geometry, which is the invariant the catalog
+    // enforces: a declared attribute, or a declared landmark.
+    const area = mark.regions_from
+      ? surfaceArea(mark, finding, fdi)
+      : landmarkArea(mark, tooth)
+    if ('reason' in area) {
+      produced.push(...fail(area.reason))
+      continue
+    }
+
+    const components = area.components.map(figure => toChart(fdi, figure))
+    if (components.some(figure => figure === null)) {
+      produced.push(...fail('tooth_not_on_chart'))
+      continue
+    }
+
+    produced.push({
+      ...base,
+      kind,
+      layer,
+      style: style as NtsFillStyle & NtsOutlineStyle,
+      fdi,
+      components: components as NtsAreaFigure[],
+      regions: area.regions
+    })
+  }
+
+  return produced
+}
+
+/**
+ * Mark kinds this slice can draw — which, as of 05D.4, is all of them.
+ *
+ * The set stays because it is what makes an unrecognised kind report itself
+ * instead of falling through to whichever resolver happens to be last.
  */
 const DRAWABLE_KINDS: ReadonlySet<string> = new Set([
   'box_siglas',
   'symbol',
   'line',
   'connector',
-  'arrow'
+  'arrow',
+  'shape_fill',
+  'outline'
 ])
 
 export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRender {
@@ -1070,7 +1361,9 @@ export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRe
         : mark.kind === 'symbol' ? resolveSymbol(mark, rule, finding, drawable)
           : mark.kind === 'line' ? resolveLine(mark, finding, drawable)
             : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable)
-              : resolveArrow(mark, finding, drawable)
+              : mark.kind === 'shape_fill' ? resolveArea(mark, finding, drawable, 'shape_fill')
+                : mark.kind === 'outline' ? resolveArea(mark, finding, drawable, 'outline')
+                  : resolveArrow(mark, finding, drawable)
 
     instructions.push(...produced)
     if (produced.some(instruction => instruction.kind !== 'unsupported')) drawn += 1
@@ -1270,14 +1563,73 @@ export function resolveChart(
 
   const instructions = resolved.flatMap(entry => entry.instructions)
   const overflows = layoutBoxes(instructions)
+  const overlaps = findOverlaps(instructions)
 
   return {
     findings: resolved,
+    // Stable sort, so findings that share a layer keep the record's own order
+    // and the chart paints the same way twice.
     instructions: instructions.sort((a, b) => a.layer - b.layer),
     overflows,
+    overlaps,
     partial: resolved.filter(r => r.completeness === 'partial').map(r => r.findingId),
     unsupported: resolved.filter(r => r.completeness === 'unsupported').map(r => r.findingId)
   }
+}
+
+/**
+ * Findings whose areas land on the same region of the same tooth.
+ *
+ * Compared by the geometry ids the instructions already carry rather than by
+ * intersecting polygons: the ids are what the regions *are*, so two findings
+ * naming the same one cover the same ground exactly, with no tolerance to pick
+ * and no arithmetic to get wrong.
+ *
+ * Changes nothing about the drawing. Both findings keep every instruction they
+ * had, in the order they were recorded.
+ */
+function findOverlaps(instructions: readonly NtsRenderInstruction[]): NtsAreaOverlap[] {
+  const writesSigla = new Set(
+    instructions.filter(i => i.kind === 'text').map(i => i.findingId)
+  )
+
+  // fdi → region id → the findings that claimed it, in arrival order.
+  const claims = new Map<number, Map<string, string[]>>()
+  for (const instruction of instructions) {
+    if (instruction.kind !== 'shape_fill' && instruction.kind !== 'outline') continue
+    const perTooth = claims.get(instruction.fdi) ?? new Map<string, string[]>()
+    claims.set(instruction.fdi, perTooth)
+    for (const region of instruction.regions) {
+      const holders = perTooth.get(region) ?? []
+      if (!holders.includes(instruction.findingId)) holders.push(instruction.findingId)
+      perTooth.set(region, holders)
+    }
+  }
+
+  const overlaps: NtsAreaOverlap[] = []
+  for (const [fdi, perTooth] of claims) {
+    // One entry per set of findings, listing every region they share, so two
+    // findings covering four regions are reported once and not four times.
+    const byGroup = new Map<string, string[]>()
+    for (const [region, holders] of perTooth) {
+      if (holders.length < 2) continue
+      const groupKey = holders.join(' ')
+      const regions = byGroup.get(groupKey) ?? []
+      regions.push(region)
+      byGroup.set(groupKey, regions)
+    }
+    for (const [groupKey, regions] of byGroup) {
+      const findingIds = groupKey.split(' ')
+      overlaps.push({
+        fdi,
+        findingIds,
+        regions: regions.sort(),
+        silent: findingIds.some(id => !writesSigla.has(id))
+      })
+    }
+  }
+
+  return overlaps.sort((a, b) => a.fdi - b.fdi || (a.findingIds[0]! < b.findingIds[0]! ? -1 : 1))
 }
 
 /**

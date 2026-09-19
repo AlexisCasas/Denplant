@@ -676,3 +676,70 @@ Two consequences worth stating, because neither is a defect to be fixed:
 
 **G5 is now closed as product policy, not as norm.** Nothing above may be
 cited as something NTS N.° 188 defines.
+
+## 21. How an area mark is drawn (NTS-05D.4)
+
+`shape_fill` and `outline` are the last two mark kinds to reach the chart, and
+they share one resolver because they are the same geometry painted two ways:
+the fill covers the regions, the contour strokes their **merged boundary**.
+
+Where the geometry comes from is read from the mark and never guessed:
+
+| The mark declares | Resolved by |
+|---|---|
+| `regions_from` | the bound attribute's codes → the surface policy (§20) |
+| `params.at` | the named landmark → the crown tiles it covers |
+
+The renderer never reads `finding.attributes.surfaces` by name. Every rule in
+this norm happens to call the attribute that, and a renderer that hardcoded it
+would be right by accident until a norm named it otherwise — which is the gap
+`regions_from` was added to close. Anything the binding cannot resolve —
+absent attribute, a value that is not a set of codes, an empty set, codes that
+name no geometry — is reported as `unsupported` with its own reason. Nothing
+is approximated.
+
+**A landmark is not a surface.** `coronal_pulp` resolves to the crown's central
+tiles through the dentition's neutral accessor, *not* through the surface
+policy. On a front tooth the two are materially different polygons — the
+landmark is the whole central zone, the incisal surface is the inset band
+inside it — and drawing one with the other's shape would be a wrong clinical
+statement, not a rounding error.
+
+**Style params are optional, and the fallback is guarded.** The catalog
+requires only an arrow to carry its own params, so an area mark may declare no
+style, and one in this norm does. The renderer falls back to the single style
+its vocabulary declares, which is a reading of the contract rather than a
+guess — while the vocabulary has one member. A test pins that; if either enum
+ever gains a second value, the catalog has to declare a default before the
+fallback can stay.
+
+### Multi-loop figures
+
+A component's `boundary` is **one or more** closed loops. A figure that
+encloses ground the finding does not cover has a rim *and* holes, wound against
+each other by nesting depth. The renderer keeps every loop and emits them as
+**one path** with one closed subpath each, under `fill-rule="nonzero"` —
+chosen because that is exactly what the opposite windings mean, not as a
+default. Drawing only the first loop would fill a hole in and claim an area
+nobody recorded; splitting the loops across separate paths would discard the
+relationship the winding encodes.
+
+### Two findings on the same ground
+
+Both are drawn, both keep every instruction, and neither is merged into the
+other: merging is only ever within one finding. Painting order is the record's
+own order, kept stable through the layer sort. The situation is reported
+outside the drawing as `NtsChartRender.overlaps`, flagged `silent` when one of
+the findings writes no sigla anywhere — a contour has no letters to fall back
+on, so whatever is painted over it can hide it completely.
+
+### Coverage
+
+With these two kinds implemented the catalog classifies as **35 complete,
+1 partial, 2 unsupported**. What remains is not a renderer gap:
+
+| Rule | State | Why |
+|---|---|---|
+| 6.1.35 sealant | partial | its sigla draws; the fissure anatomy the mark follows is not modelled (G10) |
+| 6.1.10 fracture | unsupported | the norm draws the shape the clinician observed, and no channel carries it (G6) |
+| 6.1.13 giroversión | unsupported | the direction is a clinical observation the norm never enumerates (CLINICAL-03) |

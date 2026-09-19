@@ -25,10 +25,20 @@ import type {
   NtsArrowInstruction,
   NtsConnectorInstruction,
   NtsLineInstruction,
+  NtsOutlineInstruction,
+  NtsShapeFillInstruction,
   NtsSymbolInstruction,
   NtsTextInstruction,
   NtsUnsupportedInstruction
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsRenderModel'
+import {
+  incisalBand,
+  resolveSurfaceComponents
+} from '../../../backend/app/modules/odontogram/frontend/utils/ntsSurfaceGeometry'
+import {
+  NTS_ALL_TEETH,
+  centralRegionsOf
+} from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import {
   annotationBox,
   apexBand,
@@ -167,6 +177,10 @@ const symbols = (r: ReturnType<typeof resolveFinding>) =>
   r.instructions.filter((i): i is NtsSymbolInstruction => i.kind === 'symbol')
 const unsupported = (r: ReturnType<typeof resolveFinding>) =>
   r.instructions.filter((i): i is NtsUnsupportedInstruction => i.kind === 'unsupported')
+const fills = (r: ReturnType<typeof resolveFinding>) =>
+  r.instructions.filter((i): i is NtsShapeFillInstruction => i.kind === 'shape_fill')
+const outlines = (r: ReturnType<typeof resolveFinding>) =>
+  r.instructions.filter((i): i is NtsOutlineInstruction => i.kind === 'outline')
 
 // ---------------------------------------------------------------------------
 // text resolution
@@ -623,12 +637,16 @@ describe('a finding that is only partly drawable says so', () => {
     expect(resolveFinding(finding({ rule_id: 'X.50' }), r).completeness).toBe('complete')
   })
 
-  it('a drawable mark beside a deferred one is partial, and the deferred one is reported', () => {
+  it('a drawable mark beside an unresolvable one is partial, and the other is reported', () => {
+    // Every mark kind draws as of 05D.4, so the way a finding becomes partial
+    // is no longer a deferred *kind* but a mark whose geometry cannot be
+    // resolved — here an area that says neither which attribute supplies its
+    // regions nor which landmark it sits on.
     const r = rule({
       rule_id: 'X.51',
       render: {
         color_semantics: 'good_or_non_pathological',
-        marks: [{ kind: 'shape_fill', params: { fill: 'solid' }, text_from: null, suffix_from: null, role: null, target_selector: null },
+        marks: [{ kind: 'shape_fill', params: { fill: 'solid' }, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: null },
           symbolMark('square', 'crown')]
       }
     })
@@ -637,19 +655,37 @@ describe('a finding that is only partly drawable says so', () => {
     expect(result.completeness).toBe('partial')
     expect(symbols(result)).toHaveLength(1)
     expect(unsupported(result)[0]).toMatchObject({
-      reason: 'mark_kind_not_in_slice',
+      reason: 'unknown_placement',
       markKind: 'shape_fill'
     })
   })
 
+  it('an unknown mark kind is still reported rather than dropped', () => {
+    const r = rule({
+      rule_id: 'X.52',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [{ kind: 'shading', params: {}, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: null },
+          symbolMark('square', 'crown')]
+      }
+    })
+    const result = resolveFinding(finding({ rule_id: 'X.52' }), r)
+
+    expect(result.completeness).toBe('partial')
+    expect(unsupported(result)[0]).toMatchObject({
+      reason: 'mark_kind_not_in_slice',
+      markKind: 'shading'
+    })
+  })
+
   it.each(['shape_fill', 'outline'])(
-    'a %s-only rule is unsupported, and never silently empty',
+    'a %s-only rule with no geometry source is unsupported, never silently empty',
     (kind) => {
       const r = rule({
         rule_id: `X.${kind}`,
         render: {
           color_semantics: 'good_or_non_pathological',
-          marks: [{ kind, params: {}, text_from: null, suffix_from: null, role: null, target_selector: null }]
+          marks: [{ kind, params: {}, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: null }]
         }
       })
       const result = resolveFinding(finding({ rule_id: r.rule_id }), r)
@@ -914,7 +950,14 @@ describe('the real catalog drives the same generic paths', () => {
       const attributes: Record<string, unknown> = {}
       for (const attribute of r.attributes ?? []) {
         const values = attribute.values ?? []
-        if (values.length > 0) attributes[attribute.name] = values[0]!.code
+        if (values.length === 0) continue
+        // A multi-valued attribute is a *list* of codes, and the record model
+        // rejects a bare string for one. Synthesising it as a string produced
+        // data no stored finding could have, which is worse than useless in a
+        // census meant to say what the renderer does with real records.
+        attributes[attribute.name] = attribute.kind === 'enum_multi'
+          ? [values[0]!.code]
+          : values[0]!.code
       }
       const targets = r.target_identity === 'unnumbered'
         ? [target({ target_kind: 'unnumbered_tooth', tooth_number: null }),
@@ -930,14 +973,15 @@ describe('the real catalog drives the same generic paths', () => {
       counts[result.completeness] += 1
     }
 
-    // Siglas, symbols, lines, connectors and arrows are drawn. What remains
-    // needs the shape the clinician observed, which has no channel yet.
+    // Every mark kind the catalog declares now draws.
     //
-    // 30 complete.
-    //  5 partial: a sigla beside a fill or a freehand line.
-    //  3 unsupported: a freehand fracture, a rotation whose sense is a
-    //    clinical observation, and a contour that waits for `outline`.
-    expect(counts).toEqual({ complete: 30, partial: 5, unsupported: 3 })
+    // 35 complete.
+    //  1 partial: a sigla beside a mark anchored to fissure anatomy the chart
+    //    does not model, which is a geometry gap and not a renderer one.
+    //  2 unsupported: a freehand shape the clinician has no channel to supply,
+    //    and a direction the norm leaves unenumerated. Both are open questions
+    //    about the data, not about drawing.
+    expect(counts).toEqual({ complete: 35, partial: 1, unsupported: 2 })
     expect(counts.complete + counts.partial + counts.unsupported).toBe(38)
   })
 })
@@ -962,6 +1006,21 @@ describe('the renderer knows no rule and no clinical word', () => {
       expect(text).not.toContain(`'${sigla}'`)
       expect(text).not.toContain(`"${sigla}"`)
     }
+  })
+
+  it.each(FILES)('%s owns no surface vocabulary and no attribute name', (file) => {
+    // NTS-05D.4. What a surface code means geometrically belongs to the
+    // surface policy module, and which attribute carries the codes is the
+    // mark's own declaration. Either one appearing here would be the renderer
+    // deciding something it has no business deciding — and would be right by
+    // accident on this norm, until a norm named the attribute differently.
+    const code = source(file)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\/\/.*$/gm, '')
+
+    expect(code).not.toContain('surfaces')
+    expect(code).not.toMatch(/['"][MDOVL]['"]/)
   })
 
   it.each(FILES)('%s switches only on mark kind, shape, placement or paint', (file) => {
@@ -1488,5 +1547,450 @@ describe('arrows point the way the arch decides', () => {
     const r = arrowRule('X.147', 'outside_occlusal', 'sideways')
     expect(unsupported(resolveFinding(on('X.147', 16), r))[0]!.reason)
       .toBe('unknown_arrow_direction')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.4 — shape_fill and outline
+// ---------------------------------------------------------------------------
+
+/** Synthetic: a rule whose area mark reads its regions from a named attribute. */
+const areaRule = (
+  ruleId: string,
+  kind: 'shape_fill' | 'outline',
+  options: { regionsFrom?: string | null, at?: string, style?: string, box?: boolean } = {}
+) => rule({
+  rule_id: ruleId,
+  attributes: [{
+    name: 'zones',
+    kind: 'enum_multi',
+    required: true,
+    is_sigla: false,
+    values: ['M', 'D', 'O', 'V', 'L'].map(code => ({
+      code, name: `Label ${code}`, status: 'verified', notes: null, specification_requirement: null
+    })),
+    status: 'verified',
+    notes: null
+  }, ...(options.box ? [SIGLA_ATTR('sigla', ['Q'])] : [])] as never,
+  render: {
+    color_semantics: 'good_or_non_pathological',
+    marks: [
+      {
+        kind,
+        params: {
+          ...(options.style === undefined
+            ? (kind === 'shape_fill' ? { fill: 'solid' } : { style: 'contour' })
+            : options.style === '' ? {} : (kind === 'shape_fill' ? { fill: options.style } : { style: options.style })),
+          ...(options.at ? { at: options.at } : {})
+        },
+        text_from: null,
+        suffix_from: null,
+        role: null,
+        target_selector: null,
+        regions_from: options.regionsFrom === undefined ? 'zones' : options.regionsFrom
+      },
+      ...(options.box ? [boxMark('sigla')] : [])
+    ]
+  }
+})
+
+const onTooth = (ruleId: string, fdi: number, zones: unknown) => finding({
+  rule_id: ruleId,
+  attributes: (zones === undefined ? {} : { zones }) as never,
+  targets: [target({ tooth_number: fdi })]
+})
+
+/** Every point of every ring of every figure. */
+const allPoints = (instruction: NtsShapeFillInstruction | NtsOutlineInstruction) =>
+  instruction.components.flatMap(c => [...c.polygons.flat(), ...c.boundary.flat()])
+
+describe('NTS-05D.4 — an area reads its regions through the declared binding', () => {
+  it('resolves the bound attribute, whatever it is called', () => {
+    // The attribute is deliberately not named "surfaces": a renderer that
+    // hardcoded that word would pass on this norm and fail on the next.
+    const r = areaRule('X.200', 'shape_fill')
+    const result = resolveFinding(onTooth('X.200', 16, ['M']), r)
+
+    expect(result.completeness).toBe('complete')
+    expect(fills(result)).toHaveLength(1)
+    expect(fills(result)[0]!.fdi).toBe(16)
+    expect(fills(result)[0]!.style).toBe('solid')
+  })
+
+  it.each([
+    ['the mark declares no source', { regionsFrom: null }, undefined, 'unknown_placement'],
+    ['the attribute is absent', {}, undefined, 'missing_attribute_value'],
+    ['the value is a bare code', {}, 'M', 'invalid_region_source'],
+    ['the value is empty', {}, [], 'invalid_region_source'],
+    ['the value holds a non-code', {}, [1], 'invalid_region_source'],
+    ['every code is unknown', {}, ['Z', 'Q'], 'unresolved_regions']
+  ])('reports %s rather than inventing geometry', (_label, ruleOpts, zones, reason) => {
+    // The first case keeps a valid value and breaks the mark instead.
+    const isBindingCase = (ruleOpts as { regionsFrom?: unknown }).regionsFrom === null
+    const r = areaRule('X.201', 'shape_fill', ruleOpts as never)
+    const result = resolveFinding(
+      onTooth('X.201', 16, isBindingCase ? ['M'] : zones), r
+    )
+
+    expect(result.completeness).toBe('unsupported')
+    expect(unsupported(result)[0]!.reason).toBe(reason)
+    expect(fills(result)).toHaveLength(0)
+  })
+
+  it('an unknown code among known ones is simply not drawn', () => {
+    const r = areaRule('X.202', 'shape_fill')
+    const withJunk = fills(resolveFinding(onTooth('X.202', 16, ['M', 'Z']), r))
+    const without = fills(resolveFinding(onTooth('X.202', 16, ['M']), r))
+
+    expect(withJunk[0]!.regions).toEqual(without[0]!.regions)
+  })
+
+  it('a tooth the chart does not draw is reported', () => {
+    const r = areaRule('X.203', 'shape_fill')
+    const result = resolveFinding(onTooth('X.203', 99, ['M']), r)
+    expect(unsupported(result)[0]!.reason).toBe('tooth_not_on_chart')
+  })
+
+  it('an unknown style is refused, and an absent one falls back to the only style', () => {
+    expect(unsupported(resolveFinding(
+      onTooth('X.204', 16, ['M']), areaRule('X.204', 'shape_fill', { style: 'hatched' })
+    ))[0]!.reason).toBe('unknown_fill_style')
+
+    expect(unsupported(resolveFinding(
+      onTooth('X.205', 16, ['M']), areaRule('X.205', 'outline', { style: 'dotted' })
+    ))[0]!.reason).toBe('unknown_outline_style')
+
+    // Absent is legal: the catalog makes the param optional.
+    expect(fills(resolveFinding(
+      onTooth('X.206', 16, ['M']), areaRule('X.206', 'shape_fill', { style: '' })
+    ))[0]!.style).toBe('solid')
+  })
+
+  it('a finding with no colour draws no area at all', () => {
+    const r = rule({
+      rule_id: 'X.207',
+      attributes: [CONDITION_ATTR] as never,
+      render: {
+        color_semantics: 'condition_dependent',
+        marks: [{ kind: 'shape_fill', params: { fill: 'solid' }, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: 'zones' }]
+      }
+    })
+    const result = resolveFinding(finding({ rule_id: 'X.207', attributes: { zones: ['M'] } as never }), r)
+    expect(unsupported(result)[0]!.reason).toBe('missing_condition_state')
+    expect(fills(result)).toHaveLength(0)
+  })
+})
+
+describe('NTS-05D.4 — the geometry comes from the surface policy, unchanged', () => {
+  it('a single surface is one figure of one ring', () => {
+    const r = areaRule('X.210', 'shape_fill')
+    const [instruction] = fills(resolveFinding(onTooth('X.210', 16, ['M']), r))
+
+    expect(instruction!.components).toHaveLength(1)
+    expect(instruction!.components[0]!.polygons).toHaveLength(1)
+    expect(instruction!.components[0]!.boundary).toHaveLength(1)
+  })
+
+  it('a posterior occlusal surface fills every central tile as one figure', () => {
+    const r = areaRule('X.211', 'shape_fill')
+    const [instruction] = fills(resolveFinding(onTooth('X.211', 16, ['O']), r))
+
+    expect(instruction!.components).toHaveLength(1)
+    expect(instruction!.components[0]!.polygons).toHaveLength(4)
+    // Merged: one rim, no seam between the four.
+    expect(instruction!.components[0]!.boundary).toHaveLength(1)
+    expect(instruction!.regions).toEqual(['center-1', 'center-2', 'center-3', 'center-4'])
+  })
+
+  it('an anterior occlusal surface is the incisal band, not the whole central zone', () => {
+    const r = areaRule('X.212', 'shape_fill')
+    const [instruction] = fills(resolveFinding(onTooth('X.212', 11, ['O']), r))
+
+    expect(instruction!.regions).toEqual(['incisal'])
+
+    // The very polygon the policy owns, moved onto the chart and nothing else.
+    const band = incisalBand(11)!
+    const placed = instruction!.components[0]!.polygons[0]!
+    expect(placed).toHaveLength(band.points.length)
+
+    // Horizontal and centred: two distinct heights, wider than it is tall.
+    const ys = new Set(placed.map(p => Math.round(p.y * 100)))
+    expect(ys.size).toBe(2)
+    const width = Math.max(...placed.map(p => p.x)) - Math.min(...placed.map(p => p.x))
+    const height = Math.max(...placed.map(p => p.y)) - Math.min(...placed.map(p => p.y))
+    expect(width).toBeGreaterThan(height)
+  })
+
+  it('contiguous surfaces fill as one figure and non-contiguous ones do not', () => {
+    const r = areaRule('X.213', 'shape_fill')
+    const merged = fills(resolveFinding(onTooth('X.213', 16, ['M', 'O']), r))[0]!
+    const split = fills(resolveFinding(onTooth('X.213', 16, ['M', 'D']), r))[0]!
+
+    expect(merged.components).toHaveLength(1)
+    expect(merged.components[0]!.polygons).toHaveLength(5)
+    expect(merged.components[0]!.boundary).toHaveLength(1)
+
+    expect(split.components).toHaveLength(2)
+    for (const figure of split.components) expect(figure.boundary).toHaveLength(1)
+  })
+
+  it('the order the surfaces were recorded in changes nothing', () => {
+    const r = areaRule('X.214', 'shape_fill')
+    const a = fills(resolveFinding(onTooth('X.214', 16, ['O', 'M', 'V']), r))[0]!
+    const b = fills(resolveFinding(onTooth('X.214', 16, ['V', 'O', 'M']), r))[0]!
+    expect(a.components).toEqual(b.components)
+    expect(a.regions).toEqual(b.regions)
+  })
+
+  it('every coordinate is on the chart, inside that tooth', () => {
+    const r = areaRule('X.215', 'shape_fill')
+    for (const fdi of [16, 26, 36, 46, 11, 41, 55, 85]) {
+      const instruction = fills(resolveFinding(onTooth('X.215', fdi, ['M', 'D', 'O', 'V', 'L']), r))[0]!
+      const crown = crownBox(fdi)!
+      for (const point of allPoints(instruction)) {
+        expect(point.x, String(fdi)).toBeGreaterThanOrEqual(crown.x - 0.01)
+        expect(point.x).toBeLessThanOrEqual(crown.x + crown.width + 0.01)
+        expect(point.y).toBeGreaterThanOrEqual(crown.y - 0.01)
+        expect(point.y).toBeLessThanOrEqual(crown.y + crown.height + 0.01)
+      }
+    }
+  })
+
+  it('one instruction per tooth when a finding names several', () => {
+    const r = areaRule('X.216', 'shape_fill')
+    const result = resolveFinding(finding({
+      rule_id: 'X.216',
+      attributes: { zones: ['M'] } as never,
+      targets: [target({ id: 'a', tooth_number: 16 }), target({ id: 'b', position: 1, tooth_number: 26 })]
+    }), r)
+
+    expect(fills(result).map(i => i.fdi)).toEqual([16, 26])
+  })
+})
+
+describe('NTS-05D.4 — an outline keeps every loop it was given', () => {
+  it('strokes the boundary, not the tiles', () => {
+    const r = areaRule('X.220', 'outline')
+    const [instruction] = outlines(resolveFinding(onTooth('X.220', 16, ['M', 'O']), r))
+
+    expect(instruction!.style).toBe('contour')
+    expect(instruction!.components).toHaveLength(1)
+    // Five tiles, one contour: the shared edges are gone.
+    expect(instruction!.components[0]!.polygons).toHaveLength(5)
+    expect(instruction!.components[0]!.boundary).toHaveLength(1)
+  })
+
+  it('two separated surfaces give two contours', () => {
+    const r = areaRule('X.221', 'outline')
+    const [instruction] = outlines(resolveFinding(onTooth('X.221', 16, ['M', 'D']), r))
+    expect(instruction!.components).toHaveLength(2)
+  })
+
+  it('CRITICAL — a figure with holes keeps all of its loops', () => {
+    // An anterior with every surface affected encloses two slivers that were
+    // never recorded. Keeping only the rim would fill them in and claim ground
+    // nobody observed; keeping only the first loop is the exact bug 05D.4b
+    // uncovered when the boundary stopped being a single ring.
+    const r = areaRule('X.222', 'outline')
+    const [instruction] = outlines(resolveFinding(onTooth('X.222', 11, ['M', 'D', 'O', 'V', 'L']), r))
+
+    expect(instruction!.components).toHaveLength(1)
+    expect(instruction!.components[0]!.boundary).toHaveLength(3)
+
+    // And it is exactly what the geometry module produced, loop for loop.
+    const expected = resolveSurfaceComponents(11, ['M', 'D', 'O', 'V', 'L'])
+    expect(instruction!.components[0]!.boundary.map(l => l.length))
+      .toEqual(expected[0]!.boundary.map(l => l.length))
+  })
+
+  it('the loops keep the winding the geometry gave them', () => {
+    // `fill-rule="nonzero"` is only correct while rim and hole are wound
+    // against each other, so the renderer must not normalise or reverse them.
+    const r = areaRule('X.223', 'outline')
+    const [instruction] = outlines(resolveFinding(onTooth('X.223', 11, ['M', 'D', 'O', 'V', 'L']), r))
+
+    const turn = (ring: { x: number, y: number }[]) => {
+      let sum = 0
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i]!
+        const b = ring[(i + 1) % ring.length]!
+        sum += a.x * b.y - b.x * a.y
+      }
+      return Math.sign(sum)
+    }
+    const signs = instruction!.components[0]!.boundary.map(turn)
+    expect(new Set(signs).size).toBe(2)
+  })
+})
+
+describe('NTS-05D.4 — a landmark-anchored area is not a surface', () => {
+  const pulpRule = (ruleId: string) => rule({
+    rule_id: ruleId,
+    render: {
+      color_semantics: 'good_or_non_pathological',
+      marks: [{ kind: 'shape_fill', params: { at: 'coronal_pulp' }, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: null }]
+    }
+  })
+
+  it('fills the crown tiles the landmark covers, merged into one figure', () => {
+    const result = resolveFinding(onTooth('X.230', 16, undefined), pulpRule('X.230'))
+    const [instruction] = fills(result)
+
+    expect(result.completeness).toBe('complete')
+    expect(instruction!.components).toHaveLength(1)
+    expect(instruction!.components[0]!.polygons).toHaveLength(4)
+    expect(instruction!.components[0]!.boundary).toHaveLength(1)
+  })
+
+  it('on a front tooth it is the whole central zone, NOT the incisal band', () => {
+    // The two are different polygons on the same tooth, and confusing them
+    // would draw an anatomical landmark with a surface's shape.
+    const [instruction] = fills(resolveFinding(onTooth('X.231', 11, undefined), pulpRule('X.231')))
+    const placed = instruction!.components[0]!.polygons[0]!
+    const height = Math.max(...placed.map(p => p.y)) - Math.min(...placed.map(p => p.y))
+
+    const zone = centralRegionsOf(NTS_ALL_TEETH.find(t => t.fdi === 11)!)[0]!
+    const zoneHeight = Math.max(...zone.points.map(p => p.y)) - Math.min(...zone.points.map(p => p.y))
+    const band = incisalBand(11)!
+    const bandHeight = Math.max(...band.points.map(p => p.y)) - Math.min(...band.points.map(p => p.y))
+
+    const scale = toothPlacement(11)!.scale
+    expect(height).toBeCloseTo(zoneHeight * scale, 6)
+    expect(height).not.toBeCloseTo(bandHeight * scale, 6)
+    expect(instruction!.regions).toEqual(['center'])
+  })
+
+  it('needs no surface attribute, and refuses a landmark it does not model', () => {
+    const r = rule({
+      rule_id: 'X.232',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [{ kind: 'shape_fill', params: { at: 'root_canal' }, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: null }]
+      }
+    })
+    expect(unsupported(resolveFinding(onTooth('X.232', 16, undefined), r))[0]!.reason)
+      .toBe('unknown_landmark')
+  })
+})
+
+describe('NTS-05D.4 — areas sit under everything else', () => {
+  it('fill and outline take the two lowest layers', () => {
+    const fill = fills(resolveFinding(onTooth('X.240', 16, ['M']), areaRule('X.240', 'shape_fill')))[0]!
+    const outline = outlines(resolveFinding(onTooth('X.241', 16, ['M']), areaRule('X.241', 'outline')))[0]!
+
+    expect(fill.layer).toBe(NTS_LAYERS.fill)
+    expect(outline.layer).toBe(NTS_LAYERS.outline)
+    expect(NTS_LAYERS.fill).toBeLessThan(NTS_LAYERS.outline)
+    for (const above of [NTS_LAYERS.line, NTS_LAYERS.symbol, NTS_LAYERS.arrow, NTS_LAYERS.text]) {
+      expect(NTS_LAYERS.outline).toBeLessThan(above)
+    }
+  })
+
+  it('the chart orders them first, and a sigla beside a fill still sits on top', () => {
+    const r = areaRule('X.242', 'shape_fill', { box: true })
+    const chart = resolveChart([onTooth('X.242', 16, ['M'])], [r])
+    const kinds = chart.instructions.map(i => i.kind)
+
+    expect(kinds.indexOf('shape_fill')).toBeLessThan(kinds.indexOf('text'))
+  })
+})
+
+describe('NTS-05D.4 — two findings on the same ground are reported, never merged', () => {
+  it('overlapping areas are both kept, in the order recorded', () => {
+    const r = areaRule('X.250', 'shape_fill', { box: true })
+    const first = onTooth('X.250', 16, ['M', 'O'])
+    const second = onTooth('X.250', 16, ['O'])
+    const chart = resolveChart([first, second], [r])
+
+    const drawn = chart.instructions.filter(
+      (i): i is NtsShapeFillInstruction => i.kind === 'shape_fill'
+    )
+    expect(drawn.map(i => i.findingId)).toEqual([first.id, second.id])
+    // Never merged across findings: each keeps its own figures.
+    expect(drawn[0]!.components[0]!.polygons).toHaveLength(5)
+    expect(drawn[1]!.components[0]!.polygons).toHaveLength(4)
+  })
+
+  it('the overlap is reported once, with the regions they share', () => {
+    const r = areaRule('X.251', 'shape_fill', { box: true })
+    const first = onTooth('X.251', 16, ['M', 'O'])
+    const second = onTooth('X.251', 16, ['O'])
+    const chart = resolveChart([first, second], [r])
+
+    expect(chart.overlaps).toHaveLength(1)
+    expect(chart.overlaps[0]).toMatchObject({
+      fdi: 16,
+      findingIds: [first.id, second.id],
+      regions: ['center-1', 'center-2', 'center-3', 'center-4'],
+      silent: false
+    })
+  })
+
+  it('no overlap is reported when the areas only touch', () => {
+    const r = areaRule('X.252', 'shape_fill', { box: true })
+    const chart = resolveChart(
+      [onTooth('X.252', 16, ['M']), onTooth('X.252', 16, ['O'])],
+      [r]
+    )
+    expect(chart.overlaps).toEqual([])
+  })
+
+  it('nor across different teeth', () => {
+    const r = areaRule('X.253', 'shape_fill', { box: true })
+    const chart = resolveChart(
+      [onTooth('X.253', 16, ['M']), onTooth('X.253', 26, ['M'])],
+      [r]
+    )
+    expect(chart.overlaps).toEqual([])
+  })
+
+  it('an area with no sigla to fall back on is flagged as silent', () => {
+    // A finding whose only representation is the area itself can be covered
+    // completely by whatever is painted over it, and then it is simply gone
+    // from the chart. That is worth saying out loud.
+    const silent = areaRule('X.254', 'outline')
+    const spoken = areaRule('X.255', 'shape_fill', { box: true })
+    const chart = resolveChart(
+      [onTooth('X.255', 16, ['O']), onTooth('X.254', 16, ['O'])],
+      [silent, spoken]
+    )
+
+    expect(chart.overlaps).toHaveLength(1)
+    expect(chart.overlaps[0]!.silent).toBe(true)
+  })
+
+  it('the warning changes nothing about what is drawn', () => {
+    const r = areaRule('X.256', 'shape_fill', { box: true })
+    const alone = resolveChart([onTooth('X.256', 16, ['O'])], [r])
+    const together = resolveChart(
+      [onTooth('X.256', 16, ['O']), onTooth('X.256', 16, ['O'])],
+      [r]
+    )
+    const shapes = (c: typeof alone) => c.instructions
+      .filter((i): i is NtsShapeFillInstruction => i.kind === 'shape_fill')
+      .map(i => i.components)
+
+    expect(together.overlaps).toHaveLength(1)
+    expect(shapes(together)[0]).toEqual(shapes(alone)[0])
+    expect(shapes(together)[1]).toEqual(shapes(alone)[0])
+  })
+})
+
+describe('NTS-05D.4 — the style vocabularies are still single-valued', () => {
+  it('falling back to the only style stays honest', () => {
+    // The fallback for an absent style param is "the one style the catalog
+    // declares". The moment either vocabulary gains a second member that stops
+    // being a reading of the contract and becomes a guess, and the catalog has
+    // to declare a default instead. This test is the tripwire.
+    const styles = { fill: new Set<string>(), outline: new Set<string>() }
+    for (const r of CATALOG.rules) {
+      const marks = (r.render as unknown as { marks: Array<{ kind: string, params?: Record<string, string> }> }).marks
+      for (const mark of marks) {
+        if (mark.kind === 'shape_fill' && mark.params?.fill) styles.fill.add(mark.params.fill)
+        if (mark.kind === 'outline' && mark.params?.style) styles.outline.add(mark.params.style)
+      }
+    }
+    expect([...styles.fill]).toEqual(['solid'])
+    expect([...styles.outline]).toEqual(['contour'])
   })
 })

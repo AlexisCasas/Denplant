@@ -19,14 +19,17 @@
  */
 
 import type {
+  NtsAreaFigure,
   NtsArrowInstruction,
   NtsArrowShape,
   NtsBoxOverflow,
   NtsConnectorInstruction,
   NtsLineInstruction,
+  NtsOutlineInstruction,
   NtsPaint,
   NtsPoint,
   NtsRenderInstruction,
+  NtsShapeFillInstruction,
   NtsSymbolInstruction,
   NtsTextInstruction
 } from '../../utils/ntsRenderModel'
@@ -47,6 +50,36 @@ function ink(paint: NtsPaint): string {
 const symbols = computed(
   () => props.instructions.filter((i): i is NtsSymbolInstruction => i.kind === 'symbol')
 )
+
+const fills = computed(
+  () => props.instructions.filter((i): i is NtsShapeFillInstruction => i.kind === 'shape_fill')
+)
+
+const outlines = computed(
+  () => props.instructions.filter((i): i is NtsOutlineInstruction => i.kind === 'outline')
+)
+
+/**
+ * One figure as one path: every ring a closed subpath, in the order given.
+ *
+ * All of them, deliberately. A figure can enclose an area the finding does not
+ * cover, and that arrives as a second ring wound against the first. Emitting
+ * only the outer one would fill the gap in and claim ground nobody recorded,
+ * and splitting the rings across separate paths would break the relationship
+ * the winding encodes — so they stay together, in order, unreordered.
+ */
+function figurePath(figure: NtsAreaFigure, rings: 'polygons' | 'boundary'): string {
+  return figure[rings]
+    .map((ring) => {
+      const [first, ...rest] = ring
+      if (!first) return ''
+      return `M${round(first.x)},${round(first.y)} `
+        + rest.map(point => `L${round(point.x)},${round(point.y)}`).join(' ')
+        + ' Z'
+    })
+    .filter(Boolean)
+    .join(' ')
+}
 
 /**
  * Strokes, already resolved upstream.
@@ -202,6 +235,68 @@ function intersectingCircles(s: NtsSymbolInstruction): Array<{ cx: number, cy: n
     aria-hidden="true"
     data-testid="nts-finding-layer"
   >
+    <!--
+      Areas first, so nothing clinical is buried under a filled surface: the
+      instruction model puts fills and outlines on the two lowest layers, and
+      in SVG the document order is the painting order.
+
+      `fill-rule="nonzero"` is the geometry module's own contract, not a
+      default taken on trust: it winds a figure's rim one way and any enclosed
+      gap the other, which is exactly what the non-zero rule reads as a hole.
+      Choosing `evenodd` would happen to agree on these shapes and stop
+      agreeing the moment a figure nested twice.
+    -->
+    <g
+      v-for="(area, index) in fills"
+      :key="`${area.findingId}-fill-${index}`"
+      :data-finding="area.findingId"
+      :data-rule="area.ruleId"
+      :data-fdi="area.fdi"
+      :data-style="area.style"
+      :data-paint="area.paint"
+      :data-components="area.components.length"
+      :data-testid="`nts-fill-${area.findingId}-${area.fdi}`"
+    >
+      <path
+        v-for="(figure, f) in area.components"
+        :key="f"
+        :d="figurePath(figure, 'polygons')"
+        :fill="ink(area.paint)"
+        fill-rule="nonzero"
+        stroke="none"
+        :data-loops="figure.polygons.length"
+      />
+    </g>
+
+    <!--
+      Contours. Stroked from the *boundary*, which has had every edge shared
+      between two regions removed, so several affected surfaces read as one
+      figure instead of a grid.
+    -->
+    <g
+      v-for="(area, index) in outlines"
+      :key="`${area.findingId}-outline-${index}`"
+      :data-finding="area.findingId"
+      :data-rule="area.ruleId"
+      :data-fdi="area.fdi"
+      :data-style="area.style"
+      :data-paint="area.paint"
+      :data-components="area.components.length"
+      :data-testid="`nts-outline-${area.findingId}-${area.fdi}`"
+    >
+      <path
+        v-for="(figure, f) in area.components"
+        :key="f"
+        :d="figurePath(figure, 'boundary')"
+        fill="none"
+        :stroke="ink(area.paint)"
+        stroke-width="1.6"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+        :data-loops="figure.boundary.length"
+      />
+    </g>
+
     <!--
       Lines and connectors. Every coordinate arrived resolved; this branch
       knows nothing about arches, spans, roles or roots.
