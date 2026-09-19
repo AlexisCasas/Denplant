@@ -434,20 +434,37 @@ function centralRegions(box: CrownBox, count: number): NtsCrownRegion[] {
  *
  * Clinically validated for DenPlant: a three-rooted tooth is not three
  * separate triangles standing side by side. The roots leave a common trunk, so
- * their bases sit close together and overlap, while the apices stay far enough
- * apart to be counted. The middle root is the one read first, and the two
- * lateral ones cross behind it.
+ * their bases overlap, while the apices stay far enough apart to be counted.
+ *
+ * **The attachment is as wide as the crown allows.** 05D.4b got the overlap
+ * right and the width wrong: the three bases spanned half the crown and the
+ * roots read as a narrow cluster hanging from the middle of the tooth. The
+ * annex draws the opposite — its outer flanks meet the crown about two pixels
+ * inside its corners on an 89-pixel crown, an envelope near 95%, with the
+ * apices at ±0.275 of the width and each triangle symmetric about its own
+ * apex.
+ *
+ * The numbers below take the annex's proportions to the chart's own
+ * convention rather than to the raster's last pixel, which 05B settled is how
+ * a scan is allowed to inform geometry. `baseSpread ± baseHalf` resolves to
+ * `0.05` and `0.45` — exactly the pad and half-slice a **two**-rooted molar
+ * already uses. So the outer two roots of a trifurcated tooth are now the very
+ * same triangles a two-rooted tooth is drawn with, and the third simply stands
+ * between them. One rule for how a root meets a crown, not two, and an
+ * envelope that matches its sibling to the unit.
  *
  * Only the horizontal spread is described here. Base and apex *heights* are
  * shared with every other root on the chart and are deliberately untouched:
  * the apex band, the range and arch overlays and the supernumerary anchor are
- * all measured from them.
+ * all measured from them. `tipSpread` is untouched for the same reason — the
+ * annex puts the apices where this already put them, and the defect was never
+ * about the tips.
  */
 const TRIFURCATED = {
   /** Half-width of one root's base. */
-  baseHalf: 0.13,
+  baseHalf: 0.20,
   /** How far the outer bases sit from the centre. */
-  baseSpread: 0.12,
+  baseSpread: 0.25,
   /** How far the outer apices sit from the centre. */
   tipSpread: 0.28
 } as const

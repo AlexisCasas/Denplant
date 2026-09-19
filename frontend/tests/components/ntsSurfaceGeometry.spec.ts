@@ -54,6 +54,7 @@ import type {
 import {
   NTS_PLACEMENTS,
   apexPoint,
+  localToGlobal,
   rootAxes,
   rootBox
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
@@ -779,19 +780,28 @@ describe('H — everything placed against a root still lands where it did', () =
     }
   })
 
-  it('a three-rooted box now contains all of the root geometry', () => {
+  it('a three-rooted box contains all of the root geometry', () => {
+    // The invariant is that the box spans every corner of every triangle,
+    // whichever corner happens to be outermost. 05D.4c introduced it while the
+    // apices were the widest part; 05D.4d widened the attachment past them, so
+    // the bases now are. Both readings are the same rule, which is why it is
+    // stated once, over all the corners, instead of over whichever kind of
+    // corner currently wins.
     for (const placement of NTS_PLACEMENTS.filter(p => rootCountFor(p.tooth) === 3)) {
       const box = rootBox(placement.fdi)!
       const shapes = toothGeometry(placement.tooth).rootShapes
-      const bases = Math.max(...shapes.map(s => s.right)) - Math.min(...shapes.map(s => s.left))
 
-      // Wider than the bases alone, because the outer apices reach past them.
-      expect(box.width, String(placement.fdi)).toBeGreaterThan(bases * placement.scale)
-
-      // And wide enough for every corner of every triangle.
       const local = [...shapes.flatMap(s => [s.left, s.right, s.tip.x])]
       const span = Math.max(...local) - Math.min(...local)
-      expect(box.width).toBeCloseTo(span * placement.scale, 6)
+      expect(box.width, String(placement.fdi)).toBeCloseTo(span * placement.scale, 6)
+
+      for (const shape of shapes) {
+        for (const x of [shape.left, shape.right, shape.tip.x]) {
+          const placed = localToGlobal(placement.fdi, { x, y: shape.base.y })!
+          expect(placed.x).toBeGreaterThanOrEqual(box.x - 1e-6)
+          expect(placed.x).toBeLessThanOrEqual(box.x + box.width + 1e-6)
+        }
+      }
     }
   })
 })
@@ -1115,5 +1125,153 @@ describe('NTS-05D.4c — the incisal band gets no invented outline', () => {
           .toBeCloseTo(ringLength(component.boundary), 6)
       }
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.4d — a trifurcated root attaches across the whole crown
+// ---------------------------------------------------------------------------
+
+/** Every three-rooted tooth, derived — never a list this file owns. */
+const TRIFURCATED_TEETH = NTS_ALL_TEETH.filter(t => rootCountFor(t) === 3)
+
+/** How far the outermost base edges reach, as a fraction of the crown. */
+function attachmentEnvelope(t: NtsTooth): number {
+  const { crown, rootShapes } = toothGeometry(t)
+  const left = Math.min(...rootShapes.map(s => s.left))
+  const right = Math.max(...rootShapes.map(s => s.right))
+  return (right - left) / crown.width
+}
+
+describe('NTS-05D.4d — the attachment spans the crown, not a cluster in its middle', () => {
+  it('the inventory is still exactly the upper molars', () => {
+    expect(TRIFURCATED_TEETH.map(t => t.fdi).sort((a, b) => a - b))
+      .toEqual([16, 17, 18, 26, 27, 28, 54, 55, 64, 65])
+  })
+
+  it('CLINICAL — the bases cover ~90% of the crown, not ~50%', () => {
+    // The defect: the three bases used to span half the crown, so the roots
+    // read as a narrow cluster hanging from the middle of the tooth. The annex
+    // attaches them almost corner to corner.
+    for (const t of TRIFURCATED_TEETH) {
+      const envelope = attachmentEnvelope(t)
+      expect(envelope, String(t.fdi)).toBeGreaterThan(0.88)
+      expect(envelope, String(t.fdi)).toBeLessThan(0.92)
+    }
+  })
+
+  it('REGRESSION — it must never go back to a narrow attachment', () => {
+    // The superseded proportions gave exactly 0.50. If this starts passing at
+    // half the crown again, someone has reverted the constants rather than
+    // re-derived them.
+    for (const t of TRIFURCATED_TEETH) {
+      expect(attachmentEnvelope(t), String(t.fdi)).not.toBeCloseTo(0.5, 2)
+    }
+  })
+
+  it('the attachment matches what a two-rooted molar already uses', () => {
+    // §15: a three-rooted tooth may not attach across half the crown while its
+    // two-rooted neighbour attaches across nine tenths of it.
+    const twoRooted = NTS_ALL_TEETH.filter(t => rootCountFor(t) === 2)
+    expect(twoRooted.length).toBeGreaterThan(0)
+
+    for (const t of TRIFURCATED_TEETH) {
+      for (const other of twoRooted) {
+        expect(attachmentEnvelope(t)).toBeCloseTo(attachmentEnvelope(other), 6)
+      }
+    }
+  })
+
+  it('and its outer roots ARE that molar\'s roots, to the unit', () => {
+    // The proportions were chosen so `baseSpread ∓ baseHalf` land on the pad
+    // and half-slice a two-rooted molar is already drawn with. One rule for
+    // how a root meets a crown, so the two geometries cannot drift apart.
+    const molar = toothGeometry(NTS_ALL_TEETH.find(t => t.fdi === 46)!).rootShapes
+    const upper = toothGeometry(NTS_ALL_TEETH.find(t => t.fdi === 16)!).rootShapes
+
+    expect([upper[0]!.left, upper[0]!.right]).toEqual([molar[0]!.left, molar[0]!.right])
+    expect([upper[2]!.left, upper[2]!.right]).toEqual([molar[1]!.left, molar[1]!.right])
+    expect(upper[0]!.base.x).toBe(molar[0]!.base.x)
+    expect(upper[2]!.base.x).toBe(molar[1]!.base.x)
+  })
+
+  it('the roots still overlap, and visibly', () => {
+    for (const t of TRIFURCATED_TEETH) {
+      const { crown, rootShapes } = toothGeometry(t)
+      for (let i = 0; i < rootShapes.length - 1; i++) {
+        const overlap = rootShapes[i]!.right - rootShapes[i + 1]!.left
+        expect(overlap, `${t.fdi} ${i}`).toBeGreaterThan(0)
+        // Not a near-tangent touch: a tenth of the crown at least.
+        expect(overlap / crown.width).toBeGreaterThan(0.10)
+      }
+    }
+  })
+
+  it('bases and tips are both symmetric about the crown centre', () => {
+    for (const t of TRIFURCATED_TEETH) {
+      const { crown, rootShapes } = toothGeometry(t)
+      const centre = crown.x + crown.width / 2
+      const [left, middle, right] = rootShapes as [typeof rootShapes[0], typeof rootShapes[0], typeof rootShapes[0]]
+
+      expect(middle.base.x, String(t.fdi)).toBeCloseTo(centre, 6)
+      expect(middle.tip.x, String(t.fdi)).toBeCloseTo(centre, 6)
+      expect(centre - left.base.x).toBeCloseTo(right.base.x - centre, 6)
+      expect(centre - left.tip.x).toBeCloseTo(right.tip.x - centre, 6)
+      expect(centre - left.left).toBeCloseTo(right.right - centre, 6)
+    }
+  })
+
+  it('three apices, distinct, and where they always were', () => {
+    for (const t of TRIFURCATED_TEETH) {
+      const { crown, rootShapes } = toothGeometry(t)
+      const tips = rootShapes.map(s => s.tip.x)
+
+      expect(new Set(tips).size).toBe(3)
+      expect(tips[0]!).toBeLessThan(tips[1]!)
+      expect(tips[1]!).toBeLessThan(tips[2]!)
+      // Untouched by this ticket: the defect was the attachment, not the tips.
+      expect((tips[2]! - tips[0]!) / 2 / crown.width).toBeCloseTo(0.28, 6)
+    }
+  })
+
+  it('every corner stays inside the crown', () => {
+    for (const t of TRIFURCATED_TEETH) {
+      const { crown, rootShapes } = toothGeometry(t)
+      for (const shape of rootShapes) {
+        for (const x of [shape.left, shape.right, shape.tip.x, shape.base.x]) {
+          expect(x, String(t.fdi)).toBeGreaterThanOrEqual(crown.x)
+          expect(x).toBeLessThanOrEqual(crown.x + crown.width)
+        }
+      }
+    }
+  })
+
+  it('nothing moved vertically — the whole chart hangs off these heights', () => {
+    for (const t of NTS_ALL_TEETH) {
+      const { crown, rootShapes } = toothGeometry(t)
+      const tipY = t.arch === 'upper' ? NTS_BLEED / 2 : NTS_CELL_HEIGHT - NTS_BLEED / 2
+      const baseY = t.arch === 'upper' ? crown.y : crown.y + crown.height
+      for (const shape of rootShapes) {
+        expect(shape.tip.y, String(t.fdi)).toBe(tipY)
+        expect(shape.base.y, String(t.fdi)).toBe(baseY)
+      }
+    }
+  })
+
+  it('one- and two-rooted teeth are byte-identical to before', () => {
+    // Golden strings unchanged since 05D.4b: only the three-rooted case moved.
+    expect(toothGeometry(tooth(11)).roots).toEqual(['M14.48,82 L34,2 L53.52,82 Z'])
+    expect(toothGeometry(tooth(46)).roots).toEqual([
+      'M7.9,68 L25.5,148 L43.1,68 Z',
+      'M51.9,68 L69.5,148 L87.1,68 Z'
+    ])
+  })
+
+  it('a three-rooted tooth draws the paths this ticket settled on', () => {
+    expect(toothGeometry(tooth(16)).roots).toEqual([
+      'M7.9,82 L22.86,2 L43.1,82 Z',
+      'M29.9,82 L47.5,2 L65.1,82 Z',
+      'M51.9,82 L72.14,2 L87.1,82 Z'
+    ])
   })
 })

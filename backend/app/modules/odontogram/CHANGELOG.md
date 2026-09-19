@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+- fix(nts-05d.4d): **a trifurcated root attaches across the whole crown**. A
+  second clinical review of the annex found that 05D.4b fixed the overlap and
+  left the width wrong: the three bases spanned exactly **50%** of the crown,
+  so the roots read as a narrow cluster hanging from the middle of the tooth
+  while the two-rooted molar beside it attached across **90%**.
+
+  Measured against the annex rather than adjusted by eye. On its 89-pixel
+  crown the outer root flanks land about two pixels inside the corners — an
+  envelope near 95% — the apices sit at ±0.275 of the width, and each triangle
+  is symmetric about its own apex. The apex measurement confirms `tipSpread`
+  was already right, so it is untouched: the defect was never about the tips.
+
+  `baseHalf` 0.13 → **0.20** and `baseSpread` 0.12 → **0.25**, chosen so that
+  `baseSpread ∓ baseHalf` resolve to `0.05` and `0.45` — exactly the pad and
+  half-slice a **two**-rooted molar already uses. The outer two roots of a
+  trifurcated tooth are now the very same triangles a two-rooted tooth is
+  drawn with, down to the unit (`7.9..43.1` and `51.9..87.1`), with the third
+  standing between them. One rule for how a root meets a crown, not two.
+
+  Envelope 50% → **90%**, adjacent overlap 12.32 → **13.20** units (15% of the
+  crown, so the roots overlap slightly more than before, not less).
+
+  Nothing moved vertically. Apex Y, base Y and apex X are identical for all 52
+  teeth; 42 teeth are byte-identical and within the ten that changed only
+  `roots` differs — viewBox, crown and every region path are unchanged.
+
+  Two consequences worth naming. The old geometry put each outer apex
+  *outside its own base* (`M46.62,82 L72.14,2 L69.5,82`), which is why 05D.4c
+  had to widen `rootBox` to reach the tips; the tips now sit inside their
+  bases, so that invariant is restated over *every* corner instead of over
+  whichever kind currently protrudes. And `rootBox` for a three-rooted tooth
+  is now identical to a two-rooted one, which makes the `near_roots` symbol
+  the same size on both — it had been drawn smaller on three-rooted teeth
+  because it was sized against the narrow old box. Centres are unchanged.
+
 - fix(nts-05d.4c): **the tooth stays readable under a clinical fill**. 05D.4
   left one visual tension open: a solid fill is painted over the drawing, so
   wherever it reached the crown's own strokes it covered them and the outline
