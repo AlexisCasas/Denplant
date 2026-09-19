@@ -460,7 +460,7 @@
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
         "marks": [
-          { "kind": "shape_fill", "params": { "fill": "solid" } },
+          { "kind": "shape_fill", "params": { "fill": "solid" }, "regions_from": "surfaces" },
           { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "caries_type" }
         ]
       },
@@ -873,7 +873,7 @@
       "render": {
         "color_semantics": "condition_dependent",
         "marks": [
-          { "kind": "shape_fill", "params": { "fill": "solid" } },
+          { "kind": "shape_fill", "params": { "fill": "solid" }, "regions_from": "surfaces" },
           { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "restoration_material" }
         ]
       },
@@ -904,7 +904,7 @@
       ],
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
-        "marks": [{ "kind": "outline", "params": { "style": "contour" } }]
+        "marks": [{ "kind": "outline", "params": { "style": "contour" }, "regions_from": "surfaces" }]
       },
       "geometry_input": {
         "mode": "clinician_defined_shape",
@@ -983,7 +983,7 @@
       "render": {
         "color_semantics": "bad_temporary_or_pathological",
         "marks": [
-          { "kind": "shape_fill", "params": { "fill": "solid" } },
+          { "kind": "shape_fill", "params": { "fill": "solid" }, "regions_from": "surfaces" },
           { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
         ]
       },

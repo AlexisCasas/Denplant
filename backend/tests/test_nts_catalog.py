@@ -1192,3 +1192,184 @@ def test_target_selector_serialises_flat_for_the_api(catalog):
     for r in dumped["rules"]:
         for mark in r["render"]["marks"]:
             assert "target_selector" in mark
+
+
+# --- 14. NTS-05D.4a: an area mark declares where its area comes from -------
+#
+# `box_siglas` says which attribute supplies its text. `shape_fill` and
+# `outline` said nothing about which attribute supplies their regions, so a
+# renderer would have had to go looking for an attribute called "surfaces" --
+# or for the rule's only `enum_multi`. Both happen to work on this norm and
+# neither is a contract, which is the same gap C3 closed for text.
+#
+# What a surface code *means* on a drawn crown is explicitly NOT settled here.
+# The norm draws "la forma que se observa" (p.11, p.17) and defines no
+# correspondence between M/D/O/V/L and parts of the figure.
+
+
+def _marks_of(rule, kind):
+    return [m for m in rule.render.marks if m.kind is kind]
+
+
+@pytest.mark.parametrize("rule_id", ["6.1.16", "6.1.33", "6.1.36"])
+def test_surface_fills_declare_their_region_source(rule_id):
+    """A/B/D. The three rules the norm paints over recorded surfaces."""
+    rule = get_nts_rule(rule_id, NORM)
+    fill = _marks_of(rule, RenderKind.SHAPE_FILL)[0]
+
+    assert fill.regions_from == "surfaces"
+    assert "at" not in fill.params
+
+    source = next(a for a in rule.attributes if a.name == fill.regions_from)
+    assert source.kind is AttributeKind.ENUM_MULTI
+    assert {v.code for v in source.values} == {"M", "D", "O", "V", "L"}
+
+
+def test_the_outline_rule_declares_its_region_source():
+    """C. 6.1.34 contours "las superficies comprometidas", not the crown."""
+    rule = get_nts_rule("6.1.34", NORM)
+    outline = _marks_of(rule, RenderKind.OUTLINE)[0]
+
+    assert outline.regions_from == "surfaces"
+    assert "at" not in outline.params
+    assert outline.params["style"] == "contour"
+
+
+def test_a_fill_anchored_to_a_landmark_carries_no_region_source():
+    """E. `shape_fill` does not imply surfaces.
+
+    6.1.27 paints the coronal pulp — a landmark the norm names, on a
+    tooth-scoped rule with no surfaces attribute at all. It is the standing
+    proof that the two geometry sources are alternatives.
+    """
+    rule = get_nts_rule("6.1.27", NORM)
+    fill = _marks_of(rule, RenderKind.SHAPE_FILL)[0]
+
+    assert fill.regions_from is None
+    assert fill.params["at"] == "coronal_pulp"
+    assert rule.scope is Scope.TOOTH
+    assert not any(a.name == "surfaces" for a in rule.attributes)
+
+
+def test_every_area_mark_has_exactly_one_geometry_source(catalog):
+    """The invariant, over the whole catalog rather than the five known marks."""
+    area_kinds = {RenderKind.SHAPE_FILL, RenderKind.OUTLINE}
+    seen = 0
+
+    for rule in catalog.rules:
+        for mark in rule.render.marks:
+            if mark.kind not in area_kinds:
+                # Nothing else may carry one.
+                assert mark.regions_from is None, f"{rule.rule_id}.{mark.kind.value}"
+                continue
+            seen += 1
+            assert ("at" in mark.params) != (mark.regions_from is not None), rule.rule_id
+
+    assert seen == 5
+
+
+def test_no_consumer_has_to_look_up_the_attribute_by_name(catalog):
+    """The binding resolves; nothing needs to know the word "surfaces".
+
+    The attribute happens to be called that in every case today, and a renderer
+    that hardcoded it would be right by accident — until a norm named it
+    otherwise.
+    """
+    for rule in catalog.rules:
+        for mark in rule.render.marks:
+            if mark.regions_from is None:
+                continue
+            attribute = next((a for a in rule.attributes if a.name == mark.regions_from), None)
+            assert attribute is not None, rule.rule_id
+            assert attribute.kind is AttributeKind.ENUM_MULTI
+
+
+# --- the validator refuses every way of getting it wrong -------------------
+
+
+def _swap(rule, old, new):
+    marks = tuple(new if m is old else m for m in rule.render.marks)
+    return rule.model_copy(update={"render": rule.render.model_copy(update={"marks": marks})})
+
+
+def test_validator_rejects_a_region_source_that_does_not_exist(catalog):
+    """F."""
+    rule = get_nts_rule("6.1.16", NORM)
+    fill = _marks_of(rule, RenderKind.SHAPE_FILL)[0]
+    broken = _swap(rule, fill, fill.model_copy(update={"regions_from": "faces"}))
+
+    with pytest.raises(CatalogValidationError, match="is not an attribute of"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_region_source_that_is_not_multi_valued(catalog):
+    """G. A finding covers however many regions were recorded."""
+    rule = get_nts_rule("6.1.16", NORM)
+    fill = _marks_of(rule, RenderKind.SHAPE_FILL)[0]
+    broken = _swap(rule, fill, fill.model_copy(update={"regions_from": "caries_type"}))
+
+    with pytest.raises(CatalogValidationError, match="regions are a set"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "kind"),
+    [("6.1.16", RenderKind.SHAPE_FILL), ("6.1.34", RenderKind.OUTLINE)],
+)
+def test_validator_rejects_an_area_mark_with_no_geometry_source(catalog, rule_id, kind):
+    """H/J. With neither, a renderer has nothing to draw against."""
+    rule = get_nts_rule(rule_id, NORM)
+    mark = _marks_of(rule, kind)[0]
+    broken = _swap(rule, mark, mark.model_copy(update={"regions_from": None}))
+
+    with pytest.raises(CatalogValidationError, match="exactly one source"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "kind"),
+    [("6.1.16", RenderKind.SHAPE_FILL), ("6.1.34", RenderKind.OUTLINE)],
+)
+def test_validator_rejects_an_area_mark_with_two_geometry_sources(catalog, rule_id, kind):
+    """I/K. With both, a renderer has to choose — and choosing is guessing."""
+    rule = get_nts_rule(rule_id, NORM)
+    mark = _marks_of(rule, kind)[0]
+    params = dict(mark.params) | {"at": "coronal_pulp"}
+    broken = _swap(rule, mark, mark.model_copy(update={"params": params}))
+
+    with pytest.raises(CatalogValidationError, match="exactly one source"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_validator_rejects_a_region_source_on_a_mark_that_covers_no_area(catalog):
+    """L. A sigla, a line and an arrow have no area to fill."""
+    rule = get_nts_rule("6.1.16", NORM)
+    box = _marks_of(rule, RenderKind.BOX_SIGLAS)[0]
+    broken = _swap(rule, box, box.model_copy(update={"regions_from": "surfaces"}))
+
+    with pytest.raises(CatalogValidationError, match="only meaningful on a mark that covers"):
+        validate_nts_catalog(_with(catalog, broken))
+
+
+def test_region_source_serialises_flat_for_the_api(catalog):
+    dumped = catalog.model_dump(mode="json")
+    rule = next(r for r in dumped["rules"] if r["rule_id"] == "6.1.34")
+    outline = rule["render"]["marks"][0]
+
+    assert outline["regions_from"] == "surfaces"
+    # Present on every mark, null where it does not apply.
+    for r in dumped["rules"]:
+        for mark in r["render"]["marks"]:
+            assert "regions_from" in mark
+
+
+def test_the_catalog_still_says_nothing_about_what_a_surface_looks_like():
+    """G5 is a product decision, and the catalog does not pre-empt it.
+
+    No region id, no side, no geometric word: the norm defines none of it, and
+    the orientation of V/L plus the representation of O on an anterior are
+    still open clinical questions.
+    """
+    raw = (CATALOG_DIR / f"{NORM}.json").read_text(encoding="utf-8")
+    for geometric in ("outer-top", "outer-right", "outer-bottom", "outer-left", "center-"):
+        assert geometric not in raw

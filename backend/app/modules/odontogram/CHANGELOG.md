@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- feat(nts-05d.4a): **an area mark declares where its area comes from**.
+  `box_siglas` has said which attribute supplies its text since NTS-05D.0b;
+  `shape_fill` and `outline` said nothing about which attribute supplies their
+  regions. A renderer would have had to hunt for an attribute called
+  "surfaces", or for the rule's only `enum_multi` — both work on this norm
+  today, neither is a contract, and it is the same gap C3 closed for text.
+
+  `RenderMark.regions_from` closes it, declared on 6.1.16, 6.1.33, 6.1.34 and
+  6.1.36. A new generic invariant requires `shape_fill` and `outline` to take
+  their geometry from **exactly one** source — a landmark `at` or a
+  `regions_from` attribute, never both and never neither — and forbids the
+  binding on any kind that covers no area. 6.1.27 is the standing proof that
+  the two are alternatives: it paints the coronal pulp from `at`, on a
+  tooth-scoped rule with no surfaces attribute at all.
+
+  Metadata only. The clinical drawing is byte-identical and coverage stays at
+  30 complete / 5 partial / 3 unsupported; `shape_fill` and `outline` are still
+  the two mark kinds nothing draws.
+
+  **G5 is not closed.** A surface→region mapping is *proposed* — the
+  mesial/distal derivation is verified against all eight quadrants and the
+  crown regions tile exactly — but it stays **pending clinical validation** on
+  the vestibular/lingual orientation, which the norm never fixes, and on how an
+  anterior's occlusal/incisal surface should read when its central region is 4%
+  of the crown against 19% on a posterior. The catalog deliberately says
+  nothing about either: it names the attribute and stops.
+
+  Still open and untouched: G6 (freehand fracture shape), G9 (multi-segment
+  registration), G10 (fissure anatomy), CLINICAL-02 (pilar cardinality),
+  CLINICAL-03 (giroversión direction).
+
 - feat(nts-05d.3): **lines, connectors and arrows reach the chart**. With the
   span primitives in place the drawing goes from 18 rules to **30 complete,
   5 partial, 3 unsupported**: orthodontic appliances, edentulous arches,

@@ -324,6 +324,7 @@ the validator:
 | `suffix_from` | attribute appended after that text | 6.1.19 → `mobility_degree` |
 | `role` | `target_roles` code selecting which targets carry the mark | 6.1.29 → `pilar` |
 | `target_selector` | a subset of targets chosen by the span's own shape | 6.1.1 → `range_endpoints` |
+| `regions_from` | attribute whose selected values name the regions the mark covers | 6.1.16 → `surfaces` |
 
 **`at` says where, `target_selector` and `role` say which targets.** They are
 separate because a mark can state both: §6.1.1 draws its crossed squares on
@@ -544,6 +545,17 @@ in one pass, not one error per run.
 | 17 | every `box_siglas` declares `text_from`; `text_from`/`suffix_from`/`role` resolve within the rule; no `is_sigla` attribute is left unread |
 | 18 | every connector, and every non-freehand line, declares its own `at` |
 | 19 | a `target_selector` is used on a mark drawn per target, and `range_endpoints` only on a numbered range |
+| 20 | `shape_fill` and `outline` take their geometry from exactly one source — a landmark `at` **or** a `regions_from` attribute, which must be `enum_multi`; no other kind may carry one |
+
+**What a surface code looks like is not in the catalog, and not settled.** The
+norm draws "la forma que se observa" (pp. 11, 17) and defines no
+correspondence between `M`/`D`/`O`/`V`/`L` and parts of a drawn crown. Any such
+mapping is a **product policy**: proposed in the NTS-05D.4 pre-flight, with
+mesial/distal derivation verified against all eight quadrants, but **pending
+clinical validation** on two points — the vestibular/lingual orientation, and
+how an anterior's occlusal/incisal surface should be represented when its
+central region is 4% of the crown. The catalog states which attribute carries
+the codes and stops there.
 
 Checks 16 and 17 are what make a rule-id-free renderer possible: after them, a
 mark's text source, suffix source, target role and placement are all answerable

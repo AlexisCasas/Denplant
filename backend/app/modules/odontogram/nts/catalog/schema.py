@@ -471,9 +471,10 @@ class RenderMark(BaseModel):
 
     * ``params`` say **how it looks** — shape, style, case, placement. They are
       descriptive tokens from the enums above, never coordinates.
-    * ``text_from`` / ``suffix_from`` / ``role`` say **what data it reads**.
-      They are references into the rule's own ``attributes`` and
-      ``target_roles``, and the validator resolves every one of them.
+    * ``text_from`` / ``suffix_from`` / ``role`` / ``target_selector`` /
+      ``regions_from`` say **what data it reads**. They are references into the
+      rule's own ``attributes`` and ``target_roles``, and the validator
+      resolves every one of them.
 
     The split exists so a renderer never has to infer a binding. With a single
     ``is_sigla`` attribute per rule the text source *looks* inferable today,
@@ -501,6 +502,20 @@ class RenderMark(BaseModel):
     #: rather than by anything the clinician recorded (§6.1.1's extremes).
     #: Orthogonal to ``params["at"]``, which says where the mark is drawn.
     target_selector: TargetSelector | None = None
+    #: Attribute whose selected values name the regions this mark covers —
+    #: the dental surfaces, for the rules the norm scopes to surfaces.
+    #:
+    #: Declared rather than looked up. A renderer must not go hunting for an
+    #: attribute called "surfaces", nor for "the rule's only ``enum_multi``":
+    #: both happen to work on NTS N.° 188 today and neither is a contract. It
+    #: is mutually exclusive with ``params["at"]`` — a mark takes its geometry
+    #: from a landmark or from recorded data, never from both and never from
+    #: neither.
+    #:
+    #: What a surface *code* means geometrically is not settled here and is not
+    #: the catalog's business: the norm draws "la forma que se observa" and
+    #: defines no correspondence between M/D/O/V/L and parts of a drawn crown.
+    regions_from: str | None = Field(default=None, min_length=1)
 
 
 class Render(BaseModel):

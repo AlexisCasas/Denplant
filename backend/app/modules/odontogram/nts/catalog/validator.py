@@ -66,6 +66,12 @@ _PER_TARGET_KINDS = frozenset(
 #: is a band, unless the clinician draws the shape and there is no band to give.
 _PLACEMENT_REQUIRED_KINDS = frozenset({RenderKind.CONNECTOR, RenderKind.LINE})
 
+#: Mark kinds that cover an area and therefore take their geometry either from
+#: a landmark or from the regions a finding records. They are the two the norm
+#: words as covering surfaces; nothing else in NTS N.° 188 paints an area, and
+#: a kind that never does would have nothing to point ``regions_from`` at.
+_AREA_KINDS = frozenset({RenderKind.SHAPE_FILL, RenderKind.OUTLINE})
+
 #: Attribute kinds a mark may append as a suffix: anything that is one scalar.
 _SUFFIX_SOURCE_KINDS = frozenset(
     {AttributeKind.ENUM, AttributeKind.FIXED, AttributeKind.INTEGER, AttributeKind.FREE_TEXT}
@@ -98,6 +104,7 @@ def validate_nts_catalog(catalog: NtsCatalog) -> None:
         _check_render(rule, errors)
         _check_mark_vocabulary(rule, errors)
         _check_mark_placement(rule, errors)
+        _check_region_sources(rule, errors)
         _check_target_selectors(rule, errors)
         _check_mark_bindings(rule, errors)
         _check_condition_state(rule, errors)
@@ -301,6 +308,62 @@ def _check_mark_placement(rule: NtsRule, errors: list[str]) -> None:
                 f"{rule.rule_id}.render.marks[{index}]({mark.kind.value}): must declare an "
                 "'at' placement; geometry_input.constraints is per-rule and cannot say "
                 "where an individual mark goes"
+            )
+
+
+def _check_region_sources(rule: NtsRule, errors: list[str]) -> None:
+    """20. An area mark has exactly one source of geometry, and it is declared.
+
+    ``shape_fill`` and ``outline`` cover an area. Where that area is comes
+    either from a landmark the norm names (§6.1.27's coronal pulp) or from the
+    regions the finding records — never both, never neither. The exclusive-or
+    is the whole point: with neither, a renderer has nothing; with both, it has
+    to choose, and choosing is guessing.
+
+    ``regions_from`` must name a real ``enum_multi`` attribute of the rule.
+    Multi-valued because a finding covers however many regions the clinician
+    recorded; a single-valued attribute could not express two surfaces.
+
+    What those codes *mean* on a drawn crown is deliberately not checked here.
+    The norm draws "la forma que se observa" and states no correspondence
+    between a surface code and a part of the figure, so any such mapping is a
+    product decision that belongs to the renderer — and to a clinical sign-off
+    the catalog has no business pre-empting.
+    """
+    attributes = {a.name: a for a in rule.attributes}
+
+    for index, mark in enumerate(rule.render.marks):
+        where = f"{rule.rule_id}.render.marks[{index}]({mark.kind.value})"
+        has_landmark = "at" in mark.params
+        has_regions = mark.regions_from is not None
+
+        if mark.kind in _AREA_KINDS:
+            if has_landmark == has_regions:
+                errors.append(
+                    f"{where}: must take its geometry from exactly one source — "
+                    f"either a landmark in params['at'] or a regions_from attribute "
+                    f"(declared: {'both' if has_landmark else 'neither'})"
+                )
+        elif has_regions:
+            errors.append(
+                f"{where}: regions_from is only meaningful on a mark that covers an "
+                f"area ({', '.join(sorted(k.value for k in _AREA_KINDS))})"
+            )
+
+        if not has_regions:
+            continue
+
+        attribute = attributes.get(mark.regions_from or "")
+        if attribute is None:
+            errors.append(
+                f"{where}: regions_from {mark.regions_from!r} is not an attribute of "
+                f"this rule ({sorted(attributes) or 'none declared'})"
+            )
+        elif attribute.kind is not AttributeKind.ENUM_MULTI:
+            errors.append(
+                f"{where}: regions_from {mark.regions_from!r} is kind "
+                f"{attribute.kind.value!r}; regions are a set, so the attribute must "
+                f"be {AttributeKind.ENUM_MULTI.value!r}"
             )
 
 
