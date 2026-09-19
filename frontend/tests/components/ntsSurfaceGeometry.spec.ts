@@ -30,7 +30,8 @@ import {
   incisalBand,
   resolveSurfaceComponents,
   resolveSurfaceRegions,
-  resolveSurfaces
+  resolveSurfaces,
+  structuralEdges
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsSurfaceGeometry'
 import type {
   NtsSurfaceCode,
@@ -41,6 +42,7 @@ import {
   NTS_BLEED,
   NTS_CELL_HEIGHT,
   centralRegionCountFor,
+  centralRegionsOf,
   isAnterior,
   rootCountFor,
   toothGeometry
@@ -865,5 +867,253 @@ describe('J — the module is pure, and owns only what it is allowed to own', ()
   it('says in its own words that the mapping is not normative', () => {
     expect(source).toContain('clinically validated')
     expect(source).toMatch(/never a normative mapping|not a table NTS N\.° 188 defines/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.4c — which parts of a figure's rim are the drawing's own structure
+// ---------------------------------------------------------------------------
+
+/** Total length of a set of open runs. */
+function runLength(runs: readonly NtsPoint[][]): number {
+  let total = 0
+  for (const run of runs) {
+    for (let i = 0; i < run.length - 1; i++) {
+      total += Math.hypot(run[i + 1]!.x - run[i]!.x, run[i + 1]!.y - run[i]!.y)
+    }
+  }
+  return total
+}
+
+/** Total length of a set of closed rings. */
+function ringLength(rings: readonly NtsPoint[][]): number {
+  let total = 0
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]!
+      const b = ring[(i + 1) % ring.length]!
+      total += Math.hypot(b.x - a.x, b.y - a.y)
+    }
+  }
+  return total
+}
+
+/** Every segment the tooth is actually drawn with. */
+function neutralSegments(fdi: number): Array<[NtsPoint, NtsPoint]> {
+  const t = NTS_ALL_TEETH.find(x => x.fdi === fdi)!
+  return toothGeometry(t).regions.flatMap(region =>
+    region.points.map((point, i) =>
+      [point, region.points[(i + 1) % region.points.length]!] as [NtsPoint, NtsPoint])
+  )
+}
+
+function onSome(fdi: number, p: NtsPoint, q: NtsPoint): boolean {
+  const on = (a: NtsPoint, b: NtsPoint, z: NtsPoint) => {
+    const cross = (b.x - a.x) * (z.y - a.y) - (b.y - a.y) * (z.x - a.x)
+    if (Math.abs(cross) > 1e-6) return false
+    return z.x >= Math.min(a.x, b.x) - 1e-9 && z.x <= Math.max(a.x, b.x) + 1e-9
+      && z.y >= Math.min(a.y, b.y) - 1e-9 && z.y <= Math.max(a.y, b.y) + 1e-9
+  }
+  return neutralSegments(fdi).some(([a, b]) => on(a, b, p) && on(a, b, q))
+}
+
+const edgesOf = (runs: readonly NtsPoint[][]) =>
+  runs.flatMap(run => run.slice(0, -1).map((p, i) => [p, run[i + 1]!] as [NtsPoint, NtsPoint]))
+
+const structuralFor = (fdi: number, surfaces: string[]) =>
+  resolveSurfaceComponents(fdi, surfaces).map(c => structuralEdges(fdi, c.boundary))
+
+describe('NTS-05D.4c — a restored segment is always one the tooth is drawn with', () => {
+  it('every returned segment lies on a real edge of the drawing', () => {
+    for (const fdi of [16, 14, 11, 26, 46, 55, 51]) {
+      for (const surfaces of [['M'], ['O'], ['M', 'O'], ['M', 'D'], ['V'], ['M', 'D', 'O', 'V', 'L']]) {
+        for (const runs of structuralFor(fdi, surfaces)) {
+          for (const [p, q] of edgesOf(runs)) {
+            expect(onSome(fdi, p, q), `${fdi} ${surfaces.join('')}`).toBe(true)
+          }
+        }
+      }
+    }
+  })
+
+  it('every returned segment also lies on the figure it came from', () => {
+    // It restores the rim, never anything inside or outside it.
+    for (const fdi of [16, 11]) {
+      for (const surfaces of [['M', 'O'], ['M', 'D', 'O', 'V', 'L']]) {
+        for (const component of resolveSurfaceComponents(fdi, surfaces)) {
+          const rim = component.boundary.flatMap(loop =>
+            loop.map((p, i) => [p, loop[(i + 1) % loop.length]!] as [NtsPoint, NtsPoint]))
+          const on = (a: NtsPoint, b: NtsPoint, z: NtsPoint) => {
+            const cross = (b.x - a.x) * (z.y - a.y) - (b.y - a.y) * (z.x - a.x)
+            if (Math.abs(cross) > 1e-6) return false
+            return z.x >= Math.min(a.x, b.x) - 1e-9 && z.x <= Math.max(a.x, b.x) + 1e-9
+              && z.y >= Math.min(a.y, b.y) - 1e-9 && z.y <= Math.max(a.y, b.y) + 1e-9
+          }
+          for (const [p, q] of edgesOf(structuralEdges(fdi, component.boundary))) {
+            expect(rim.some(([a, b]) => on(a, b, p) && on(a, b, q))).toBe(true)
+          }
+        }
+      }
+    }
+  })
+
+  it('the runs are open, never closed back on themselves', () => {
+    // A closed ring would draw an edge the odontogram does not have.
+    for (const runs of structuralFor(11, ['O'])) {
+      for (const run of runs) {
+        expect(run.length).toBeGreaterThanOrEqual(2)
+      }
+    }
+  })
+
+  it('an unknown tooth restores nothing', () => {
+    expect(structuralEdges(99, [[{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]])).toEqual([])
+  })
+
+  it('it is deterministic', () => {
+    expect(structuralFor(16, ['M', 'O'])).toEqual(structuralFor(16, ['M', 'O']))
+  })
+})
+
+describe('NTS-05D.4c — outer perimeter and sound-surface borders come back', () => {
+  it('a single surface restores its whole rim: all of it is real structure', () => {
+    // Crown edge, two diagonals against sound surfaces, and the inner divider.
+    for (const fdi of [16, 26, 46, 11]) {
+      const [component] = resolveSurfaceComponents(fdi, ['M'])
+      const runs = structuralEdges(fdi, component!.boundary)
+      expect(runLength(runs), String(fdi)).toBeCloseTo(ringLength(component!.boundary), 6)
+    }
+  })
+
+  it('the crown perimeter is restored wherever a fill reaches it', () => {
+    const crown = toothGeometry(NTS_ALL_TEETH.find(t => t.fdi === 16)!).crown
+    const [component] = resolveSurfaceComponents(16, ['M'])
+    const points = structuralEdges(16, component!.boundary).flat()
+
+    // 16 is quadrant 1, so its mesial trapezoid is the right-hand one and its
+    // outer side is the crown's right edge.
+    expect(points.some(p => Math.abs(p.x - (crown.x + crown.width)) < 1e-6)).toBe(true)
+  })
+
+  it('a posterior with every surface restores the perimeter and nothing inside', () => {
+    const crown = toothGeometry(NTS_ALL_TEETH.find(t => t.fdi === 16)!).crown
+    const [component] = resolveSurfaceComponents(16, ['M', 'D', 'O', 'V', 'L'])
+    const runs = structuralEdges(16, component!.boundary)
+
+    expect(runLength(runs)).toBeCloseTo(2 * (crown.width + crown.height), 4)
+    for (const point of runs.flat()) {
+      const onEdge = Math.abs(point.x - crown.x) < 1e-6
+        || Math.abs(point.x - (crown.x + crown.width)) < 1e-6
+        || Math.abs(point.y - crown.y) < 1e-6
+        || Math.abs(point.y - (crown.y + crown.height)) < 1e-6
+      expect(onEdge).toBe(true)
+    }
+  })
+})
+
+describe('NTS-05D.4c — a divider between two selected surfaces never comes back', () => {
+  it('M+O restores no segment along the boundary the two share', () => {
+    // The edge where the mesial trapezoid meets the central table. Merging the
+    // two exists precisely so no line is drawn there.
+    const tooth = NTS_ALL_TEETH.find(t => t.fdi === 16)!
+    const mesial = toothGeometry(tooth).regions.find(r => r.id === 'outer-right')!
+    const shared = mesial.points.filter(p => p.x === Math.min(...mesial.points.map(q => q.x)))
+    const [top, bottom] = [Math.min(...shared.map(p => p.y)), Math.max(...shared.map(p => p.y))]
+
+    const [component] = resolveSurfaceComponents(16, ['M', 'O'])
+    for (const point of structuralEdges(16, component!.boundary).flat()) {
+      const onShared = Math.abs(point.x - shared[0]!.x) < 1e-6
+        && point.y > top + 1e-6 && point.y < bottom - 1e-6
+      expect(onShared, JSON.stringify(point)).toBe(false)
+    }
+  })
+
+  it('CRITICAL — a posterior occlusal fill restores no internal grid', () => {
+    // The central table is drawn in four tiles. Filled as one clinical figure
+    // it must not get its tile dividers back.
+    const tooth = NTS_ALL_TEETH.find(t => t.fdi === 16)!
+    const tiles = centralRegionsOf(tooth)
+    expect(tiles).toHaveLength(4)
+
+    const xs = tiles.flatMap(t => t.points.map(p => p.x))
+    const ys = tiles.flatMap(t => t.points.map(p => p.y))
+    const midX = (Math.min(...xs) + Math.max(...xs)) / 2
+    const midY = (Math.min(...ys) + Math.max(...ys)) / 2
+
+    const [component] = resolveSurfaceComponents(16, ['O'])
+    const runs = structuralEdges(16, component!.boundary)
+
+    // Nothing on either of the two dividers, except where they meet the rim.
+    for (const [p, q] of edgesOf(runs)) {
+      const bothOnVertical = Math.abs(p.x - midX) < 1e-6 && Math.abs(q.x - midX) < 1e-6
+      const bothOnHorizontal = Math.abs(p.y - midY) < 1e-6 && Math.abs(q.y - midY) < 1e-6
+      expect(bothOnVertical || bothOnHorizontal).toBe(false)
+    }
+
+    // And what is restored is exactly the zone's own rectangle.
+    const width = Math.max(...xs) - Math.min(...xs)
+    const height = Math.max(...ys) - Math.min(...ys)
+    expect(runLength(runs)).toBeCloseTo(2 * (width + height), 4)
+  })
+
+  it('M+D keeps two independent figures, each with its own restored rim', () => {
+    const components = resolveSurfaceComponents(16, ['M', 'D'])
+    expect(components).toHaveLength(2)
+    for (const component of components) {
+      const runs = structuralEdges(16, component.boundary)
+      expect(runLength(runs)).toBeCloseTo(ringLength(component.boundary), 6)
+    }
+  })
+})
+
+describe('NTS-05D.4c — the incisal band gets no invented outline', () => {
+  it('its long sides are never restored: the drawing has no line there', () => {
+    const band = incisalBand(11)!
+    const ys = band.points.map(p => p.y)
+    const [top, bottom] = [Math.min(...ys), Math.max(...ys)]
+
+    const [component] = resolveSurfaceComponents(11, ['O'])
+    for (const [p, q] of edgesOf(structuralEdges(11, component!.boundary))) {
+      const horizontalOnBand = Math.abs(p.y - q.y) < 1e-6
+        && (Math.abs(p.y - top) < 1e-6 || Math.abs(p.y - bottom) < 1e-6)
+      expect(horizontalOnBand, JSON.stringify([p, q])).toBe(false)
+    }
+  })
+
+  it('its short sides ARE restored: they are part of a real divider', () => {
+    // The band spans the central zone edge to edge, so its ends sit on the
+    // zone's own vertical sides. Restoring them keeps those lines continuous
+    // instead of notched where the mark crosses.
+    const band = incisalBand(11)!
+    const [component] = resolveSurfaceComponents(11, ['O'])
+    const runs = structuralEdges(11, component!.boundary)
+
+    const ys = band.points.map(p => p.y)
+    const height = Math.max(...ys) - Math.min(...ys)
+    expect(runs).toHaveLength(2)
+    expect(runLength(runs)).toBeCloseTo(2 * height, 6)
+  })
+
+  it('so an anterior restores strictly less than its rim', () => {
+    for (const surfaces of [['O'], ['M', 'O'], ['M', 'D', 'O', 'V', 'L']]) {
+      const [component] = resolveSurfaceComponents(11, surfaces)
+      const kept = runLength(structuralEdges(11, component!.boundary))
+      const rim = ringLength(component!.boundary)
+      const band = incisalBand(11)!
+      const xs = band.points.map(p => p.x)
+      const width = Math.max(...xs) - Math.min(...xs)
+
+      // Exactly the band's two long sides are missing, every time.
+      expect(rim - kept, surfaces.join('')).toBeCloseTo(2 * width, 4)
+    }
+  })
+
+  it('a posterior loses nothing, because it has no synthetic edge', () => {
+    for (const surfaces of [['O'], ['M', 'O'], ['M', 'D', 'O', 'V', 'L']]) {
+      for (const component of resolveSurfaceComponents(16, surfaces)) {
+        expect(runLength(structuralEdges(16, component.boundary)), surfaces.join(''))
+          .toBeCloseTo(ringLength(component.boundary), 6)
+      }
+    }
   })
 })

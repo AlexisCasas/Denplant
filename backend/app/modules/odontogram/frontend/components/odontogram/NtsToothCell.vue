@@ -16,7 +16,7 @@
  */
 
 import type { NtsTooth } from '../../utils/ntsDentition'
-import { NTS_CELL_HEIGHT, cellWidthFor, toothGeometry } from '../../utils/ntsDentition'
+import { NTS_CELL_HEIGHT, NTS_TOOTH_STROKE, cellWidthFor, toothGeometry } from '../../utils/ntsDentition'
 
 const props = withDefaults(
   defineProps<{
@@ -148,7 +148,7 @@ const stateClass = computed(() => {
       preserveAspectRatio="xMidYMid meet"
       fill="none"
       stroke="currentColor"
-      stroke-width="3"
+      :stroke-width="NTS_TOOTH_STROKE"
       stroke-linejoin="round"
       :style="{ height: `${heightPx}px`, color: 'var(--color-text-muted)' }"
     >

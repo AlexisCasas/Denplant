@@ -518,6 +518,127 @@ export function mergeRegions(rings: readonly NtsPoint[][]): NtsRegionFigure[] {
   }))
 }
 
+// ---------------------------------------------------------------------------
+// which parts of a figure's rim are the drawing's own structure
+// ---------------------------------------------------------------------------
+
+/** Inclusive of the endpoints, unlike `onSegment`, which wants strictly inside. */
+function liesOn(a: NtsPoint, b: NtsPoint, p: NtsPoint): boolean {
+  const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
+  if (Math.abs(cross) > 1e-6) return false
+  return p.x >= Math.min(a.x, b.x) - 1e-9 && p.x <= Math.max(a.x, b.x) + 1e-9
+    && p.y >= Math.min(a.y, b.y) - 1e-9 && p.y <= Math.max(a.y, b.y) + 1e-9
+}
+
+/** Every edge the chart draws the tooth with: the sides of its regions. */
+function neutralEdges(tooth: NtsTooth): Array<[NtsPoint, NtsPoint]> {
+  const edges: Array<[NtsPoint, NtsPoint]> = []
+  for (const region of toothGeometry(tooth).regions) {
+    const ring = region.points
+    for (let i = 0; i < ring.length; i++) {
+      edges.push([ring[i]!, ring[(i + 1) % ring.length]!])
+    }
+  }
+  return edges
+}
+
+/**
+ * The parts of a figure's rim that coincide with the tooth's own outline.
+ *
+ * A solid clinical fill is painted over the drawing and hides the neutral
+ * strokes beneath it. Some of those must come back — the crown has to stay
+ * readable — and some must not: the whole point of merging contiguous
+ * surfaces is that no divider appears between them, so repainting the tooth's
+ * grid wholesale over a fill would undo exactly the clinical decision the
+ * merge encodes.
+ *
+ * The rim answers this by itself, and no new rule is needed. An edge between
+ * two selected regions of one figure is interior and is already absent from
+ * `boundary`; every edge that survives there either bounds the crown or
+ * separates a selected region from an unselected one — the two cases that must
+ * stay visible. Intersecting that with the tooth's real edges then drops the
+ * last case: a rim segment the drawing never had. The incisal band is the one
+ * that exists — it is inset inside the central zone, so its long sides run
+ * through open space, and giving them a neutral stroke would invent an
+ * anatomical subdivision the odontogram does not contain. Its short sides do
+ * lie on the zone's real divider and are restored, which keeps that line
+ * continuous rather than notched.
+ *
+ * Returns open polylines in the tooth's own units. Nothing is widened, moved
+ * or re-ordered: these are the rim's own segments, chained where they meet.
+ */
+export function structuralEdges(
+  fdi: number,
+  boundary: readonly NtsPoint[][]
+): NtsPoint[][] {
+  const tooth = toothFor(fdi)
+  if (!tooth) return []
+
+  const neutral = neutralEdges(tooth)
+  const kept: Array<[NtsPoint, NtsPoint]> = []
+
+  for (const loop of boundary) {
+    for (let i = 0; i < loop.length; i++) {
+      const from = loop[i]!
+      const to = loop[(i + 1) % loop.length]!
+      if (key(from) === key(to)) continue
+      if (neutral.some(([a, b]) => liesOn(a, b, from) && liesOn(a, b, to))) {
+        kept.push([from, to])
+      }
+    }
+  }
+
+  return chainOpen(kept)
+}
+
+/**
+ * Link segments that meet into polylines, so a corner joins instead of butting.
+ *
+ * Deterministic: walks from the lexicographically smallest endpoint each time.
+ */
+function chainOpen(segments: ReadonlyArray<[NtsPoint, NtsPoint]>): NtsPoint[][] {
+  const links = new Map<string, NtsPoint[][]>()
+  const points = new Map<string, NtsPoint>()
+  for (const [a, b] of segments) {
+    points.set(key(a), a)
+    points.set(key(b), b)
+    for (const [from, to] of [[a, b], [b, a]] as const) {
+      const bucket = links.get(key(from))
+      if (bucket) bucket.push([from, to])
+      else links.set(key(from), [[from, to]])
+    }
+  }
+
+  const used = new Set<string>()
+  const chains: NtsPoint[][] = []
+
+  // Ends first, so an open run is walked from its end rather than its middle;
+  // whatever is left over is a closed run and may start anywhere.
+  const starts = [...links.keys()].sort()
+  for (const pass of [1, 2]) {
+    for (const start of starts) {
+      const degree = links.get(start)!.length
+      if (pass === 1 ? degree !== 1 : degree === 1) continue
+
+      let current = start
+      const chain: NtsPoint[] = [points.get(start)!]
+      for (;;) {
+        const next = (links.get(current) ?? [])
+          .filter(([from, to]) => !used.has(segmentKey(from!, to!)))
+          .sort((a, b) => (key(a[1]!) < key(b[1]!) ? -1 : 1))[0]
+        if (!next) break
+        used.add(segmentKey(next[0]!, next[1]!))
+        chain.push(next[1]!)
+        current = key(next[1]!)
+        if (current === start) break
+      }
+      if (chain.length > 1) chains.push(chain)
+    }
+  }
+
+  return chains
+}
+
 /**
  * The figures a set of surfaces makes on one tooth.
  *

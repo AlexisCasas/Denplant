@@ -25,6 +25,7 @@ import {
   NTS_CELL_HEIGHT,
   NTS_ROWS,
   cellWidthFor,
+  NTS_TOOTH_STROKE,
   centralRegionCountFor,
   rootCountFor,
   rowWidthFor,
@@ -1153,5 +1154,153 @@ describe('NTS-05D.4 — areas on the real chart', () => {
     expect(wrapper.find('[data-testid="nts-fill-s1-16"]').exists()).toBe(false)
     // Still reported: part of it is not drawn.
     expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.4c — the chart's own structure survives a fill
+// ---------------------------------------------------------------------------
+
+describe('NTS-05D.4c — neutral structure over a clinical fill', () => {
+  const REAL_CATALOG = JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), '../backend/app/modules/odontogram/nts/catalog/pe_nts_188_2022.json'),
+      'utf8'
+    )
+  )
+
+  const on = (id: string, ruleId: string, fdi: number, attributes: Record<string, unknown>) => ({
+    id,
+    record_id: 'rec-1',
+    norm_version: 'pe_nts_188_2022',
+    rule_id: ruleId,
+    attributes,
+    provenance: 'observed' as const,
+    source_finding_id: null,
+    sequence: 1,
+    created_at: '2026-01-02T10:00:00Z',
+    created_by: 'u1',
+    targets: [{
+      id: `t-${id}`, group_index: 0, position: 0, participation: 'subject', role: null,
+      target_kind: 'fdi_tooth', tooth_number: fdi, arch: null, local_ordinal: null, geometry: null
+    }]
+  })
+
+  const caries = (id: string, fdi: number, surfaces: string[]) =>
+    on(id, '6.1.16', fdi, { caries_type: 'CD', surfaces })
+
+  /** Subpath starts in a `d`. */
+  const moves = (d: string) => d.split('M').filter(part => part.trim().length > 0)
+
+  const mount = async (findings: unknown[]) => mountChart({
+    record: makeRecord({ findings: findings as never }),
+    catalog: REAL_CATALOG
+  })
+
+  it('a filled surface repaints the tooth outline it covered', async () => {
+    const wrapper = await mount([caries('s1', 16, ['M'])])
+    const group = wrapper.find('[data-testid="nts-structure-s1-16"]')
+
+    expect(group.exists()).toBe(true)
+    const path = group.find('path')
+    expect(path.attributes('fill')).toBe('none')
+    // Chart ink, not a clinical colour — this is structure, not a finding.
+    expect(path.attributes('stroke')).toBe('var(--color-text-muted)')
+    expect(path.attributes('stroke')).not.toContain('nts-finding')
+    expect(Number(path.attributes('stroke-width'))).toBeGreaterThan(0)
+  })
+
+  it('the repaired runs are open, never closed back into a ring', async () => {
+    const wrapper = await mount([caries('s2', 11, ['O'])])
+    const d = wrapper.find('[data-testid="nts-structure-s2-11"]').find('path').attributes('d')!
+
+    expect(d).not.toContain('Z')
+    // Exactly the two ends of the band's own divider, nothing around it.
+    expect(moves(d)).toHaveLength(2)
+  })
+
+  it('CRITICAL — a posterior occlusal fill gets no tile grid back', async () => {
+    const wrapper = await mount([caries('s3', 16, ['O'])])
+    const path = wrapper.find('[data-testid="nts-structure-s3-16"]').find('path')
+
+    // One continuous run around the central table, and only that.
+    expect(path.attributes('data-runs')).toBe('1')
+    expect(path.attributes('d')).not.toContain('Z')
+  })
+
+  it('CRITICAL — M+O gets its rim back and its shared divider does not', async () => {
+    const wrapper = await mount([caries('s4', 16, ['M', 'O'])])
+    const structure = wrapper.find('[data-testid="nts-structure-s4-16"]').find('path')
+    const fill = wrapper.find('[data-testid="nts-fill-s4-16"]').find('path')
+
+    // One run: the outline of the merged figure, unbroken.
+    expect(structure.attributes('data-runs')).toBe('1')
+    // The fill is still the five tiles drawn as one continuous area.
+    expect(fill.attributes('d')!.split('Z').filter(p => p.trim()).length).toBe(5)
+  })
+
+  it('structure is painted after the fill and before every clinical mark', async () => {
+    const wrapper = await mount([caries('s5', 16, ['M', 'O'])])
+    const html = wrapper.find('[data-testid="nts-finding-layer"]').html()
+
+    expect(html.indexOf('nts-fill-s5-16')).toBeLessThan(html.indexOf('nts-structure-s5-16'))
+    expect(html.indexOf('nts-structure-s5-16')).toBeLessThan(html.indexOf('nts-sigla-s5'))
+  })
+
+  it('an outline repairs nothing: it hides nothing', async () => {
+    const wrapper = await mount([on('s6', '6.1.34', 16, { surfaces: ['M', 'O'] })])
+
+    expect(wrapper.find('[data-testid="nts-outline-s6-16"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-structure-s6-16"]').exists()).toBe(false)
+  })
+
+  it('an outline keeps its clinical colour, never the neutral ink', async () => {
+    const wrapper = await mount([on('s7', '6.1.34', 16, { surfaces: ['M', 'O'] })])
+    const stroke = wrapper.find('[data-testid="nts-outline-s7-16"]').find('path').attributes('stroke')
+
+    expect(stroke).toContain('--color-nts-finding')
+    expect(stroke).not.toBe('var(--color-text-muted)')
+  })
+
+  it('no opacity, blend mode or pattern is used anywhere in the layer', async () => {
+    const wrapper = await mount([
+      caries('s8', 16, ['M', 'O']),
+      on('s9', '6.1.34', 26, { surfaces: ['O'] })
+    ])
+    const html = wrapper.find('[data-testid="nts-finding-layer"]').html()
+
+    for (const forbidden of ['opacity', 'mix-blend', 'url(#', 'pattern']) {
+      expect(html, forbidden).not.toContain(forbidden)
+    }
+  })
+
+  it('two findings on one tooth each repair their own figure', async () => {
+    const wrapper = await mount([caries('sa', 16, ['M', 'O']), caries('sb', 16, ['O'])])
+
+    expect(wrapper.find('[data-testid="nts-structure-sa-16"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-structure-sb-16"]').exists()).toBe(true)
+    // The later finding still paints over the earlier one: order is untouched.
+    const html = wrapper.find('[data-testid="nts-finding-layer"]').html()
+    expect(html.indexOf('nts-fill-sa-16')).toBeLessThan(html.indexOf('nts-fill-sb-16'))
+  })
+
+  it('the layer still takes no clicks', async () => {
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: [caries('sc', 16, ['M', 'O'])] as never }),
+      catalog: REAL_CATALOG,
+      selectable: true
+    })
+
+    expect(wrapper.find('[data-testid="nts-finding-layer"]').classes())
+      .toContain('pointer-events-none')
+    await wrapper.find('[data-testid="nts-tooth-16"]').trigger('click')
+    expect(wrapper.emitted('toothSelect')![0]![0]).toBe(16)
+  })
+
+  it('the cell and the repair use one stroke width, not two', async () => {
+    const wrapper = await mount([caries('sd', 16, ['M'])])
+    const cellSvg = wrapper.find('[data-testid="nts-tooth-16"]').find('svg')
+
+    expect(Number(cellSvg.attributes('stroke-width'))).toBe(NTS_TOOTH_STROKE)
   })
 })

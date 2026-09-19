@@ -53,11 +53,13 @@ import {
   toothPlacement
 } from './ntsChartGeometry'
 import type { NtsTooth } from './ntsDentition'
-import { centralRegionsOf } from './ntsDentition'
+import { NTS_TOOTH_STROKE, centralRegionsOf } from './ntsDentition'
+import type { NtsRegionFigure } from './ntsSurfaceGeometry'
 import {
   mergeRegions,
   resolveSurfaceComponents,
-  resolveSurfaceRegions
+  resolveSurfaceRegions,
+  structuralEdges
 } from './ntsSurfaceGeometry'
 
 /**
@@ -275,6 +277,21 @@ export type NtsOutlineStyle = 'contour'
 export interface NtsAreaFigure {
   polygons: NtsPoint[][]
   boundary: NtsPoint[][]
+  /**
+   * The parts of the rim that are the chart's own structure, as open
+   * polylines — what has to be redrawn after a solid fill has covered it.
+   *
+   * Not the whole rim and never the whole tooth. Repainting the drawing's grid
+   * over a fill would put a divider back between contiguous surfaces, which is
+   * precisely what merging them exists to avoid; drawing the whole rim would
+   * additionally trace shapes the odontogram never had. These are the segments
+   * that satisfy both: on the rim, and on a line the tooth is actually drawn
+   * with.
+   *
+   * Carried by outlines too, because it is a property of the figure. Only a
+   * fill has anything to repair, so only the fill branch draws it.
+   */
+  structural: NtsPoint[][]
 }
 
 /**
@@ -297,6 +314,15 @@ export interface NtsShapeFillInstruction extends NtsInstructionBase {
    * drawing, never a clinical code.
    */
   regions: string[]
+  /**
+   * How thick this tooth's own outline is, in chart units.
+   *
+   * A fact about the drawing, not a styling choice: the structural segments
+   * are the tooth's own lines being repaired, and at any other weight they
+   * would read as a different kind of line laid over the drawing rather than
+   * as the drawing showing through.
+   */
+  structuralStroke: number
 }
 
 /** The same area, contoured instead of filled. */
@@ -307,6 +333,7 @@ export interface NtsOutlineInstruction extends NtsInstructionBase {
   fdi: number
   components: NtsAreaFigure[]
   regions: string[]
+  structuralStroke: number
 }
 
 export type NtsRenderInstruction =
@@ -1149,7 +1176,7 @@ const LANDMARK_RINGS: Readonly<Record<string, (tooth: NtsTooth) => NtsPoint[][]>
 }
 
 interface ResolvedArea {
-  components: NtsAreaFigure[]
+  components: NtsRegionFigure[]
   regions: string[]
 }
 
@@ -1204,9 +1231,12 @@ function landmarkArea(
   return { components: figures, regions: centralRegionsOf(tooth).map(region => region.id) }
 }
 
-/** Move a figure from a tooth's own units onto the chart. */
-function toChart(fdi: number, figure: NtsAreaFigure): NtsAreaFigure | null {
-  const move = (rings: NtsPoint[][]): NtsPoint[][] | null => {
+/**
+ * Move a figure from a tooth's own units onto the chart, working out on the
+ * way which parts of its rim the tooth is actually drawn with.
+ */
+function toChart(fdi: number, figure: NtsRegionFigure): NtsAreaFigure | null {
+  const move = (rings: readonly NtsPoint[][]): NtsPoint[][] | null => {
     const moved: NtsPoint[][] = []
     for (const ring of rings) {
       const points: NtsPoint[] = []
@@ -1222,8 +1252,9 @@ function toChart(fdi: number, figure: NtsAreaFigure): NtsAreaFigure | null {
 
   const polygons = move(figure.polygons)
   const boundary = move(figure.boundary)
-  if (!polygons || !boundary) return null
-  return { polygons, boundary }
+  const structural = move(structuralEdges(fdi, figure.boundary))
+  if (!polygons || !boundary || !structural) return null
+  return { polygons, boundary, structural }
 }
 
 /**
@@ -1290,7 +1321,8 @@ function resolveArea(
       style: style as NtsFillStyle & NtsOutlineStyle,
       fdi,
       components: components as NtsAreaFigure[],
-      regions: area.regions
+      regions: area.regions,
+      structuralStroke: NTS_TOOTH_STROKE * (toothPlacement(fdi)?.scale ?? 1)
     })
   }
 
@@ -1613,13 +1645,13 @@ function findOverlaps(instructions: readonly NtsRenderInstruction[]): NtsAreaOve
     const byGroup = new Map<string, string[]>()
     for (const [region, holders] of perTooth) {
       if (holders.length < 2) continue
-      const groupKey = holders.join(' ')
+      const groupKey = holders.join('\u0000')
       const regions = byGroup.get(groupKey) ?? []
       regions.push(region)
       byGroup.set(groupKey, regions)
     }
     for (const [groupKey, regions] of byGroup) {
-      const findingIds = groupKey.split(' ')
+      const findingIds = groupKey.split('\u0000')
       overlaps.push({
         fdi,
         findingIds,

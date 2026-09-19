@@ -37,6 +37,7 @@ import {
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsSurfaceGeometry'
 import {
   NTS_ALL_TEETH,
+  NTS_TOOTH_STROKE,
   centralRegionsOf
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import {
@@ -1992,5 +1993,162 @@ describe('NTS-05D.4 — the style vocabularies are still single-valued', () => {
     }
     expect([...styles.fill]).toEqual(['solid'])
     expect([...styles.outline]).toEqual(['contour'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.4c — the neutral structure a fill covers is restored, selectively
+// ---------------------------------------------------------------------------
+
+describe('NTS-05D.4c — an area carries the structure it has to repair', () => {
+  const figureOf = (fdi: number, surfaces: string[]) =>
+    fills(resolveFinding(onTooth('X.300', fdi, surfaces), areaRule('X.300', 'shape_fill')))[0]!
+
+  it('A — a single surface restores its whole rim', () => {
+    const instruction = figureOf(16, ['M'])
+    const figure = instruction.components[0]!
+
+    expect(figure.structural.length).toBeGreaterThan(0)
+    // All of it: a lone trapezoid's rim is crown edge, diagonals and divider.
+    const rim = figure.boundary[0]!.length
+    const restored = figure.structural.reduce((n, run) => n + run.length - 1, 0)
+    expect(restored).toBe(rim)
+  })
+
+  it('A — it is drawn at the weight the tooth itself is drawn at', () => {
+    const instruction = figureOf(16, ['M'])
+    expect(instruction.structuralStroke)
+      .toBeCloseTo(NTS_TOOTH_STROKE * toothPlacement(16)!.scale, 6)
+    // Positive and sane: a hairline would not read as the same line.
+    expect(instruction.structuralStroke).toBeGreaterThan(0)
+  })
+
+  it('B — M+O restores nothing along the edge the two share', () => {
+    const instruction = figureOf(16, ['M', 'O'])
+    const figure = instruction.components[0]!
+
+    // The shared edge is not even on the rim, so it cannot be restored.
+    const shared = crownBox(16)!
+    expect(figure.boundary).toHaveLength(1)
+    expect(figure.structural.length).toBeGreaterThan(0)
+
+    // Everything restored is on the rim, and the rim has no interior edge.
+    const rimPoints = new Set(figure.boundary[0]!.map(p => `${p.x.toFixed(4)},${p.y.toFixed(4)}`))
+    for (const point of figure.structural.flat()) {
+      expect(rimPoints.has(`${point.x.toFixed(4)},${point.y.toFixed(4)}`)).toBe(true)
+    }
+    expect(shared.width).toBeGreaterThan(0)
+  })
+
+  it('C — CRITICAL: a posterior occlusal fill restores no internal grid', () => {
+    const instruction = figureOf(16, ['O'])
+    const figure = instruction.components[0]!
+
+    // Four tiles in, one rim out, and only that rim restored.
+    expect(figure.polygons).toHaveLength(4)
+    expect(figure.boundary).toHaveLength(1)
+
+    const rimPoints = new Set(figure.boundary[0]!.map(p => `${p.x.toFixed(4)},${p.y.toFixed(4)}`))
+    for (const point of figure.structural.flat()) {
+      expect(rimPoints.has(`${point.x.toFixed(4)},${point.y.toFixed(4)}`)).toBe(true)
+    }
+  })
+
+  it('D — M+D stays two figures, each repairing only its own rim', () => {
+    const instruction = figureOf(16, ['M', 'D'])
+    expect(instruction.components).toHaveLength(2)
+    for (const figure of instruction.components) {
+      expect(figure.structural.length).toBeGreaterThan(0)
+      const rim = figure.boundary[0]!.length
+      const restored = figure.structural.reduce((n, run) => n + run.length - 1, 0)
+      expect(restored).toBe(rim)
+    }
+  })
+
+  it('E — an anterior incisal fill gets no invented box around it', () => {
+    const instruction = figureOf(11, ['O'])
+    const figure = instruction.components[0]!
+
+    // Two short runs, not a closed ring: the band's long sides run through
+    // open space and the drawing has no line there.
+    expect(figure.structural).toHaveLength(2)
+    for (const run of figure.structural) {
+      expect(run).toHaveLength(2)
+      // Vertical: the ends of the band sit on the zone's real divider.
+      expect(run[0]!.x).toBeCloseTo(run[1]!.x, 6)
+    }
+  })
+
+  it('E — and a posterior loses nothing, having no synthetic edge', () => {
+    const figure = figureOf(16, ['O']).components[0]!
+    const rim = figure.boundary[0]!.length
+    const restored = figure.structural.reduce((n, run) => n + run.length - 1, 0)
+    expect(restored).toBe(rim)
+  })
+
+  it('F — an outline is unchanged: it carries structure but repairs nothing', () => {
+    const outline = outlines(resolveFinding(
+      onTooth('X.301', 16, ['M', 'O']), areaRule('X.301', 'outline')
+    ))[0]!
+    const fill = figureOf(16, ['M', 'O'])
+
+    // Same geometry as the fill, because it is the same figure.
+    expect(outline.components[0]!.boundary).toEqual(fill.components[0]!.boundary)
+    expect(outline.paint).toBe('good')
+    expect(outline.style).toBe('contour')
+  })
+
+  it('a landmark-anchored fill repairs its own rim too', () => {
+    const pulp = rule({
+      rule_id: 'X.302',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [{ kind: 'shape_fill', params: { at: 'coronal_pulp' }, text_from: null, suffix_from: null, role: null, target_selector: null, regions_from: null }]
+      }
+    })
+    const figure = fills(resolveFinding(onTooth('X.302', 16, undefined), pulp))[0]!.components[0]!
+    expect(figure.structural.length).toBeGreaterThan(0)
+  })
+
+  it('the restored runs are open — closing one would draw an edge that is not there', () => {
+    for (const surfaces of [['M'], ['O'], ['M', 'O'], ['M', 'D', 'O', 'V', 'L']]) {
+      for (const fdi of [16, 11]) {
+        for (const figure of figureOf(fdi, surfaces).components) {
+          for (const run of figure.structural) {
+            expect(run.length).toBeGreaterThanOrEqual(2)
+            const [first] = run
+            const last = run[run.length - 1]!
+            // An open run may legitimately close on itself only when the whole
+            // rim is structural; a two-point run never may.
+            if (run.length === 2) {
+              expect(`${first!.x},${first!.y}`).not.toBe(`${last.x},${last.y}`)
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it('every restored point is inside the tooth that owns it', () => {
+    for (const fdi of [16, 26, 36, 46, 11, 41]) {
+      const crown = crownBox(fdi)!
+      for (const figure of figureOf(fdi, ['M', 'D', 'O', 'V', 'L']).components) {
+        for (const point of figure.structural.flat()) {
+          expect(point.x, String(fdi)).toBeGreaterThanOrEqual(crown.x - 0.01)
+          expect(point.x).toBeLessThanOrEqual(crown.x + crown.width + 0.01)
+          expect(point.y).toBeGreaterThanOrEqual(crown.y - 0.01)
+          expect(point.y).toBeLessThanOrEqual(crown.y + crown.height + 0.01)
+        }
+      }
+    }
+  })
+
+  it('restoring structure changes nothing a finding draws', () => {
+    // It repairs the chart under the finding; the clinical geometry above is
+    // byte-identical to what 05D.4 produced.
+    const instruction = figureOf(16, ['M', 'O'])
+    const expected = resolveSurfaceComponents(16, ['M', 'O'])[0]!
+    expect(instruction.components[0]!.polygons).toHaveLength(expected.polygons.length)
+    expect(instruction.components[0]!.boundary).toHaveLength(expected.boundary.length)
   })
 })

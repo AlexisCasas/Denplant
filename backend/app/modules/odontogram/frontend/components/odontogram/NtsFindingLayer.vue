@@ -82,6 +82,28 @@ function figurePath(figure: NtsAreaFigure, rings: 'polygons' | 'boundary'): stri
 }
 
 /**
+ * The tooth's own lines, where a fill has covered them — open runs, not rings.
+ *
+ * Deliberately not closed: these are stretches of an existing outline showing
+ * through again, and closing them would draw an edge the drawing does not
+ * have.
+ */
+function structuralPath(figure: NtsAreaFigure): string {
+  return figure.structural
+    .map((run) => {
+      const [first, ...rest] = run
+      if (!first) return ''
+      return `M${round(first.x)},${round(first.y)} `
+        + rest.map(point => `L${round(point.x)},${round(point.y)}`).join(' ')
+    })
+    .filter(Boolean)
+    .join(' ')
+}
+
+const hasStructure = (instruction: NtsShapeFillInstruction) =>
+  instruction.components.some(figure => figure.structural.length > 0)
+
+/**
  * Strokes, already resolved upstream.
  *
  * Lines and connectors are the same drawing job — a set of polylines in chart
@@ -265,6 +287,45 @@ function intersectingCircles(s: NtsSymbolInstruction): Array<{ cx: number, cy: n
         fill-rule="nonzero"
         stroke="none"
         :data-loops="figure.polygons.length"
+      />
+    </g>
+
+    <!--
+      The tooth's own outline, where a fill has just covered it.
+
+      This is chart structure, not a finding: it is drawn in the same neutral
+      ink and at the same weight as the cell underneath, so what the reader
+      sees is the drawing showing through rather than a new line on top of it.
+      No clinical colour appears here and none may.
+
+      Placed after the fills and before everything else, which is the only
+      position that works: any earlier and the fill would cover it again, any
+      later and it would cut across the clinical marks that must stay legible
+      on top.
+
+      What is *not* here matters as much. The model hands over the segments
+      that are both on a figure's rim and on a line the tooth is actually drawn
+      with — never the whole grid, so a divider cannot reappear between two
+      contiguous surfaces of one finding, and never the whole rim, so a shape
+      the odontogram does not contain is not traced in neutral ink.
+    -->
+    <g
+      v-for="(area, index) in fills.filter(hasStructure)"
+      :key="`${area.findingId}-structure-${index}`"
+      :data-finding="area.findingId"
+      :data-fdi="area.fdi"
+      :data-testid="`nts-structure-${area.findingId}-${area.fdi}`"
+    >
+      <path
+        v-for="(figure, f) in area.components"
+        :key="f"
+        :d="structuralPath(figure)"
+        fill="none"
+        stroke="var(--color-text-muted)"
+        :stroke-width="area.structuralStroke"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+        :data-runs="figure.structural.length"
       />
     </g>
 

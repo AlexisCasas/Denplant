@@ -743,3 +743,41 @@ With these two kinds implemented the catalog classifies as **35 complete,
 | 6.1.35 sealant | partial | its sigla draws; the fissure anatomy the mark follows is not modelled (G10) |
 | 6.1.10 fracture | unsupported | the norm draws the shape the clinician observed, and no channel carries it (G6) |
 | 6.1.13 giroversión | unsupported | the direction is a clinical observation the norm never enumerates (CLINICAL-03) |
+
+### Neutral structure under a fill (NTS-05D.4c)
+
+A solid clinical fill is painted over the drawing, so it hides the tooth's own
+strokes beneath it. Repainting the whole tooth on top would fix the crown and
+break something more important: the grid would put a divider back between
+contiguous surfaces, which is exactly what merging them exists to prevent.
+
+The figure's own rim settles it, and no new rule is needed:
+
+| Segment | Restored? | Why |
+|---|---|---|
+| outer crown perimeter | **yes** | on the rim, and a line the tooth is drawn with |
+| selected ↔ unaffected surface | **yes** | same — it is the border of the finding |
+| selected ↔ selected, one figure | **no** | interior: already absent from `boundary` |
+| the incisal band's long sides | **no** | the drawing has no line there (synthetic) |
+| the incisal band's short ends | **yes** | they sit on the central zone's real divider |
+
+So the restored set is `boundary ∩ (the tooth's own edges)`. The first term
+drops internal dividers for free — an edge shared by two selected regions
+cancels during boundary extraction — and the second drops geometry DenPlant
+introduced but the odontogram never had. **A neutral stroke is never drawn on
+an edge the base chart does not contain.**
+
+It is emitted as open polylines, never closed rings: these are stretches of an
+existing outline showing through again, and closing one would draw an edge the
+drawing does not have. They use the chart's own neutral ink and
+`NTS_TOOTH_STROKE`, the same constant the cell draws with, so the result reads
+as the drawing showing through rather than as a new line on top of it — and
+`ntsDentition` owns that constant precisely so there cannot be two.
+
+Painting order is fill → **structure** → outline → line/connector → symbol →
+arrow → text. Any earlier and the fill covers it again; any later and it cuts
+across clinical marks. An `outline` gets none: it fills nothing, so it hides
+nothing.
+
+No opacity, blend mode, pattern or third colour is involved — the clinical
+fill stays solid and its two colours stay the only two.

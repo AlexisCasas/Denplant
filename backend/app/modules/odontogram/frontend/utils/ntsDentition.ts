@@ -222,6 +222,18 @@ export const NTS_CELL_HEIGHT = CELL_HEIGHT
 export const NTS_BLEED = BLEED
 
 /**
+ * How thick the tooth's own outline is drawn, in layout units.
+ *
+ * Exported by 05D.4c because a second thing now draws that same outline. A
+ * clinical fill sits above the drawing and covers the neutral strokes under
+ * it; the parts of them that must stay visible are restored from the overlay,
+ * and a restored segment that did not match the original weight would read as
+ * a different kind of line rather than as the same one continuing. One
+ * constant, used by the cell that draws it and by the overlay that repairs it.
+ */
+export const NTS_TOOTH_STROKE = 3
+
+/**
  * Width of one tooth's column in layout units — crown plus its gutter.
  *
  * The annotation box, the FDI number and the tooth all share this width, which

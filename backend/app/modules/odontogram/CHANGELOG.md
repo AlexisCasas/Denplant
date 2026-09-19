@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- fix(nts-05d.4c): **the tooth stays readable under a clinical fill**. 05D.4
+  left one visual tension open: a solid fill is painted over the drawing, so
+  wherever it reached the crown's own strokes it covered them and the outline
+  went missing.
+
+  The naive fix — repaint the tooth above every fill — was rejected outright.
+  It would restore the crown and simultaneously put a divider back between
+  contiguous surfaces of one finding, which is precisely what merging them
+  exists to prevent: a posterior occlusal fill would get its four tile
+  dividers back and stop reading as one clinical figure.
+
+  The figure's own rim answers it instead, with no new rule invented. An edge
+  between two selected regions of one figure is interior and is already absent
+  from the boundary; every edge that survives there either bounds the crown or
+  borders an unaffected surface — the two cases that must stay visible.
+  Intersecting that with the tooth's real edges drops the last case, a rim
+  segment the drawing never had: the incisal band is inset inside the central
+  zone, so its long sides run through open space and giving them a neutral
+  stroke would invent an anatomical subdivision the odontogram does not
+  contain. Its short ends do lie on the zone's real divider and are restored,
+  which keeps that line continuous instead of notched.
+
+  Restored as open polylines — closing one would draw an edge that is not
+  there — in the chart's own neutral ink, at `NTS_TOOTH_STROKE`, now a shared
+  constant so the cell that draws the outline and the overlay that repairs it
+  cannot disagree. Painted after the fill and before every clinical mark. An
+  outline gets none: it fills nothing, so it hides nothing.
+
+  No opacity, blend mode, pattern or third colour — asserted by a test over
+  the rendered layer. Clinical semantics, mark kinds, catalog, DB and coverage
+  (35 / 1 / 2) are all untouched.
+
+  Also fixed here: two literal NUL bytes that 05D.4 left in
+  `ntsRenderModel.ts`, from a separator escape that was decoded into the byte
+  itself rather than written as an escape. Harmless at runtime, but it made the
+  file read as binary to git and grep.
+
 - feat(nts-05d.4): **filled and contoured surfaces reach the chart**, and the
   render vocabulary is complete. `shape_fill` and `outline` were the last two
   mark kinds nothing drew; both now resolve through metadata that already
