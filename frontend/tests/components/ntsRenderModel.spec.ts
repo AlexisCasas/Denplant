@@ -22,14 +22,24 @@ import {
   resolveFinding
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsRenderModel'
 import type {
+  NtsArrowInstruction,
+  NtsConnectorInstruction,
+  NtsLineInstruction,
   NtsSymbolInstruction,
   NtsTextInstruction,
   NtsUnsupportedInstruction
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsRenderModel'
 import {
   annotationBox,
+  apexBand,
+  apexPoint,
+  archSpan,
   crownBox,
-  numberAnchor
+  numberAnchor,
+  occlusalBand,
+  rangeSpan,
+  rootAxes,
+  toothPlacement
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
 import type {
   NtsFinding,
@@ -510,21 +520,18 @@ describe('every declared symbol shape resolves to real geometry', () => {
     expect(unsupported(result)[0]!.reason).toBe('targets_not_adjacent')
   })
 
-  it('a symbol drawn on a subset of the targets is deferred, not approximated', () => {
-    // Since NTS-05D.3a the mark states where it goes (`at`) and which targets
-    // it applies to (`target_selector`) separately. The placement is known;
-    // what is missing is the span primitive, and drawing the squares without
-    // the connector that joins them would show half a mark.
+  it('a selector without a band is still refused', () => {
+    // The two questions are separate: naming which targets does not say where.
     const r = rule({
       rule_id: 'X.35',
       scope: 'range',
       render: {
         color_semantics: 'good_or_non_pathological',
-        marks: [symbolMark('square_with_cross', 'apex_level', undefined, 'range_endpoints')]
+        marks: [symbolMark('square_with_cross', undefined, undefined, 'range_endpoints')]
       }
     })
     expect(unsupported(resolveFinding(finding({ rule_id: 'X.35' }), r))[0]!.reason)
-      .toBe('needs_range_orchestration')
+      .toBe('unknown_placement')
   })
 
   it('a band placement with no selector is still an unknown placement for a symbol', () => {
@@ -621,7 +628,7 @@ describe('a finding that is only partly drawable says so', () => {
       rule_id: 'X.51',
       render: {
         color_semantics: 'good_or_non_pathological',
-        marks: [{ kind: 'line', params: { style: 'straight_vertical' }, text_from: null, suffix_from: null, role: null },
+        marks: [{ kind: 'shape_fill', params: { fill: 'solid' }, text_from: null, suffix_from: null, role: null, target_selector: null },
           symbolMark('square', 'crown')]
       }
     })
@@ -631,18 +638,18 @@ describe('a finding that is only partly drawable says so', () => {
     expect(symbols(result)).toHaveLength(1)
     expect(unsupported(result)[0]).toMatchObject({
       reason: 'mark_kind_not_in_slice',
-      markKind: 'line'
+      markKind: 'shape_fill'
     })
   })
 
-  it.each(['line', 'connector', 'arrow', 'shape_fill', 'outline'])(
+  it.each(['shape_fill', 'outline'])(
     'a %s-only rule is unsupported, and never silently empty',
     (kind) => {
       const r = rule({
         rule_id: `X.${kind}`,
         render: {
           color_semantics: 'good_or_non_pathological',
-          marks: [{ kind, params: {}, text_from: null, suffix_from: null, role: null }]
+          marks: [{ kind, params: {}, text_from: null, suffix_from: null, role: null, target_selector: null }]
         }
       })
       const result = resolveFinding(finding({ rule_id: r.rule_id }), r)
@@ -879,13 +886,26 @@ describe('the real catalog drives the same generic paths', () => {
     expect(laid.map(i => i.line)).toEqual([0, 1])
   })
 
-  it('a span rule draws nothing yet, and reports both deferred marks', () => {
+  it('a bridge draws its span, and its verticals only where the role is', () => {
     const r = real('6.1.29')
-    const result = resolveFinding(
-      finding({ rule_id: '6.1.29', attributes: { condition_state: 'good' } }), r
-    )
-    expect(result.completeness).toBe('unsupported')
-    expect(unsupported(result).map(i => i.markKind).sort()).toEqual(['connector', 'line'])
+    const result = resolveFinding(finding({
+      rule_id: '6.1.29',
+      attributes: { condition_state: 'good' },
+      targets: [13, 12, 11, 21, 22, 23].map((tooth, index) => target({
+        id: `t${index}`, position: index, tooth_number: tooth,
+        role: tooth === 21 ? 'pilar' : null
+      }))
+    }), r)
+
+    expect(result.completeness).toBe('complete')
+    const horizontal = result.instructions.find(i => i.kind === 'line') as NtsLineInstruction
+    const ticks = result.instructions.find(i => i.kind === 'connector') as NtsConnectorInstruction
+
+    expect(horizontal.strokes[0]![0]!.x).toBeCloseTo(rangeSpan([13, 23], 'apex')!.x1, 6)
+    expect(horizontal.strokes[0]![1]!.x).toBeCloseTo(rangeSpan([13, 23], 'apex')!.x2, 6)
+    // The role decides, not the ends of the span.
+    expect(ticks.strokes).toHaveLength(1)
+    expect(ticks.strokes[0]![0]!.x).toBeCloseTo(toothPlacement(21)!.center.x, 6)
   })
 
   it('the whole catalog classifies exactly as the slice promises', () => {
@@ -910,14 +930,14 @@ describe('the real catalog drives the same generic paths', () => {
       counts[result.completeness] += 1
     }
 
-    // box_siglas / symbol are drawn; everything else waits for 05D.3+.
+    // Siglas, symbols, lines, connectors and arrows are drawn. What remains
+    // needs the shape the clinician observed, which has no channel yet.
     //
-    // 18 complete: every rule whose marks are only siglas and symbols.
-    //  7 partial: a symbol or a sigla beside a line, fill or outline.
-    // 13 unsupported: nothing drawable at all, which includes the range rule
-    //    whose symbol applies to the span's endpoints — placing those without
-    //    the connector that joins them would show half a mark.
-    expect(counts).toEqual({ complete: 18, partial: 7, unsupported: 13 })
+    // 30 complete.
+    //  5 partial: a sigla beside a fill or a freehand line.
+    //  3 unsupported: a freehand fracture, a rotation whose sense is a
+    //    clinical observation, and a contour that waits for `outline`.
+    expect(counts).toEqual({ complete: 30, partial: 5, unsupported: 3 })
     expect(counts.complete + counts.partial + counts.unsupported).toBe(38)
   })
 })
@@ -951,5 +971,522 @@ describe('the renderer knows no rule and no clinical word', () => {
       .replace(/\/\/.*$/gm, '')
     expect(code).not.toMatch(/rule_id\s*===/)
     expect(code).not.toMatch(/switch\s*\(\s*\w*rule\w*\.?rule_id/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05D.3 — lines, connectors and arrows
+// ---------------------------------------------------------------------------
+
+const lineMark = (style: string, at?: string) => ({
+  kind: 'line',
+  params: at ? { style, at } : { style },
+  text_from: null,
+  suffix_from: null,
+  role: null,
+  target_selector: null
+})
+
+const connectorMark = (style: string, at?: string, role?: string) => ({
+  kind: 'connector',
+  params: at ? { style, at } : { style },
+  text_from: null,
+  suffix_from: null,
+  role: role ?? null,
+  target_selector: null
+})
+
+const arrowMark = (style: string, at?: string, toward?: string) => ({
+  kind: 'arrow',
+  params: { style, ...(at ? { at } : {}), ...(toward ? { toward } : {}) },
+  text_from: null,
+  suffix_from: null,
+  role: null,
+  target_selector: null
+})
+
+const lines = (r: ReturnType<typeof resolveFinding>) =>
+  r.instructions.filter((i): i is NtsLineInstruction => i.kind === 'line')
+const connectors = (r: ReturnType<typeof resolveFinding>) =>
+  r.instructions.filter((i): i is NtsConnectorInstruction => i.kind === 'connector')
+const arrowsOf = (r: ReturnType<typeof resolveFinding>) =>
+  r.instructions.filter((i): i is NtsArrowInstruction => i.kind === 'arrow')
+
+/** Subjects spanning teeth, in the order given. */
+const span = (teeth: number[], group = 0) =>
+  teeth.map((tooth, index) => target({
+    id: `t${group}-${index}`, position: index, tooth_number: tooth, group_index: group
+  }))
+
+const archTarget = (arch: string) =>
+  target({ target_kind: 'arch', tooth_number: null, arch })
+
+const finite = (points: { x: number, y: number }[][]) =>
+  points.every(stroke => stroke.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)))
+
+describe('lines are drawn across the extent their scope defines', () => {
+  it('an arch line spans the permanent row and nothing else', () => {
+    const r = rule({
+      rule_id: 'X.100',
+      scope: 'arch',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [lineMark('straight_horizontal', 'over_crowns')]
+      }
+    })
+    const result = resolveFinding(
+      finding({ rule_id: 'X.100', targets: [archTarget('upper')] }), r
+    )
+    const stroke = lines(result)[0]!.strokes[0]!
+
+    expect(result.completeness).toBe('complete')
+    expect(lines(result)[0]!.strokes).toHaveLength(1)
+    // The whole upper permanent row, at the crown band.
+    expect(stroke[0]!.x).toBeCloseTo(archSpan('upper', 'crown')!.x1, 6)
+    expect(stroke[1]!.x).toBeCloseTo(archSpan('upper', 'crown')!.x2, 6)
+    expect(stroke[0]!.y).toBeCloseTo(archSpan('upper', 'crown')!.y, 6)
+    // ...which is wider than the deciduous row nested inside it.
+    expect(stroke[1]!.x - stroke[0]!.x).toBeGreaterThan(
+      rangeSpan([55, 65], 'crown')!.x2 - rangeSpan([55, 65], 'crown')!.x1
+    )
+  })
+
+  it('a range line spans the teeth in row order, crossing the midline', () => {
+    const r = rule({
+      rule_id: 'X.101',
+      scope: 'range',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [lineMark('straight_horizontal', 'apex_level')]
+      }
+    })
+    const result = resolveFinding(
+      finding({ rule_id: 'X.101', targets: span([13, 12, 11, 21, 22, 23]) }), r
+    )
+    const stroke = lines(result)[0]!.strokes[0]!
+    const expected = rangeSpan([13, 23], 'apex')!
+
+    expect(stroke[0]!.x).toBeCloseTo(expected.x1, 6)
+    expect(stroke[1]!.x).toBeCloseTo(expected.x2, 6)
+    expect(stroke[0]!.y).toBeCloseTo(apexBand('permanentUpper')!, 6)
+  })
+
+  it('two parallel horizontals are two strokes at a fixed separation', () => {
+    const r = rule({
+      rule_id: 'X.102',
+      scope: 'arch',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [lineMark('two_parallel_horizontal', 'apex_level')]
+      }
+    })
+    const instruction = lines(resolveFinding(
+      finding({ rule_id: 'X.102', targets: [archTarget('lower')] }), r
+    ))[0]!
+
+    expect(instruction.strokes).toHaveLength(2)
+    const [first, second] = instruction.strokes as [{ y: number }[], { y: number }[]]
+    expect(first[0]!.y).not.toBe(second[0]!.y)
+    expect(Math.abs(first[0]!.y - second[0]!.y)).toBeCloseTo(3, 6)
+    // Both run the same extent.
+    expect(instruction.strokes[0]![0]!.x).toBeCloseTo(instruction.strokes[1]![0]!.x, 6)
+  })
+
+  it('a zigzag is deterministic and stays within its band', () => {
+    const r = rule({
+      rule_id: 'X.103',
+      scope: 'arch',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [lineMark('zigzag', 'apex_level')]
+      }
+    })
+    const build = () => lines(resolveFinding(
+      finding({ rule_id: 'X.103', targets: [archTarget('upper')] }), r
+    ))[0]!
+
+    const first = build()
+    const second = build()
+    expect(JSON.stringify(first.strokes)).toBe(JSON.stringify(second.strokes))
+
+    const points = first.strokes[0]!
+    expect(points.length).toBeGreaterThan(4)
+    expect(finite(first.strokes)).toBe(true)
+    // x strictly increases; y alternates either side of the band.
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i]!.x).toBeGreaterThan(points[i - 1]!.x)
+    }
+    const band = apexBand('permanentUpper')!
+    expect(new Set(points.map(p => Math.sign(p.y - band))).size).toBe(2)
+  })
+
+  it('a vertical line is one central stroke per tooth, never one per root', () => {
+    const r = rule({
+      rule_id: 'X.104',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [lineMark('straight_vertical', 'root')]
+      }
+    })
+    // 16 is an upper molar: three roots, and still one line.
+    const instruction = lines(resolveFinding(
+      finding({ rule_id: 'X.104', targets: [target({ tooth_number: 16 })] }), r
+    ))[0]!
+
+    expect(rootAxes(16)).toHaveLength(3)
+    expect(instruction.strokes).toHaveLength(1)
+
+    const [from, to] = instruction.strokes[0]! as [{ x: number, y: number }, { x: number, y: number }]
+    expect(from.x).toBeCloseTo(toothPlacement(16)!.center.x, 6)
+    expect(to.x).toBeCloseTo(from.x, 6)
+    // Runs from inside the crown out to the apex.
+    expect(to.y).toBeCloseTo(apexPoint(16)!.y, 6)
+    expect(from.y).toBeGreaterThan(to.y)
+  })
+
+  it.each([
+    ['fracture_trace', 'needs_clinician_shape'],
+    ['sealant_path', 'needs_fissure_anatomy']
+  ])('a %s line is deferred with its real reason', (style, reason) => {
+    const r = rule({
+      rule_id: `X.${style}`,
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [lineMark(style)]
+      },
+      geometry_input: { mode: 'clinician_defined_shape', constraints: [] }
+    })
+    const result = resolveFinding(finding({ rule_id: r.rule_id }), r)
+
+    expect(lines(result)).toHaveLength(0)
+    expect(unsupported(result)[0]!.reason).toBe(reason)
+    expect(result.completeness).toBe('unsupported')
+  })
+
+  it('an unknown line style is refused', () => {
+    const r = rule({
+      rule_id: 'X.105',
+      render: { color_semantics: 'good_or_non_pathological', marks: [lineMark('squiggle', 'apex_level')] }
+    })
+    expect(unsupported(resolveFinding(finding({ rule_id: 'X.105' }), r))[0]!.reason)
+      .toBe('unknown_line_style')
+  })
+})
+
+describe('multi-segment spans', () => {
+  const r = rule({
+    rule_id: 'X.110',
+    scope: 'range',
+    render: {
+      color_semantics: 'good_or_non_pathological',
+      marks: [lineMark('two_parallel_horizontal', 'apex_level')]
+    }
+  })
+
+  it('one group is one span', () => {
+    const result = resolveFinding(
+      finding({ rule_id: 'X.110', targets: span([46, 45, 44]) }), r
+    )
+    // Two strokes because the style is a pair, one segment.
+    expect(lines(result)[0]!.strokes).toHaveLength(2)
+  })
+
+  it('two groups are two spans, and neither is invented', () => {
+    const result = resolveFinding(finding({
+      rule_id: 'X.110',
+      targets: [...span([46, 45, 44], 0), ...span([34, 35, 36], 1)]
+    }), r)
+    const instruction = lines(result)[0]!
+
+    // Two segments × two parallel strokes each.
+    expect(instruction.strokes).toHaveLength(4)
+    const first = rangeSpan([46, 44], 'apex')!
+    const second = rangeSpan([34, 36], 'apex')!
+    const xs = instruction.strokes.map(s => s[0]!.x)
+    expect(xs.filter(x => Math.abs(x - first.x1) < 0.001)).toHaveLength(2)
+    expect(xs.filter(x => Math.abs(x - second.x1) < 0.001)).toHaveLength(2)
+  })
+})
+
+describe('connectors', () => {
+  it('a straight_line connector runs the whole span', () => {
+    const r = rule({
+      rule_id: 'X.120',
+      scope: 'range',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [connectorMark('straight_line', 'apex_level')]
+      }
+    })
+    const result = resolveFinding(
+      finding({ rule_id: 'X.120', targets: span([16, 15, 14, 13]) }), r
+    )
+    const stroke = connectors(result)[0]!.strokes[0]!
+    const expected = rangeSpan([16, 13], 'apex')!
+
+    expect(connectors(result)[0]!.style).toBe('straight_line')
+    expect(stroke[0]!.x).toBeCloseTo(expected.x1, 6)
+    expect(stroke[1]!.x).toBeCloseTo(expected.x2, 6)
+  })
+
+  // -- the one that matters: endpoints are not the role ----------------------
+
+  const roleRule = rule({
+    rule_id: 'X.121',
+    scope: 'range',
+    target_roles: [{
+      code: 'anchor_tooth', name: 'Anchor', applies_to: 'subject',
+      min_count: null, max_count: null, status: 'verified', notes: null
+    }],
+    render: {
+      color_semantics: 'good_or_non_pathological',
+      marks: [
+        lineMark('straight_horizontal', 'apex_level'),
+        connectorMark('vertical_marks', 'apex_level', 'anchor_tooth')
+      ]
+    }
+  })
+
+  const withRoles = (teeth: number[], roles: Record<number, string>) =>
+    finding({
+      rule_id: 'X.121',
+      targets: teeth.map((tooth, index) => target({
+        id: `t${index}`, position: index, tooth_number: tooth,
+        role: roles[tooth] ?? null
+      }))
+    })
+
+  it('a role marked only in the middle gets its tick there, not at the ends', () => {
+    const result = resolveFinding(
+      withRoles([13, 12, 11, 21, 22, 23], { 21: 'anchor_tooth' }), roleRule
+    )
+    const ticks = connectors(result)[0]!.strokes
+
+    // The horizontal still covers the whole span...
+    const horizontal = lines(result)[0]!.strokes[0]!
+    expect(horizontal[0]!.x).toBeCloseTo(rangeSpan([13, 23], 'apex')!.x1, 6)
+    expect(horizontal[1]!.x).toBeCloseTo(rangeSpan([13, 23], 'apex')!.x2, 6)
+
+    // ...and exactly one tick, on the marked tooth alone.
+    expect(ticks).toHaveLength(1)
+    expect(ticks[0]![0]!.x).toBeCloseTo(toothPlacement(21)!.center.x, 6)
+    expect(ticks[0]![0]!.x).not.toBeCloseTo(toothPlacement(13)!.center.x, 3)
+    expect(ticks[0]![0]!.x).not.toBeCloseTo(toothPlacement(23)!.center.x, 3)
+
+    // It is a visible stroke dropped from the band onto the tooth, not a
+    // vanishing stub: the band is the row's extreme apex, so measuring to the
+    // tooth's own apex would collapse to nothing for whichever tooth defines
+    // it. Upper arch, so the tick runs down toward the crowns.
+    const [from, to] = ticks[0]! as [{ y: number }, { y: number }]
+    expect(from.y).toBeCloseTo(apexBand('permanentUpper')!, 6)
+    expect(to.y - from.y).toBeCloseTo(7, 6)
+  })
+
+  it('several marked targets each get a tick', () => {
+    const result = resolveFinding(
+      withRoles([13, 12, 11, 21, 22, 23], { 13: 'anchor_tooth', 23: 'anchor_tooth' }), roleRule
+    )
+    expect(connectors(result)[0]!.strokes).toHaveLength(2)
+  })
+
+  it('the tick is mirrored between the arches, and neither is named', () => {
+    const upper = resolveFinding(withRoles([13, 12, 11], { 12: 'anchor_tooth' }), roleRule)
+    const lower = resolveFinding(withRoles([43, 42, 41], { 42: 'anchor_tooth' }), roleRule)
+    const travel = (r: ReturnType<typeof resolveFinding>) => {
+      const [from, to] = connectors(r)[0]!.strokes[0]! as [{ y: number }, { y: number }]
+      return Math.sign(to.y - from.y)
+    }
+
+    expect(travel(upper)).toBe(1)
+    expect(travel(lower)).toBe(-1)
+  })
+
+  it('no marked target means no ticks, and the horizontal stays', () => {
+    const result = resolveFinding(withRoles([13, 12, 11, 21, 22, 23], {}), roleRule)
+
+    expect(connectors(result)[0]!.strokes).toHaveLength(0)
+    expect(lines(result)[0]!.strokes).toHaveLength(1)
+    // The span is still drawn, so nothing is lost by the absence of a role.
+    expect(result.completeness).toBe('complete')
+  })
+
+  it('a connector without a placement is refused rather than guessed', () => {
+    const r = rule({
+      rule_id: 'X.122',
+      scope: 'range',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [connectorMark('straight_line')]
+      }
+    })
+    expect(unsupported(resolveFinding(
+      finding({ rule_id: 'X.122', targets: span([16, 15]) }), r
+    ))[0]!.reason).toBe('unknown_placement')
+  })
+
+  it('an unknown connector style is refused', () => {
+    const r = rule({
+      rule_id: 'X.123',
+      scope: 'range',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [connectorMark('dotted', 'apex_level')]
+      }
+    })
+    expect(unsupported(resolveFinding(
+      finding({ rule_id: 'X.123', targets: span([16, 15]) }), r
+    ))[0]!.reason).toBe('unknown_connector_style')
+  })
+})
+
+describe('symbols on the endpoints of a span', () => {
+  const r = rule({
+    rule_id: 'X.130',
+    scope: 'range',
+    render: {
+      color_semantics: 'good_or_non_pathological',
+      marks: [symbolMark('square_with_cross', 'apex_level', undefined, 'range_endpoints')]
+    }
+  })
+
+  it('one symbol at each extreme, and none in between', () => {
+    const result = resolveFinding(
+      finding({ rule_id: 'X.130', targets: span([16, 15, 14, 13]) }), r
+    )
+    const placed = symbols(result)
+
+    expect(result.completeness).toBe('complete')
+    expect(placed).toHaveLength(2)
+    const xs = placed.map(s => s.at.x).sort((a, b) => a - b)
+    expect(xs[0]).toBeCloseTo(toothPlacement(16)!.center.x, 6)
+    expect(xs[1]).toBeCloseTo(toothPlacement(13)!.center.x, 6)
+    // Both sit on the declared band.
+    for (const symbol of placed) expect(symbol.at.y).toBeCloseTo(apexBand('permanentUpper')!, 6)
+  })
+
+  it('11 → 21 is contiguous: the extremes are the neighbours, not the numbers', () => {
+    const result = resolveFinding(
+      finding({ rule_id: 'X.130', targets: span([11, 21]) }), r
+    )
+    const xs = symbols(result).map(s => s.at.x).sort((a, b) => a - b)
+
+    expect(symbols(result)).toHaveLength(2)
+    expect(xs[0]).toBeCloseTo(toothPlacement(11)!.center.x, 6)
+    expect(xs[1]).toBeCloseTo(toothPlacement(21)!.center.x, 6)
+    // Adjacent columns: the span is two teeth wide, not ten.
+    expect(toothPlacement(21)!.index - toothPlacement(11)!.index).toBe(1)
+  })
+
+  it('the order the targets arrive in does not change the drawing', () => {
+    const forwards = resolveFinding(finding({ rule_id: 'X.130', targets: span([13, 14, 15, 16]) }), r)
+    const backwards = resolveFinding(finding({ rule_id: 'X.130', targets: span([16, 15, 14, 13]) }), r)
+    const xs = (x: ReturnType<typeof resolveFinding>) =>
+      symbols(x).map(s => Math.round(s.at.x * 100)).sort((a, b) => a - b)
+
+    expect(xs(forwards)).toEqual(xs(backwards))
+  })
+
+  it('two groups yield two pairs of endpoints', () => {
+    const result = resolveFinding(finding({
+      rule_id: 'X.130',
+      targets: [...span([46, 45, 44], 0), ...span([34, 35, 36], 1)]
+    }), r)
+    expect(symbols(result)).toHaveLength(4)
+  })
+})
+
+describe('arrows point the way the arch decides', () => {
+  const arrowRule = (id: string, at: string, toward: string, style = 'straight_vertical') =>
+    rule({
+      rule_id: id,
+      render: { color_semantics: 'good_or_non_pathological', marks: [arrowMark(style, at, toward)] }
+    })
+
+  /** Sign of the arrow's travel: +1 down the screen, -1 up. */
+  const sense = (r: ReturnType<typeof resolveFinding>) => {
+    const points = arrowsOf(r)[0]!.arrows[0]!.points
+    return Math.sign(points[points.length - 1]!.y - points[0]!.y)
+  }
+
+  const on = (id: string, fdi: number) =>
+    finding({ rule_id: id, targets: [target({ tooth_number: fdi })] })
+
+  it('outward runs away from the tooth: down on an upper, up on a lower', () => {
+    const r = arrowRule('X.140', 'outside_occlusal', 'outward')
+    expect(sense(resolveFinding(on('X.140', 16), r))).toBe(1)
+    expect(sense(resolveFinding(on('X.140', 46), r))).toBe(-1)
+  })
+
+  it('inward is the mirror of outward on the same tooth', () => {
+    const out = arrowRule('X.141', 'outside_occlusal', 'outward')
+    const into = arrowRule('X.142', 'outside_occlusal', 'incisal_occlusal')
+
+    expect(sense(resolveFinding(on('X.141', 16), out)))
+      .toBe(-sense(resolveFinding(on('X.142', 16), into)))
+    expect(sense(resolveFinding(on('X.141', 46), out)))
+      .toBe(-sense(resolveFinding(on('X.142', 46), into)))
+  })
+
+  it('an on-figure arrow sits over the tooth, not outside it', () => {
+    const r = arrowRule('X.143', 'on_figure', 'occlusal_plane', 'zigzag')
+    const result = resolveFinding(on('X.143', 16), r)
+    const points = arrowsOf(result)[0]!.arrows[0]!.points
+    const crown = crownBox(16)!
+
+    expect(arrowsOf(result)[0]!.style).toBe('zigzag')
+    expect(points.length).toBeGreaterThan(2)
+    // Its tip lands on the crown rather than clear of the row's biting edge.
+    const tip = points[points.length - 1]!
+    expect(tip.y).toBeLessThanOrEqual(crown.y + crown.height + 0.001)
+    expect(tip.y).toBeGreaterThanOrEqual(crown.y - 0.001)
+  })
+
+  it('an outside arrow clears the row\'s occlusal band', () => {
+    const r = arrowRule('X.144', 'outside_occlusal', 'outward')
+    const points = arrowsOf(resolveFinding(on('X.144', 16), r))[0]!.arrows[0]!.points
+    const band = occlusalBand('permanentUpper')!
+
+    for (const point of points) expect(point.y).toBeGreaterThan(band)
+  })
+
+  it('two crossed curves are symmetric, whichever order the pair arrives in', () => {
+    const r = rule({
+      rule_id: 'X.145',
+      scope: 'pair',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [arrowMark('two_crossed_curved', 'tooth_numbers')]
+      }
+    })
+    const build = (teeth: number[]) => arrowsOf(resolveFinding(
+      finding({ rule_id: 'X.145', targets: span(teeth) }), r
+    ))[0]!
+
+    const forwards = build([26, 27])
+    const backwards = build([27, 26])
+
+    expect(forwards.arrows).toHaveLength(2)
+    expect(forwards.arrows.every(a => a.curved)).toBe(true)
+    expect(JSON.stringify(forwards.arrows)).toBe(JSON.stringify(backwards.arrows))
+
+    // One bows above the numbers and the other below.
+    const bows = forwards.arrows.map(a => Math.sign(a.points[1]!.y - a.points[0]!.y))
+    expect(new Set(bows)).toEqual(new Set([-1, 1]))
+    // Anchored on the FDI strip.
+    expect(forwards.arrows[0]!.points[0]!.y).toBeCloseTo(numberAnchor(26)!.y, 6)
+  })
+
+  it('a curved arrow whose sense is a clinical observation is not invented', () => {
+    const r = arrowRule('X.146', 'occlusal_zone', '', 'curved')
+    const result = resolveFinding(on('X.146', 16), r)
+
+    expect(arrowsOf(result)).toHaveLength(0)
+    expect(unsupported(result)[0]!.reason).toBe('needs_clinical_direction')
+  })
+
+  it('an arrow with no recognised direction token is refused', () => {
+    const r = arrowRule('X.147', 'outside_occlusal', 'sideways')
+    expect(unsupported(resolveFinding(on('X.147', 16), r))[0]!.reason)
+      .toBe('unknown_arrow_direction')
   })
 })

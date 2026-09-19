@@ -25,24 +25,39 @@
  *
  * ## What this slice draws
  *
- * `box_siglas` and `symbol`. Everything else — lines, connectors, arrows,
- * fills, outlines — is **deferred**, not ignored: a finding whose marks are
- * only partly drawable reports itself as `partial`, and one that cannot be
- * drawn at all reports `unsupported`. Nothing disappears quietly, because a
- * finding that vanishes from an odontogram reads as a finding that was never
- * made.
+ * `box_siglas`, `symbol`, `line`, `connector` and `arrow`. What is left —
+ * `shape_fill` and `outline` — both need the shape the clinician observed,
+ * which has no channel to arrive through yet.
+ *
+ * Deferral is **reported, never silent**: a finding whose marks are only
+ * partly drawable reports itself as `partial`, one that cannot be drawn at all
+ * reports `unsupported`, and each undrawable mark carries the reason. A
+ * finding that vanished from an odontogram would read as a finding that was
+ * never made.
  */
 
 import type { NtsFinding, NtsFindingTarget, NtsRule } from '../types/nts'
-import type { NtsBox, NtsPoint } from './ntsChartGeometry'
+import type { NtsBox, NtsLevel, NtsPoint, NtsRowId, NtsSpan } from './ntsChartGeometry'
 import {
   annotationBox,
+  apexPoint,
+  archSpan,
   crownBox,
   interproximalPoint,
   numberAnchor,
+  occlusalBand,
+  occlusalDirection,
+  rangeSpan,
   rootBox,
   toothPlacement
 } from './ntsChartGeometry'
+
+/**
+ * Re-exported because they are part of this module's own contract: every
+ * instruction carries boxes and points, and a consumer should not have to
+ * import half of its types from the geometry module to read one.
+ */
+export type { NtsBox, NtsPoint } from './ntsChartGeometry'
 
 // ---------------------------------------------------------------------------
 // the instruction model
@@ -134,6 +149,58 @@ export interface NtsSymbolInstruction extends NtsInstructionBase {
   enclosedText?: string
 }
 
+export type NtsLineStyle =
+  | 'straight_horizontal'
+  | 'straight_vertical'
+  | 'two_parallel_horizontal'
+  | 'zigzag'
+
+/**
+ * A stroke, or several, already resolved to chart coordinates.
+ *
+ * Polylines rather than path strings: a zigzag is its points, a pair of
+ * parallels is two of them, and a test can say where a line runs without
+ * parsing SVG. The layer turns each into one `<polyline>` and nothing else.
+ */
+export interface NtsLineInstruction extends NtsInstructionBase {
+  kind: 'line'
+  /** Narrowed: nothing is drawn without a colour. */
+  paint: NtsPaint
+  style: NtsLineStyle
+  strokes: NtsPoint[][]
+}
+
+export type NtsConnectorStyle = 'straight_line' | 'vertical_marks'
+
+export interface NtsConnectorInstruction extends NtsInstructionBase {
+  kind: 'connector'
+  paint: NtsPaint
+  style: NtsConnectorStyle
+  strokes: NtsPoint[][]
+}
+
+export type NtsArrowStyle = 'zigzag' | 'straight_vertical' | 'two_crossed_curved'
+
+/**
+ * One arrow: a spine and the way its head faces.
+ *
+ * `points` runs tail → tip, so the head is always at the last point and its
+ * facing is the last segment. `curved` marks a three-point spine to be drawn
+ * as a quadratic through its middle, which is what the two crossed arrows of a
+ * transposition need.
+ */
+export interface NtsArrowShape {
+  points: NtsPoint[]
+  curved: boolean
+}
+
+export interface NtsArrowInstruction extends NtsInstructionBase {
+  kind: 'arrow'
+  paint: NtsPaint
+  style: NtsArrowStyle
+  arrows: NtsArrowShape[]
+}
+
 /** Why something could not be drawn. Always reported, never swallowed. */
 export type NtsUnsupportedReason =
   | 'mark_kind_not_in_slice'
@@ -145,6 +212,17 @@ export type NtsUnsupportedReason =
   | 'targets_not_adjacent'
   | 'wrong_target_count'
   | 'needs_range_orchestration'
+  /** The norm draws the shape the clinician observed; there is no channel. */
+  | 'needs_clinician_shape'
+  /** The norm anchors the mark to anatomy the chart does not model. */
+  | 'needs_fissure_anatomy'
+  /** The direction is a clinical observation the norm leaves unenumerated. */
+  | 'needs_clinical_direction'
+  | 'unknown_line_style'
+  | 'unknown_connector_style'
+  | 'unknown_arrow_style'
+  | 'unknown_arrow_direction'
+  | 'no_targets'
   /**
    * The norm ties this rule's colour to a good/bad state the finding does not
    * carry, or carries as something the catalog does not enumerate. Both
@@ -162,6 +240,9 @@ export interface NtsUnsupportedInstruction extends NtsInstructionBase {
 export type NtsRenderInstruction =
   | NtsTextInstruction
   | NtsSymbolInstruction
+  | NtsLineInstruction
+  | NtsConnectorInstruction
+  | NtsArrowInstruction
   | NtsUnsupportedInstruction
 
 /** How much of a finding this slice can actually draw. */
@@ -458,11 +539,488 @@ const KNOWN_SHAPES: ReadonlySet<string> = new Set<NtsSymbolShape>([
 ])
 
 // ---------------------------------------------------------------------------
+// placement tokens
+// ---------------------------------------------------------------------------
+//
+// The catalog and the geometry module name bands differently, on purpose: the
+// catalog speaks the norm's language ("a nivel de los ápices") and the geometry
+// speaks the chart's. The translation is one explicit table, not a guess, and
+// it is the *only* place the two vocabularies meet.
+//
+// `geometry_input.constraints` is deliberately absent from all of this.
+// NTS-05D.3a settled that it cannot place a mark: it is declared once per rule
+// while marks are many, and at least one rule declares two areas for two
+// different marks.
+
+/** Catalog placement token → the band the geometry module knows. */
+const BAND_FOR_TOKEN: Readonly<Record<string, NtsLevel>> = {
+  apex_level: 'apex',
+  over_crowns: 'crown'
+}
+
+/**
+ * Distance a mark sits clear of the band it is anchored outside of.
+ *
+ * Chart units, like everything else here: the coordinate space is derived from
+ * the dentition and never from a viewport, so this is the same number at every
+ * screen width and in print.
+ */
+const OUTSIDE_MARGIN = 5
+
+/** Gap between the two strokes of a parallel pair. */
+const PARALLEL_GAP = 3
+
+/** Zigzag geometry, in chart units. */
+const ZIGZAG_AMPLITUDE = 3
+const ZIGZAG_WAVELENGTH = 11
+
+/** Length of an arrow's shaft. */
+const ARROW_LENGTH = 13
+
+/**
+ * Length of a tick dropped from a band onto a target.
+ *
+ * The norm draws these as short strokes and states no length, so this is a
+ * presentation choice like stroke width. It is a constant rather than "down to
+ * that tooth's apex" for a concrete reason: the band is already the *extreme*
+ * apex of the row, so a tooth whose own apex sits near it would get a tick a
+ * fraction of a pixel long and effectively vanish.
+ */
+const TICK_LENGTH = 7
+
+// ---------------------------------------------------------------------------
+// spans
+// ---------------------------------------------------------------------------
+
+/**
+ * The subject targets, grouped as the record stores them.
+ *
+ * One span per `group_index`. The editor produces a single group today, so
+ * this changes nothing now — but the norm's own figure draws two disjoint
+ * stretches for one appliance, and when the persistence gap closes the
+ * renderer already knows what to do with the second group. It never invents a
+ * group that is not there.
+ */
+function subjectGroups(finding: NtsFinding): number[][] {
+  const groups = new Map<number, number[]>()
+  for (const target of subjects(finding)) {
+    if (target.tooth_number === null) continue
+    const bucket = groups.get(target.group_index)
+    if (bucket) bucket.push(target.tooth_number)
+    else groups.set(target.group_index, [target.tooth_number])
+  }
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([, teeth]) => teeth)
+}
+
+function archesOf(finding: NtsFinding): string[] {
+  return subjects(finding)
+    .filter(target => target.target_kind === 'arch' && target.arch !== null)
+    .map(target => target.arch!)
+}
+
+/**
+ * Every span this finding covers at the given band.
+ *
+ * An arch-scoped finding spans the permanent row of each arch it names — the
+ * policy the 05D.0 audit settled, since the norm draws one 16-tooth arch and
+ * stretching the mark over the nested deciduous row would assert something
+ * about those teeth that the norm does not.
+ */
+function spansFor(finding: NtsFinding, level: NtsLevel): NtsSpan[] {
+  const arches = archesOf(finding)
+  if (arches.length > 0) {
+    return arches
+      .map(arch => archSpan(arch as 'upper' | 'lower', level))
+      .filter((span): span is NtsSpan => span !== null)
+  }
+  return subjectGroups(finding)
+    .map(teeth => rangeSpan(teeth, level))
+    .filter((span): span is NtsSpan => span !== null)
+}
+
+// ---------------------------------------------------------------------------
+// stroke builders
+// ---------------------------------------------------------------------------
+
+function horizontal(span: NtsSpan, y: number): NtsPoint[] {
+  return [{ x: span.x1, y }, { x: span.x2, y }]
+}
+
+/**
+ * A zigzag across the span, deterministic for a given width.
+ *
+ * The number of teeth is computed from the span rather than fixed, so a
+ * removable appliance over a whole arch and one over half of it have the same
+ * tooth size instead of the same tooth count.
+ */
+function zigzagPoints(span: NtsSpan, y: number): NtsPoint[] {
+  const width = span.x2 - span.x1
+  const teeth = Math.max(2, Math.round(width / ZIGZAG_WAVELENGTH))
+  const step = width / teeth
+  const points: NtsPoint[] = []
+  for (let i = 0; i <= teeth; i++) {
+    points.push({
+      x: span.x1 + step * i,
+      y: i % 2 === 0 ? y - ZIGZAG_AMPLITUDE : y + ZIGZAG_AMPLITUDE
+    })
+  }
+  return points
+}
+
+// ---------------------------------------------------------------------------
+// line
+// ---------------------------------------------------------------------------
+
+const LINE_STYLES: ReadonlySet<string> = new Set<NtsLineStyle>([
+  'straight_horizontal',
+  'straight_vertical',
+  'two_parallel_horizontal',
+  'zigzag'
+])
+
+/**
+ * Styles the norm words as "the shape the clinician observed".
+ *
+ * They are named here so the deferral carries the real reason rather than
+ * "unknown style": the catalog declares them properly, what is missing is a
+ * channel to store a drawn shape (G6) and a model of fissure anatomy (G10).
+ */
+const FREEHAND_LINE_STYLES: Readonly<Record<string, NtsUnsupportedReason>> = {
+  fracture_trace: 'needs_clinician_shape',
+  sealant_path: 'needs_fissure_anatomy'
+}
+
+function resolveLine(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  base: DrawableBase
+): NtsRenderInstruction[] {
+  const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
+    { ...base, kind: 'unsupported', layer: NTS_LAYERS.line, reason, markKind: mark.kind }
+  ]
+
+  const style = mark.params.style
+  if (style && style in FREEHAND_LINE_STYLES) return fail(FREEHAND_LINE_STYLES[style]!)
+  if (!style || !LINE_STYLES.has(style)) return fail('unknown_line_style')
+
+  // A vertical line belongs to one tooth, not to a span: the norm draws it
+  // down the tooth's own axis.
+  if (style === 'straight_vertical') return verticalLines(mark, finding, base)
+
+  const token = mark.params.at
+  const level = token === undefined ? undefined : BAND_FOR_TOKEN[token]
+  if (level === undefined) return fail('unknown_placement')
+
+  const spans = spansFor(finding, level)
+  if (spans.length === 0) return fail('no_targets')
+
+  const strokes: NtsPoint[][] = []
+  for (const span of spans) {
+    if (style === 'zigzag') {
+      strokes.push(zigzagPoints(span, span.y))
+    } else if (style === 'two_parallel_horizontal') {
+      strokes.push(horizontal(span, span.y - PARALLEL_GAP / 2))
+      strokes.push(horizontal(span, span.y + PARALLEL_GAP / 2))
+    } else {
+      strokes.push(horizontal(span, span.y))
+    }
+  }
+
+  return [{
+    ...base,
+    kind: 'line',
+    layer: NTS_LAYERS.line,
+    style: style as NtsLineStyle,
+    strokes
+  }]
+}
+
+/**
+ * The vertical line down a tooth.
+ *
+ * **One line per tooth, on its centre axis** — settled from the norm's own
+ * figures, magnified: p.19 draws a two-rooted deciduous molar with a single
+ * line running *between* its roots, and p.9 draws a three-rooted molar with
+ * one line. `rootAxes` exists and is deliberately not used here: it is a
+ * geometric capability, not an instruction to repeat the mark per root.
+ */
+function verticalLines(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  base: DrawableBase
+): NtsRenderInstruction[] {
+  const strokes: NtsPoint[][] = []
+
+  for (const fdi of numberedSubjects(finding)) {
+    const placement = toothPlacement(fdi)
+    const apex = apexPoint(fdi)
+    if (!placement || !apex) continue
+    const crown = placement.crown
+    const from = crown.y + crown.height / 2
+    strokes.push([{ x: placement.center.x, y: from }, { x: placement.center.x, y: apex.y }])
+  }
+
+  if (strokes.length === 0) {
+    return [{
+      ...base,
+      kind: 'unsupported',
+      layer: NTS_LAYERS.line,
+      reason: 'tooth_not_on_chart',
+      markKind: mark.kind
+    }]
+  }
+
+  return [{
+    ...base,
+    kind: 'line',
+    layer: NTS_LAYERS.line,
+    style: 'straight_vertical',
+    strokes
+  }]
+}
+
+// ---------------------------------------------------------------------------
+// connector
+// ---------------------------------------------------------------------------
+
+function resolveConnector(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  base: DrawableBase
+): NtsRenderInstruction[] {
+  const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
+    { ...base, kind: 'unsupported', layer: NTS_LAYERS.line, reason, markKind: mark.kind }
+  ]
+
+  const style = mark.params.style
+  const token = mark.params.at
+  const level = token === undefined ? undefined : BAND_FOR_TOKEN[token]
+  if (level === undefined) return fail('unknown_placement')
+
+  const spans = spansFor(finding, level)
+  if (spans.length === 0) return fail('no_targets')
+
+  if (style === 'straight_line') {
+    // Joins the marks at the extremes of the span, which is the span itself.
+    return [{
+      ...base,
+      kind: 'connector',
+      layer: NTS_LAYERS.line,
+      style: 'straight_line',
+      strokes: spans.map(span => horizontal(span, span.y))
+    }]
+  }
+
+  if (style === 'vertical_marks') {
+    // Dropped onto the targets carrying the mark's role, and onto no others.
+    // The norm names a role for these and never equates it with the extremes
+    // of the span; the figure it prints merely happens to have them coincide.
+    // So the role is read off the targets, never inferred from position — and
+    // a span with no target carrying it gets the horizontal alone.
+    const strokes: NtsPoint[][] = []
+    const band = spans[0]!.y
+
+    for (const target of subjects(finding)) {
+      if (mark.role === null || target.role !== mark.role) continue
+      if (target.tooth_number === null) continue
+      const placement = toothPlacement(target.tooth_number)
+      const toward = occlusalDirection(target.tooth_number)
+      if (!placement || toward === null) continue
+      // Dropped from the band onto the tooth. The teeth lie on the biting side
+      // of an apex band, so the tick follows the same sense as the arch's
+      // occlusal direction and is mirrored between upper and lower without
+      // either being named.
+      strokes.push([
+        { x: placement.center.x, y: band },
+        { x: placement.center.x, y: band + TICK_LENGTH * toward }
+      ])
+    }
+
+    return [{
+      ...base,
+      kind: 'connector',
+      layer: NTS_LAYERS.line,
+      style: 'vertical_marks',
+      strokes
+    }]
+  }
+
+  return fail('unknown_connector_style')
+}
+
+// ---------------------------------------------------------------------------
+// arrow
+// ---------------------------------------------------------------------------
+
+/**
+ * Which way an arrow points, on the screen.
+ *
+ * Never stored, always derived: `toward` says what the arrow means relative to
+ * the tooth, and the arch says which way that is. An upper and a lower tooth
+ * with the same finding point opposite ways, and neither the catalog nor the
+ * clinician is asked about it.
+ *
+ * `occlusalDirection` is +1 when a tooth's biting edge faces down the screen.
+ */
+function arrowDirection(toward: string | undefined, fdi: number): number | null {
+  const occlusal = occlusalDirection(fdi)
+  if (occlusal === null) return null
+  switch (toward) {
+    // "en sentido externo": out of the arch, away from the tooth.
+    case 'outward':
+      return occlusal
+    // Toward the tooth's own incisal/occlusal zone: inward.
+    case 'incisal_occlusal':
+      return -occlusal
+    // Toward the occlusal plane, drawn over the figure.
+    case 'occlusal_plane':
+      return occlusal
+    default:
+      return null
+  }
+}
+
+function resolveArrow(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  base: DrawableBase
+): NtsRenderInstruction[] {
+  const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
+    { ...base, kind: 'unsupported', layer: NTS_LAYERS.arrow, reason, markKind: mark.kind }
+  ]
+
+  const style = mark.params.style
+  const at = mark.params.at
+  const teeth = numberedSubjects(finding)
+
+  if (style === 'two_crossed_curved') return crossedArrows(mark, teeth, base, at)
+
+  if (style !== 'zigzag' && style !== 'straight_vertical') {
+    // A curved arrow follows "el sentido de la giroversión" — an observed
+    // datum the norm never enumerates. Its placement is known; its direction
+    // is a clinical fact nobody has recorded in a form this can read, and
+    // guessing one would draw a rotation that may not exist.
+    return fail(style === 'curved' ? 'needs_clinical_direction' : 'unknown_arrow_style')
+  }
+
+  const fdi = teeth[0]
+  if (fdi === undefined) return fail('no_targets')
+  const placement = toothPlacement(fdi)
+  if (!placement) return fail('tooth_not_on_chart')
+
+  const direction = arrowDirection(mark.params.toward, fdi)
+  if (direction === null) return fail('unknown_arrow_direction')
+
+  const x = placement.center.x
+  const crown = placement.crown
+  let tail: number
+  let tip: number
+
+  if (at === 'on_figure') {
+    // Over the tooth itself: the norm draws this one "sobre la gráfica".
+    tail = direction > 0 ? crown.y - ARROW_LENGTH / 2 : crown.y + crown.height + ARROW_LENGTH / 2
+    tip = direction > 0 ? crown.y + crown.height : crown.y
+  } else if (at === 'outside_occlusal') {
+    const band = occlusalBand(placement.row as NtsRowId)
+    if (band === null) return fail('unknown_placement')
+    // Clear of the biting edge, on that side. An outward arrow runs away from
+    // the band; an inward one runs back toward it.
+    const near = band + OUTSIDE_MARGIN * occlusalDirection(fdi)!
+    const far = near + ARROW_LENGTH * occlusalDirection(fdi)!
+    const outward = direction === occlusalDirection(fdi)
+    tail = outward ? near : far
+    tip = outward ? far : near
+  } else {
+    return fail('unknown_placement')
+  }
+
+  return [{
+    ...base,
+    kind: 'arrow',
+    layer: NTS_LAYERS.arrow,
+    style: style as NtsArrowStyle,
+    arrows: [{
+      points: style === 'zigzag'
+        ? zigzagSpine(x, tail, tip)
+        : [{ x, y: tail }, { x, y: tip }],
+      curved: false
+    }]
+  }]
+}
+
+/** A zigzag running vertically from tail to tip. */
+function zigzagSpine(x: number, tail: number, tip: number): NtsPoint[] {
+  const steps = 4
+  const dy = (tip - tail) / steps
+  const points: NtsPoint[] = []
+  for (let i = 0; i <= steps; i++) {
+    points.push({
+      x: i === steps ? x : x + (i % 2 === 0 ? -ZIGZAG_AMPLITUDE : ZIGZAG_AMPLITUDE),
+      y: tail + dy * i
+    })
+  }
+  return points
+}
+
+/**
+ * Two curved arrows crossing between the tooth numbers.
+ *
+ * Symmetric by construction: one runs left to right and the other right to
+ * left, each bowing to the opposite side. Which target the record happens to
+ * list first therefore changes nothing about the drawing.
+ */
+function crossedArrows(
+  mark: CatalogMark,
+  teeth: number[],
+  base: DrawableBase,
+  at: string | undefined
+): NtsRenderInstruction[] {
+  const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
+    { ...base, kind: 'unsupported', layer: NTS_LAYERS.arrow, reason, markKind: mark.kind }
+  ]
+
+  if (at !== 'tooth_numbers') return fail('unknown_placement')
+  if (teeth.length !== 2) return fail('wrong_target_count')
+
+  const anchors = teeth.map(numberAnchor)
+  if (anchors.some(point => point === null)) return fail('tooth_not_on_chart')
+
+  // Ordered by position on the chart, so the pair is drawn the same way round
+  // whichever order the targets arrive in.
+  const [left, right] = (anchors as NtsPoint[]).slice().sort((a, b) => a.x - b.x) as [NtsPoint, NtsPoint]
+  const midX = (left.x + right.x) / 2
+  const y = (left.y + right.y) / 2
+  const bow = Math.max(6, (right.x - left.x) / 3)
+
+  return [{
+    ...base,
+    kind: 'arrow',
+    layer: NTS_LAYERS.arrow,
+    style: 'two_crossed_curved',
+    arrows: [
+      { points: [left, { x: midX, y: y - bow }, right], curved: true },
+      { points: [right, { x: midX, y: y + bow }, left], curved: true }
+    ]
+  }]
+}
+
+// ---------------------------------------------------------------------------
 // one finding
 // ---------------------------------------------------------------------------
 
-/** Mark kinds this slice can draw. The rest are deferred, never dropped. */
-const DRAWABLE_KINDS: ReadonlySet<string> = new Set(['box_siglas', 'symbol'])
+/**
+ * Mark kinds this slice can draw. The rest are deferred, never dropped.
+ *
+ * `shape_fill` and `outline` are the two left: both need the shape the
+ * clinician observed, which has no channel to arrive through yet.
+ */
+const DRAWABLE_KINDS: ReadonlySet<string> = new Set([
+  'box_siglas',
+  'symbol',
+  'line',
+  'connector',
+  'arrow'
+])
 
 export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRender {
   const paint = paintFor(rule, finding)
@@ -504,14 +1062,18 @@ export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRe
       continue
     }
 
+    // One mark can become several instructions: a pair of endpoint symbols,
+    // a vertical tick per role-bearing target, a stroke per segment of a span.
     const drawable = { ...base, paint }
     const produced =
-      mark.kind === 'box_siglas'
-        ? resolveBox(mark, rule, finding, drawable)
-        : resolveSymbol(mark, rule, finding, drawable)
+      mark.kind === 'box_siglas' ? [resolveBox(mark, rule, finding, drawable)]
+        : mark.kind === 'symbol' ? resolveSymbol(mark, rule, finding, drawable)
+          : mark.kind === 'line' ? resolveLine(mark, finding, drawable)
+            : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable)
+              : resolveArrow(mark, finding, drawable)
 
-    instructions.push(produced)
-    if (produced.kind !== 'unsupported') drawn += 1
+    instructions.push(...produced)
+    if (produced.some(instruction => instruction.kind !== 'unsupported')) drawn += 1
   }
 
   const completeness: NtsCompleteness =
@@ -562,27 +1124,17 @@ function resolveSymbol(
   rule: NtsRule,
   finding: NtsFinding,
   base: DrawableBase
-): NtsRenderInstruction {
+): NtsRenderInstruction[] {
   const shape = mark.params.shape
-  const fail = (reason: NtsUnsupportedReason): NtsUnsupportedInstruction => ({
+  const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [{
     ...base,
     kind: 'unsupported',
     layer: NTS_LAYERS.symbol,
     reason,
     markKind: mark.kind
-  })
+  }]
 
   if (!shape || !KNOWN_SHAPES.has(shape)) return fail('unknown_symbol_shape')
-
-  // A mark drawn on only some of the finding's targets needs the span resolved
-  // before it can be placed, and the span primitives belong to a later slice.
-  // The placement itself is now stated (`at`), so this is a missing primitive
-  // rather than missing metadata — and drawing the marks without the connector
-  // that joins them would show half a mark.
-  if (mark.target_selector !== null) return fail('needs_range_orchestration')
-
-  const placed = placeSymbol(shape as NtsSymbolShape, mark.params.at, finding)
-  if ('reason' in placed) return fail(placed.reason)
 
   let enclosedText: string | undefined
   if (mark.text_from) {
@@ -591,7 +1143,7 @@ function resolveSymbol(
     enclosedText = resolved.text
   }
 
-  return {
+  const emit = (placed: Placed): NtsSymbolInstruction => ({
     ...base,
     kind: 'symbol',
     layer: NTS_LAYERS.symbol,
@@ -599,7 +1151,66 @@ function resolveSymbol(
     at: placed.at,
     bounds: placed.bounds,
     ...(enclosedText === undefined ? {} : { enclosedText })
+  })
+
+  // A mark that applies to a subset of the targets: one symbol per selected
+  // target, placed at the band the mark declares. The two questions are read
+  // from two fields, which is what NTS-05D.3a separated them for.
+  if (mark.target_selector !== null) {
+    return resolveSelectedSymbols(mark, finding, base, emit, fail)
   }
+
+  const placed = placeSymbol(shape as NtsSymbolShape, mark.params.at, finding)
+  if ('reason' in placed) return fail(placed.reason)
+  return [emit(placed)]
+}
+
+/**
+ * Symbols drawn on a chosen subset of the finding's targets.
+ *
+ * The extremes are taken **in row order**, never by FDI number: 11 and 21 are
+ * neighbours on the chart and ten apart numerically, so sorting by number
+ * would invert every span that crosses the midline. `rangeSpan` already orders
+ * by position, so the endpoints fall out of the span it returns.
+ */
+function resolveSelectedSymbols(
+  mark: CatalogMark,
+  finding: NtsFinding,
+  base: DrawableBase,
+  emit: (placed: Placed) => NtsSymbolInstruction,
+  fail: (reason: NtsUnsupportedReason) => NtsRenderInstruction[]
+): NtsRenderInstruction[] {
+  if (mark.target_selector !== 'range_endpoints') return fail('unknown_placement')
+
+  const token = mark.params.at
+  const level = token === undefined ? undefined : BAND_FOR_TOKEN[token]
+  if (level === undefined) return fail('unknown_placement')
+
+  const instructions: NtsSymbolInstruction[] = []
+  for (const teeth of subjectGroups(finding)) {
+    const span = rangeSpan(teeth, level)
+    if (!span || teeth.length === 0) continue
+    const ordered = orderedByColumn(teeth)
+    const ends = ordered.length === 1 ? [ordered[0]!] : [ordered[0]!, ordered[ordered.length - 1]!]
+
+    for (const fdi of ends) {
+      const placement = toothPlacement(fdi)
+      if (!placement) continue
+      const point = { x: placement.center.x, y: span.y }
+      instructions.push(emit({ at: point, bounds: squareAround(point, placement.crown, 0.35) }))
+    }
+  }
+
+  return instructions.length > 0 ? instructions : fail('no_targets')
+}
+
+/** Teeth sorted by where they sit on the chart, not by their number. */
+function orderedByColumn(teeth: readonly number[]): number[] {
+  return teeth
+    .map(fdi => ({ fdi, placement: toothPlacement(fdi) }))
+    .filter(entry => entry.placement !== null)
+    .sort((a, b) => a.placement!.index - b.placement!.index)
+    .map(entry => entry.fdi)
 }
 
 // ---------------------------------------------------------------------------

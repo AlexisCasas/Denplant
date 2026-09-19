@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- feat(nts-05d.3): **lines, connectors and arrows reach the chart**. With the
+  span primitives in place the drawing goes from 18 rules to **30 complete,
+  5 partial, 3 unsupported**: orthodontic appliances, edentulous arches,
+  bridges, complete and partial prostheses, root canals, posts, eruption,
+  extrusion, intrusion and transposition all draw.
+
+  Three instruction kinds, all carrying geometry already resolved to chart
+  coordinates: `line` and `connector` as polylines, `arrow` as a spine plus a
+  head that faces along its last segment. The layer draws them and knows
+  nothing else — no scope, no roles, no arches.
+
+  Everything is still read from the mark. The catalog's placement tokens are
+  translated to geometry bands by one explicit table; `geometry_input.constraints`
+  is never consulted, as NTS-05D.3a settled. Arrow direction is derived from
+  `toward` plus the tooth's arch, so an upper and a lower tooth with the same
+  finding mirror each other without either being named. A span's endpoints come
+  from row order, so a bridge from 11 to 21 is two teeth wide and not ten.
+
+  The verticals of a fixed partial prosthesis are dropped onto the targets
+  carrying the mark's role and onto no others — a span with the role marked
+  only in the middle gets its stroke there, and one with no role marked gets
+  the horizontal alone. Endpoints are never assumed to be the role.
+
+  Spans are grouped by `group_index`, so a finding delivered with two groups
+  draws two segments. That does not fix the persistence gap and no group is
+  ever invented; it means the renderer is ready when the gap closes.
+
+  Root lines follow the reading closed in NTS-05D.3a: **one line per tooth on
+  its centre axis**, never one per root. `rootAxes` stays available and stays
+  unused here.
+
+  Left undrawn, and reported rather than approximated: the freehand fracture
+  shape (G6), fissure anatomy for sealants (G10), and the direction of a
+  rotation, which is a clinical observation the norm never enumerates
+  (CLINICAL-03). `shape_fill` and `outline` are the two mark kinds still to
+  come.
+
 - feat(nts-05d.3a): **where a mark goes and which targets it applies to are now
   two questions**. The 05D.3 pre-flight found four marks with no stated height:
   §6.1.1's symbol and connector, and §6.1.29's line and connector. The norm

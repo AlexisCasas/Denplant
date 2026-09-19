@@ -841,9 +841,26 @@ describe('NTS-05D.2 — the finding layer draws inside the shared space', () => 
   })
 
   it('a finding this slice cannot draw is announced instead of omitted', async () => {
-    // 6.1.30 is drawn with two parallel lines; no line primitive exists yet.
-    const arch = {
+    // 6.1.34 is drawn as the contour of the shape the clinician observed. No
+    // outline primitive exists, and no channel carries the shape either.
+    const temporary = {
       ...boxOnly(16, 'f9'),
+      rule_id: '6.1.34',
+      attributes: { surfaces: ['O'] }
+    }
+    const wrapper = await mountChart({
+      record: makeRecord({ findings: [temporary] as never }),
+      catalog: REAL_CATALOG
+    })
+
+    expect(wrapper.find('[data-testid="nts-sigla-f9"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(true)
+  })
+
+  it('a line-drawn finding now reaches the chart', async () => {
+    // 6.1.30: two parallel lines at apex level across the upper arch.
+    const arch = {
+      ...boxOnly(16, 'f10'),
       rule_id: '6.1.30',
       attributes: { condition_state: 'good' },
       targets: [{
@@ -856,8 +873,10 @@ describe('NTS-05D.2 — the finding layer draws inside the shared space', () => 
       catalog: REAL_CATALOG
     })
 
-    expect(wrapper.find('[data-testid="nts-sigla-f9"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(true)
+    const mark = wrapper.find('[data-testid="nts-mark-f10-two_parallel_horizontal"]')
+    expect(mark.exists()).toBe(true)
+    expect(mark.findAll('polyline')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="nts-chart-findings-pending"]').exists()).toBe(false)
   })
 
   it('a box with more siglas than it can hold shows the count, and says so', async () => {

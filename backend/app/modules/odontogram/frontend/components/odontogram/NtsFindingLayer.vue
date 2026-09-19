@@ -19,8 +19,13 @@
  */
 
 import type {
+  NtsArrowInstruction,
+  NtsArrowShape,
   NtsBoxOverflow,
+  NtsConnectorInstruction,
+  NtsLineInstruction,
   NtsPaint,
+  NtsPoint,
   NtsRenderInstruction,
   NtsSymbolInstruction,
   NtsTextInstruction
@@ -42,6 +47,74 @@ function ink(paint: NtsPaint): string {
 const symbols = computed(
   () => props.instructions.filter((i): i is NtsSymbolInstruction => i.kind === 'symbol')
 )
+
+/**
+ * Strokes, already resolved upstream.
+ *
+ * Lines and connectors are the same drawing job — a set of polylines in chart
+ * coordinates — so they share one template branch. What they *mean* differs,
+ * and that is recorded in `data-kind` for the tests and for anyone reading the
+ * DOM; it changes nothing about the geometry, which arrives finished.
+ */
+const strokeGroups = computed(() =>
+  props.instructions.filter(
+    (i): i is NtsLineInstruction | NtsConnectorInstruction =>
+      i.kind === 'line' || i.kind === 'connector'
+  )
+)
+
+const arrows = computed(
+  () => props.instructions.filter((i): i is NtsArrowInstruction => i.kind === 'arrow')
+)
+
+/** `12,3 45,6` — what `<polyline>` wants. */
+function pointsOf(points: readonly NtsPoint[]): string {
+  return points.map(point => `${round(point.x)},${round(point.y)}`).join(' ')
+}
+
+/** Rounded so the same instruction always emits the same bytes, and prints so. */
+function round(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+/**
+ * An arrow's shaft: a polyline, or a quadratic through its middle point when
+ * the instruction says the spine is curved.
+ */
+function shaftPath(arrow: NtsArrowShape): string {
+  const [first, ...rest] = arrow.points
+  if (!first) return ''
+  if (arrow.curved && arrow.points.length === 3) {
+    const [, control, end] = arrow.points as [NtsPoint, NtsPoint, NtsPoint]
+    return `M${round(first.x)},${round(first.y)} Q${round(control.x)},${round(control.y)} ${round(end.x)},${round(end.y)}`
+  }
+  return `M${round(first.x)},${round(first.y)} ` +
+    rest.map(point => `L${round(point.x)},${round(point.y)}`).join(' ')
+}
+
+/** The head, as two strokes meeting at the tip and opening back along the shaft. */
+function headPath(arrow: NtsArrowShape): string {
+  const points = arrow.points
+  const tip = points[points.length - 1]
+  const previous = points[points.length - 2]
+  if (!tip || !previous) return ''
+
+  const dx = tip.x - previous.x
+  const dy = tip.y - previous.y
+  const length = Math.hypot(dx, dy) || 1
+  const ux = dx / length
+  const uy = dy / length
+  const size = 4
+  // Rotate the reversed unit vector by ±30 degrees.
+  const cos = Math.cos(Math.PI / 6)
+  const sin = Math.sin(Math.PI / 6)
+  const left = { x: -ux * cos - -uy * sin, y: -ux * sin + -uy * cos }
+  const right = { x: -ux * cos + -uy * sin, y: ux * sin + -uy * cos }
+
+  return `M${round(tip.x + left.x * size)},${round(tip.y + left.y * size)} ` +
+    `L${round(tip.x)},${round(tip.y)} ` +
+    `L${round(tip.x + right.x * size)},${round(tip.y + right.y * size)}`
+}
 
 /** Only the siglas that were given a line. The rest are counted by an overflow. */
 const texts = computed(
@@ -129,6 +202,67 @@ function intersectingCircles(s: NtsSymbolInstruction): Array<{ cx: number, cy: n
     aria-hidden="true"
     data-testid="nts-finding-layer"
   >
+    <!--
+      Lines and connectors. Every coordinate arrived resolved; this branch
+      knows nothing about arches, spans, roles or roots.
+    -->
+    <g
+      v-for="(stroke, index) in strokeGroups"
+      :key="`${stroke.findingId}-${stroke.kind}-${index}`"
+      :data-finding="stroke.findingId"
+      :data-rule="stroke.ruleId"
+      :data-kind="stroke.kind"
+      :data-style="stroke.style"
+      :data-paint="stroke.paint"
+      :data-strokes="stroke.strokes.length"
+      :data-testid="`nts-mark-${stroke.findingId}-${stroke.style}`"
+    >
+      <polyline
+        v-for="(polyline, p) in stroke.strokes"
+        :key="p"
+        :points="pointsOf(polyline)"
+        fill="none"
+        :stroke="ink(stroke.paint)"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </g>
+
+    <!-- arrows -->
+    <g
+      v-for="(arrow, index) in arrows"
+      :key="`${arrow.findingId}-arrow-${index}`"
+      :data-finding="arrow.findingId"
+      :data-rule="arrow.ruleId"
+      :data-style="arrow.style"
+      :data-paint="arrow.paint"
+      :data-arrows="arrow.arrows.length"
+      :data-testid="`nts-mark-${arrow.findingId}-${arrow.style}`"
+    >
+      <template
+        v-for="(shape, a) in arrow.arrows"
+        :key="a"
+      >
+        <path
+          :d="shaftPath(shape)"
+          fill="none"
+          :stroke="ink(arrow.paint)"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          :d="headPath(shape)"
+          fill="none"
+          :stroke="ink(arrow.paint)"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </template>
+    </g>
+
     <!-- symbols -->
     <g
       v-for="(symbol, index) in symbols"
