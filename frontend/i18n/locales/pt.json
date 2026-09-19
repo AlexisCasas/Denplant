@@ -618,6 +618,33 @@
         "clinicalTitle": "Não foi possível concluir a operação",
         "normUnavailableTitle": "Versão normativa indisponível",
         "normUnavailable": "Esta versão normativa não está disponível nesta instalação."
+      },
+      "specifications": {
+        "title": "Especificações",
+        "add": "Adicionar especificação",
+        "edit": "Editar especificação",
+        "remove": "Remover especificação",
+        "removeExplanation": "A entrada deixa de constar no odontograma. O registo mantém o seu rasto de auditoria.",
+        "textLabel": "Texto da especificação",
+        "emptyDraft": "Ainda não há especificações. Use «Adicionar especificação» para registar o que não cabe nos quadros.",
+        "emptyFinalized": "Sem especificações.",
+        "readonly": "Este registo está finalizado: as especificações são apresentadas apenas para leitura.",
+        "linkedTeeth": "Sobre o(s) dente(s) {teeth}",
+        "linkedFinding": "Associada a um achado deste registo",
+        "linkedUnknown": "Associada a um achado que não está carregado",
+        "overflowTitle": "Há informação que não cabe visualmente num ou mais quadros",
+        "overflowBody": "Os achados continuam registados e aparecem na lista. Se precisar de os detalhar, pode escrevê-los aqui em Especificações."
+      },
+      "observations": {
+        "title": "Observações",
+        "label": "Observações",
+        "hint": "Achados clínicos que a nomenclatura do odontograma não contempla.",
+        "empty": "Sem observações.",
+        "readonly": "Este registo está finalizado: as observações são apresentadas apenas para leitura."
+      },
+      "text": {
+        "refreshFailedTitle": "As alterações foram guardadas, mas não foi possível atualizar a vista",
+        "refreshFailedBody": "O registo no servidor já contém as alterações. Volte a lê-lo para as ver; nada será enviado de novo."
       }
     },
     "tooth": "Dente",

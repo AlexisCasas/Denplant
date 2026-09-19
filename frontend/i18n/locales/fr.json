@@ -618,6 +618,33 @@
         "clinicalTitle": "L'opération n'a pas pu aboutir",
         "normUnavailableTitle": "Version normative indisponible",
         "normUnavailable": "Cette version normative n'est pas disponible dans cette installation."
+      },
+      "specifications": {
+        "title": "Spécifications",
+        "add": "Ajouter une spécification",
+        "edit": "Modifier la spécification",
+        "remove": "Retirer la spécification",
+        "removeExplanation": "L'entrée n'apparaît plus sur l'odontogramme. Le dossier conserve sa piste d'audit.",
+        "textLabel": "Texte de la spécification",
+        "emptyDraft": "Aucune spécification pour l'instant. Utilisez « Ajouter une spécification » pour consigner ce qui ne tient pas dans les cases.",
+        "emptyFinalized": "Aucune spécification.",
+        "readonly": "Ce dossier est finalisé : les spécifications sont en lecture seule.",
+        "linkedTeeth": "Concerne la/les dent(s) {teeth}",
+        "linkedFinding": "Liée à une observation de ce dossier",
+        "linkedUnknown": "Liée à une observation non chargée",
+        "overflowTitle": "Certaines informations ne tiennent pas visuellement dans une ou plusieurs cases",
+        "overflowBody": "Les observations restent enregistrées et figurent dans la liste. Si vous devez les détailler, vous pouvez les écrire ici, dans Spécifications."
+      },
+      "observations": {
+        "title": "Observations",
+        "label": "Observations",
+        "hint": "Constatations cliniques que la nomenclature de l'odontogramme ne prévoit pas.",
+        "empty": "Aucune observation.",
+        "readonly": "Ce dossier est finalisé : les observations sont en lecture seule."
+      },
+      "text": {
+        "refreshFailedTitle": "Vos modifications ont été enregistrées, mais l'affichage n'a pas pu être actualisé",
+        "refreshFailedBody": "Le dossier sur le serveur contient déjà les modifications. Relisez-le pour les voir ; rien ne sera renvoyé."
       }
     },
     "tooth": "Dent",

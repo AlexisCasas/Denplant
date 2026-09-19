@@ -646,6 +646,33 @@
         "clinicalTitle": "No se pudo completar la operación",
         "normUnavailableTitle": "Versión normativa no disponible",
         "normUnavailable": "Esta versión normativa no está disponible en esta instalación."
+      },
+      "specifications": {
+        "title": "Especificaciones",
+        "add": "Agregar especificación",
+        "edit": "Editar especificación",
+        "remove": "Quitar especificación",
+        "removeExplanation": "La entrada deja de figurar en el odontograma. El registro conserva su traza de auditoría.",
+        "textLabel": "Texto de la especificación",
+        "emptyDraft": "Aún no hay especificaciones. Use «Agregar especificación» para registrar lo que no cabe en los recuadros.",
+        "emptyFinalized": "Sin especificaciones.",
+        "readonly": "Este registro está finalizado: las especificaciones se muestran solo para lectura.",
+        "linkedTeeth": "Sobre la(s) pieza(s) {teeth}",
+        "linkedFinding": "Asociada a un hallazgo del registro",
+        "linkedUnknown": "Asociada a un hallazgo que no está cargado",
+        "overflowTitle": "Hay información que no cabe visualmente en uno o más recuadros",
+        "overflowBody": "Los hallazgos siguen registrados y aparecen en la lista. Si necesita detallarlos, puede escribirlos aquí en Especificaciones."
+      },
+      "observations": {
+        "title": "Observaciones",
+        "label": "Observaciones",
+        "hint": "Hallazgos clínicos que no están contemplados en la nomenclatura del odontograma.",
+        "empty": "Sin observaciones.",
+        "readonly": "Este registro está finalizado: las observaciones se muestran solo para lectura."
+      },
+      "text": {
+        "refreshFailedTitle": "Los cambios se guardaron, pero no se pudo actualizar la vista",
+        "refreshFailedBody": "El registro en el servidor ya contiene los cambios. Vuelva a leerlo para verlos; no se enviará nada de nuevo."
       }
     },
     "tooth": "Diente",

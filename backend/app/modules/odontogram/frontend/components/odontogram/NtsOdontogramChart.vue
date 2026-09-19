@@ -66,7 +66,18 @@ const props = withDefaults(
   }
 )
 
-const emit = defineEmits<{ toothSelect: [fdi: number, rowOrder: number[]] }>()
+const emit = defineEmits<{
+  toothSelect: [fdi: number, rowOrder: number[]]
+  /**
+   * How many siglas had no room in their box.
+   *
+   * Reported outward because §5.14 makes *Especificaciones* the natural place
+   * to write what did not fit, and that block lives outside the chart. The
+   * chart keeps its own count alert: this says nothing new, it only lets the
+   * advisory appear where the clinician would act on it.
+   */
+  overflow: [hidden: number]
+}>()
 
 const { t } = useI18n()
 
@@ -118,6 +129,8 @@ const incomplete = computed(() => {
 const hiddenSiglas = computed(() =>
   render.value?.overflows.reduce((total, overflow) => total + overflow.hidden, 0) ?? 0
 )
+
+watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
 </script>
 
 <template>

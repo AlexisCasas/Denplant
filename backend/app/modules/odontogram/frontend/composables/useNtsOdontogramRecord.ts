@@ -223,7 +223,13 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    * did before deciding again.
    */
   async function recoverFromConflict(kind: NtsConflictKind): Promise<void> {
-    await load()
+    // In place, like every other post-mutation refetch. A foreground load here
+    // swapped the whole clinical surface for a spinner and rebuilt it, which
+    // took any unsaved text down with it — the worst possible answer to a
+    // conflict, since the clinician's own words are exactly what they need to
+    // decide what to do next. The conflict alert already says what happened;
+    // a full-surface reload adds nothing but destruction.
+    await load({ background: true })
     conflict.value = kind
   }
 
@@ -365,6 +371,18 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    */
   const refreshFailed = ref(false)
 
+  /**
+   * One lock over both text mutations, held across the refetch too.
+   *
+   * `isMutating` drops as soon as the server answers, which is right for a
+   * spinner but wrong for a lock: between that moment and the end of the
+   * refetch the loaded record still carries the *old* version, so a second
+   * write started there would send a version the server has already left
+   * behind. Holding until the refresh lands means the next write reads the
+   * version the last one produced.
+   */
+  const isSavingText = ref(false)
+
   /** Re-read after a refresh failure. A GET, and only a GET. */
   async function retryRefresh(): Promise<boolean> {
     refreshFailed.value = false
@@ -390,25 +408,32 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     mutate: (record: NtsRecord) => Promise<unknown>
   ): Promise<boolean> {
     const record = draft.value
-    if (!record) return false
+    // Already writing: a second call here would read the version the first
+    // one is in the middle of replacing.
+    if (!record || isSavingText.value) return false
 
     beginMutation()
+    isSavingText.value = true
     refreshFailed.value = false
     try {
-      await mutate(record)
-    } catch (raw) {
-      const failure = applyFailure(raw)
-      const kind = conflictKind(failure)
-      // The conflict policy refetches on its own; the mutation is not retried
-      // and whatever the caller was editing stays with the caller.
-      if (kind) await recoverFromConflict(kind)
-      return false
-    } finally {
-      isMutating.value = false
-    }
+      try {
+        await mutate(record)
+      } catch (raw) {
+        const failure = applyFailure(raw)
+        const kind = conflictKind(failure)
+        // The conflict policy refetches on its own; the mutation is not
+        // retried and whatever the caller was editing stays with the caller.
+        if (kind) await recoverFromConflict(kind)
+        return false
+      } finally {
+        isMutating.value = false
+      }
 
-    refreshFailed.value = (await reload()) === false
-    return true
+      refreshFailed.value = (await reload()) === false
+      return true
+    } finally {
+      isSavingText.value = false
+    }
   }
 
   /**
@@ -503,6 +528,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     observations,
     specifications,
     refreshFailed,
+    isSavingText,
 
     load,
     reload,

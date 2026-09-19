@@ -20,6 +20,8 @@ import { useNtsOdontogramRecord } from '../../composables/useNtsOdontogramRecord
 import NtsOdontogramChart from './NtsOdontogramChart.vue'
 import NtsFindingEditor from './NtsFindingEditor.vue'
 import NtsFindingList from './NtsFindingList.vue'
+import NtsSpecificationsPanel from './NtsSpecificationsPanel.vue'
+import NtsObservationsPanel from './NtsObservationsPanel.vue'
 import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 
 const props = defineProps<{
@@ -56,6 +58,16 @@ const {
   isEmpty,
   pendingCarriedForward,
   hasPendingCarriedForward,
+  observations,
+  specifications,
+  isTextEditable,
+  isSavingText,
+  refreshFailed: textRefreshFailed,
+  retryRefresh: retryTextRefresh,
+  saveObservations,
+  addSpecification,
+  editSpecification,
+  removeSpecification,
   load,
   reload,
   recoverFromConflict,
@@ -172,6 +184,47 @@ async function submitDiscard() {
     discardOpen.value = false
     discardReason.value = ''
   }
+}
+
+/**
+ * The record's own two text blocks (§5.14, §5.15).
+ *
+ * Both panels are controlled: they hold a local buffer and emit, and the
+ * write goes through the record composable, which owns the id and the
+ * version. A panel is told a write *succeeded* rather than guessing from a
+ * prop change, so a rejected save leaves the clinician's text on screen
+ * instead of silently reverting it.
+ */
+const specificationsPanel = ref<{
+  createSucceeded: () => void
+  editSucceeded: () => void
+  removeSucceeded: () => void
+} | null>(null)
+const observationsPanel = ref<{ saveSucceeded: () => void } | null>(null)
+
+/** Siglas the chart could not fit. Advisory input for §5.14, never a rule. */
+const hiddenSiglas = ref(0)
+
+async function submitObservations(text: string | null): Promise<void> {
+  if (await saveObservations(text)) observationsPanel.value?.saveSucceeded()
+}
+
+async function submitNewSpecification(text: string): Promise<void> {
+  if (await addSpecification(text)) specificationsPanel.value?.createSucceeded()
+}
+
+async function submitSpecificationEdit(
+  id: string,
+  text: string,
+  findingId: string | null
+): Promise<void> {
+  if (await editSpecification(id, text, findingId)) {
+    specificationsPanel.value?.editSucceeded()
+  }
+}
+
+async function submitSpecificationRemoval(id: string): Promise<void> {
+  if (await removeSpecification(id)) specificationsPanel.value?.removeSucceeded()
 }
 
 onMounted(() => {
@@ -466,7 +519,65 @@ watch([() => props.patientId, normVersion], () => void load())
           :selected-teeth="selectedTeeth"
           :anchor-teeth="editor.selection.value.anchors"
           @tooth-select="(fdi, rowOrder) => editor.pickTooth(fdi, rowOrder)"
+          @overflow="hiddenSiglas = $event"
         />
+
+        <!--
+          The annex's two text blocks, in the annex's own order: the chart,
+          then Especificaciones, then Observaciones. 05F prints from this DOM,
+          so the order is part of the contract rather than a layout choice.
+
+          Full width under the chart on every viewport. A sidebar would take
+          width from a drawing that already scrolls horizontally on a phone.
+        -->
+        <NtsSpecificationsPanel
+          ref="specificationsPanel"
+          :specifications="specifications"
+          :findings="chartRecord?.findings ?? []"
+          :editable="isTextEditable"
+          :saving="isSavingText"
+          :hidden-siglas="hiddenSiglas"
+          @create="submitNewSpecification"
+          @update="submitSpecificationEdit"
+          @remove="submitSpecificationRemoval"
+        />
+
+        <NtsObservationsPanel
+          ref="observationsPanel"
+          :observations="observations"
+          :record-id="chartRecord?.id ?? null"
+          :editable="isTextEditable"
+          :saving="isSavingText"
+          @save="submitObservations"
+        />
+
+        <!--
+          The text write landed; only re-reading it failed. A second banner
+          rather than one shared with the finding editor, because the two have
+          different retries and hiding one behind the other would leave a
+          clinician pressing the wrong button.
+        -->
+        <UAlert
+          v-if="textRefreshFailed"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-refresh-cw"
+          :title="t('odontogram.nts.text.refreshFailedTitle')"
+          :description="t('odontogram.nts.text.refreshFailedBody')"
+          data-testid="nts-text-refresh-failed"
+        >
+          <template #actions>
+            <UButton
+              size="xs"
+              color="neutral"
+              :loading="isRefreshing"
+              data-testid="nts-text-refresh-retry"
+              @click="retryTextRefresh()"
+            >
+              {{ t('odontogram.nts.editor.refreshRetry') }}
+            </UButton>
+          </template>
+        </UAlert>
 
         <!-- The change is on the server; only re-reading it failed. Saying
              "not saved" here would invite sending the same finding twice. -->

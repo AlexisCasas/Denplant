@@ -618,6 +618,33 @@
         "clinicalTitle": "The operation could not be completed",
         "normUnavailableTitle": "Norm version unavailable",
         "normUnavailable": "This norm version is not available in this installation."
+      },
+      "specifications": {
+        "title": "Specifications",
+        "add": "Add specification",
+        "edit": "Edit specification",
+        "remove": "Remove specification",
+        "removeExplanation": "The entry stops appearing on the odontogram. The record keeps its audit trail.",
+        "textLabel": "Specification text",
+        "emptyDraft": "No specifications yet. Use “Add specification” to record what does not fit in the boxes.",
+        "emptyFinalized": "No specifications.",
+        "readonly": "This record is finalized: specifications are shown read-only.",
+        "linkedTeeth": "About tooth/teeth {teeth}",
+        "linkedFinding": "Linked to a finding on this record",
+        "linkedUnknown": "Linked to a finding that is not loaded",
+        "overflowTitle": "Some information does not fit visually in one or more boxes",
+        "overflowBody": "The findings are still recorded and appear in the list. If you need to spell them out, you can write them here under Specifications."
+      },
+      "observations": {
+        "title": "Observations",
+        "label": "Observations",
+        "hint": "Clinical findings the odontogram's nomenclature does not cover.",
+        "empty": "No observations.",
+        "readonly": "This record is finalized: observations are shown read-only."
+      },
+      "text": {
+        "refreshFailedTitle": "Your changes were saved, but the view could not be refreshed",
+        "refreshFailedBody": "The record on the server already contains the changes. Re-read it to see them; nothing will be sent again."
       }
     },
     "tooth": "Tooth",

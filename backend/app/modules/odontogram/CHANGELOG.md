@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- feat(nts-05e.2): **the annex's two text blocks reach the screen**.
+  *Especificaciones* (§5.14) and *Observaciones* (§5.15) are now editable on a
+  draft and readable on a finalized record, in the annex's own order — chart,
+  then Especificaciones, then Observaciones — because 05F will print from this
+  DOM.
+
+  They stay two things, never one textarea. §5.14 is vocabulary that exists and
+  had no room in the boxes: an ordered list of free-text entries, each
+  optionally naming a finding. §5.15 is what the 38 rules cannot express at
+  all: one free-text block. Neither becomes a structured finding, a treatment,
+  a plan or a budget line.
+
+  No autosave anywhere. Both panels hold a local buffer and save explicitly;
+  an emptied Observaciones box saves as an explicit `null`, because the API
+  reads an absent key as *leave it alone* and omitting the field would silently
+  keep the old text. Entries render in the server's `sequence`, never by id and
+  never alphabetically — reordering what a clinician wrote is editing it.
+
+  The `+n` overflow gets an advisory beside Especificaciones, and an advisory
+  only: nothing is created, nothing is copied, and the wording says the
+  findings are *still recorded* rather than implying any were dropped.
+
+  Two fixes fell out of building it. `recoverFromConflict` did a **foreground**
+  load, so a 409 swapped the whole clinical surface for a spinner and rebuilt
+  it — taking the clinician's unsaved text down with it, which is the worst
+  possible answer to a conflict, since their own words are what they need to
+  decide what to do next. It now refetches in place, like every other
+  post-mutation read; the conflict alert already says what happened. And the
+  text mutations now hold a lock across the refetch, not just the request:
+  `isMutating` drops when the server answers, but the loaded record still
+  carries the old version until the refresh lands, so a second write started in
+  that window would have sent a version the server had already left behind.
+
+  A separate refresh-failure banner from the finding editor's, with its own
+  retry. Sharing one would leave a clinician pressing a button that re-reads
+  the wrong thing.
+
+  Strings added to all five locales. No history selector and no `norm_version`
+  resolution: 05E.3 owns both.
+
 - feat(nts-05e.1): **client layer for Especificaciones and Observaciones**. The
   05E pre-flight found both already persisted, hashed, audited and guarded
   server-side, with every endpoint in place — so this adds no migration, no
