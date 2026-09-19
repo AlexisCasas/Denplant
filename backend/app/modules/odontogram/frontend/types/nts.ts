@@ -270,12 +270,62 @@ export interface NtsTargetsReplacePayload {
 }
 
 /**
+ * Change the record's own editable fields.
+ *
+ * The API distinguishes three states per field, and this type is what keeps
+ * that distinguishable on the way out: **absent** leaves the field alone,
+ * **null** clears it, a value sets it. So a caller that only means to write
+ * observations must send only `observations` — adding `stage: undefined` is
+ * fine, but adding `stage: null` would clear a field nobody touched.
+ */
+export interface NtsRecordMetadataPayload {
+  expected_version: number
+  stage?: string
+  stage_label?: string | null
+  observations?: string | null
+}
+
+/**
+ * A new *Especificaciones* entry (§5.14).
+ *
+ * No `sequence`: the server assigns it and returns it, and a client that sent
+ * one would be competing with `UNIQUE(record_id, sequence)` over an ordering
+ * it does not own. `finding_id` is optional because a general specification
+ * is legitimate — the norm asks for what did not fit in the boxes, not for a
+ * row per finding.
+ */
+export interface NtsSpecificationCreatePayload {
+  expected_version: number
+  text: string
+  finding_id?: string | null
+}
+
+/**
+ * Full replacement of one entry. A PUT, not a PATCH.
+ *
+ * `finding_id` is **required even when null** — the API is explicit that
+ * omitting it must never be readable as "unlink it from its finding", so the
+ * type makes the caller say which it means.
+ */
+export interface NtsSpecificationReplacePayload {
+  expected_version: number
+  text: string
+  finding_id: string | null
+}
+
+/**
  * Every finding mutation answers with the version the record actually
  * reached, so no client ever infers `expected_version + 1`.
  */
 export interface NtsFindingMutationResult {
   record_version: number
   finding: NtsFinding
+}
+
+/** The same contract for a specification: the reached version, and the row. */
+export interface NtsSpecificationMutationResult {
+  record_version: number
+  specification: NtsSpecification
 }
 
 export interface NtsVersionMutationResult {

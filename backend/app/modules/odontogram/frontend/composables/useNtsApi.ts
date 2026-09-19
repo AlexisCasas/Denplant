@@ -25,7 +25,11 @@ import type {
   NtsFindingCreatePayload,
   NtsFindingMutationResult,
   NtsRecord,
+  NtsRecordMetadataPayload,
   NtsRecordSummary,
+  NtsSpecificationCreatePayload,
+  NtsSpecificationMutationResult,
+  NtsSpecificationReplacePayload,
   NtsTargetsReplacePayload,
   NtsVersionMutationResult
 } from '../types/nts'
@@ -253,6 +257,74 @@ export function useNtsApi() {
     ): Promise<NtsVersionMutationResult> {
       const response = await api.post<ApiResponse<NtsVersionMutationResult>>(
         `${BASE}/records/${recordId}/findings/${findingId}/remove`,
+        payload
+      )
+      return response.data
+    },
+
+    // --- the record's own text ----------------------------------------------
+
+    /**
+     * Change stage, stage label or *Observaciones* (§5.15).
+     *
+     * A PATCH, and the only mutation in this client where the difference
+     * between "absent" and "null" carries meaning: the API reads an absent key
+     * as *leave it alone* and an explicit null as *clear it*. The payload is
+     * passed through untouched so that distinction survives — building the
+     * body here from optional arguments would turn every unspecified field
+     * into a null and quietly wipe two fields on every save.
+     */
+    async updateMetadata(
+      recordId: string,
+      payload: NtsRecordMetadataPayload
+    ): Promise<NtsRecord> {
+      const response = await api.patch<ApiResponse<NtsRecord>>(
+        `${BASE}/records/${recordId}`,
+        payload
+      )
+      return response.data
+    },
+
+    // --- specifications ------------------------------------------------------
+
+    /**
+     * Add an *Especificaciones* entry (§5.14).
+     *
+     * The server owns `sequence` and answers with it; nothing here proposes
+     * one.
+     */
+    async createSpecification(
+      recordId: string,
+      payload: NtsSpecificationCreatePayload
+    ): Promise<NtsSpecificationMutationResult> {
+      const response = await api.post<ApiResponse<NtsSpecificationMutationResult>>(
+        `${BASE}/records/${recordId}/specifications`,
+        payload
+      )
+      return response.data
+    },
+
+    /** Full replacement of one entry, `finding_id` included even when null. */
+    async updateSpecification(
+      recordId: string,
+      specificationId: string,
+      payload: NtsSpecificationReplacePayload
+    ): Promise<NtsSpecificationMutationResult> {
+      const response = await api.put<ApiResponse<NtsSpecificationMutationResult>>(
+        `${BASE}/records/${recordId}/specifications/${specificationId}`,
+        payload
+      )
+      return response.data
+    },
+
+    /** `POST .../remove`, for the same reason `removeFinding` is. */
+    async removeSpecification(
+      recordId: string,
+      specificationId: string,
+      payload: NtsExpectedVersionPayload
+    ): Promise<NtsVersionMutationResult> {
+      const response = await api.post<ApiResponse<NtsVersionMutationResult>>(
+        `${BASE}/records/${recordId}/specifications/${specificationId}/remove`,
         payload
       )
       return response.data

@@ -877,3 +877,94 @@ async def test_discard_keeps_the_record_and_leaves_the_hash_null(api, env):
         params={"norm_version": NORM},
     )
     assert current.json()["data"] is None
+
+
+# ===========================================================================
+# NTS-05E.1 — a finalized record refuses its own text, server-side
+# ===========================================================================
+#
+# The guard is one statement — the version bump also requires
+# ``status = 'draft'`` — so these do not re-test the service. They pin it at
+# the edge a client actually meets, because 05E.2 will put an editor in front
+# of exactly these four routes and a UI check is not a defence.
+
+
+async def _finalized_record(api, env) -> dict:
+    draft = await _create_draft(api, env)
+    response = await api.post(
+        f"{BASE}/records/{draft['id']}/finalize",
+        headers=env.dentist,
+        json={"expected_version": 1},
+    )
+    assert response.status_code == 200
+    return response.json()["data"]
+
+
+@pytest.mark.asyncio
+async def test_a_finalized_record_refuses_new_observations(api, env):
+    record = await _finalized_record(api, env)
+
+    response = await api.patch(
+        f"{BASE}/records/{record['id']}",
+        headers=env.dentist,
+        json={"expected_version": record["version"], "observations": "tarde"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "nts_state_conflict"
+
+
+@pytest.mark.asyncio
+async def test_a_finalized_record_refuses_a_new_specification(api, env):
+    record = await _finalized_record(api, env)
+
+    response = await api.post(
+        f"{BASE}/records/{record['id']}/specifications",
+        headers=env.dentist,
+        json={"expected_version": record["version"], "text": "tarde"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "nts_state_conflict"
+
+
+@pytest.mark.asyncio
+async def test_a_finalized_record_refuses_to_change_or_drop_a_specification(api, env):
+    """The entry is written while the record is still a draft, then frozen."""
+    draft = await _create_draft(api, env)
+    created = await api.post(
+        f"{BASE}/records/{draft['id']}/specifications",
+        headers=env.dentist,
+        json={"expected_version": 1, "text": "mancha blanca en 12"},
+    )
+    assert created.status_code == 201
+    specification_id = created.json()["data"]["specification"]["id"]
+
+    finalized = await api.post(
+        f"{BASE}/records/{draft['id']}/finalize",
+        headers=env.dentist,
+        json={"expected_version": 2},
+    )
+    assert finalized.status_code == 200
+    version = finalized.json()["data"]["version"]
+
+    replaced = await api.put(
+        f"{BASE}/records/{draft['id']}/specifications/{specification_id}",
+        headers=env.dentist,
+        json={"expected_version": version, "text": "corregido", "finding_id": None},
+    )
+    assert replaced.status_code == 409
+    assert replaced.json()["code"] == "nts_state_conflict"
+
+    removed = await api.post(
+        f"{BASE}/records/{draft['id']}/specifications/{specification_id}/remove",
+        headers=env.dentist,
+        json={"expected_version": version},
+    )
+    assert removed.status_code == 409
+    assert removed.json()["code"] == "nts_state_conflict"
+
+    # And it is still there, unchanged: a refused write changed nothing.
+    read = await api.get(f"{BASE}/records/{draft['id']}", headers=env.dentist)
+    entries = read.json()["data"]["specifications"]
+    assert [e["text"] for e in entries] == ["mancha blanca en 12"]

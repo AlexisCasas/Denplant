@@ -19,18 +19,20 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 
 import { useNtsApi, toNtsApiError } from '../../../backend/app/modules/odontogram/frontend/composables/useNtsApi'
 import { useNtsOdontogramRecord } from '../../../backend/app/modules/odontogram/frontend/composables/useNtsOdontogramRecord'
-import type { NtsRecord, NtsRecordSummary } from '../../../backend/app/modules/odontogram/frontend/types/nts'
+import type { NtsRecord, NtsRecordSummary, NtsSpecification } from '../../../backend/app/modules/odontogram/frontend/types/nts'
 
 const state = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
-  put: vi.fn()
+  put: vi.fn(),
+  patch: vi.fn()
 }))
 
 mockNuxtImport('useApi', () => () => ({
   get: state.get,
   post: state.post,
-  put: state.put
+  put: state.put,
+  patch: state.patch
 }))
 
 mockNuxtImport('useClinicState', () => () => ({
@@ -154,6 +156,7 @@ beforeEach(() => {
   state.get.mockReset()
   state.post.mockReset()
   state.put.mockReset()
+  state.patch.mockReset()
   routeGets()
 })
 
@@ -543,5 +546,402 @@ describe('toNtsApiError', () => {
     expect(normalised.status).toBeNull()
     expect(normalised.code).toBeNull()
     expect(normalised.errors).toEqual(['Network Error'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05E.1 — Especificaciones (§5.14) and Observaciones (§5.15), client layer
+// ---------------------------------------------------------------------------
+
+function makeSpecification(overrides: Partial<NtsSpecification> = {}): NtsSpecification {
+  return {
+    id: 'spec-1',
+    record_id: 'rec-1',
+    finding_id: null,
+    text: 'Mancha blanca vestibular en 12',
+    sequence: 1,
+    ...overrides
+  }
+}
+
+describe('NTS-05E.1 — the transport speaks the real contract', () => {
+  it('A — observations go out as a PATCH on the record', async () => {
+    const api = await runInSetup(() => useNtsApi())
+    state.patch.mockResolvedValue({ data: makeRecord() })
+
+    await api.updateMetadata('rec-1', { expected_version: 7, observations: 'Bruxismo' })
+
+    expect(state.patch).toHaveBeenCalledTimes(1)
+    expect(state.patch).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1',
+      { expected_version: 7, observations: 'Bruxismo' }
+    )
+    // Not a POST and not a PUT: the API distinguishes absent from null, and
+    // only a PATCH carries that distinction.
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+  })
+
+  it('A — a key the caller did not send is not invented', async () => {
+    // The API reads an absent key as "leave it alone" and an explicit null as
+    // "clear it". Filling the body out here would clear stage_label on every
+    // observations save.
+    const api = await runInSetup(() => useNtsApi())
+    state.patch.mockResolvedValue({ data: makeRecord() })
+
+    await api.updateMetadata('rec-1', { expected_version: 2, observations: null })
+    const [, body] = state.patch.mock.calls[0]!
+
+    expect(Object.keys(body as object).sort()).toEqual(['expected_version', 'observations'])
+    expect((body as { observations: unknown }).observations).toBeNull()
+  })
+
+  it('B — a specification is created by POST, and proposes no sequence', async () => {
+    const api = await runInSetup(() => useNtsApi())
+    state.post.mockResolvedValue({
+      data: { record_version: 8, specification: makeSpecification({ sequence: 3 }) }
+    })
+
+    const result = await api.createSpecification('rec-1', {
+      expected_version: 7,
+      text: 'Pieza 12 con mancha blanca',
+      finding_id: null
+    })
+
+    expect(state.post).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1/specifications',
+      { expected_version: 7, text: 'Pieza 12 con mancha blanca', finding_id: null }
+    )
+    // The server owns the ordering and answers with it.
+    const [, body] = state.post.mock.calls[0]!
+    expect('sequence' in (body as object)).toBe(false)
+    expect(result.specification.sequence).toBe(3)
+    expect(result.record_version).toBe(8)
+  })
+
+  it('B — a finding may be named, and is sent exactly as given', async () => {
+    const api = await runInSetup(() => useNtsApi())
+    state.post.mockResolvedValue({
+      data: { record_version: 2, specification: makeSpecification({ finding_id: 'f-9' }) }
+    })
+
+    await api.createSpecification('rec-1', {
+      expected_version: 1,
+      text: 'x',
+      finding_id: 'f-9'
+    })
+
+    expect(state.post.mock.calls[0]![1]).toMatchObject({ finding_id: 'f-9' })
+  })
+
+  it('C — a specification is replaced by PUT, finding_id always stated', async () => {
+    const api = await runInSetup(() => useNtsApi())
+    state.put.mockResolvedValue({
+      data: { record_version: 9, specification: makeSpecification({ text: 'corregido' }) }
+    })
+
+    await api.updateSpecification('rec-1', 'spec-1', {
+      expected_version: 8,
+      text: 'corregido',
+      finding_id: null
+    })
+
+    expect(state.put).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1/specifications/spec-1',
+      { expected_version: 8, text: 'corregido', finding_id: null }
+    )
+    // Explicit null, never omitted: omitting it would read as "unlink".
+    const [, body] = state.put.mock.calls[0]!
+    expect('finding_id' in (body as object)).toBe(true)
+  })
+
+  it('D — a specification is removed by POST .../remove, never DELETE', async () => {
+    const api = await runInSetup(() => useNtsApi())
+    state.post.mockResolvedValue({ data: { record_version: 10 } })
+
+    const result = await api.removeSpecification('rec-1', 'spec-1', { expected_version: 9 })
+
+    expect(state.post).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1/specifications/spec-1/remove',
+      { expected_version: 9 }
+    )
+    expect(result.record_version).toBe(10)
+  })
+
+  it('E — every one of them carries expected_version', async () => {
+    const api = await runInSetup(() => useNtsApi())
+    state.patch.mockResolvedValue({ data: makeRecord() })
+    state.post.mockResolvedValue({ data: { record_version: 1, specification: makeSpecification() } })
+    state.put.mockResolvedValue({ data: { record_version: 1, specification: makeSpecification() } })
+
+    await api.updateMetadata('rec-1', { expected_version: 1, observations: 'a' })
+    await api.createSpecification('rec-1', { expected_version: 2, text: 'b' })
+    await api.updateSpecification('rec-1', 'spec-1', { expected_version: 3, text: 'c', finding_id: null })
+    await api.removeSpecification('rec-1', 'spec-1', { expected_version: 4 })
+
+    const bodies = [
+      state.patch.mock.calls[0]![1],
+      state.post.mock.calls[0]![1],
+      state.put.mock.calls[0]![1],
+      state.post.mock.calls[1]![1]
+    ]
+    expect(bodies.map(b => (b as { expected_version: number }).expected_version))
+      .toEqual([1, 2, 3, 4])
+  })
+})
+
+describe('NTS-05E.1 — the record exposes its own text', () => {
+  async function mountWith(record: NtsRecord | null, current: NtsRecord | null = null) {
+    routeGets({ draft: record, current })
+    const patient = ref('p1')
+    const composable = await runInSetup(() =>
+      useNtsOdontogramRecord({ patientId: () => patient.value, normVersion: 'pe_nts_188_2022' })
+    )
+    await composable.load()
+    return composable
+  }
+
+  it('reads observations and specifications off the open draft', async () => {
+    const record = await mountWith(makeRecord({
+      observations: 'Respirador bucal',
+      specifications: [makeSpecification()]
+    }))
+
+    expect(record.observations.value).toBe('Respirador bucal')
+    expect(record.specifications.value).toHaveLength(1)
+    expect(record.isTextEditable.value).toBe(true)
+  })
+
+  it('SEQUENCE — they come back in the server\'s order, never the array\'s', async () => {
+    // The clinician wrote these in an order and the server owns it. Sorting by
+    // id, or leaving them as they arrived, would silently rewrite a record.
+    const record = await mountWith(makeRecord({
+      specifications: [
+        makeSpecification({ id: 'z', sequence: 3, text: 'third' }),
+        makeSpecification({ id: 'a', sequence: 1, text: 'first' }),
+        makeSpecification({ id: 'm', sequence: 2, text: 'second' })
+      ]
+    }))
+
+    expect(record.specifications.value.map(s => s.text)).toEqual(['first', 'second', 'third'])
+  })
+
+  it('K — a finalized record with no draft reports itself non-editable', async () => {
+    const record = await mountWith(null, makeRecord({
+      status: 'finalized',
+      observations: 'Cerrado',
+      specifications: [makeSpecification()]
+    }))
+
+    // Readable...
+    expect(record.observations.value).toBe('Cerrado')
+    expect(record.specifications.value).toHaveLength(1)
+    // ...and not writable.
+    expect(record.isTextEditable.value).toBe(false)
+    expect(await record.saveObservations('nuevo')).toBe(false)
+    expect(await record.addSpecification('nuevo')).toBe(false)
+    expect(state.patch).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('and reads nothing at all when there is no record', async () => {
+    const record = await mountWith(null, null)
+
+    expect(record.observations.value).toBeNull()
+    expect(record.specifications.value).toEqual([])
+    expect(record.isTextEditable.value).toBe(false)
+  })
+})
+
+describe('NTS-05E.1 — mutations behave like every other one', () => {
+  async function mounted(draftRecord: NtsRecord) {
+    routeGets({ draft: draftRecord })
+    const patient = ref('p1')
+    const composable = await runInSetup(() =>
+      useNtsOdontogramRecord({ patientId: () => patient.value, normVersion: 'pe_nts_188_2022' })
+    )
+    await composable.load()
+    return composable
+  }
+
+  it('A — observations save, taking the version from the loaded draft', async () => {
+    const record = await mounted(makeRecord({ version: 11 }))
+    state.patch.mockResolvedValue({ data: makeRecord({ version: 12, observations: 'x' }) })
+
+    expect(await record.saveObservations('Bruxismo nocturno')).toBe(true)
+    expect(state.patch).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1',
+      { expected_version: 11, observations: 'Bruxismo nocturno' }
+    )
+  })
+
+  it('A — and null is a deliberate clear, not an accident', async () => {
+    const record = await mounted(makeRecord({ version: 3, observations: 'algo' }))
+    state.patch.mockResolvedValue({ data: makeRecord({ version: 4 }) })
+
+    await record.saveObservations(null)
+    expect(state.patch.mock.calls[0]![1]).toEqual({ expected_version: 3, observations: null })
+  })
+
+  it('B/C/D — add, edit and remove reach the right endpoints', async () => {
+    const record = await mounted(makeRecord({ version: 5 }))
+    state.post.mockResolvedValue({ data: { record_version: 6, specification: makeSpecification() } })
+    state.put.mockResolvedValue({ data: { record_version: 7, specification: makeSpecification() } })
+
+    expect(await record.addSpecification('nueva')).toBe(true)
+    expect(await record.editSpecification('spec-1', 'editada', null)).toBe(true)
+    expect(await record.removeSpecification('spec-1')).toBe(true)
+
+    expect(state.post.mock.calls[0]![0]).toBe('/api/v1/odontogram/nts/records/rec-1/specifications')
+    expect(state.put.mock.calls[0]![0]).toBe('/api/v1/odontogram/nts/records/rec-1/specifications/spec-1')
+    expect(state.post.mock.calls[1]![0]).toBe('/api/v1/odontogram/nts/records/rec-1/specifications/spec-1/remove')
+  })
+
+  it('finding_id is never inferred: absent means a general entry', async () => {
+    const record = await mounted(makeRecord({ version: 2, findings: [] }))
+    state.post.mockResolvedValue({ data: { record_version: 3, specification: makeSpecification() } })
+
+    await record.addSpecification('general')
+    expect(state.post.mock.calls[0]![1]).toMatchObject({ finding_id: null })
+  })
+
+  it('E/F — a second mutation uses the version the first one produced', async () => {
+    // The chain comes from the refetch, never from `expected_version + 1`.
+    let version = 20
+    state.get.mockImplementation(async (url: string) => {
+      if (url.includes('/catalogs/')) return { data: CATALOG }
+      if (url.endsWith('/current')) return { data: null }
+      if (url.endsWith('/draft')) return { data: makeRecord({ version }) }
+      if (url.endsWith('/records')) return { data: [], total: 0, page: 1, page_size: 20 }
+      throw new Error(`unrouted GET ${url}`)
+    })
+    const patient = ref('p1')
+    const record = await runInSetup(() =>
+      useNtsOdontogramRecord({ patientId: () => patient.value, normVersion: 'pe_nts_188_2022' })
+    )
+    await record.load()
+
+    state.post.mockImplementation(async () => {
+      version += 1
+      return { data: { record_version: version, specification: makeSpecification() } }
+    })
+
+    await record.addSpecification('uno')
+    await record.addSpecification('dos')
+
+    expect(state.post.mock.calls[0]![1]).toMatchObject({ expected_version: 20 })
+    // Not 20 again: the refetch moved the record on.
+    expect(state.post.mock.calls[1]![1]).toMatchObject({ expected_version: 21 })
+  })
+
+  it('G — a 409 refetches, reports, and is never retried', async () => {
+    const record = await mounted(makeRecord({ version: 4 }))
+    const loadsBefore = state.get.mock.calls.length
+    state.post.mockRejectedValue(apiError(409, 'nts_version_conflict'))
+
+    expect(await record.addSpecification('choca')).toBe(false)
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(state.get.mock.calls.length).toBeGreaterThan(loadsBefore)
+    expect(record.conflict.value).toBe('version')
+  })
+
+  it('G — a finalized record answers with a state conflict, not a retry', async () => {
+    const record = await mounted(makeRecord({ version: 4 }))
+    state.patch.mockRejectedValue(apiError(409, 'nts_state_conflict'))
+
+    expect(await record.saveObservations('tarde')).toBe(false)
+    expect(state.patch).toHaveBeenCalledTimes(1)
+    expect(record.conflict.value).toBe('state')
+  })
+
+  it('H — a 422 surfaces as clinical errors, verbatim', async () => {
+    const record = await mounted(makeRecord({ version: 4 }))
+    state.post.mockRejectedValue(
+      apiError(422, 'nts_clinical_validation', ['text must not be blank'])
+    )
+
+    expect(await record.addSpecification(' ')).toBe(false)
+    expect(record.clinicalErrors.value).toEqual(['text must not be blank'])
+    expect(record.error.value).toBeNull()
+  })
+
+  it('I — a mutation that succeeded is not repeated when the refetch fails', async () => {
+    const record = await mounted(makeRecord({ version: 4 }))
+    state.post.mockResolvedValue({ data: { record_version: 5, specification: makeSpecification() } })
+
+    // The write lands; the refetch after it does not.
+    state.get.mockRejectedValue(apiError(500, 'boom'))
+
+    expect(await record.addSpecification('guardada')).toBe(true)
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(record.refreshFailed.value).toBe(true)
+  })
+
+  it('J — retrying the refresh is a GET, and only a GET', async () => {
+    const record = await mounted(makeRecord({ version: 4 }))
+    state.post.mockResolvedValue({ data: { record_version: 5, specification: makeSpecification() } })
+    state.get.mockRejectedValue(apiError(500, 'boom'))
+    await record.addSpecification('guardada')
+
+    const writesBefore = state.post.mock.calls.length
+    routeGets({ draft: makeRecord({ version: 5 }) })
+
+    expect(await record.retryRefresh()).toBe(true)
+    expect(record.refreshFailed.value).toBe(false)
+    // Not one more write of any kind.
+    expect(state.post).toHaveBeenCalledTimes(writesBefore)
+    expect(state.patch).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+  })
+
+  it('nothing is written locally before the server answers', async () => {
+    const record = await mounted(makeRecord({ version: 4, specifications: [] }))
+    let resolveWrite: (value: unknown) => void = () => {}
+    state.post.mockImplementation(() => new Promise((resolve) => {
+      resolveWrite = resolve
+    }))
+
+    const pending = record.addSpecification('todavía no')
+    await settle()
+    // Still empty: no optimistic insert to roll back.
+    expect(record.specifications.value).toEqual([])
+
+    routeGets({ draft: makeRecord({ version: 5, specifications: [makeSpecification()] }) })
+    resolveWrite({ data: { record_version: 5, specification: makeSpecification() } })
+    await pending
+
+    expect(record.specifications.value).toHaveLength(1)
+  })
+
+  it('L — a response for the previous patient cannot land on the current one', async () => {
+    const record = await mounted(makeRecord({ version: 4 }))
+    state.post.mockResolvedValue({ data: { record_version: 5, specification: makeSpecification() } })
+
+    // The write lands, then the patient changes before its refetch resolves.
+    let releaseDraft: (value: unknown) => void = () => {}
+    state.get.mockImplementation(async (url: string) => {
+      if (url.includes('/catalogs/')) return { data: CATALOG }
+      if (url.endsWith('/current')) return { data: null }
+      if (url.endsWith('/records')) return { data: [], total: 0, page: 1, page_size: 20 }
+      if (url.endsWith('/draft')) {
+        return await new Promise((resolve) => {
+          releaseDraft = resolve
+        })
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+
+    const pending = record.addSpecification('de p1')
+    await settle()
+
+    routeGets({ draft: makeRecord({ id: 'rec-2', patient_id: 'p2', observations: 'de p2' }) })
+    await record.load()
+
+    // The stale refetch finishes last and must not win.
+    releaseDraft({ data: makeRecord({ observations: 'de p1' }) })
+    await pending
+    await settle()
+
+    expect(record.observations.value).toBe('de p2')
   })
 })

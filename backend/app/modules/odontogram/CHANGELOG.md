@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- feat(nts-05e.1): **client layer for Especificaciones and Observaciones**. The
+  05E pre-flight found both already persisted, hashed, audited and guarded
+  server-side, with every endpoint in place — so this adds no migration, no
+  endpoint and no backend implementation, only the four client methods that
+  were missing and the composable state around them.
+
+  `useNtsApi` gains `updateMetadata`, `createSpecification`,
+  `updateSpecification` and `removeSpecification`. Three details of the real
+  contract are carried rather than smoothed over: the metadata call is a
+  **PATCH** whose payload is passed through untouched, because the API reads an
+  absent key as *leave it alone* and an explicit null as *clear it* — building
+  the body from optional arguments would wipe two fields on every observations
+  save. `finding_id` is optional on create and **required even when null** on
+  replace, so omitting it can never read as "unlink". And no client proposes a
+  `sequence`: the server owns the ordering and answers with it.
+
+  The composable exposes `observations`, `specifications` (sorted by the
+  server's `sequence`, never by id and never alphabetically — reordering what a
+  clinician wrote is editing it), `isTextEditable`, and the four mutations.
+  They target the open draft, which is the only record the server will accept a
+  write for.
+
+  Mutation and refresh stay two phases, as 05C established: once the server has
+  accepted a change, a failed refetch sets `refreshFailed`, never `error`, and
+  `retryRefresh` re-reads with a GET and only a GET. Nothing is written locally
+  before the server answers, so there is no rollback to get wrong, and the next
+  `expected_version` comes from the refetch rather than from arithmetic — two
+  mutations in a row cannot both claim the same version. A 409 refetches and
+  reports without retrying; a 422 surfaces verbatim as clinical errors.
+
+  Three API-edge tests added, none duplicating the service layer: a finalized
+  record refuses new observations, a new specification, and any change or
+  removal of an existing one — each a 409 `nts_state_conflict`, with the entry
+  provably unchanged afterwards.
+
+  No UI. `NtsOdontogramShell.vue` is untouched; the editor arrives in 05E.2.
+
 - fix(nts-05d.4d): **a trifurcated root attaches across the whole crown**. A
   second clinical review of the annex found that 05D.4b fixed the overlap and
   left the width wrong: the three bases spanned exactly **50%** of the crown,

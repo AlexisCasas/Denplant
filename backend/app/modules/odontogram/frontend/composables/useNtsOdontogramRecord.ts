@@ -27,7 +27,8 @@ import type {
   NtsApiError,
   NtsCatalog,
   NtsRecord,
-  NtsRecordSummary
+  NtsRecordSummary,
+  NtsSpecification
 } from '../types/nts'
 // Explicit relative import (not the layer auto-import) for the same reason as
 // the components: `frontend/module_layers` does not resolve in the test
@@ -318,6 +319,158 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     }
   }
 
+  // ------------------------------------------------------------------------
+  // NTS-05E.1 — Especificaciones (§5.14) and Observaciones (§5.15)
+  // ------------------------------------------------------------------------
+
+  /**
+   * The record these two fields belong to.
+   *
+   * The draft when one is open, because that is the only record the server
+   * will accept a write for; otherwise the finalized record in force, so its
+   * text can still be read. 05E.3 introduces a record *in view* — a historical
+   * one, always read-only — and this follows it then rather than now.
+   */
+  const textRecord = computed<NtsRecord | null>(() => draft.value ?? currentRecord.value)
+
+  /**
+   * Whether the text can be changed at all.
+   *
+   * A convenience for the UI, never a defence: the server refuses a write to
+   * anything but a draft in the same statement that checks the version, so a
+   * client that got this wrong would be rejected rather than obeyed.
+   */
+  const isTextEditable = computed(() => draft.value !== null)
+
+  /** §5.15. Free text on the record — never a finding, a plan or a treatment. */
+  const observations = computed(() => textRecord.value?.observations ?? null)
+
+  /**
+   * §5.14, in the server's own order.
+   *
+   * Sorted by `sequence`, which the server owns and returns. Never by id and
+   * never alphabetically: the clinician wrote these in an order, and an
+   * odontogram that reorders what someone recorded is editing it.
+   */
+  const specifications = computed<NtsSpecification[]>(() =>
+    [...(textRecord.value?.specifications ?? [])].sort((a, b) => a.sequence - b.sequence)
+  )
+
+  /**
+   * A refetch after one of these mutations failed on its own.
+   *
+   * Kept apart from `error` for the reason 05C established: once the server
+   * has accepted a change, nothing that goes wrong afterwards may be shown as
+   * if the change was lost.
+   */
+  const refreshFailed = ref(false)
+
+  /** Re-read after a refresh failure. A GET, and only a GET. */
+  async function retryRefresh(): Promise<boolean> {
+    refreshFailed.value = false
+    const ok = await reload()
+    refreshFailed.value = !ok
+    return ok
+  }
+
+  /**
+   * Run one text mutation, then refresh — as two separate phases.
+   *
+   * Up to `await mutate` a failure means the server rejected the change.
+   * After it, the change is applied and anything that goes wrong is a display
+   * problem: the mutation is never re-sent, and `refreshFailed` says so
+   * instead of `error`.
+   *
+   * No optimistic write. Nothing local changes until the server has answered,
+   * so there is no rollback to get wrong — and the new version comes from the
+   * refetch rather than from `expected_version + 1`, which is what keeps two
+   * mutations in a row from both claiming the same version.
+   */
+  async function runTextMutation(
+    mutate: (record: NtsRecord) => Promise<unknown>
+  ): Promise<boolean> {
+    const record = draft.value
+    if (!record) return false
+
+    beginMutation()
+    refreshFailed.value = false
+    try {
+      await mutate(record)
+    } catch (raw) {
+      const failure = applyFailure(raw)
+      const kind = conflictKind(failure)
+      // The conflict policy refetches on its own; the mutation is not retried
+      // and whatever the caller was editing stays with the caller.
+      if (kind) await recoverFromConflict(kind)
+      return false
+    } finally {
+      isMutating.value = false
+    }
+
+    refreshFailed.value = (await reload()) === false
+    return true
+  }
+
+  /**
+   * Save *Observaciones*.
+   *
+   * Sends only that key, so the two other editable fields keep the value they
+   * have: an absent key means "leave it alone", and a null would clear it.
+   * `null` here is a deliberate clear, which is why the parameter accepts it.
+   */
+  async function saveObservations(text: string | null): Promise<boolean> {
+    return await runTextMutation(record =>
+      nts.updateMetadata(record.id, {
+        expected_version: record.version,
+        observations: text
+      })
+    )
+  }
+
+  /**
+   * Add an *Especificaciones* entry.
+   *
+   * `findingId` is optional and never inferred. The norm asks for what did
+   * not fit in the boxes, not for a row per finding, so a general entry is
+   * legitimate; 05E.2 may *offer* an association, and will not require one.
+   */
+  async function addSpecification(
+    text: string,
+    findingId: string | null = null
+  ): Promise<boolean> {
+    return await runTextMutation(record =>
+      nts.createSpecification(record.id, {
+        expected_version: record.version,
+        text,
+        finding_id: findingId
+      })
+    )
+  }
+
+  /** Replace one entry. Its id never changes; `findingId` is always stated. */
+  async function editSpecification(
+    specificationId: string,
+    text: string,
+    findingId: string | null
+  ): Promise<boolean> {
+    return await runTextMutation(record =>
+      nts.updateSpecification(record.id, specificationId, {
+        expected_version: record.version,
+        text,
+        finding_id: findingId
+      })
+    )
+  }
+
+  /** Withdraw one entry. The server renumbers what is left; this does not. */
+  async function removeSpecification(specificationId: string): Promise<boolean> {
+    return await runTextMutation(record =>
+      nts.removeSpecification(record.id, specificationId, {
+        expected_version: record.version
+      })
+    )
+  }
+
   function dismissConflict(): void {
     conflict.value = null
   }
@@ -345,13 +498,24 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     stateKey,
 
     // actions
+    textRecord,
+    isTextEditable,
+    observations,
+    specifications,
+    refreshFailed,
+
     load,
     reload,
+    retryRefresh,
     /** Exposed so the finding editor shares one conflict policy, not two. */
     recoverFromConflict,
     createDraft,
     finalizeDraft,
     discardDraft,
+    saveObservations,
+    addSpecification,
+    editSpecification,
+    removeSpecification,
     dismissConflict
   }
 }
