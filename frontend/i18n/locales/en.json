@@ -578,7 +578,9 @@
         "openedAt": "Opened on",
         "recordedBy": "Recorded by",
         "findings": "Findings",
-        "discardReason": "Reason"
+        "discardReason": "Reason",
+        "discardedAt": "Discarded on",
+        "normVersion": "Norm version"
       },
       "actions": {
         "createDraft": "Create draft",
@@ -601,7 +603,8 @@
         "empty": "No earlier records.",
         "loadFailedTitle": "This odontogram could not be opened",
         "catalogFailedTitle": "The norm version of this odontogram could not be loaded",
-        "catalogFailedBody": "This record was made under version {version}, which is unavailable. Nothing is drawn: reading it under another version would show findings the record does not contain."
+        "catalogFailedBody": "This record was made under version {version}, which is unavailable. Nothing is drawn: reading it under another version would show findings the record does not contain.",
+        "isCurrent": "Current odontogram"
       },
       "empty": {
         "title": "No MINSA odontogram has been recorded for this patient."
@@ -654,6 +657,12 @@
       "text": {
         "refreshFailedTitle": "Your changes were saved, but the view could not be refreshed",
         "refreshFailedBody": "The record on the server already contains the changes. Re-read it to see them; nothing will be sent again."
+      },
+      "unsaved": {
+        "title": "You have unsaved changes",
+        "body": "If you continue, the text you wrote and did not save will be lost.",
+        "stay": "Keep editing",
+        "discard": "Discard and continue"
       }
     },
     "tooth": "Tooth",

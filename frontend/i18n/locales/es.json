@@ -606,7 +606,9 @@
         "openedAt": "Abierto el",
         "recordedBy": "Registrado por",
         "findings": "Hallazgos",
-        "discardReason": "Motivo"
+        "discardReason": "Motivo",
+        "discardedAt": "Descartado el",
+        "normVersion": "Versión normativa"
       },
       "actions": {
         "createDraft": "Crear borrador",
@@ -629,7 +631,8 @@
         "empty": "Sin registros anteriores.",
         "loadFailedTitle": "No se pudo abrir este odontograma",
         "catalogFailedTitle": "No se pudo cargar la versión normativa de este odontograma",
-        "catalogFailedBody": "Este registro fue hecho con la versión {version}, que no está disponible. No se dibuja nada: interpretarlo con otra versión mostraría hallazgos que el registro no contiene."
+        "catalogFailedBody": "Este registro fue hecho con la versión {version}, que no está disponible. No se dibuja nada: interpretarlo con otra versión mostraría hallazgos que el registro no contiene.",
+        "isCurrent": "Odontograma actual"
       },
       "empty": {
         "title": "Este paciente no tiene ningún odontograma MINSA registrado."
@@ -682,6 +685,12 @@
       "text": {
         "refreshFailedTitle": "Los cambios se guardaron, pero no se pudo actualizar la vista",
         "refreshFailedBody": "El registro en el servidor ya contiene los cambios. Vuelva a leerlo para verlos; no se enviará nada de nuevo."
+      },
+      "unsaved": {
+        "title": "Hay cambios sin guardar",
+        "body": "Si continúa, el texto que escribió y no guardó se perderá.",
+        "stay": "Seguir editando",
+        "discard": "Descartar y continuar"
       }
     },
     "tooth": "Diente",

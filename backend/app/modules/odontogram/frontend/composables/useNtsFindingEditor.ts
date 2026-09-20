@@ -72,6 +72,18 @@ export interface UseNtsFindingEditorOptions {
   reload: () => Promise<boolean | void>
   /** Called when a mutation hits a 409, with the kind of conflict. */
   onConflict: (kind: 'version' | 'draft' | 'state') => Promise<void>
+  /**
+   * The record-wide write lock, when the caller keeps one.
+   *
+   * Every mutation here bumps the same `version` as the record's own text
+   * mutations do, and a local `isSaving` cannot see those. Without a shared
+   * lock, saving observations and confirming a carried-forward finding both
+   * read the loaded record and both send `expected_version: N`; the second
+   * 409s for no reason the clinician did anything to cause.
+   *
+   * Optional so the editor can still be exercised on its own.
+   */
+  lock?: { begin: () => boolean, end: () => void }
 }
 
 export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
@@ -367,6 +379,9 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
   ): Promise<boolean> {
     const record = options.record()
     if (!record) return false
+    // Someone else holds the record: their write is about to move the version
+    // this one would have sent.
+    if (options.lock && !options.lock.begin()) return false
 
     const progress: MutationProgress = { appliedTo: null }
     isSaving.value = true
@@ -391,6 +406,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
         close()
         // The conflict policy refetches; there is no second reload here.
         await options.onConflict(kind)
+        options.lock?.end()
         return false
       }
 
@@ -404,6 +420,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
       } else {
         error.value = failure
       }
+      options.lock?.end()
       return false
     } finally {
       isSaving.value = false
@@ -413,6 +430,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     // re-read; a refresh failure from here is never reported as a lost save.
     onApplied?.()
     await refresh()
+    options.lock?.end()
     return true
   }
 

@@ -78,6 +78,32 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    */
   const isRefreshing = ref(false)
   const isMutating = ref(false)
+  /**
+   * One write at a time, for the **whole record** — not per editor.
+   *
+   * Every mutation in this module bumps the same `version`: findings,
+   * targets, specifications, observations, carry-forward confirmation,
+   * finalize, discard. Each editor used to guard only itself, which left a
+   * real gap: saving observations and confirming a carried-forward finding
+   * are different components with different busy flags, so both read the
+   * loaded record and both sent `expected_version: N`. The second one 409s,
+   * and the clinician loses an action they were entitled to make.
+   *
+   * Held across the refetch as well as the request, because the loaded record
+   * still carries the old version until the refresh lands.
+   */
+  const isWriting = ref(false)
+
+  /** Take the record-wide write lock, or report that someone else has it. */
+  function beginWrite(): boolean {
+    if (isWriting.value) return false
+    isWriting.value = true
+    return true
+  }
+
+  function endWrite(): void {
+    isWriting.value = false
+  }
   /** Transport/unknown failure. Clinical problems go to `clinicalErrors`. */
   const error = ref<NtsApiError | null>(null)
   /** Every problem a 422 reported, in order. Never truncated to the first. */
@@ -301,6 +327,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     stage: string
     stageLabel?: string | null
   }): Promise<boolean> {
+    if (!beginWrite()) return false
     beginMutation()
     try {
       const created = await nts.createDraft(patientId.value, {
@@ -310,7 +337,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
         seed: 'empty'
       })
       draft.value = created
-      await load()
+      await load({ background: true })
       return true
     } catch (raw) {
       const failure = applyFailure(raw)
@@ -322,6 +349,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
       return false
     } finally {
       isMutating.value = false
+      endWrite()
     }
   }
 
@@ -334,12 +362,14 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    */
   async function finalizeDraft(): Promise<boolean> {
     const open = draft.value
-    if (!open) return false
+    if (!open || !beginWrite()) return false
 
     beginMutation()
     try {
       await nts.finalize(open.id, { expected_version: open.version })
-      await load()
+      // In place: finalizing does not need the clinical surface taken down
+      // and rebuilt, and doing so would discard anything unsaved around it.
+      await load({ background: true })
       return true
     } catch (raw) {
       const failure = applyFailure(raw)
@@ -348,13 +378,14 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
       return false
     } finally {
       isMutating.value = false
+      endWrite()
     }
   }
 
   /** Discard the open draft. Nothing is deleted; a reason is required. */
   async function discardDraft(reason: string): Promise<boolean> {
     const open = draft.value
-    if (!open || !reason.trim()) return false
+    if (!open || !reason.trim() || !beginWrite()) return false
 
     beginMutation()
     try {
@@ -362,7 +393,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
         expected_version: open.version,
         reason: reason.trim()
       })
-      await load()
+      await load({ background: true })
       return true
     } catch (raw) {
       const failure = applyFailure(raw)
@@ -371,6 +402,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
       return false
     } finally {
       isMutating.value = false
+      endWrite()
     }
   }
 
@@ -457,10 +489,12 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     mutate: (record: NtsRecord) => Promise<unknown>
   ): Promise<boolean> {
     const record = draft.value
-    // Already writing: a second call here would read the version the first
-    // one is in the middle of replacing. And a historical view is inspection:
-    // the server would refuse it anyway, but the client must not ask.
-    if (!record || isSavingText.value || isHistorical.value) return false
+    // A historical view is inspection: the server would refuse the write
+    // anyway, but the client must not ask.
+    if (!record || isHistorical.value) return false
+    // Someone else — this panel or the finding editor — is mid-write, and the
+    // loaded version is about to be replaced.
+    if (!beginWrite()) return false
 
     beginMutation()
     isSavingText.value = true
@@ -483,6 +517,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
       return true
     } finally {
       isSavingText.value = false
+      endWrite()
     }
   }
 
@@ -721,6 +756,9 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     specifications,
     refreshFailed,
     isSavingText,
+    isWriting,
+    beginWrite,
+    endWrite,
 
     load,
     reload,

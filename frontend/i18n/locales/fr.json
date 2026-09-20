@@ -578,7 +578,9 @@
         "openedAt": "Ouvert le",
         "recordedBy": "Enregistré par",
         "findings": "Constatations",
-        "discardReason": "Motif"
+        "discardReason": "Motif",
+        "discardedAt": "Abandonné le",
+        "normVersion": "Version normative"
       },
       "actions": {
         "createDraft": "Créer un brouillon",
@@ -601,7 +603,8 @@
         "empty": "Aucun enregistrement antérieur.",
         "loadFailedTitle": "Impossible d'ouvrir cet odontogramme",
         "catalogFailedTitle": "Impossible de charger la version normative de cet odontogramme",
-        "catalogFailedBody": "Cet enregistrement a été réalisé selon la version {version}, qui n'est pas disponible. Rien n'est dessiné : le lire selon une autre version montrerait des observations que l'enregistrement ne contient pas."
+        "catalogFailedBody": "Cet enregistrement a été réalisé selon la version {version}, qui n'est pas disponible. Rien n'est dessiné : le lire selon une autre version montrerait des observations que l'enregistrement ne contient pas.",
+        "isCurrent": "Odontogramme actuel"
       },
       "empty": {
         "title": "Aucun odontogramme MINSA enregistré pour ce patient."
@@ -654,6 +657,12 @@
       "text": {
         "refreshFailedTitle": "Vos modifications ont été enregistrées, mais l'affichage n'a pas pu être actualisé",
         "refreshFailedBody": "Le dossier sur le serveur contient déjà les modifications. Relisez-le pour les voir ; rien ne sera renvoyé."
+      },
+      "unsaved": {
+        "title": "Des modifications ne sont pas enregistrées",
+        "body": "Si vous continuez, le texte saisi et non enregistré sera perdu.",
+        "stay": "Continuer à modifier",
+        "discard": "Abandonner et continuer"
       }
     },
     "tooth": "Dent",

@@ -2521,21 +2521,28 @@ describe('NTS-05E.3 — history and historical catalogs', () => {
 
   // --- accessibility -------------------------------------------------------
 
-  it('A11Y — the list is a listbox and marks the open record semantically', async () => {
+  it('A11Y — plain buttons with aria-current, not a false listbox', async () => {
+    // 05E.3 shipped `listbox`/`option` with a button inside each option, which
+    // is invalid ARIA and promised an arrow-key model that did not exist.
+    // 05E.4 chose the markup that matches the real interaction: activate one
+    // of several controls, reachable by Tab, named by `aria-current`.
     histRoute({
       summaries: [summary()],
       records: { 'rec-hist': histRecord() }
     })
     const wrapper = await histShell()
 
-    expect(wrapper.find('[data-testid="nts-history-list"]').attributes('role')).toBe('listbox')
-    const option = wrapper.find('[role="option"]')
-    expect(option.attributes('aria-selected')).toBe('false')
+    expect(wrapper.find('[data-testid="nts-history-list"]').attributes('role')).toBeUndefined()
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(0)
 
-    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    const row = wrapper.find('[data-testid="nts-history-open-0"]')
+    expect(row.element.tagName).toBe('BUTTON')
+    expect(row.attributes('aria-current')).toBeUndefined()
+
+    await row.trigger('click')
     await settle()
 
-    expect(wrapper.find('[role="option"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-testid="nts-history-open-0"]').attributes('aria-current')).toBe('true')
     // Not colour alone: the open row says so in words.
     expect(wrapper.find('[data-testid="nts-history-open-marker-0"]').exists()).toBe(true)
   })
@@ -2566,5 +2573,421 @@ describe('NTS-05E.3 — history and historical catalogs', () => {
     ).length
     // Both records cite the norm already loaded, so nothing was re-fetched.
     expect(after).toBe(before)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05E.4 — the phase, end to end
+// ---------------------------------------------------------------------------
+//
+// One record, one `version`, many editors. These integrate what the earlier
+// slices built in isolation, and pin the two things that only appear when
+// they run together: a write from one family while another holds the record,
+// and navigation away from text nobody has saved.
+
+describe('NTS-05E.4 — lifecycle and history, integrated', () => {
+  const mounted: Array<{ unmount: () => void }> = []
+  afterEach(() => {
+    mounted.forEach(w => w.unmount())
+    mounted.length = 0
+  })
+
+  const carried = (id = 'f-c') => ({
+    id, record_id: 'rec-1', norm_version: 'pe_nts_188_2022', rule_id: '6.1.9',
+    attributes: {}, provenance: 'carried_forward' as const, source_finding_id: 'older',
+    sequence: 1, created_at: '2026-01-02T10:00:00Z', created_by: 'u1',
+    targets: [{
+      id: `t-${id}`, group_index: 0, position: 0, participation: 'subject', role: null,
+      target_kind: 'fdi_tooth', tooth_number: 16, arch: null, local_ordinal: null, geometry: null
+    }]
+  })
+
+  function rec(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'rec-1', clinic_id: 'clinic-a', patient_id: 'p1',
+      norm_version: 'pe_nts_188_2022', stage: 'diagnosis', stage_label: null,
+      status: 'draft', version: 7, observations: null,
+      recorded_at: '2026-01-02T10:00:00Z', recorded_by: 'u1',
+      finalized_at: null, finalized_by: null, discarded_at: null, discarded_by: null,
+      discard_reason: null, recorded_by_name: 'Dra. Ruiz', recorded_by_role: 'dentist',
+      recorded_by_professional_id: 'COP-1', supersedes_record_id: null,
+      supersession_reason: null, content_hash: null, hash_algorithm: null,
+      canonicalization_version: null, created_at: '2026-01-02T10:00:00Z',
+      updated_at: '2026-01-02T10:00:00Z', findings: [], specifications: [],
+      ...overrides
+    }
+  }
+
+  function route(options: { draft?: unknown, current?: unknown, summaries?: unknown[], records?: Record<string, unknown> } = {}) {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: REAL_CATALOG }
+      if (url.includes('/records/current')) return { data: options.current ?? null }
+      if (url.includes('/records/draft')) return { data: options.draft ?? null }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        const rows = options.summaries ?? []
+        return { data: rows, total: rows.length, page: 1, page_size: 20 }
+      }
+      const byId = url.match(/\/nts\/records\/([^/?]+)$/)
+      if (byId && options.records?.[byId[1]!]) return { data: options.records[byId[1]!] }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function shell(patientId = 'p1') {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId, normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  // --- B: the record-wide serialization guard ------------------------------
+
+  it('B — CRITICAL: two mutation families cannot send the same version', async () => {
+    // Observations and carry-forward confirmation are different components
+    // with different busy flags, and both bump the same `version`. Before
+    // 05E.4 both read the loaded record and both sent expected_version: 7.
+    route({ draft: rec({ findings: [carried()] }) })
+    const wrapper = await shell()
+
+    let releasePatch: (value: unknown) => void = () => {}
+    state.patch.mockImplementation(() => new Promise((resolve) => {
+      releasePatch = resolve
+    }))
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('texto')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await nextTick()
+
+    // The other family is visibly unavailable, and refuses even if clicked.
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').attributes('disabled')).toBeDefined()
+    await wrapper.find('[data-testid="nts-confirm-f-c"]').trigger('click')
+    await settle()
+    expect(state.post).not.toHaveBeenCalled()
+
+    // The lock lifts once the first write and its refetch are done.
+    route({ draft: rec({ version: 8, observations: 'texto', findings: [carried()] }) })
+    releasePatch({ data: rec({ version: 8 }) })
+    await settle()
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('B — and the guard covers the refetch, not just the request', async () => {
+    // Between the server answering and the refresh landing, the loaded record
+    // still carries the old version. A write started there would be stale.
+    route({ draft: rec({ findings: [carried()] }) })
+    const wrapper = await shell()
+
+    let releaseRefetch: (value: unknown) => void = () => {}
+    state.patch.mockResolvedValue({ data: rec({ version: 8 }) })
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: REAL_CATALOG }
+      if (url.includes('/records/current')) return { data: null }
+      if (url.endsWith('/nts/patients/p1/records')) return { data: [], total: 0, page: 1, page_size: 20 }
+      if (url.includes('/records/draft')) {
+        return await new Promise((resolve) => {
+          releaseRefetch = resolve
+        })
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('texto')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await settle()
+
+    // Mid-refetch: still locked.
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').attributes('disabled')).toBeDefined()
+    releaseRefetch({ data: rec({ version: 8, findings: [carried()] }) })
+    await settle()
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').attributes('disabled')).toBeUndefined()
+  })
+
+  // --- E: finalize is refused while a carry-forward is unreviewed ----------
+
+  it('E — finalize is unavailable while a carried-forward finding is pending', async () => {
+    route({ draft: rec({ findings: [carried()] }) })
+    const wrapper = await shell()
+
+    expect(wrapper.find('[data-testid="nts-carried-forward"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-finalize-draft"]').attributes('disabled')).toBeDefined()
+
+    // Nothing was auto-confirmed to make it possible.
+    expect(state.post).not.toHaveBeenCalled()
+    const finding = wrapper.find('[data-testid="nts-finding-f-c"]')
+    expect(finding.exists()).toBe(true)
+  })
+
+  it('E — confirming it individually is what unlocks finalize', async () => {
+    route({ draft: rec({ findings: [carried()] }) })
+    const wrapper = await shell()
+
+    state.post.mockResolvedValue({
+      data: { record_version: 8, finding: { ...carried(), provenance: 'observed' } }
+    })
+    route({ draft: rec({ version: 8, findings: [{ ...carried(), provenance: 'observed' }] }) })
+    await wrapper.find('[data-testid="nts-confirm-f-c"]').trigger('click')
+    await settle()
+
+    expect(state.post).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1/findings/f-c/confirm',
+      { expected_version: 7 }
+    )
+    expect(wrapper.find('[data-testid="nts-finalize-draft"]').attributes('disabled')).toBeUndefined()
+  })
+
+  // --- D: finalize ---------------------------------------------------------
+
+  it('D — finalizing locks the document without tearing the surface down', async () => {
+    route({ draft: rec({ observations: 'listo', specifications: [{ id: 's', record_id: 'rec-1', finding_id: null, text: 'spec', sequence: 1 }] }) })
+    const wrapper = await shell()
+
+    state.post.mockResolvedValue({ data: rec({ status: 'finalized', finalized_at: 'x', content_hash: 'h' }) })
+    route({ current: rec({ status: 'finalized', finalized_at: 'x', content_hash: 'h', observations: 'listo', specifications: [{ id: 's', record_id: 'rec-1', finding_id: null, text: 'spec', sequence: 1 }] }) })
+    await wrapper.find('[data-testid="nts-finalize-draft"]').trigger('click')
+    await settle()
+
+    // Everything is read-only, and the shell never went through a skeleton.
+    expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-observations-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text()).toBe('listo')
+    expect(wrapper.find('[data-testid="nts-spec-add"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-spec-row-0"]').text()).toContain('spec')
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(false)
+  })
+
+  // --- F: discard ----------------------------------------------------------
+
+  it('F — discarding keeps the record and offers no undo', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-discard-draft"]').trigger('click')
+    await nextTick()
+    // The dialog is teleported, and the testid may sit on the control or on
+    // its wrapper depending on how the UI kit forwards attributes.
+    const host = document.querySelector('[data-testid="nts-discard-reason"]')
+    const reason = host instanceof HTMLInputElement
+      ? host
+      : host?.querySelector('input, textarea')
+    expect(reason).not.toBeNull()
+
+    state.post.mockResolvedValue({ data: rec({ status: 'discarded' }) })
+    route({ summaries: [] })
+    // The dialog is teleported; drive the submit through the document.
+    const el = reason as HTMLInputElement
+    el.value = 'duplicado'
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    ;(document.querySelector('[data-testid="nts-discard-submit"]') as HTMLElement)?.click()
+    await settle()
+
+    expect(state.post).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/records/rec-1/discard',
+      { expected_version: 7, reason: 'duplicado' }
+    )
+    // No restore affordance anywhere.
+    expect(wrapper.html()).not.toContain('nts-restore')
+  })
+
+  // --- M: dirty navigation -------------------------------------------------
+
+  it('M — CRITICAL: opening history with unsaved text asks first', async () => {
+    route({
+      draft: rec({ observations: 'guardado' }),
+      summaries: [{
+        id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022',
+        stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2,
+        recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z',
+        discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false
+      }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized', observations: 'viejo' }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('a medio escribir')
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    // Stopped: nothing was fetched and the text is still there.
+    expect(wrapper.find('[data-testid="nts-unsaved-dialog"]').exists()
+      || document.querySelector('[data-testid="nts-unsaved-stay"]') !== null).toBe(true)
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(false)
+    expect((wrapper.find('[data-testid="nts-observations-input"]').element as HTMLTextAreaElement).value)
+      .toBe('a medio escribir')
+
+    // Staying keeps it.
+    ;(document.querySelector('[data-testid="nts-unsaved-stay"]') as HTMLElement)?.click()
+    await settle()
+    expect((wrapper.find('[data-testid="nts-observations-input"]').element as HTMLTextAreaElement).value)
+      .toBe('a medio escribir')
+
+    // Discarding continues.
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+    ;(document.querySelector('[data-testid="nts-unsaved-discard"]') as HTMLElement)?.click()
+    await settle()
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+  })
+
+  it('M — an untouched draft navigates straight through', async () => {
+    route({
+      draft: rec({ observations: 'guardado' }),
+      summaries: [{
+        id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022',
+        stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2,
+        recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z',
+        discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false
+      }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized', observations: 'viejo' }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(document.querySelector('[data-testid="nts-unsaved-stay"]')).toBeNull()
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+  })
+
+  it('M — an open finding editor counts as unsaved work too', async () => {
+    route({
+      draft: rec(),
+      summaries: [{
+        id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022',
+        stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2,
+        recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z',
+        discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false
+      }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized' }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-add-finding"]').trigger('click')
+    await settle()
+    expect(wrapper.find('[data-testid="nts-editor-panel"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(document.querySelector('[data-testid="nts-unsaved-stay"]')).not.toBeNull()
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(false)
+    ;(document.querySelector('[data-testid="nts-unsaved-stay"]') as HTMLElement)?.click()
+    await settle()
+  })
+
+  // --- carried-forward on a historical record ------------------------------
+
+  it('carried-forward on a historical record is information, not a task', async () => {
+    route({
+      current: rec({ status: 'finalized' }),
+      summaries: [{
+        id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022',
+        stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2,
+        recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z',
+        discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false
+      }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized', findings: [carried()] }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    // The finding is listed, and there is nothing to do about it here.
+    expect(wrapper.find('[data-testid="nts-finding-f-c"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-edit-f-c"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-remove-f-c"]').exists()).toBe(false)
+    // And the shell does not advertise it as a pending job on the current record.
+    expect(wrapper.find('[data-testid="nts-carried-forward"]').exists()).toBe(false)
+  })
+
+  // --- history row semantics ----------------------------------------------
+
+  it('the selector distinguishes "the current odontogram" from "the one on screen"', async () => {
+    route({
+      draft: rec({ id: 'rec-1' }),
+      summaries: [
+        { id: 'rec-1', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'diagnosis', stage_label: null, status: 'draft', version: 7, recorded_at: '2026-06-01T10:00:00Z', finalized_at: null, discarded_at: null, supersedes_record_id: null, content_hash: null, is_superseded: false },
+        { id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2, recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z', discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false }
+      ],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized' }) }
+    })
+    const wrapper = await shell()
+
+    // Row 0 is the record in force; nothing is on screen from the history yet.
+    expect(wrapper.find('[data-testid="nts-history-current-0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-history-open-marker-0"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="nts-history-open-1"]').trigger('click')
+    await settle()
+
+    // Row 1 is now on screen; row 0 is still the current one. Two facts.
+    expect(wrapper.find('[data-testid="nts-history-open-marker-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-history-current-0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-history-current-1"]').exists()).toBe(false)
+  })
+
+  // --- actor detail --------------------------------------------------------
+
+  it('an opened record shows the actor fields it actually has', async () => {
+    route({
+      current: rec({ status: 'finalized' }),
+      summaries: [{ id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2, recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z', discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized', recorded_by_name: 'Dra. Ruiz', recorded_by_professional_id: 'COP-1' }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    const detail = wrapper.find('[data-testid="nts-historical-detail"]')
+    expect(detail.exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-historical-actor"]').text()).toContain('Dra. Ruiz')
+    expect(wrapper.find('[data-testid="nts-historical-norm"]').text()).toBe('pe_nts_188_2022')
+  })
+
+  it('and renders no blank row for an actor the record does not name', async () => {
+    route({
+      current: rec({ status: 'finalized' }),
+      summaries: [{ id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2, recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z', discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized', recorded_by_name: null, recorded_by_professional_id: null }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-historical-detail"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-historical-actor"]').exists()).toBe(false)
+  })
+
+  // --- O: patient switch ---------------------------------------------------
+
+  it('O — a patient change clears any historical view with it', async () => {
+    route({
+      draft: rec(),
+      summaries: [{ id: 'rec-old', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'diagnosis', stage_label: null, status: 'finalized', version: 2, recorded_at: '2026-04-01T10:00:00Z', finalized_at: '2026-04-01T11:00:00Z', discarded_at: null, supersedes_record_id: null, content_hash: 'a', is_superseded: false }],
+      records: { 'rec-old': rec({ id: 'rec-old', status: 'finalized' }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+
+    state.get.mockImplementation(() => new Promise(() => {}))
+    await wrapper.setProps({ patientId: 'patient-b' })
+    await settle()
+
+    // A real context change: the surface is replaced, and the previous
+    // patient's historical record does not survive it.
+    expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(false)
   })
 })

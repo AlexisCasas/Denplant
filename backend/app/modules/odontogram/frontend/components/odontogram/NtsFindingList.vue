@@ -22,8 +22,16 @@ const props = withDefaults(
     /** A finalized record is a locked document: no action is offered. */
     readonly?: boolean
     busyId?: string | null
+    /**
+     * A write is in flight somewhere on this record.
+     *
+     * Every action here bumps the same version as the record's text edits do,
+     * so while one of those is running these must not be offered — the click
+     * would be refused by the shared lock and read as a dead button.
+     */
+    writing?: boolean
   }>(),
-  { readonly: false, busyId: null }
+  { readonly: false, busyId: null, writing: false }
 )
 
 const emit = defineEmits<{
@@ -174,6 +182,7 @@ function roleText(row: Row): string {
             <UButton
               v-if="row.pending"
               size="xs"
+              :disabled="writing"
               :loading="busyId === row.finding.id"
               :data-testid="`nts-confirm-${row.finding.id}`"
               @click="emit('confirm', row.finding)"
@@ -184,7 +193,7 @@ function roleText(row: Row): string {
               size="xs"
               color="neutral"
               variant="ghost"
-              :disabled="!row.rule"
+              :disabled="!row.rule || writing"
               :data-testid="`nts-edit-${row.finding.id}`"
               @click="emit('edit', row.finding)"
             >
@@ -194,6 +203,7 @@ function roleText(row: Row): string {
               size="xs"
               color="neutral"
               variant="ghost"
+              :disabled="writing"
               :loading="busyId === row.finding.id"
               :data-testid="`nts-remove-${row.finding.id}`"
               @click="emit('remove', row.finding)"

@@ -23,7 +23,17 @@ const props = defineProps<{
   saving: boolean
 }>()
 
-const emit = defineEmits<{ save: [text: string | null] }>()
+const emit = defineEmits<{
+  save: [text: string | null]
+  /**
+   * Whether there is text here the server has not been told about.
+   *
+   * Reported outward so the shell can refuse to navigate away from it: the
+   * buffer resets on a change of record, and losing a clinician's half-written
+   * observation to a stray click is not an acceptable way to change screens.
+   */
+  'update:dirty': [dirty: boolean]
+}>()
 
 const { t } = useI18n()
 
@@ -50,6 +60,7 @@ function saveSucceeded(): void {
 }
 
 const isDirty = computed(() => buffer.value !== persisted.value)
+watch(isDirty, value => emit('update:dirty', value), { immediate: true })
 const canSave = computed(() => props.editable && isDirty.value && !props.saving)
 
 function cancel(): void {

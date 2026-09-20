@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- fix(nts-05e.4): **one record, one write at a time** — plus the integration
+  pass that closes phase 05E.
+
+  The defect this ticket was written to find: every mutation in the module
+  bumps the same `record.version`, but each editor guarded only itself. Saving
+  *Observaciones* and confirming a carried-forward finding are different
+  components with different busy flags, so both read the loaded record and both
+  sent `expected_version: 7`. Proved by probe before fixing: two requests, one
+  version, and the second 409s for something the clinician did nothing to
+  cause. There is now a **record-wide** lock in `useNtsOdontogramRecord`, held
+  across the refetch as well as the request — the loaded record still carries
+  the old version until the refresh lands — and the finding editor takes it
+  through a new optional `lock` option. Every write affordance is disabled
+  while it is held, so the guard is visible rather than a silently dead click.
+
+  **Unsaved text is no longer lost to a click.** Opening a historical record
+  swaps the record in view, which resets the panels' buffers. Both panels now
+  report dirtiness, an open finding editor counts as unsaved work, and
+  navigating away asks first — discard and continue, or keep editing. A
+  confirm rather than per-record buffer retention: the smaller mechanism, and
+  the honest one, since the clinician is told what they are about to lose.
+
+  **The history selector's ARIA was wrong and is now right.** 05E.3 shipped
+  `listbox`/`option` with a button inside each option — invalid, and it
+  promised an arrow-key model that did not exist. It is a plain list of
+  buttons with `aria-current`, which is what the interaction actually is.
+
+  Two more facts are now said in words rather than implied by colour: which row
+  is *the current odontogram* and which is *the one on screen* — different
+  things that a single "current" badge would have conflated. An opened record
+  shows the actor and metadata fields it actually carries, and renders nothing
+  where it carries none.
+
+  `finalize`, `discard` and `createDraft` now refetch in place like every other
+  post-mutation read, instead of replacing the clinical surface with a skeleton
+  and rebuilding it.
+
+  Renderer coverage unchanged at 35 complete / 1 partial / 2 unsupported. No
+  backend, migration or catalog change.
+
 - feat(nts-05e.3): **record history, and a record is read under its own norm**.
   The list 05A shipped becomes a selector that opens earlier odontograms
   read-only, and the catalog is now resolved from `record.norm_version`

@@ -22,6 +22,12 @@ const props = defineProps<{
   records: readonly NtsRecordSummary[]
   /** The record currently open from the history, if any. */
   openId: string | null
+  /**
+   * The record the lifecycle considers current — the open draft, else the one
+   * in force. Distinct from `openId`: "the current odontogram" and "the one on
+   * screen" are different facts and are named differently.
+   */
+  currentId: string | null
   /** True while a record is being fetched. */
   loading: boolean
   /** The norm the active profile would create a new record under. */
@@ -109,11 +115,14 @@ function foreignNorm(row: NtsRecordSummary): string | null {
     </template>
 
     <!--
-      A listbox rather than a stack of links: the rows are a single choice of
-      which record is being inspected, and that is what `aria-selected` on a
-      listbox conveys. Keyboard reaches every row because each is a button.
-    -->
-    <!--
+      A plain list of buttons, not a listbox.
+
+      05E.3 marked this up as `listbox`/`option` with a button inside each
+      option, which is invalid — an option may not contain a focusable control
+      — and it promised an arrow-key model that did not exist. The real
+      interaction is "activate one of several controls", which is what native
+      buttons and Tab already are. `aria-current` names the one on screen.
+
       Rows stay clickable while one is loading. Disabling them would make a
       slow record block the selector, and switching away from it impossible —
       the very case the record and catalog generation tokens exist to make
@@ -122,15 +131,12 @@ function foreignNorm(row: NtsRecordSummary): string | null {
     -->
     <ul
       class="divide-y divide-default"
-      role="listbox"
       :aria-label="t('odontogram.nts.history.title')"
       data-testid="nts-history-list"
     >
       <li
         v-for="(row, index) in records"
         :key="row.id"
-        role="option"
-        :aria-selected="row.id === openId"
       >
         <button
           type="button"
@@ -138,6 +144,7 @@ function foreignNorm(row: NtsRecordSummary): string | null {
                  flex-wrap rounded-token-xs transition-colors hover:bg-elevated
                  disabled:opacity-60"
           :class="row.id === openId ? 'bg-elevated' : ''"
+          :aria-current="row.id === openId ? 'true' : undefined"
           :data-testid="`nts-history-open-${index}`"
           :data-record="row.id"
           @click="emit('open', row.id)"
@@ -180,6 +187,20 @@ function foreignNorm(row: NtsRecordSummary): string | null {
               :data-testid="`nts-history-status-${index}`"
             >
               {{ t(`odontogram.nts.status.${row.status}`) }}
+            </UBadge>
+
+            <!--
+              Two different facts, two different words: this row is the
+              odontogram in force, and this row is the one being looked at.
+            -->
+            <UBadge
+              v-if="row.id === currentId"
+              color="primary"
+              variant="subtle"
+              size="sm"
+              :data-testid="`nts-history-current-${index}`"
+            >
+              {{ t('odontogram.nts.history.isCurrent') }}
             </UBadge>
 
             <UIcon

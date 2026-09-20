@@ -32,6 +32,8 @@ const emit = defineEmits<{
   create: [text: string]
   update: [id: string, text: string, findingId: string | null]
   remove: [id: string]
+  /** Whether a composer or an inline edit holds text that is not saved. */
+  'update:dirty': [dirty: boolean]
 }>()
 
 const { t } = useI18n()
@@ -69,6 +71,21 @@ function findingLabel(specification: NtsSpecification): string | null {
     ? t('odontogram.nts.specifications.linkedTeeth', { teeth: teeth.join(', ') })
     : t('odontogram.nts.specifications.linkedFinding')
 }
+
+/**
+ * Text here the server has not been told about.
+ *
+ * An open composer with something typed in it, or an edit whose text no
+ * longer matches what is stored. An empty composer is not dirty: nothing
+ * would be lost by closing it.
+ */
+const isDirty = computed(() => {
+  if (creating.value && draftText.value.trim().length > 0) return true
+  if (editingId.value === null) return false
+  const original = props.specifications.find(s => s.id === editingId.value)
+  return original ? editText.value !== original.text : editText.value.trim().length > 0
+})
+watch(isDirty, value => emit('update:dirty', value), { immediate: true })
 
 const canSubmitCreate = computed(() => draftText.value.trim().length > 0)
 const canSubmitEdit = computed(() => editText.value.trim().length > 0)

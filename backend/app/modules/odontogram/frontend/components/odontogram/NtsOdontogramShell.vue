@@ -63,6 +63,9 @@ const {
   specifications,
   isTextEditable,
   isSavingText,
+  isWriting,
+  beginWrite,
+  endWrite,
   refreshFailed: textRefreshFailed,
   retryRefresh: retryTextRefresh,
   mode,
@@ -139,7 +142,10 @@ const editor = useNtsFindingEditor({
   record: () => (!isHistorical.value && draft.value?.status === 'draft' ? draft.value : null),
   rules: () => catalog.value?.rules ?? [],
   reload: () => reload(),
-  onConflict: kind => recoverFromConflict(kind)
+  onConflict: kind => recoverFromConflict(kind),
+  // One lock for the whole record, shared with the text panels: the two
+  // families bump the same version and cannot both read it at once.
+  lock: { begin: beginWrite, end: endWrite }
 })
 
 /** Teeth may only be picked while a rule that needs them is open. */
@@ -226,6 +232,59 @@ const observationsPanel = ref<{ saveSucceeded: () => void } | null>(null)
 
 /** Siglas the chart could not fit. Advisory input for §5.14, never a rule. */
 const hiddenSiglas = ref(0)
+
+/**
+ * Unsaved work anywhere on the current record.
+ *
+ * One definition for one policy. The two text panels report their own
+ * buffers; an open finding editor counts because it holds a half-built
+ * finding that closing would discard. A historical view has no buffers of its
+ * own, so leaving it is always safe.
+ */
+const textDirty = ref({ specifications: false, observations: false })
+const hasUnsavedWork = computed(
+  () => !isHistorical.value
+    && (textDirty.value.specifications || textDirty.value.observations || editor.isOpen.value)
+)
+
+/** Where navigation was heading when it was stopped. */
+const pendingNavigation = ref<{ kind: 'history', recordId: string } | { kind: 'current' } | null>(null)
+
+/**
+ * Navigate, or ask first.
+ *
+ * Opening a historical record swaps the record in view, which resets the
+ * panels' buffers — so a stray click would silently destroy a half-written
+ * observation. Rather than preserve buffers per record (state that would then
+ * have to be invalidated correctly) the navigation is simply confirmed, which
+ * is the smaller and more honest mechanism: the clinician is told what they
+ * are about to lose and decides.
+ */
+function requestHistorical(recordId: string): void {
+  if (hasUnsavedWork.value) {
+    pendingNavigation.value = { kind: 'history', recordId }
+    return
+  }
+  void openHistorical(recordId)
+}
+
+function requestCurrent(): void {
+  if (hasUnsavedWork.value) {
+    pendingNavigation.value = { kind: 'current' }
+    return
+  }
+  backToCurrent()
+}
+
+/** The clinician chose to lose it. Nothing is saved on the way out. */
+function confirmNavigation(): void {
+  const target = pendingNavigation.value
+  pendingNavigation.value = null
+  if (!target) return
+  editor.close()
+  if (target.kind === 'history') void openHistorical(target.recordId)
+  else backToCurrent()
+}
 
 /**
  * Leave the history.
@@ -489,6 +548,7 @@ watch([() => props.patientId, normVersion], () => void load())
                   color="neutral"
                   variant="ghost"
                   :loading="isMutating"
+                  :disabled="isWriting"
                   data-testid="nts-discard-draft"
                   @click="discardOpen = true"
                 >
@@ -497,7 +557,7 @@ watch([() => props.patientId, normVersion], () => void load())
                 <UButton
                   size="xs"
                   :loading="isMutating"
-                  :disabled="hasPendingCarriedForward"
+                  :disabled="hasPendingCarriedForward || isWriting"
                   data-testid="nts-finalize-draft"
                   @click="finalizeDraft()"
                 >
@@ -558,12 +618,76 @@ watch([() => props.patientId, normVersion], () => void load())
               size="xs"
               color="neutral"
               data-testid="nts-historical-return"
-              @click="backToCurrent()"
+              @click="requestCurrent()"
             >
               {{ t('odontogram.nts.history.returnToCurrent') }}
             </UButton>
           </template>
         </UAlert>
+
+        <!--
+          Who recorded it, when, and under which norm — but only the fields
+          the record actually carries. A summary has no actor names, which is
+          why the selector promises none; the full record sometimes does, and
+          an absent one is simply not rendered rather than shown as a blank.
+        -->
+        <UCard
+          v-if="isHistorical && historicalRecord"
+          data-testid="nts-historical-detail"
+        >
+          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt class="text-subtle">
+              {{ t('odontogram.nts.field.stage') }}
+            </dt>
+            <dd>{{ stageLabel(historicalRecord.stage, historicalRecord.stage_label) }}</dd>
+
+            <dt class="text-subtle">
+              {{ t('odontogram.nts.field.openedAt') }}
+            </dt>
+            <dd>{{ formatDate(historicalRecord.recorded_at) }}</dd>
+
+            <template v-if="historicalRecord.finalized_at">
+              <dt class="text-subtle">
+                {{ t('odontogram.nts.field.finalizedAt') }}
+              </dt>
+              <dd>{{ formatDate(historicalRecord.finalized_at) }}</dd>
+            </template>
+
+            <template v-if="historicalRecord.discarded_at">
+              <dt class="text-subtle">
+                {{ t('odontogram.nts.field.discardedAt') }}
+              </dt>
+              <dd>{{ formatDate(historicalRecord.discarded_at) }}</dd>
+            </template>
+
+            <template v-if="historicalRecord.discard_reason">
+              <dt class="text-subtle">
+                {{ t('odontogram.nts.field.discardReason') }}
+              </dt>
+              <dd data-testid="nts-historical-discard-reason">
+                {{ historicalRecord.discard_reason }}
+              </dd>
+            </template>
+
+            <template v-if="historicalRecord.recorded_by_name">
+              <dt class="text-subtle">
+                {{ t('odontogram.nts.field.recordedBy') }}
+              </dt>
+              <dd data-testid="nts-historical-actor">
+                {{ historicalRecord.recorded_by_name }}
+                <span
+                  v-if="historicalRecord.recorded_by_professional_id"
+                  class="text-subtle"
+                >· {{ historicalRecord.recorded_by_professional_id }}</span>
+              </dd>
+            </template>
+
+            <dt class="text-subtle">
+              {{ t('odontogram.nts.field.normVersion') }}
+            </dt>
+            <dd data-testid="nts-historical-norm">{{ historicalRecord.norm_version }}</dd>
+          </dl>
+        </UCard>
 
         <!-- The record could not be read. The current one is untouched. -->
         <UAlert
@@ -650,8 +774,9 @@ watch([() => props.patientId, normVersion], () => void load())
           :specifications="specifications"
           :findings="chartRecord?.findings ?? []"
           :editable="isTextEditable"
-          :saving="isSavingText"
+          :saving="isWriting"
           :hidden-siglas="hiddenSiglas"
+          @update:dirty="textDirty.specifications = $event"
           @create="submitNewSpecification"
           @update="submitSpecificationEdit"
           @remove="submitSpecificationRemoval"
@@ -662,7 +787,8 @@ watch([() => props.patientId, normVersion], () => void load())
           :observations="observations"
           :record-id="chartRecord?.id ?? null"
           :editable="isTextEditable"
-          :saving="isSavingText"
+          :saving="isWriting"
+          @update:dirty="textDirty.observations = $event"
           @save="submitObservations"
         />
 
@@ -770,6 +896,7 @@ watch([() => props.patientId, normVersion], () => void load())
           <UButton
             icon="i-lucide-plus"
             size="sm"
+            :disabled="isWriting"
             data-testid="nts-add-finding"
             @click="editor.startCreate"
           >
@@ -783,6 +910,7 @@ watch([() => props.patientId, normVersion], () => void load())
           :rules="viewCatalog?.rules ?? []"
           :readonly="!editor.canEdit.value"
           :busy-id="editor.isSaving.value ? editor.editing.value : null"
+          :writing="isWriting"
           @edit="editor.startEdit"
           @confirm="editor.confirmFinding"
           @remove="removing = $event"
@@ -798,10 +926,11 @@ watch([() => props.patientId, normVersion], () => void load())
           v-if="history.length > 0"
           :records="history"
           :open-id="historicalId"
+          :current-id="(draft ?? currentRecord)?.id ?? null"
           :loading="isOpeningHistorical"
           :profile-norm-version="normVersion"
-          @open="openHistorical"
-          @return-to-current="backToCurrent"
+          @open="requestHistorical"
+          @return-to-current="requestCurrent"
         />
       </template>
     </template>
@@ -890,6 +1019,43 @@ watch([() => props.patientId, normVersion], () => void load())
             @click="submitDiscard()"
           >
             {{ t('odontogram.nts.actions.discardDraft') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!--
+      Navigation away from unsaved text. Not a save prompt: there is no
+      autosave here and offering one would blur what "saved" means on a
+      clinical record. The choice is to discard and continue, or to stay.
+    -->
+    <UModal
+      :open="pendingNavigation !== null"
+      :title="t('odontogram.nts.unsaved.title')"
+      data-testid="nts-unsaved-dialog"
+      @update:open="$event || (pendingNavigation = null)"
+    >
+      <template #body>
+        <p class="text-sm">
+          {{ t('odontogram.nts.unsaved.body') }}
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            data-testid="nts-unsaved-stay"
+            @click="pendingNavigation = null"
+          >
+            {{ t('odontogram.nts.unsaved.stay') }}
+          </UButton>
+          <UButton
+            color="warning"
+            data-testid="nts-unsaved-discard"
+            @click="confirmNavigation()"
+          >
+            {{ t('odontogram.nts.unsaved.discard') }}
           </UButton>
         </div>
       </template>
