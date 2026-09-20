@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+- fix(nts-05e.4a): **a context change cannot silently discard clinical text**.
+  05E.4 guarded navigation *inside* the odontogram; the controls that take the
+  odontogram away live outside it, and could not see what they were about to
+  destroy.
+
+  The audit found what those controls actually are, and it was not what the
+  ticket assumed. `patientId` reaches the shell from `route.params.id`, read
+  once — **there is no in-page patient switcher**, so changing patient is
+  route navigation. The one reachable in-screen context change is the
+  chart-format selector, a *sibling* of the mount point: clicking it flips
+  shared preference state and the shell is unmounted.
+
+  So the shell now publishes, through a small shared composable, the only
+  thing outside controls need: whether anything would be lost. Two flags, not
+  one — `dirty` is text a clinician typed and can discard, `writing` is a
+  mutation already sent, which is not the browser's to throw away and whose
+  result needs somewhere to land. They get different answers: a confirmation
+  for the first, an unavailable control for the second.
+
+  The guard sits at the control that causes the change, never as an attempt
+  to revert a prop afterwards. The format selector asks before switching,
+  using the same words as the odontogram's own history prompt — one policy
+  for abandoning unsaved clinical text, not three dialogs that disagree.
+  Leaving the page is covered by `onBeforeRouteLeave` scoped to the shell
+  rather than to the patient page, which hosts several tabs with nothing to
+  protect; reload and tab-close reuse the `beforeunload` pattern the
+  periodontogram already established.
+
+  Nothing is persisted to survive the navigation. A copy of clinical text in
+  `localStorage` would be a second source of truth, which this module refuses
+  everywhere else; confirming before abandoning it is enough.
+
 - fix(nts-05e.4): **one record, one write at a time** — plus the integration
   pass that closes phase 05E.
 

@@ -17,6 +17,8 @@ import { defineComponent, h, nextTick } from 'vue'
 import OdontogramProfileView from '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramProfileView.vue'
 import OdontogramChart from '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramChart.vue'
 import NtsOdontogramShell from '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramShell.vue'
+import OdontogramProfileSelector from '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramProfileSelector.vue'
+import { useNtsUnsavedChanges } from '../../../backend/app/modules/odontogram/frontend/composables/useNtsUnsavedChanges'
 import { useOdontogramProfile } from '../../../backend/app/modules/odontogram/frontend/composables/useOdontogramProfile'
 
 const state = vi.hoisted(() => ({
@@ -244,5 +246,155 @@ describe('useOdontogramProfile', () => {
 
     expect(state.get).toHaveBeenCalledTimes(2)
     expect(api.profile.value).toBe('pe_nts_188_2022')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NTS-05E.4a — changing the chart format is a context change too
+// ---------------------------------------------------------------------------
+//
+// The selector is a sibling of the mount point, not its parent: clicking it
+// flips shared preference state and the odontogram shell is unmounted. So it
+// can destroy unsaved clinical text without ever seeing it, which is why the
+// guard lives here — at the control that causes the change — rather than
+// trying to undo a prop after the fact.
+
+describe('OdontogramProfileSelector — unsaved clinical text', () => {
+  const mounted: Array<{ unmount: () => void }> = []
+  afterEach(() => {
+    mounted.forEach(w => w.unmount())
+    mounted.length = 0
+  })
+
+  /**
+   * Set the shared flags the odontogram shell publishes.
+   *
+   * Written through the composable rather than poked into a store, so the
+   * test exercises the same contract the shell uses.
+   */
+  async function publish(flags: { dirty: boolean, writing: boolean }) {
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+    unsaved.publish(flags)
+    await nextTick()
+    return unsaved
+  }
+
+  async function mountSelector() {
+    state.get.mockResolvedValue({ data: { profile: 'original' } })
+    const wrapper = await mountSuspended(OdontogramProfileSelector)
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  beforeEach(async () => {
+    // Shared state outlives a component; start every case from nothing owed.
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+    unsaved.reset()
+  })
+
+  it('A — with nothing unsaved, the switch happens straight away', async () => {
+    await publish({ dirty: false, writing: false })
+    const wrapper = await mountSelector()
+
+    state.put.mockResolvedValue({ data: { profile: 'pe_nts_188_2022' } })
+    await wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').trigger('click')
+    await settle()
+
+    expect(state.put).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-testid="odontogram-profile-unsaved-stay"]')).toBeNull()
+  })
+
+  it('B — with unsaved text, it asks before switching', async () => {
+    await publish({ dirty: true, writing: false })
+    const wrapper = await mountSelector()
+
+    await wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').trigger('click')
+    await settle()
+
+    // Nothing was written, and the format has not changed.
+    expect(state.put).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-testid="odontogram-profile-unsaved-stay"]')).not.toBeNull()
+  })
+
+  it('F — keeping the edit leaves the format alone', async () => {
+    await publish({ dirty: true, writing: false })
+    const wrapper = await mountSelector()
+
+    await wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').trigger('click')
+    await settle()
+    ;(document.querySelector('[data-testid="odontogram-profile-unsaved-stay"]') as HTMLElement).click()
+    await settle()
+
+    expect(state.put).not.toHaveBeenCalled()
+    expect(
+      wrapper.find('[data-testid="odontogram-profile-option-original"]').attributes('aria-pressed')
+    ).toBe('true')
+  })
+
+  it('G/H — discarding switches, and saves nothing on the way out', async () => {
+    await publish({ dirty: true, writing: false })
+    const wrapper = await mountSelector()
+
+    await wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').trigger('click')
+    await settle()
+
+    state.put.mockResolvedValue({ data: { profile: 'pe_nts_188_2022' } })
+    ;(document.querySelector('[data-testid="odontogram-profile-unsaved-discard"]') as HTMLElement).click()
+    await settle()
+
+    // Exactly one PUT — the preference itself. The discarded text was never
+    // sent anywhere: discarding is not a quiet save.
+    expect(state.put).toHaveBeenCalledTimes(1)
+    expect(state.put).toHaveBeenCalledWith(
+      '/api/v1/odontogram/preferences',
+      { profile: 'pe_nts_188_2022' }
+    )
+  })
+
+  it('WRITING — a mutation already sent is not offered as discardable', async () => {
+    // It may already be on the server, and its result needs somewhere to
+    // land. The honest answer is to wait, not to offer to throw it away.
+    await publish({ dirty: false, writing: true })
+    const wrapper = await mountSelector()
+
+    const option = wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]')
+    expect(option.attributes('disabled')).toBeDefined()
+
+    await option.trigger('click')
+    await settle()
+
+    expect(state.put).not.toHaveBeenCalled()
+    // And no dialog: there is nothing to decide.
+    expect(document.querySelector('[data-testid="odontogram-profile-unsaved-stay"]')).toBeNull()
+  })
+
+  it('WRITING — the switch becomes available once the write settles', async () => {
+    const unsaved = await publish({ dirty: false, writing: true })
+    const wrapper = await mountSelector()
+    expect(
+      wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').attributes('disabled')
+    ).toBeDefined()
+
+    // The write landed and the refetch finished: nothing is owed any more.
+    unsaved.publish({ dirty: false, writing: false })
+    await settle()
+
+    expect(
+      wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').attributes('disabled')
+    ).toBeUndefined()
+  })
+
+  it('a failed refetch after a successful save is not treated as unsaved text', async () => {
+    // The data reached the server. Refusing to leave over a display problem
+    // would be telling the clinician they might lose work they already saved.
+    await publish({ dirty: false, writing: false })
+    const wrapper = await mountSelector()
+
+    state.put.mockResolvedValue({ data: { profile: 'pe_nts_188_2022' } })
+    await wrapper.find('[data-testid="odontogram-profile-option-pe_nts_188_2022"]').trigger('click')
+    await settle()
+
+    expect(state.put).toHaveBeenCalledTimes(1)
   })
 })

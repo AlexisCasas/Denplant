@@ -16,9 +16,20 @@ import { ODONTOGRAM_PROFILES } from '~~/app/config/odontogramConstants'
 import type { OdontogramProfile } from '~~/app/config/odontogramConstants'
 // Explicit relative import — see the note in `OdontogramProfileView.vue`.
 import { useOdontogramProfile } from '../../composables/useOdontogramProfile'
+import { useNtsUnsavedChanges } from '../../composables/useNtsUnsavedChanges'
 
 const { t } = useI18n()
 const { profile, isLoaded, loading, ensureLoaded, setProfile } = useOdontogramProfile()
+
+/**
+ * Switching format unmounts whichever chart is showing, so it is a context
+ * change like any other — and this is the control that causes it, which is
+ * why the guard lives here rather than being reverted after the fact.
+ */
+const unsaved = useNtsUnsavedChanges()
+
+/** The format the user asked for while something was still unsaved. */
+const pending = ref<OdontogramProfile | null>(null)
 
 onMounted(() => {
   void ensureLoaded()
@@ -33,7 +44,23 @@ const options = computed(() =>
 
 async function select(next: OdontogramProfile) {
   if (next === profile.value || loading.value) return
+
+  // A mutation already sent is not the browser's to discard, and its result
+  // needs somewhere to land. Nothing to offer here but waiting.
+  if (unsaved.writing.value) return
+
+  if (unsaved.dirty.value) {
+    pending.value = next
+    return
+  }
   await setProfile(next)
+}
+
+/** The clinician chose to lose the text. Nothing is saved on the way out. */
+async function confirmDiscard() {
+  const next = pending.value
+  pending.value = null
+  if (next) await setProfile(next)
 }
 </script>
 
@@ -61,7 +88,7 @@ async function select(next: OdontogramProfile) {
           ? 'border-primary bg-primary/10 text-primary-accent'
           : 'border-default bg-default text-default hover:bg-elevated'"
         :aria-pressed="profile === option.value"
-        :disabled="loading || !isLoaded"
+        :disabled="loading || !isLoaded || unsaved.writing.value"
         :data-testid="`odontogram-profile-option-${option.value}`"
         @click="select(option.value)"
       >
@@ -75,5 +102,42 @@ async function select(next: OdontogramProfile) {
       class="w-4 h-4 animate-spin text-subtle"
       :aria-label="t('common.loading')"
     />
+
+    <!--
+      The same question, and deliberately the same words, as the one the
+      odontogram asks before opening a historical record: one policy for
+      abandoning unsaved clinical text, not three dialogs that disagree.
+    -->
+    <UModal
+      :open="pending !== null"
+      :title="t('odontogram.nts.unsaved.title')"
+      data-testid="odontogram-profile-unsaved"
+      @update:open="$event || (pending = null)"
+    >
+      <template #body>
+        <p class="text-sm">
+          {{ t('odontogram.nts.unsaved.body') }}
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full flex-wrap">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            data-testid="odontogram-profile-unsaved-stay"
+            @click="pending = null"
+          >
+            {{ t('odontogram.nts.unsaved.stay') }}
+          </UButton>
+          <UButton
+            color="warning"
+            data-testid="odontogram-profile-unsaved-discard"
+            @click="confirmDiscard()"
+          >
+            {{ t('odontogram.nts.unsaved.discard') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

@@ -662,7 +662,8 @@
         "title": "You have unsaved changes",
         "body": "If you continue, the text you wrote and did not save will be lost.",
         "stay": "Keep editing",
-        "discard": "Discard and continue"
+        "discard": "Discard and continue",
+        "leavePage": "The odontogram has unsaved changes. Leave anyway?"
       }
     },
     "tooth": "Tooth",

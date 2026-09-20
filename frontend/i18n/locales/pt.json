@@ -662,7 +662,8 @@
         "title": "Há alterações por guardar",
         "body": "Se continuar, o texto que escreveu e não guardou será perdido.",
         "stay": "Continuar a editar",
-        "discard": "Descartar e continuar"
+        "discard": "Descartar e continuar",
+        "leavePage": "O odontograma tem alterações por guardar. Sair mesmo assim?"
       }
     },
     "tooth": "Dente",

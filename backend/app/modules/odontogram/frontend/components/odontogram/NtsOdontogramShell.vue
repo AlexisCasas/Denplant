@@ -24,6 +24,7 @@ import NtsSpecificationsPanel from './NtsSpecificationsPanel.vue'
 import NtsObservationsPanel from './NtsObservationsPanel.vue'
 import NtsRecordHistory from './NtsRecordHistory.vue'
 import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
+import { useNtsUnsavedChanges } from '../../composables/useNtsUnsavedChanges'
 
 const props = defineProps<{
   patientId: string
@@ -320,8 +321,67 @@ async function submitSpecificationRemoval(id: string): Promise<void> {
   if (await removeSpecification(id)) specificationsPanel.value?.removeSucceeded()
 }
 
+/**
+ * Publish what would be lost, for the controls that can take this away.
+ *
+ * The chart-format selector is a sibling and a route change comes from
+ * outside both, so neither can see these buffers. They get one boolean each
+ * instead: `dirty` is discardable text, `writing` is a mutation already sent.
+ */
+const unsaved = useNtsUnsavedChanges()
+watch(
+  [hasUnsavedWork, isWriting],
+  ([dirty, writing]) => unsaved.publish({ dirty, writing }),
+  { immediate: true }
+)
+
+/**
+ * Leaving the page.
+ *
+ * Scoped to this component rather than to the patient page, which hosts
+ * several other tabs that have nothing to protect. `onBeforeRouteLeave` is
+ * only active while the shell is mounted, which is exactly the window in
+ * which these buffers exist.
+ *
+ * A window-level `beforeunload` covers reload and tab close, following the
+ * periodontogram's existing guard. The browser ignores any custom text, so
+ * none is supplied: the point is the native prompt, not its wording.
+ */
+onBeforeRouteLeave(() => {
+  // A mutation already sent is not the browser's to discard, and its result
+  // needs a screen to land on. There is nothing to offer here — not even a
+  // confirmation, because agreeing to it would not undo the write. The
+  // navigation is refused until the request and its refetch have settled,
+  // which is at most a moment.
+  if (unsaved.writing.value) return false
+
+  if (!unsaved.dirty.value) return true
+
+  // Text the clinician typed and nobody has sent: theirs to abandon.
+  // eslint-disable-next-line no-alert
+  return window.confirm(t('odontogram.nts.unsaved.leavePage'))
+})
+
+function guardUnload(event: BeforeUnloadEvent): void {
+  if (!unsaved.isBlocked.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
 onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', guardUnload)
+  }
   void load()
+})
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('beforeunload', guardUnload)
+  }
+  // Shared state outlives the component; a stale `true` would block
+  // navigation on a screen with nothing left to lose.
+  unsaved.reset()
 })
 
 // A patient or norm change must never leave the previous record on screen;

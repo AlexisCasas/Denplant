@@ -20,6 +20,7 @@ import { defineComponent, h, nextTick } from 'vue'
 import OdontogramProfileView from '../../../backend/app/modules/odontogram/frontend/components/odontogram/OdontogramProfileView.vue'
 import NtsOdontogramShell from '../../../backend/app/modules/odontogram/frontend/components/odontogram/NtsOdontogramShell.vue'
 import { useOdontogramProfile } from '../../../backend/app/modules/odontogram/frontend/composables/useOdontogramProfile'
+import { useNtsUnsavedChanges } from '../../../backend/app/modules/odontogram/frontend/composables/useNtsUnsavedChanges'
 
 const state = vi.hoisted(() => ({
   profile: 'original' as string,
@@ -48,6 +49,19 @@ const REAL_CATALOG = JSON.parse(
     'utf8'
   )
 )
+
+/**
+ * Capture the route-leave guard the shell registers.
+ *
+ * There is no router in this environment, so the real `onBeforeRouteLeave`
+ * would silently do nothing and the guard would be untestable. Doubling it
+ * keeps the handler reachable and lets a test ask it the question the router
+ * would.
+ */
+const routeGuard = vi.hoisted(() => ({ handler: null as null | (() => unknown) }))
+mockNuxtImport('onBeforeRouteLeave', () => (fn: () => unknown) => {
+  routeGuard.handler = fn
+})
 
 mockNuxtImport('useClinicState', () => () => ({
   currentClinic: { get value() { return { id: 'clinic-a' } } }
@@ -2965,6 +2979,159 @@ describe('NTS-05E.4 — lifecycle and history, integrated', () => {
 
     expect(wrapper.find('[data-testid="nts-historical-detail"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="nts-historical-actor"]').exists()).toBe(false)
+  })
+
+  // --- 05E.4a: what the shell tells the outside world ----------------------
+
+  it('the shell publishes unsaved text so outside controls can see it', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+
+    expect(unsaved.dirty.value).toBe(false)
+    expect(unsaved.isBlocked.value).toBe(false)
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('sin guardar')
+    await settle()
+
+    // The chart-format selector is a sibling and cannot see this buffer; one
+    // boolean is what it gets instead.
+    expect(unsaved.dirty.value).toBe(true)
+    expect(unsaved.isBlocked.value).toBe(true)
+  })
+
+  it('and publishes an in-flight write as a different state from dirty text', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+
+    let release: (value: unknown) => void = () => {}
+    state.patch.mockImplementation(() => new Promise((resolve) => {
+      release = resolve
+    }))
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('texto')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await nextTick()
+
+    // Sent, so no longer discardable — and said as its own flag.
+    expect(unsaved.writing.value).toBe(true)
+
+    route({ draft: rec({ version: 8, observations: 'texto' }) })
+    release({ data: rec({ version: 8, observations: 'texto' }) })
+    await settle()
+
+    expect(unsaved.writing.value).toBe(false)
+    expect(unsaved.dirty.value).toBe(false)
+  })
+
+  it('an open finding editor counts as unsaved for the outside too', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+
+    await wrapper.find('[data-testid="nts-add-finding"]').trigger('click')
+    await settle()
+
+    expect(unsaved.dirty.value).toBe(true)
+  })
+
+  it('and the signal is cleared when the shell goes away', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('sin guardar')
+    await settle()
+    expect(unsaved.dirty.value).toBe(true)
+
+    // Shared state outlives the component; a stale `true` would block
+    // navigation on a screen with nothing left to lose.
+    wrapper.unmount()
+    await settle()
+    expect(unsaved.isBlocked.value).toBe(false)
+  })
+
+  // --- 05E.4a gate: leaving the route ---------------------------------------
+  //
+  // Three answers, because there are three situations. Clean leaves. Typed
+  // text asks. A mutation already sent refuses — agreeing to leave would not
+  // undo the write, so there is nothing to agree to.
+
+  it('GATE A — a route leave is refused outright while a write is in flight', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    state.patch.mockImplementation(() => new Promise(() => {}))
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('texto')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await nextTick()
+
+    expect(routeGuard.handler).not.toBeNull()
+    expect(routeGuard.handler!()).toBe(false)
+    // Not even asked: consenting would not undo a request already sent.
+    expect(confirm).not.toHaveBeenCalled()
+    confirm.mockRestore()
+  })
+
+  it('GATE B/D — typed text asks first, and leaves when the answer is yes', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('sin guardar')
+    await settle()
+
+    expect(routeGuard.handler!()).toBe(true)
+    expect(confirm).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  it('GATE C — and stays when the answer is no', async () => {
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('sin guardar')
+    await settle()
+
+    expect(routeGuard.handler!()).toBe(false)
+    expect(confirm).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  it('GATE E — nothing unsaved leaves immediately, with no prompt', async () => {
+    route({ draft: rec({ observations: 'guardado' }) })
+    await shell()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    expect(routeGuard.handler!()).toBe(true)
+    expect(confirm).not.toHaveBeenCalled()
+    confirm.mockRestore()
+  })
+
+  it('GATE F — a save that landed lets the route go, even if the refetch failed', async () => {
+    // The data reached the server. Blocking navigation over a display problem
+    // would tell the clinician they might lose work they have already saved.
+    route({ draft: rec() })
+    const wrapper = await shell()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const unsaved = await runInSetup(() => useNtsUnsavedChanges())
+
+    state.patch.mockResolvedValue({ data: rec({ version: 8, observations: 'guardado' }) })
+    state.get.mockRejectedValue({ statusCode: 500, data: { message: 'boom' } })
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('guardado')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await settle()
+
+    // The refresh failure is reported, and it is not unsaved work.
+    expect(wrapper.find('[data-testid="nts-text-refresh-failed"]').exists()).toBe(true)
+    expect(unsaved.writing.value).toBe(false)
+    expect(unsaved.dirty.value).toBe(false)
+
+    expect(routeGuard.handler!()).toBe(true)
+    expect(confirm).not.toHaveBeenCalled()
+    confirm.mockRestore()
   })
 
   // --- O: patient switch ---------------------------------------------------

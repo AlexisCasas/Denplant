@@ -690,7 +690,8 @@
         "title": "Hay cambios sin guardar",
         "body": "Si continúa, el texto que escribió y no guardó se perderá.",
         "stay": "Seguir editando",
-        "discard": "Descartar y continuar"
+        "discard": "Descartar y continuar",
+        "leavePage": "Hay cambios sin guardar en el odontograma. ¿Salir de todos modos?"
       }
     },
     "tooth": "Diente",

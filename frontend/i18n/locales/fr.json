@@ -662,7 +662,8 @@
         "title": "Des modifications ne sont pas enregistrées",
         "body": "Si vous continuez, le texte saisi et non enregistré sera perdu.",
         "stay": "Continuer à modifier",
-        "discard": "Abandonner et continuer"
+        "discard": "Abandonner et continuer",
+        "leavePage": "L'odontogramme comporte des modifications non enregistrées. Quitter quand même ?"
       }
     },
     "tooth": "Dent",
