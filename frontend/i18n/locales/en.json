@@ -592,7 +592,16 @@
         "title": "Draft in progress"
       },
       "history": {
-        "title": "Record history"
+        "title": "Record history",
+        "returnToCurrent": "Back to the current odontogram",
+        "viewing": "On screen",
+        "viewingTitle": "You are viewing an odontogram from the history",
+        "viewingBody": "Shown as it was recorded, under the norm version it belongs to. It cannot be changed.",
+        "superseded": "Superseded",
+        "empty": "No earlier records.",
+        "loadFailedTitle": "This odontogram could not be opened",
+        "catalogFailedTitle": "The norm version of this odontogram could not be loaded",
+        "catalogFailedBody": "This record was made under version {version}, which is unavailable. Nothing is drawn: reading it under another version would show findings the record does not contain."
       },
       "empty": {
         "title": "No MINSA odontogram has been recorded for this patient."

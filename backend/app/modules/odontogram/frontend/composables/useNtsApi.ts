@@ -117,9 +117,17 @@ export function useNtsApi() {
       return response.data ?? null
     },
 
+    /**
+     * A patient's record history.
+     *
+     * `normVersion` is nullable because the API's filter is: omit it and the
+     * patient's whole NTS history comes back, whichever norm each record was
+     * written under. A clinical history does not shrink because the clinic
+     * upgraded its norm version.
+     */
     async listRecords(
       patientId: string,
-      normVersion: string,
+      normVersion: string | null,
       options: { page?: number, pageSize?: number, status?: string } = {},
       signal?: AbortSignal
     ): Promise<PaginatedResponse<NtsRecordSummary>> {
@@ -127,7 +135,7 @@ export function useNtsApi() {
         `${BASE}/patients/${patientId}/records`,
         {
           query: {
-            norm_version: normVersion,
+            norm_version: normVersion ?? undefined,
             page: options.page ?? 1,
             page_size: options.pageSize ?? 20,
             status: options.status

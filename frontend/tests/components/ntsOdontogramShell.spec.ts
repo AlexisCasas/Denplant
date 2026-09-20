@@ -2057,3 +2057,514 @@ describe('NTS-05E.2 gate — a 409 never tears the clinical surface down', () =>
     expect(wrapper.find('[data-testid="nts-specifications"]').exists()).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// NTS-05E.3 — record history and historical norm-version resolution
+// ---------------------------------------------------------------------------
+//
+// The rule this section exists to enforce: **a record is read under the norm
+// it was written in**. The active profile decides what a *new* record would
+// be created under and nothing else. Before 05E.3 the history list happened
+// to be filtered by the profile's norm, so every listed record matched the
+// one loaded catalog — a correctness guarantee resting on a filter rather
+// than on anything stated.
+
+describe('NTS-05E.3 — history and historical catalogs', () => {
+  const mounted: Array<{ unmount: () => void }> = []
+  afterEach(() => {
+    mounted.forEach(w => w.unmount())
+    mounted.length = 0
+  })
+
+  /** A second norm this build also serves, with its own rule for 6.1.9. */
+  const CATALOG_B = {
+    ...REAL_CATALOG,
+    norm_version: 'pe_nts_999_2099',
+    norm_label: 'NTS N.° 999 (later norm)'
+  }
+
+  function histRecord(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'rec-hist',
+      clinic_id: 'clinic-a',
+      patient_id: 'p1',
+      norm_version: 'pe_nts_188_2022',
+      stage: 'diagnosis',
+      stage_label: null,
+      status: 'finalized',
+      version: 3,
+      observations: null,
+      recorded_at: '2026-05-02T10:00:00Z',
+      recorded_by: 'u1',
+      finalized_at: '2026-05-02T11:00:00Z',
+      finalized_by: 'u1',
+      discarded_at: null,
+      discarded_by: null,
+      discard_reason: null,
+      recorded_by_name: 'Dra. Ruiz',
+      recorded_by_role: 'dentist',
+      recorded_by_professional_id: 'COP-1',
+      supersedes_record_id: null,
+      supersession_reason: null,
+      content_hash: 'abc',
+      hash_algorithm: 'sha256',
+      canonicalization_version: 1,
+      created_at: '2026-05-02T10:00:00Z',
+      updated_at: '2026-05-02T11:00:00Z',
+      findings: [],
+      specifications: [],
+      ...overrides
+    }
+  }
+
+  function summary(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'rec-hist',
+      patient_id: 'p1',
+      norm_version: 'pe_nts_188_2022',
+      stage: 'diagnosis',
+      stage_label: null,
+      status: 'finalized',
+      version: 3,
+      recorded_at: '2026-05-02T10:00:00Z',
+      finalized_at: '2026-05-02T11:00:00Z',
+      discarded_at: null,
+      supersedes_record_id: null,
+      content_hash: 'abc',
+      is_superseded: false,
+      ...overrides
+    }
+  }
+
+  /**
+   * Route every GET. `records` answers the by-id reads, `catalogs` the
+   * per-version ones, so a test can make one version fail or arrive late.
+   */
+  function histRoute(options: {
+    draft?: unknown
+    current?: unknown
+    summaries?: unknown[]
+    records?: Record<string, unknown>
+    catalogs?: Record<string, unknown | (() => Promise<unknown>)>
+  } = {}) {
+    const catalogs = options.catalogs ?? { pe_nts_188_2022: REAL_CATALOG }
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) {
+        const version = url.split('/nts/catalogs/')[1]!
+        const entry = catalogs[version]
+        if (entry === undefined) throw apiErrorLike(404, 'nts_norm_version_unknown')
+        return { data: typeof entry === 'function' ? await entry() : entry }
+      }
+      if (url.includes('/records/current')) return { data: options.current ?? null }
+      if (url.includes('/records/draft')) return { data: options.draft ?? null }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        const rows = options.summaries ?? []
+        return { data: rows, total: rows.length, page: 1, page_size: 20 }
+      }
+      const byId = url.match(/\/nts\/records\/([^/?]+)$/)
+      if (byId) {
+        const found = options.records?.[byId[1]!]
+        if (found === undefined) throw apiErrorLike(404, 'nts_record_not_found')
+        return { data: typeof found === 'function' ? await (found as () => Promise<unknown>)() : found }
+      }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  function apiErrorLike(status: number, code: string) {
+    return { statusCode: status, data: { message: code, code, errors: [] } }
+  }
+
+  async function histShell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  // --- the list ------------------------------------------------------------
+
+  it('LIST — the history is asked for without a norm filter', async () => {
+    histRoute({ summaries: [summary()] })
+    await histShell()
+
+    const listCall = state.get.mock.calls.find(
+      ([url]) => (url as string).endsWith('/nts/patients/p1/records')
+    )!
+    const query = (listCall[1] as { query: Record<string, unknown> }).query
+    // A clinical history does not shrink because the clinic changed norm.
+    expect(query.norm_version).toBeUndefined()
+  })
+
+  it('LIST — a record written under another norm is listed, and says so', async () => {
+    histRoute({
+      summaries: [summary({ id: 'other', norm_version: 'pe_nts_999_2099' })],
+      catalogs: { pe_nts_188_2022: REAL_CATALOG }
+    })
+    const wrapper = await histShell()
+
+    expect(wrapper.find('[data-testid="nts-history-open-0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-history-norm-0"]').text()).toBe('pe_nts_999_2099')
+  })
+
+  it('LIST — a record under the profile\'s own norm is not labelled', async () => {
+    histRoute({ summaries: [summary()] })
+    const wrapper = await histShell()
+    expect(wrapper.find('[data-testid="nts-history-norm-0"]').exists()).toBe(false)
+  })
+
+  // --- the wrong-catalog guard, which is the point of this ticket -----------
+
+  it('GUARD — a historical record is read under ITS norm, never the profile\'s', async () => {
+    histRoute({
+      summaries: [summary({ id: 'rec-b', norm_version: 'pe_nts_999_2099' })],
+      records: { 'rec-b': histRecord({ id: 'rec-b', norm_version: 'pe_nts_999_2099' }) },
+      catalogs: { pe_nts_188_2022: REAL_CATALOG, pe_nts_999_2099: CATALOG_B }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    // The later norm's catalog was fetched, and it is the one on the chart.
+    const fetched = state.get.mock.calls
+      .map(([url]) => url as string)
+      .filter(url => url.includes('/nts/catalogs/'))
+    expect(fetched.some(url => url.endsWith('pe_nts_999_2099'))).toBe(true)
+    expect(wrapper.find('[data-testid="nts-norm-label"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+  })
+
+  it('GUARD — if that norm cannot be served, NOTHING is drawn under another', async () => {
+    // The failure mode this ticket exists to prevent: rendering a record's
+    // findings against rules it was never recorded under.
+    histRoute({
+      summaries: [summary({ id: 'rec-b', norm_version: 'pe_nts_999_2099' })],
+      records: { 'rec-b': histRecord({ id: 'rec-b', norm_version: 'pe_nts_999_2099' }) },
+      catalogs: { pe_nts_188_2022: REAL_CATALOG }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-historical-catalog-error"]').exists()).toBe(true)
+    // No chart at all — not a chart drawn from the profile's catalog.
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(false)
+    // The record's own metadata is still readable.
+    expect(wrapper.find('[data-testid="nts-historical-catalog-error"]').text())
+      .toContain('pe_nts_999_2099')
+  })
+
+  it('GUARD — retrying the catalog is a GET, and writes nothing', async () => {
+    let servedB = false
+    histRoute({
+      summaries: [summary({ id: 'rec-b', norm_version: 'pe_nts_999_2099' })],
+      records: { 'rec-b': histRecord({ id: 'rec-b', norm_version: 'pe_nts_999_2099' }) },
+      catalogs: {
+        pe_nts_188_2022: REAL_CATALOG,
+        get pe_nts_999_2099() {
+          if (!servedB) {
+            servedB = true
+            throw apiErrorLike(503, 'unavailable')
+          }
+          return CATALOG_B
+        }
+      } as Record<string, unknown>
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+    expect(wrapper.find('[data-testid="nts-historical-catalog-error"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="nts-historical-catalog-retry"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-historical-catalog-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.patch).not.toHaveBeenCalled()
+  })
+
+  // --- races ---------------------------------------------------------------
+
+  it('RACE — opening B while A is in flight ends on B', async () => {
+    let releaseA: (value: unknown) => void = () => {}
+    histRoute({
+      summaries: [
+        summary({ id: 'rec-a', stage_label: 'A' }),
+        summary({ id: 'rec-b', stage_label: 'B' })
+      ],
+      records: {
+        'rec-a': () => new Promise((resolve) => {
+          releaseA = resolve
+        }),
+        'rec-b': histRecord({ id: 'rec-b', observations: 'soy B' })
+      }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await wrapper.find('[data-testid="nts-history-open-1"]').trigger('click')
+    await settle()
+
+    // B landed first and is what is shown.
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text()).toBe('soy B')
+
+    // A's late answer must not install itself over it.
+    releaseA(histRecord({ id: 'rec-a', observations: 'soy A' }))
+    await settle()
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text()).toBe('soy B')
+  })
+
+  it('RACE — a late catalog for A cannot be paired with record B', async () => {
+    // The dangerous half of the same race: record and catalog are installed
+    // together and checked against one token, so they can never disagree.
+    let releaseCatalogA: (value: unknown) => void = () => {}
+    histRoute({
+      summaries: [
+        summary({ id: 'rec-a', norm_version: 'pe_nts_777_2077' }),
+        summary({ id: 'rec-b', norm_version: 'pe_nts_999_2099' })
+      ],
+      records: {
+        'rec-a': histRecord({ id: 'rec-a', norm_version: 'pe_nts_777_2077', observations: 'soy A' }),
+        'rec-b': histRecord({ id: 'rec-b', norm_version: 'pe_nts_999_2099', observations: 'soy B' })
+      },
+      catalogs: {
+        pe_nts_188_2022: REAL_CATALOG,
+        pe_nts_777_2077: () => new Promise((resolve) => {
+          releaseCatalogA = resolve
+        }),
+        pe_nts_999_2099: CATALOG_B
+      }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await wrapper.find('[data-testid="nts-history-open-1"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text()).toBe('soy B')
+
+    releaseCatalogA({ ...REAL_CATALOG, norm_version: 'pe_nts_777_2077' })
+    await settle()
+
+    // Still B, still drawn: A's catalog never reached the screen.
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text()).toBe('soy B')
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
+  })
+
+  // --- read-only -----------------------------------------------------------
+
+  it('READONLY — a historical record offers no write of any kind', async () => {
+    const carried = {
+      id: 'f-c', record_id: 'rec-hist', norm_version: 'pe_nts_188_2022',
+      rule_id: '6.1.9', attributes: {}, provenance: 'carried_forward' as const,
+      source_finding_id: 'older', sequence: 1,
+      created_at: '2026-05-02T10:00:00Z', created_by: 'u1',
+      targets: [{
+        id: 't', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'fdi_tooth', tooth_number: 16, arch: null, local_ordinal: null, geometry: null
+      }]
+    }
+    histRoute({
+      summaries: [summary()],
+      records: { 'rec-hist': histRecord({
+        findings: [carried],
+        specifications: [{ id: 's1', record_id: 'rec-hist', finding_id: null, text: 'histórica', sequence: 1 }],
+        observations: 'observación histórica'
+      }) }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    // No finding writes.
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-edit-f-c"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-remove-f-c"]').exists()).toBe(false)
+    // No text writes.
+    expect(wrapper.find('[data-testid="nts-spec-add"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-observations-input"]').exists()).toBe(false)
+    // No lifecycle writes.
+    expect(wrapper.find('[data-testid="nts-finalize-draft"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-discard-draft"]').exists()).toBe(false)
+    // And it says what it is, rather than leaving an empty bar to interpret.
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+  })
+
+  it('READONLY — even a historical record whose status is draft', async () => {
+    // A draft in the history is still not the draft this shell is editing.
+    histRoute({
+      summaries: [summary({ status: 'draft', finalized_at: null })],
+      records: { 'rec-hist': histRecord({ status: 'draft', finalized_at: null, content_hash: null }) }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-spec-add"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-observations-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-add-finding"]').exists()).toBe(false)
+  })
+
+  it('TEXT — a historical record shows its own specifications and observations', async () => {
+    histRoute({
+      summaries: [summary()],
+      records: { 'rec-hist': histRecord({
+        specifications: [
+          { id: 's2', record_id: 'rec-hist', finding_id: null, text: 'segunda', sequence: 2 },
+          { id: 's1', record_id: 'rec-hist', finding_id: null, text: 'primera', sequence: 1 }
+        ],
+        observations: 'lo que se observó entonces'
+      }) }
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(wrapper.findAll('[data-testid^="nts-spec-row-"]').map(r => r.text()))
+      .toEqual([expect.stringContaining('primera'), expect.stringContaining('segunda')])
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text())
+      .toBe('lo que se observó entonces')
+    // Order preserved: chart, then specifications, then observations.
+    const html = wrapper.html()
+    expect(html.indexOf('nts-specifications')).toBeLessThan(html.indexOf('nts-observations'))
+  })
+
+  // --- returning -----------------------------------------------------------
+
+  it('RETURN — going back restores the current record, its catalog and editing', async () => {
+    histRoute({
+      draft: histRecord({ id: 'rec-draft', status: 'draft', finalized_at: null, content_hash: null, observations: 'borrador' }),
+      summaries: [summary({ id: 'rec-b', norm_version: 'pe_nts_999_2099' })],
+      records: { 'rec-b': histRecord({ id: 'rec-b', norm_version: 'pe_nts_999_2099', observations: 'histórico' }) },
+      catalogs: { pe_nts_188_2022: REAL_CATALOG, pe_nts_999_2099: CATALOG_B }
+    })
+    const wrapper = await histShell()
+
+    // The draft is editable to begin with.
+    expect(wrapper.find('[data-testid="nts-observations-input"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+    expect(wrapper.find('[data-testid="nts-observations-text"]').text()).toBe('histórico')
+
+    await wrapper.find('[data-testid="nts-historical-return"]').trigger('click')
+    await settle()
+
+    // Back to the draft: editable again, and no historical state left over.
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(false)
+    const input = wrapper.find('[data-testid="nts-observations-input"]')
+    expect(input.exists()).toBe(true)
+    expect((input.element as HTMLTextAreaElement).value).toBe('borrador')
+    // Nothing was created to get back.
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  // --- failure of the record itself ---------------------------------------
+
+  it('ERROR — a failed history read never replaces the current record', async () => {
+    histRoute({
+      draft: histRecord({ id: 'rec-draft', status: 'draft', finalized_at: null, content_hash: null, observations: 'borrador' }),
+      summaries: [summary({ id: 'missing' })],
+      records: {}
+    })
+    const wrapper = await histShell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-historical-error"]').exists()).toBe(true)
+    // The current draft is still loaded underneath, not discarded.
+    await wrapper.find('[data-testid="nts-historical-return"]').trigger('click')
+    await settle()
+    const input = wrapper.find('[data-testid="nts-observations-input"]')
+    expect((input.element as HTMLTextAreaElement).value).toBe('borrador')
+  })
+
+  // --- status indicators ---------------------------------------------------
+
+  it('STATUS — discarded and superseded records are listed and marked', async () => {
+    histRoute({
+      summaries: [
+        summary({ id: 'd', status: 'discarded', discarded_at: '2026-06-01T10:00:00Z', finalized_at: null, content_hash: null }),
+        summary({ id: 's', is_superseded: true })
+      ],
+      records: {
+        d: histRecord({ id: 'd', status: 'discarded', finalized_at: null, content_hash: null, discard_reason: 'duplicado' })
+      }
+    })
+    const wrapper = await histShell()
+
+    // Neither is hidden: clinical history stays history.
+    expect(wrapper.findAll('[data-testid^="nts-history-open-"]')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="nts-history-status-0"]').text().length).toBeGreaterThan(0)
+    expect(wrapper.find('[data-testid="nts-history-superseded-1"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+    // Opened read-only, with no restore offered.
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-spec-add"]').exists()).toBe(false)
+  })
+
+  // --- accessibility -------------------------------------------------------
+
+  it('A11Y — the list is a listbox and marks the open record semantically', async () => {
+    histRoute({
+      summaries: [summary()],
+      records: { 'rec-hist': histRecord() }
+    })
+    const wrapper = await histShell()
+
+    expect(wrapper.find('[data-testid="nts-history-list"]').attributes('role')).toBe('listbox')
+    const option = wrapper.find('[role="option"]')
+    expect(option.attributes('aria-selected')).toBe('false')
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[role="option"]').attributes('aria-selected')).toBe('true')
+    // Not colour alone: the open row says so in words.
+    expect(wrapper.find('[data-testid="nts-history-open-marker-0"]').exists()).toBe(true)
+  })
+
+  // --- caching -------------------------------------------------------------
+
+  it('CACHE — one download per norm version, keyed by version alone', async () => {
+    histRoute({
+      summaries: [
+        summary({ id: 'one' }),
+        summary({ id: 'two' })
+      ],
+      records: { one: histRecord({ id: 'one' }), two: histRecord({ id: 'two' }) }
+    })
+    const wrapper = await histShell()
+
+    const before = state.get.mock.calls.filter(
+      ([url]) => (url as string).includes('/nts/catalogs/')
+    ).length
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await settle()
+    await wrapper.find('[data-testid="nts-history-open-1"]').trigger('click')
+    await settle()
+
+    const after = state.get.mock.calls.filter(
+      ([url]) => (url as string).includes('/nts/catalogs/')
+    ).length
+    // Both records cite the norm already loaded, so nothing was re-fetched.
+    expect(after).toBe(before)
+  })
+})

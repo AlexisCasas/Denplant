@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+- feat(nts-05e.3): **record history, and a record is read under its own norm**.
+  The list 05A shipped becomes a selector that opens earlier odontograms
+  read-only, and the catalog is now resolved from `record.norm_version`
+  everywhere — never from the active profile.
+
+  This closes the risk 05D.0 flagged and the 05E pre-flight confirmed was
+  still live. `resolveChart` matches findings by `rule_id` against whichever
+  catalog it is handed, with no norm check; the only thing that had been
+  keeping that safe was the history list being filtered by the profile's norm,
+  so every listed record happened to match the one loaded catalog. A
+  correctness guarantee resting on a filter is not a guarantee. The filter is
+  now gone — a clinical history does not shrink because the clinic upgraded
+  its norm version — and the guarantee is stated instead: `catalogFor(version)`
+  resolves each record's own norm, cached by version and by nothing else.
+
+  **There is no fallback.** If a record's norm cannot be served, nothing is
+  drawn: interpreting findings under a norm they were not recorded in would
+  put marks on the chart the record does not contain, which is a fabricated
+  clinical statement, not a degraded view. The record's dates and status stay
+  readable, with a retry that is a GET.
+
+  Two generations, not one. Opening B while A is in flight ends on B, and A's
+  late answer is dropped — record *and* catalog are checked against the same
+  token and installed together, so a record can never be paired with another
+  record's rules. The rows stay clickable while one is loading: disabling them
+  would make a slow record block the selector and switching away impossible,
+  which is the very case the tokens exist to make safe.
+
+  `mode` is explicit — `current` or `historical` — rather than inferred from
+  `status`, because the record in force is routinely finalized and is still
+  the current one. A historical record is inspection: no finding, text or
+  lifecycle write is offered, whatever its status says, and the finding editor
+  is never bound to it. Returning restores the current record, its catalog and
+  its editing state, and creates nothing.
+
+  The current record now resolves its catalog from itself too, so there is one
+  rule rather than two. The profile's catalog still gates the clinical reads —
+  a norm this build cannot interpret must not reach a patient's record at all
+  — and the second fetch happens only when record and profile genuinely
+  disagree, which is exactly the case that used to be read wrongly.
+
+  Frontend only: `norm_version` was already optional on the list endpoint, so
+  no API, migration or schema change was needed.
+
 - feat(nts-05e.2): **the annex's two text blocks reach the screen**.
   *Especificaciones* (§5.14) and *Observaciones* (§5.15) are now editable on a
   draft and readable on a finalized record, in the annex's own order — chart,

@@ -121,7 +121,39 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     () => pendingCarriedForward.value.length > 0
   )
 
+  /**
+   * Catalogs by norm version, for the life of this composable.
+   *
+   * Keyed by the version string and by nothing else — never by profile, which
+   * is a preference about what to *create* next and says nothing about how an
+   * existing record must be read. Two records under the same norm share one
+   * download; switching between them re-downloads nothing.
+   */
+  const catalogs = new Map<string, NtsCatalog>()
+
+  /**
+   * The catalog a record must be read under.
+   *
+   * There is no fallback. If this version cannot be served, the caller gets an
+   * error and draws nothing: interpreting a finding under a norm it was not
+   * recorded in would put marks on a chart that the record does not contain,
+   * which is a fabricated clinical statement rather than a degraded view.
+   */
+  async function catalogFor(
+    version: string,
+    signal?: AbortSignal
+  ): Promise<NtsCatalog> {
+    const cached = catalogs.get(version)
+    if (cached) return cached
+
+    const loaded = await nts.getCatalog(version, signal)
+    catalogs.set(version, loaded)
+    return loaded
+  }
+
   function clearState(): void {
+    clearHistorical()
+    mode.value = 'current'
     catalog.value = null
     currentRecord.value = null
     draft.value = null
@@ -171,20 +203,37 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     normUnavailable.value = false
 
     try {
-      const loadedCatalog = await nts.getCatalog(
-        normVersion.value,
-        controller.signal
-      )
+      // The profile's catalog still gates the clinical reads: a norm this
+      // build cannot interpret must not reach a patient's record at all.
+      const profileCatalog = await catalogFor(normVersion.value, controller.signal)
       if (token !== generation) return true
-      catalog.value = loadedCatalog
 
       const [current, openDraft, records] = await Promise.all([
         nts.getCurrentRecord(patientId.value, normVersion.value, controller.signal),
         nts.getDraft(patientId.value, normVersion.value, controller.signal),
-        nts.listRecords(patientId.value, normVersion.value, {}, controller.signal)
+        // No `norm_version` filter: the history is the patient's clinical
+        // history, and a record written under an earlier norm does not stop
+        // existing because the clinic moved to a later one. The filter used to
+        // be here, and it was quietly doing double duty as a correctness
+        // guarantee — every listed record happened to match the loaded
+        // catalog. 05E.3 makes that guarantee explicit instead, by resolving
+        // each record's catalog from the record itself.
+        nts.listRecords(patientId.value, null, {}, controller.signal)
       ])
       if (token !== generation) return true
 
+      // A record in hand decides which norm it is read under; the profile only
+      // decides which norm a *new* record would be created in. They agree in
+      // every ordinary case, and `catalogFor` caches, so this costs a second
+      // request only when they genuinely differ — which is precisely the case
+      // that used to be read under the wrong norm.
+      const recordVersion = (openDraft ?? current)?.norm_version
+      const loadedCatalog = recordVersion && recordVersion !== normVersion.value
+        ? await catalogFor(recordVersion, controller.signal)
+        : profileCatalog
+      if (token !== generation) return true
+
+      catalog.value = loadedCatalog
       currentRecord.value = current
       draft.value = openDraft
       history.value = records.data
@@ -337,7 +386,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    * text can still be read. 05E.3 introduces a record *in view* — a historical
    * one, always read-only — and this follows it then rather than now.
    */
-  const textRecord = computed<NtsRecord | null>(() => draft.value ?? currentRecord.value)
+  const textRecord = computed<NtsRecord | null>(() => viewRecord.value)
 
   /**
    * Whether the text can be changed at all.
@@ -346,7 +395,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
    * anything but a draft in the same statement that checks the version, so a
    * client that got this wrong would be rejected rather than obeyed.
    */
-  const isTextEditable = computed(() => draft.value !== null)
+  const isTextEditable = computed(() => !isHistorical.value && draft.value !== null)
 
   /** §5.15. Free text on the record — never a finding, a plan or a treatment. */
   const observations = computed(() => textRecord.value?.observations ?? null)
@@ -409,8 +458,9 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
   ): Promise<boolean> {
     const record = draft.value
     // Already writing: a second call here would read the version the first
-    // one is in the middle of replacing.
-    if (!record || isSavingText.value) return false
+    // one is in the middle of replacing. And a historical view is inspection:
+    // the server would refuse it anyway, but the client must not ask.
+    if (!record || isSavingText.value || isHistorical.value) return false
 
     beginMutation()
     isSavingText.value = true
@@ -496,6 +546,137 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     )
   }
 
+  // ------------------------------------------------------------------------
+  // NTS-05E.3 — opening a record from the history
+  // ------------------------------------------------------------------------
+
+  /**
+   * Which record the shell is showing.
+   *
+   * An explicit mode rather than a guess from `status`. The record in force is
+   * routinely finalized and is still the *current* one, so "finalized" cannot
+   * mean "historical" — and a clinician needs to know which of the two they
+   * are looking at before they trust an empty action bar.
+   */
+  const mode = ref<'current' | 'historical'>('current')
+
+  /** The opened record and the catalog it must be read under. Always a pair. */
+  const historicalRecord = ref<NtsRecord | null>(null)
+  const historicalCatalog = ref<NtsCatalog | null>(null)
+  const historicalId = ref<string | null>(null)
+
+  const isOpeningHistorical = ref(false)
+  /** The record itself could not be read. */
+  const historicalError = ref<NtsApiError | null>(null)
+  /** The record was read; the norm it was written under could not be served. */
+  const historicalCatalogUnavailable = ref(false)
+
+  /**
+   * Its own generation, separate from `load()`'s.
+   *
+   * Opening B while A is still in flight must end on B, and A's late response
+   * must not install itself — neither its record nor its catalog. Both are
+   * checked against the same token, so a record can never be paired with a
+   * catalog fetched for a different one.
+   */
+  let historicalGeneration = 0
+  let historicalInFlight: AbortController | null = null
+
+  function clearHistorical(): void {
+    historicalInFlight?.abort()
+    historicalInFlight = null
+    historicalGeneration += 1
+    historicalRecord.value = null
+    historicalCatalog.value = null
+    historicalId.value = null
+    historicalError.value = null
+    historicalCatalogUnavailable.value = false
+    isOpeningHistorical.value = false
+  }
+
+  /**
+   * Open a record from the history, read-only.
+   *
+   * Nothing is shown until the record *and* its catalog are both in hand:
+   * a chart drawn from one record's findings and another norm's rules is not
+   * a partial view, it is a wrong one.
+   */
+  async function openHistorical(recordId: string): Promise<boolean> {
+    const token = ++historicalGeneration
+    historicalInFlight?.abort()
+    const controller = new AbortController()
+    historicalInFlight = controller
+
+    historicalId.value = recordId
+    historicalError.value = null
+    historicalCatalogUnavailable.value = false
+    isOpeningHistorical.value = true
+    mode.value = 'historical'
+
+    try {
+      const opened = await nts.getRecord(recordId, controller.signal)
+      if (token !== historicalGeneration) return false
+
+      let openedCatalog: NtsCatalog
+      try {
+        openedCatalog = await catalogFor(opened.norm_version, controller.signal)
+      } catch {
+        if (token !== historicalGeneration) return false
+        // The record is readable; the norm it cites is not. Its dates and
+        // status can still be shown, but nothing on the chart may be drawn
+        // from another norm's rules.
+        historicalRecord.value = opened
+        historicalCatalog.value = null
+        historicalCatalogUnavailable.value = true
+        return false
+      }
+      if (token !== historicalGeneration) return false
+
+      // Installed together, so the two can never disagree.
+      historicalRecord.value = opened
+      historicalCatalog.value = openedCatalog
+      return true
+    } catch (raw) {
+      if (token !== historicalGeneration) return false
+      // The current record is untouched: a failed history read must not cost
+      // the clinician the odontogram they already had open.
+      historicalError.value = toNtsApiError(raw)
+      historicalRecord.value = null
+      historicalCatalog.value = null
+      return false
+    } finally {
+      if (token === historicalGeneration) isOpeningHistorical.value = false
+    }
+  }
+
+  /** Re-read the opened record. A GET, and only a GET. */
+  async function retryHistorical(): Promise<boolean> {
+    const recordId = historicalId.value
+    return recordId ? await openHistorical(recordId) : false
+  }
+
+  /** Back to the record in force, with nothing of the historical left behind. */
+  function returnToCurrent(): void {
+    clearHistorical()
+    mode.value = 'current'
+  }
+
+  const isHistorical = computed(() => mode.value === 'historical')
+
+  /**
+   * What the chart draws, and the norm it is drawn under.
+   *
+   * One pair for both modes, so there is a single answer to "which catalog"
+   * rather than one rule for the current record and another for a historical
+   * one. A historical view draws nothing while its catalog is missing.
+   */
+  const viewRecord = computed<NtsRecord | null>(() =>
+    isHistorical.value ? historicalRecord.value : (draft.value ?? currentRecord.value)
+  )
+  const viewCatalog = computed<NtsCatalog | null>(() =>
+    isHistorical.value ? historicalCatalog.value : catalog.value
+  )
+
   function dismissConflict(): void {
     conflict.value = null
   }
@@ -525,6 +706,17 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     // actions
     textRecord,
     isTextEditable,
+    mode,
+    isHistorical,
+    historicalRecord,
+    historicalCatalog,
+    historicalId,
+    historicalError,
+    historicalCatalogUnavailable,
+    isOpeningHistorical,
+    viewRecord,
+    viewCatalog,
+    catalogFor,
     observations,
     specifications,
     refreshFailed,
@@ -538,6 +730,9 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     createDraft,
     finalizeDraft,
     discardDraft,
+    openHistorical,
+    retryHistorical,
+    returnToCurrent,
     saveObservations,
     addSpecification,
     editSpecification,

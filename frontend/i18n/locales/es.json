@@ -620,7 +620,16 @@
         "title": "Borrador en edición"
       },
       "history": {
-        "title": "Historial de registros"
+        "title": "Historial de registros",
+        "returnToCurrent": "Volver al odontograma actual",
+        "viewing": "En pantalla",
+        "viewingTitle": "Está viendo un odontograma del historial",
+        "viewingBody": "Se muestra tal como fue registrado, con la versión normativa que le corresponde. No puede modificarse.",
+        "superseded": "Reemplazado",
+        "empty": "Sin registros anteriores.",
+        "loadFailedTitle": "No se pudo abrir este odontograma",
+        "catalogFailedTitle": "No se pudo cargar la versión normativa de este odontograma",
+        "catalogFailedBody": "Este registro fue hecho con la versión {version}, que no está disponible. No se dibuja nada: interpretarlo con otra versión mostraría hallazgos que el registro no contiene."
       },
       "empty": {
         "title": "Este paciente no tiene ningún odontograma MINSA registrado."

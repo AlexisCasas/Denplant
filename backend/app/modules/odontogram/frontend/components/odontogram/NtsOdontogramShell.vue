@@ -22,6 +22,7 @@ import NtsFindingEditor from './NtsFindingEditor.vue'
 import NtsFindingList from './NtsFindingList.vue'
 import NtsSpecificationsPanel from './NtsSpecificationsPanel.vue'
 import NtsObservationsPanel from './NtsObservationsPanel.vue'
+import NtsRecordHistory from './NtsRecordHistory.vue'
 import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 
 const props = defineProps<{
@@ -64,6 +65,18 @@ const {
   isSavingText,
   refreshFailed: textRefreshFailed,
   retryRefresh: retryTextRefresh,
+  mode,
+  isHistorical,
+  historicalId,
+  historicalRecord,
+  historicalError,
+  historicalCatalogUnavailable,
+  isOpeningHistorical,
+  viewRecord,
+  viewCatalog,
+  openHistorical,
+  retryHistorical,
+  returnToCurrent,
   saveObservations,
   addSpecification,
   editSpecification,
@@ -102,8 +115,15 @@ const discardReason = ref('')
  * record in force is shown read-only; with neither, the chart is the blank
  * official form and says so. Nothing is fabricated to fill the gap.
  */
-const chartRecord = computed(() => draft.value ?? currentRecord.value)
-const chartReadonly = computed(() => !hasDraft.value)
+/**
+ * The record on the chart, and whether it can be edited.
+ *
+ * One pair for both modes. A historical record is inspection and is read-only
+ * whatever its status says: a draft that belongs to the history is still not
+ * the draft this shell is working on.
+ */
+const chartRecord = computed(() => viewRecord.value)
+const chartReadonly = computed(() => isHistorical.value || !hasDraft.value)
 
 /**
  * The structured finding editor.
@@ -114,7 +134,9 @@ const chartReadonly = computed(() => !hasDraft.value)
  * uses, so there is one conflict policy rather than two.
  */
 const editor = useNtsFindingEditor({
-  record: () => (draft.value?.status === 'draft' ? draft.value : null),
+  // Never the historical record: opening one is inspection, and an editor
+  // bound to it would offer writes the server would refuse anyway.
+  record: () => (!isHistorical.value && draft.value?.status === 'draft' ? draft.value : null),
   rules: () => catalog.value?.rules ?? [],
   reload: () => reload(),
   onConflict: kind => recoverFromConflict(kind)
@@ -204,6 +226,18 @@ const observationsPanel = ref<{ saveSucceeded: () => void } | null>(null)
 
 /** Siglas the chart could not fit. Advisory input for §5.14, never a rule. */
 const hiddenSiglas = ref(0)
+
+/**
+ * Leave the history.
+ *
+ * The editor is closed first: it is bound to the draft, and returning with a
+ * half-filled form open would show a composer whose record just changed
+ * underneath it.
+ */
+function backToCurrent(): void {
+  editor.close()
+  returnToCurrent()
+}
 
 async function submitObservations(text: string | null): Promise<void> {
   if (await saveObservations(text)) observationsPanel.value?.saveSucceeded()
@@ -505,6 +539,86 @@ watch([() => props.patientId, normVersion], () => void load())
         </UCard>
 
         <!--
+          Which record is on screen. An explicit statement, not an inference
+          from a missing Save button: the record in force is routinely
+          finalized and is still the current one, so a clinician must be able
+          to tell inspection from the live document at a glance.
+        -->
+        <UAlert
+          v-if="isHistorical"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-history"
+          :title="t('odontogram.nts.history.viewingTitle')"
+          :description="t('odontogram.nts.history.viewingBody')"
+          data-testid="nts-historical-banner"
+        >
+          <template #actions>
+            <UButton
+              size="xs"
+              color="neutral"
+              data-testid="nts-historical-return"
+              @click="backToCurrent()"
+            >
+              {{ t('odontogram.nts.history.returnToCurrent') }}
+            </UButton>
+          </template>
+        </UAlert>
+
+        <!-- The record could not be read. The current one is untouched. -->
+        <UAlert
+          v-if="isHistorical && historicalError"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-file-x"
+          :title="t('odontogram.nts.history.loadFailedTitle')"
+          :description="historicalError.message"
+          data-testid="nts-historical-error"
+        >
+          <template #actions>
+            <UButton
+              size="xs"
+              color="neutral"
+              :loading="isOpeningHistorical"
+              data-testid="nts-historical-retry"
+              @click="retryHistorical()"
+            >
+              {{ t('common.retry') }}
+            </UButton>
+          </template>
+        </UAlert>
+
+        <!--
+          The record was read; the norm it cites cannot be served. Its dates
+          and status stay visible, and nothing is drawn: interpreting these
+          findings under another norm's rules would put marks on the chart
+          that the record does not contain.
+        -->
+        <UAlert
+          v-if="isHistorical && historicalCatalogUnavailable"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-book-x"
+          :title="t('odontogram.nts.history.catalogFailedTitle')"
+          :description="t('odontogram.nts.history.catalogFailedBody', {
+            version: historicalRecord?.norm_version ?? ''
+          })"
+          data-testid="nts-historical-catalog-error"
+        >
+          <template #actions>
+            <UButton
+              size="xs"
+              color="neutral"
+              :loading="isOpeningHistorical"
+              data-testid="nts-historical-catalog-retry"
+              @click="retryHistorical()"
+            >
+              {{ t('common.retry') }}
+            </UButton>
+          </template>
+        </UAlert>
+
+        <!--
           The official dental layout, with the findings drawn on it.
 
           The catalog goes down with the record because a finding cannot be
@@ -512,8 +626,9 @@ watch([() => props.patientId, normVersion], () => void load())
           business, and the norm lives in the catalog.
         -->
         <NtsOdontogramChart
+          v-if="!historicalCatalogUnavailable"
           :record="chartRecord"
-          :catalog="catalog"
+          :catalog="viewCatalog"
           :readonly="chartReadonly"
           :selectable="chartSelectable"
           :selected-teeth="selectedTeeth"
@@ -665,7 +780,7 @@ watch([() => props.patientId, normVersion], () => void load())
         <NtsFindingList
           v-if="chartRecord"
           :findings="chartRecord.findings"
-          :rules="catalog?.rules ?? []"
+          :rules="viewCatalog?.rules ?? []"
           :readonly="!editor.canEdit.value"
           :busy-id="editor.isSaving.value ? editor.editing.value : null"
           @edit="editor.startEdit"
@@ -673,57 +788,21 @@ watch([() => props.patientId, normVersion], () => void load())
           @remove="removing = $event"
         />
 
-        <!-- History -->
-        <UCard
+        <!--
+          The patient's odontograms. §5.10 and §5.11 mean a patient
+          accumulates them, and each one is read under the norm it was
+          written in — which is why the selector, not the shell, is where a
+          foreign norm version is surfaced.
+        -->
+        <NtsRecordHistory
           v-if="history.length > 0"
-          data-testid="nts-history"
-        >
-          <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-history"
-                class="w-5 h-5"
-              />
-              <span class="font-medium">{{ t('odontogram.nts.history.title') }}</span>
-              <UBadge
-                color="neutral"
-                variant="subtle"
-              >
-                {{ history.length }}
-              </UBadge>
-            </div>
-          </template>
-
-          <ul class="divide-y divide-default text-sm">
-            <li
-              v-for="row in history"
-              :key="row.id"
-              class="py-2 flex items-center justify-between gap-3 flex-wrap"
-            >
-              <span>{{ stageLabel(row.stage, row.stage_label) }}</span>
-              <span class="flex items-center gap-2">
-                <UBadge
-                  :color="row.status === 'finalized' ? 'success' : row.status === 'draft' ? 'warning' : 'neutral'"
-                  variant="subtle"
-                  size="sm"
-                >
-                  {{ t(`odontogram.nts.status.${row.status}`) }}
-                </UBadge>
-                <UBadge
-                  v-if="row.is_superseded"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                >
-                  {{ t('odontogram.nts.status.superseded') }}
-                </UBadge>
-                <span class="text-subtle">
-                  {{ formatDate(row.finalized_at ?? row.recorded_at) }}
-                </span>
-              </span>
-            </li>
-          </ul>
-        </UCard>
+          :records="history"
+          :open-id="historicalId"
+          :loading="isOpeningHistorical"
+          :profile-norm-version="normVersion"
+          @open="openHistorical"
+          @return-to-current="backToCurrent"
+        />
       </template>
     </template>
 

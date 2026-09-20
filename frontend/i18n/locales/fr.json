@@ -592,7 +592,16 @@
         "title": "Brouillon en cours"
       },
       "history": {
-        "title": "Historique des enregistrements"
+        "title": "Historique des enregistrements",
+        "returnToCurrent": "Revenir à l'odontogramme actuel",
+        "viewing": "À l'écran",
+        "viewingTitle": "Vous consultez un odontogramme de l'historique",
+        "viewingBody": "Affiché tel qu'il a été enregistré, selon la version normative qui lui correspond. Il ne peut pas être modifié.",
+        "superseded": "Remplacé",
+        "empty": "Aucun enregistrement antérieur.",
+        "loadFailedTitle": "Impossible d'ouvrir cet odontogramme",
+        "catalogFailedTitle": "Impossible de charger la version normative de cet odontogramme",
+        "catalogFailedBody": "Cet enregistrement a été réalisé selon la version {version}, qui n'est pas disponible. Rien n'est dessiné : le lire selon une autre version montrerait des observations que l'enregistrement ne contient pas."
       },
       "empty": {
         "title": "Aucun odontogramme MINSA enregistré pour ce patient."

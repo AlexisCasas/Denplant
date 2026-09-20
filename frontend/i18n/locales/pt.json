@@ -592,7 +592,16 @@
         "title": "Rascunho em edição"
       },
       "history": {
-        "title": "Histórico de registos"
+        "title": "Histórico de registos",
+        "returnToCurrent": "Voltar ao odontograma atual",
+        "viewing": "No ecrã",
+        "viewingTitle": "Está a ver um odontograma do histórico",
+        "viewingBody": "Apresentado tal como foi registado, com a versão normativa que lhe corresponde. Não pode ser alterado.",
+        "superseded": "Substituído",
+        "empty": "Sem registos anteriores.",
+        "loadFailedTitle": "Não foi possível abrir este odontograma",
+        "catalogFailedTitle": "Não foi possível carregar a versão normativa deste odontograma",
+        "catalogFailedBody": "Este registo foi feito com a versão {version}, que não está disponível. Nada é desenhado: lê-lo com outra versão mostraria achados que o registo não contém."
       },
       "empty": {
         "title": "Não existe um odontograma MINSA registado para este paciente."
