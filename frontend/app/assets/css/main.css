@@ -553,6 +553,35 @@ body {
     word-break: break-all;
   }
 
+  /* --- repeated identity (NTS-05F.4a) ------------------------------------
+     A `<thead>` is the only construct this Chromium repeats on every printed
+     page — `position: fixed` was measured dropping off the last page of a
+     five-page document. The strip is what stops a detached second page from
+     being an anonymous sheet of clinical text.
+
+     Deliberately small and rule-separated rather than filled: it must not
+     read as a second document header, and a background is the one thing a
+     print dialog can switch off. */
+  /* Measured cost of this strip on every page: 5.34 mm. The ordinary
+     finalized record leaves 4.6 mm of slack, so the strip is trimmed to what
+     still reads as a separated caption and the block gaps below give up the
+     rest (§9 — decorative spacing only). */
+  .nts-print-root .nts-print-continuation {
+    padding-bottom: 0.7mm;
+    margin-bottom: 1.2mm;
+    border-bottom: 0.3mm solid currentColor;
+    font-size: 7.5pt;
+    line-height: 1.2;
+  }
+
+  /* The cells exist only to carry the repeat; they add no page geometry. */
+  .nts-print-root [data-testid="nts-print-sheet"],
+  .nts-print-root [data-testid="nts-print-sheet"] > thead > tr > td,
+  .nts-print-root [data-testid="nts-print-sheet"] > tbody > tr > td {
+    padding: 0;
+    border: 0;
+  }
+
   /* --- vertical budget ---------------------------------------------------
      The screen stacks these blocks with generous spacing because a screen
      scrolls. A sheet does not: measured at the screen's own rhythm the
@@ -571,14 +600,23 @@ body {
      child, so overriding only `margin-top` changes nothing: adjacent margins
      collapse to the larger of the two. Both sides are zeroed first, then the
      gap is put back on the following sibling. */
-  .nts-print-root [data-testid="nts-print-document"] > *,
+  /* The document's blocks are children of the sheet's body cell, not of the
+     article: 05F.4a wrapped everything in a table so a `<thead>` could repeat
+     the identity on every page. The gap rules follow them in, otherwise the
+     only element they match is the table itself and the blocks collapse
+     against each other. */
+  .nts-print-root [data-testid="nts-print-sheet"] > tbody > tr > td > *,
   .nts-print-root [data-testid="nts-odontogram-chart"] > * {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
   }
 
-  .nts-print-root [data-testid="nts-print-document"] > * + * {
-    margin-top: 2.5mm !important;
+  /* 2.0 mm, not 2.5: the continuation strip costs 5.34 mm per page and the
+     ordinary record had only 4.6 mm of slack. Five gaps at 0.5 mm less buy
+     2.5 mm back and the golden case measures 273.27 mm — one sheet again.
+     Measured, both ways: at 2.5 mm it is 277.07 mm and prints on two. */
+  .nts-print-root [data-testid="nts-print-sheet"] > tbody > tr > td > * + * {
+    margin-top: 2mm !important;
   }
 
   /* The metadata lists are label/value grids; on paper their row rhythm can

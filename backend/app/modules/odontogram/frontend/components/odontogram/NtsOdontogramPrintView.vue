@@ -223,7 +223,64 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
       {{ t('odontogram.nts.print.unavailable') }}
     </p>
 
-    <template v-else>
+    <!--
+      Everything printable lives in one table, for one reason: a `<thead>` is
+      the only construct this Chromium repeats on **every** printed page.
+
+      Measured before choosing it (05F.4a): `position: fixed` was dropped on
+      the last page of a five-page document, and `@page` margin boxes work but
+      would carry the patient's name through a CSS `content:` string, where an
+      apostrophe or a quote in a real name becomes an escaping bug in exactly
+      the data that has to be right. A table head is ordinary DOM: Vue escapes
+      it, nothing mutates `document`, and no JS runs during pagination.
+
+      The chart keeps its 171 mm inside the cell — verified, not assumed.
+    -->
+    <table
+      v-else
+      class="w-full border-collapse"
+      data-testid="nts-print-sheet"
+    >
+      <thead>
+        <tr>
+          <td class="p-0">
+            <!--
+              Repeated identity. A second page separated from the first is
+              otherwise an anonymous sheet of clinical text.
+
+              It repeats on page 1 as well, because a `<thead>` cannot tell
+              which page it is on. That is deliberate and harmless: it carries
+              no label claiming to be a continuation, so on page 1 it reads as
+              a compact restatement of the header directly below it.
+            -->
+            <div
+              class="nts-print-continuation text-caption"
+              data-testid="nts-print-continuation"
+            >
+              <span data-testid="nts-print-continuation-title">
+                {{ t('odontogram.nts.print.title') }}
+              </span>
+              <template v-if="patient?.fullName">
+                · <span data-testid="nts-print-continuation-patient">{{ patient.fullName }}</span>
+              </template>
+              <template v-if="patient?.documentNumber">
+                ·
+                <span data-testid="nts-print-continuation-document">
+                  <template v-if="patient.documentType">{{ patient.documentType.toUpperCase() }}</template>
+                  {{ patient.documentNumber }}
+                </span>
+              </template>
+              <template v-if="footer">
+                · <span data-testid="nts-print-continuation-record">{{ footer.recordId }}</span>
+                · <span data-testid="nts-print-continuation-norm">{{ footer.normVersion }}</span>
+              </template>
+            </div>
+          </td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="p-0">
       <!-- 1 + 2. DenPlant identification and the annex's one date.
            Outside the normative block: the annex has no patient header. -->
       <header
@@ -539,6 +596,9 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
           </dd>
         </dl>
       </section>
-    </template>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </article>
 </template>

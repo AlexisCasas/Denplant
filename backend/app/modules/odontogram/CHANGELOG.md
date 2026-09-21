@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+- fix(nts-05f.4a): **every printed page carries the record's identity.**
+
+  05F.4 measured the gap and left it open: page 2 of a multi-page sheet began
+  mid-content and named neither the patient nor the record. Since any
+  qualified record — draft, discarded, superseded — is already two pages, a
+  detached sheet of clinical text with no owner was the normal case, not an
+  edge case.
+
+  The sheet is now wrapped in a table whose `<thead>` is a one-line
+  continuation strip: `Odontograma · paciente · documento · record id ·
+  norm_version`. Paginators repeat a table header on every page the table
+  spans, so the strip needs no reserved margin and the §4b vertical budget is
+  untouched.
+
+  Three mechanisms were measured in real Chromium on a five-page document
+  before any product code changed. `position: fixed` — the remedy 05F.4 had
+  proposed — **is dropped by Chromium on the last page**, which is the page
+  most likely to be detached. `@page` margin boxes work, but would carry the
+  patient's name through a CSS `content:` string, where an apostrophe in a
+  real name breaks the declaration silently, and would require writing PHI
+  onto `document.documentElement`, outside the print root's isolation. The
+  `<thead>` carries on every page and keeps the name in the DOM as text.
+
+  Verified page by page with `pdftotext -f N -l N` across eight record shapes
+  including historical norms and superseded records: every page of every
+  document names its own record. Nothing reaches `document.title`, the URL or
+  the console; the strip is invisible on screen; a norm mismatch still prints
+  nothing at all, strip included.
+
+  Regression caught and fixed in the same slice: moving the blocks into a
+  table cell silently detached the inter-block gap rules, which now key off
+  `[data-testid="nts-print-sheet"] > tbody > tr > td > * + *`. It was worth
+  catching — while the gaps were collapsed the sheet *gained* a page of
+  capacity, so the page counts looked better than the fixed layout's.
+
+  Page count, measured, with the gaps correct throughout: the strip costs
+  5.34 mm per page and the ordinary record had 4.6 mm of slack, so it went to
+  two pages. Paid for out of decorative spacing only (the strip's own padding
+  and margin, and the inter-block gap from 2.5 mm to 2.0 mm) — no scaling, no
+  font reduction, and the chart keeps its 171 mm and its 0.5446 cm² crowns.
+  The ordinary record measures 273.3 mm of 275 mm and is **one page** again;
+  the 15-specification and historical-norm records dropped from three pages to
+  two. Slack is now 1.7 mm, so a future block that spends it puts the golden
+  case back on two sheets — a policy outcome, not a defect.
+
+  No new i18n key: the strip's title reuses the existing print-header key and
+  follows the UI locale like the rest of the sheet.
+
 - test(nts-05f.4): **final print QA for the NTS block** — no product change,
   two findings.
 

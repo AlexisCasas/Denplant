@@ -137,13 +137,29 @@ element ids, so two instances cannot collide over an `id` or a `url(#…)`.
 
 Measured vertical budget for an ordinary finalized record (Chromium, print
 media): header 19.9 mm, chart 159.8, especificaciones 12.7, observaciones
-12.7, professional 23.9, footer 29.0 — **270.4 mm** against 275 mm of
-printable page, so it fits one sheet. A record with six specifications flows
-to a second page, which is the policy, not a failure.
+12.7, professional 23.9, footer 29.0 — **258.0 mm** of blocks, plus five
+2 mm gaps and the 5.3 mm continuation strip (§4f) = **273.3 mm** against
+275 mm of printable page, so it fits one sheet. A record with six
+specifications flows to a second page, which is the policy, not a failure.
+
+The slack is 1.7 mm, and that is deliberate: the strip had to be paid for out
+of decorative spacing (§9) rather than by scaling anything clinical. At the
+previous 2.5 mm gap the same record measures 277.1 mm and prints on two
+sheets. If a future change spends those 1.7 mm, the golden case becomes two
+pages — which is a policy outcome, not a defect.
 
 > Trap worth knowing: `space-y-*` in this Tailwind build puts the gap on the
 > **bottom** of each child. Overriding `margin-top` alone does nothing — the
 > adjacent margins collapse to the larger one. Zero both sides first.
+
+> Second trap, from 05F.4a: the blocks are no longer children of
+> `[data-testid="nts-print-document"]` — they sit in the body cell of the
+> sheet table that makes the continuation strip repeat. The rules that set the
+> inter-block gap therefore key off
+> `[data-testid="nts-print-sheet"] > tbody > tr > td > * + *`. Wrapping the
+> document in anything new moves that boundary again, and the symptom is
+> silent: the blocks simply run together, with no error anywhere — and the
+> page count *improves*, which makes it read as a success.
 
 ## 4c. Ink: what is black and what is not
 
@@ -262,34 +278,73 @@ catalog change at all.
 > be drawn without its `condition_state`, because the renderer will not invent
 > a clinical colour. There the shortfall is in the *record*, not in the build.
 
-## 4f. Known gap: page 2 carries no identity
+## 4f. Page identity — closed in 05F.4a
 
-Measured in 05F.4 with `pdftotext`: the second page of a multi-page sheet
-begins mid-content — for a record with 15 specifications, page 2 opens at
-`5. Especificación 5: …`. It carries **no record id, no patient, no norm
-version and no date**. Separated from page 1, it is an anonymous sheet of
-clinical text.
+The gap 05F.4 measured: the second page of a multi-page sheet began
+mid-content — for a record with 15 specifications, page 2 opened at
+`5. Especificación 5: …`, carrying **no record id, no patient, no norm
+version**. Separated from page 1 it was an anonymous sheet of clinical text.
 
-This is not rare. Only the plain finalized record fits one page (270.4 mm of
-275 mm); **any qualified record — draft, discarded, superseded — is already
-two pages**, because the qualification banner costs the remaining slack.
+That is not a rare shape. Only the plain finalized record fits one page;
+**any qualified record — draft, discarded, superseded — is two pages**,
+because the qualification banner costs the remaining slack.
 
-Not fixed in 05F.4, deliberately. The obvious remedy is a running header
-repeated on every page (`position: fixed` inside `@media print`, which
-Chromium repeats per page), but it has to be given room in the page margin,
-and the page has **4.6 mm of vertical slack**. Reserving ~6 mm would push the
-one-page golden case to two pages and force the whole vertical budget in §4b
-to be re-tuned — a layout change with its own overlap risk (§31), landed at
-the close of the block without the QA budget to re-validate it.
+### What carries the identity now
 
-The shape of the fix, for whoever picks it up:
+Every printed page opens with a one-line continuation strip:
 
-- `@page :first` keeps today's 10 mm top margin; `@page` gets a larger one.
-- A small print-only running header, positioned into that margin, carrying
-  record id plus minimal patient identity — **not** the full document header,
-  and **not** in `document.title` (a browser derives the suggested PDF
-  filename from it).
-- Re-measure the one-page case afterwards; the budget in §4b is the baseline.
+```
+<título> · <paciente> · <documento> · <record id> · <norm_version>
+```
+
+The title comes from the existing print-header i18n key, so the strip follows
+the UI locale like the rest of the sheet; 05F.4a added no new key.
+
+It is `[data-testid="nts-print-continuation"]`, and it is the `<thead>` of the
+table that wraps the whole sheet (`[data-testid="nts-print-sheet"]`). A table
+header row is repeated by the paginator on every page the table spans, so the
+strip is *structural*, not positioned: nothing has to be reserved in the page
+margin, and no `@page` rule changes.
+
+It costs **5.34 mm on every page**, measured. The ordinary record had 4.6 mm
+of slack, so the strip's own padding and margin were trimmed and the
+inter-block gap went from 2.5 mm to 2.0 mm — decorative spacing only, per §9.
+Measured both ways: 277.1 mm and two pages at the old spacing, 273.3 mm and
+one page at the new. Two of the long scenarios also dropped a page (15
+specifications and the historical-norm record, 3 → 2).
+
+### Why not the two alternatives
+
+Both were measured in real Chromium on a standalone five-page document before
+any product code was touched:
+
+| mechanism | pages 1–4 | last page |
+|---|---|---|
+| `@page` margin box + `counter(page)` | carried | carried |
+| `position: fixed` | carried | **dropped** |
+| `<thead>` | carried | carried |
+
+`position: fixed` — the remedy 05F.4 proposed — is disqualified on the
+measurement: Chromium does not paint it on the final page, so the one page
+most likely to be detached is the one that would lose its identity.
+
+`@page` margin boxes do work, including with `content: var(--x)`. They were
+rejected for a different reason: the patient's name would have to travel
+through a CSS `content:` string, where an apostrophe or a quote in a real name
+(`O'Brien`, `D'Angelo`) breaks the declaration silently, and the variable has
+to be written onto `document.documentElement` — a global mutation carrying PHI,
+outside the print root's isolation.
+
+### Constraints this strip keeps
+
+- Screen-invisible: it lives inside the print root, which is `display: none`
+  outside `@media print`.
+- No PHI leaves the document: nothing is written to `document.title`, the URL,
+  the console or any request.
+- Gated by the same `canRenderPrintRecord` invariant as the rest of the sheet —
+  a norm mismatch prints nothing at all, strip included.
+- The record id is the full identifier, never truncated, matching §4c's rule
+  for the footer hash.
 
 ## 5. Never
 
@@ -317,7 +372,8 @@ The shape of the fix, for whoever picks it up:
 | **05F.1** | print data + DOM: `ntsPrintModel.ts`, `useNtsPrintIdentity.ts`, `NtsOdontogramPrintView.vue` | done |
 | **05F.2** | `@page`, physical sizing, isolation, page breaks: `ntsPrintLayout.ts`, the "NTS print layout" block in `main.css` | done |
 | **05F.3** | trigger, safety gating, qualification banners, preflight: `resolvePrintAvailability`, `NtsPrintAction.vue` | done |
-| **05F.4** | long-text policy, browser PDF QA, final regression | pending |
+| **05F.4** | long-text policy, browser PDF QA, final regression | done |
+| **05F.4a** | per-page identity: the continuation strip in `NtsOdontogramPrintView.vue` (§4f) | done |
 
 Colour tokens for print are already pinned in `frontend/app/assets/css/main.css`
 (`#0000CC` / `#CC0000` under `@media print`), independent of theme.

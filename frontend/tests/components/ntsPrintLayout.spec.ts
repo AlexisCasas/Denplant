@@ -287,11 +287,14 @@ describe('NTS print layout — stylesheet', () => {
     // child, so an override of `margin-top` alone is silently ineffective:
     // the margins collapse to the larger one. Measured before this rule the
     // ordinary record came to 294.4 mm against 275 mm of page.
+    // 05F.4a moved the blocks into the sheet's body cell so a `<thead>` could
+    // repeat the page identity; the gap rules followed them in, and the gap
+    // itself dropped to 2 mm to pay for the strip's 5.34 mm per page.
     expect(PRINT_BLOCK).toMatch(
-      /\[data-testid="nts-print-document"\]\s*>\s*\*,[\s\S]{0,200}margin-bottom:\s*0\s*!important/
+      /nts-print-sheet"\]\s*>\s*tbody\s*>\s*tr\s*>\s*td\s*>\s*\*,[\s\S]{0,200}margin-bottom:\s*0\s*!important/
     )
     expect(PRINT_BLOCK).toMatch(
-      /\[data-testid="nts-print-document"\]\s*>\s*\*\s*\+\s*\*\s*\{\s*margin-top:\s*2\.5mm/
+      /nts-print-sheet"\]\s*>\s*tbody\s*>\s*tr\s*>\s*td\s*>\s*\*\s*\+\s*\*\s*\{\s*margin-top:\s*2mm/
     )
     // The chart itself keeps its size; only its own padding goes.
     expect(PRINT_BLOCK).toMatch(

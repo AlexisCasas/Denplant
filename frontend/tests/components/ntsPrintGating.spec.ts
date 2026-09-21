@@ -731,6 +731,153 @@ describe('the print control and the sheet it produces', () => {
     expect(state.patch).not.toHaveBeenCalled()
   })
 
+  // --- NTS-05F.4a — identity on every printed page ------------------------
+  //
+  // A second page separated from the first was otherwise an anonymous sheet
+  // of clinical text. The strip lives in a `<thead>` because that is the only
+  // construct this Chromium repeats on every page: `position: fixed` was
+  // measured dropping off the last page of a five-page document, and `@page`
+  // margin boxes would carry a patient's name through a CSS `content:`
+  // string, where an apostrophe becomes an escaping bug in the data that has
+  // to be right. Page-level PDF evidence lives in the 05F.4a QA run; these
+  // assert the DOM the browser repeats.
+
+  it('A — the repeated identity is built from data the sheet already has', async () => {
+    payload.data['patient:p1'] = {
+      first_name: 'Rosa',
+      last_name: 'Mamani',
+      national_id: '87654321',
+      national_id_type: 'dni'
+    }
+    route({ current: record() })
+    await shell()
+
+    const root = printRoot()!
+    const strip = root.querySelector('[data-testid="nts-print-continuation"]')!
+    expect(strip).not.toBeNull()
+    expect(strip.textContent).toContain('Rosa Mamani')
+    expect(strip.textContent).toContain('87654321')
+    expect(strip.textContent).toContain('rec-1')
+    expect(strip.textContent).toContain('pe_nts_188_2022')
+
+    // It sits in the table head, which is what makes it repeat.
+    expect(strip.closest('thead')).not.toBeNull()
+    expect(root.querySelector('[data-testid="nts-print-sheet"]')).not.toBeNull()
+  })
+
+  it('B/C — it costs no request and no mutation', async () => {
+    payload.data['patient:p1'] = { first_name: 'Rosa', last_name: 'Mamani' }
+    route({ current: record() })
+    await shell()
+
+    expect(printRoot()!.querySelector('[data-testid="nts-print-continuation-patient"]')!.textContent)
+      .toContain('Rosa Mamani')
+    // The identity comes from the page cache and the record already in hand.
+    const urls = state.get.mock.calls.map(call => String(call[0]))
+    expect(urls.every(url => url.startsWith('/api/v1/odontogram'))).toBe(true)
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.patch).not.toHaveBeenCalled()
+  })
+
+  it('D — a historical record repeats its own id and its own norm', async () => {
+    const current = record({ id: 'rec-new' })
+    const old = record({ id: 'rec-old', norm_version: 'norm-B' })
+    route({
+      current,
+      records: { 'rec-old': old, 'rec-new': current },
+      history: [{ ...old, is_superseded: false }, { ...current, is_superseded: false }],
+      catalogs: {
+        'pe_nts_188_2022': REAL_CATALOG,
+        'norm-B': { ...REAL_CATALOG, norm_version: 'norm-B' }
+      }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await new Promise(r => setTimeout(r, 0))
+    await nextTick()
+
+    const strip = printRoot()!.querySelector('[data-testid="nts-print-continuation"]')!
+    expect(strip.textContent).toContain('rec-old')
+    expect(strip.textContent).toContain('norm-B')
+    // Never the active profile's norm.
+    expect(strip.textContent).not.toContain('pe_nts_188_2022')
+  })
+
+  it('E — a blocked sheet repeats no clinical identity at all', async () => {
+    // The strip must not make an unprintable state look like a document.
+    route({ draft: record({ status: 'draft', finalized_at: null }) })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('sin guardar')
+    await nextTick()
+
+    const root = printRoot()!
+    expect(root.querySelector('[data-testid="nts-print-unsafe"]')).not.toBeNull()
+    expect(root.querySelector('[data-testid="nts-print-continuation"]')).toBeNull()
+    expect(root.querySelector('[data-testid="nts-print-sheet"]')).toBeNull()
+  })
+
+  it('E — nor does a record whose norm cannot be served', async () => {
+    const current = record({ id: 'rec-new' })
+    const foreign = record({ id: 'rec-foreign', norm_version: 'pe_nts_999_2099' })
+    route({
+      current,
+      records: { 'rec-foreign': foreign, 'rec-new': current },
+      history: [{ ...foreign, is_superseded: false }, { ...current, is_superseded: false }],
+      catalogs: { pe_nts_188_2022: REAL_CATALOG, pe_nts_999_2099: null }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-0"]').trigger('click')
+    await new Promise(r => setTimeout(r, 0))
+    await nextTick()
+
+    const root = printRoot()!
+    expect(root.querySelector('[data-testid="nts-print-unavailable"]')).not.toBeNull()
+    expect(root.querySelector('[data-testid="nts-print-continuation"]')).toBeNull()
+  })
+
+  it('F — the repeated identity never appears on screen', async () => {
+    payload.data['patient:p1'] = { first_name: 'Rosa', last_name: 'Mamani' }
+    route({ current: record() })
+    const wrapper = await shell()
+
+    expect(wrapper.find('[data-testid="nts-print-continuation"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-print-sheet"]').exists()).toBe(false)
+    // And the screen still has exactly one chart of its own.
+    expect(wrapper.findAll('[data-testid="nts-odontogram-chart"]')).toHaveLength(1)
+  })
+
+  it('J/K/L — a qualified record repeats identity and qualifies only once', async () => {
+    route({ draft: record({ status: 'draft', finalized_at: null }) })
+    await shell()
+
+    const root = printRoot()!
+    expect(root.querySelector('[data-testid="nts-print-continuation"]')).not.toBeNull()
+    // The qualification banner is page-one content, not part of the repeat.
+    expect(root.querySelectorAll('[data-testid="nts-print-qualification"]')).toHaveLength(1)
+    expect(root.querySelector('[data-testid="nts-print-continuation"]')!.closest('thead'))
+      .not.toBeNull()
+    expect(root.querySelector('[data-testid="nts-print-qualification"]')!.closest('thead'))
+      .toBeNull()
+  })
+
+  it('Q — wrapping the sheet in a table did not disturb the chart', async () => {
+    route({ current: record() })
+    const wrapper = await shell()
+
+    // Rows carry `data-dentition`, overlay text carries `data-fdi`; only a
+    // tooth cell carries both.
+    const toothCell = '[data-fdi][data-dentition]'
+    const printChart = printRoot()!.querySelector('[data-testid="nts-odontogram-chart"]')
+    expect(printChart).not.toBeNull()
+    expect(printChart!.querySelectorAll(toothCell)).toHaveLength(52)
+    expect(wrapper.find('[data-testid="nts-odontogram-chart"]').findAll(toothCell))
+      .toHaveLength(52)
+  })
+
   it('§27 — printing never touches document.title', async () => {
     const before = document.title
     route({ current: record() })
