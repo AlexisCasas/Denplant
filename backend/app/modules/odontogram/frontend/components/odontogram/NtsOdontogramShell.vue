@@ -24,6 +24,8 @@ import NtsSpecificationsPanel from './NtsSpecificationsPanel.vue'
 import NtsObservationsPanel from './NtsObservationsPanel.vue'
 import NtsRecordHistory from './NtsRecordHistory.vue'
 import NtsOdontogramPrintView from './NtsOdontogramPrintView.vue'
+import NtsPrintAction from './NtsPrintAction.vue'
+import { printDeclarations, resolvePrintAvailability } from '../../utils/ntsPrintModel'
 import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 import { useNtsUnsavedChanges } from '../../composables/useNtsUnsavedChanges'
 import { useNtsPrintIdentity } from '../../composables/useNtsPrintIdentity'
@@ -424,6 +426,42 @@ const printSuperseded = computed(() => {
   if (!id) return false
   return history.value.find(row => row.id === id)?.is_superseded ?? false
 })
+
+/**
+ * Whether the record on screen may be printed right now (NTS-05F.3).
+ *
+ * **One computation, two consumers.** The print button asks it what to offer;
+ * the always-mounted print root asks it whether to render the clinical
+ * document at all. That second reader is the one that matters: the root is
+ * reachable by the browser's own Ctrl+P without passing the button, so a
+ * disabled button is a courtesy and this object is the actual gate.
+ *
+ * The two refresh failures are OR-ed because they mean the same thing for a
+ * sheet — a write landed and the re-read did not, so what is on screen may be
+ * behind the server — even though each has its own banner and its own
+ * GET-only retry.
+ */
+const printAvailability = computed(() => resolvePrintAvailability({
+  record: viewRecord.value,
+  catalog: viewCatalog.value,
+  dirty: unsaved.dirty.value,
+  writing: unsaved.writing.value,
+  loading: isLoading.value,
+  refreshing: isRefreshing.value,
+  openingHistorical: isOpeningHistorical.value,
+  refreshFailed: textRefreshFailed.value || editor.refreshFailed.value,
+  conflict: conflict.value !== null
+}))
+
+/**
+ * Findings the chart cannot carry in full, for the preflight summary.
+ *
+ * The same call the printed sheet makes, so the count the clinician is shown
+ * before printing and the note they read afterwards cannot disagree.
+ */
+const printDeclarationList = computed(
+  () => printDeclarations(viewRecord.value, viewCatalog.value)
+)
 </script>
 
 <template>
@@ -840,6 +878,29 @@ const printSuperseded = computed(() => {
         </UAlert>
 
         <!--
+          Printing the record on screen.
+
+          One control, placed immediately above the chart, because the sheet
+          always prints `viewRecord` — the historical record when one is open,
+          otherwise the draft, otherwise the record in force. A Print button
+          in the current-record card *and* another in the draft card would be
+          two controls that both print the draft whenever a draft exists.
+
+          It shares `printAvailability` with the print root, so the button and
+          the browser's own Ctrl+P can never reach different conclusions.
+        -->
+        <div
+          class="flex justify-end"
+          data-testid="nts-print-actions"
+        >
+          <NtsPrintAction
+            :availability="printAvailability"
+            :status="viewRecord?.status ?? null"
+            :declarations="printDeclarationList"
+          />
+        </div>
+
+        <!--
           The official dental layout, with the findings drawn on it.
 
           The catalog goes down with the record because a finding cannot be
@@ -1216,6 +1277,7 @@ const printSuperseded = computed(() => {
             :catalog="viewCatalog"
             :patient="printPatient"
             :is-superseded="printSuperseded"
+            :availability="printAvailability"
           />
         </div>
       </Teleport>

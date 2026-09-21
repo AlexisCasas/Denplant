@@ -179,6 +179,67 @@ outside §5.17's requirement on the *graphic*; grey is what keeps it from
 reading as structure or as a finding. For the same reason the neutral token
 itself is not overridden — that is what `+n` is drawn with.
 
+## 4d. When printing is refused, and when it is merely qualified
+
+Two different questions, and conflating them would be the bug.
+
+**Refusals** come from `resolvePrintAvailability`. The sheet prints the record
+*as persisted*, so anything that makes the screen and the stored record
+disagree has to stop it:
+
+| blocker | why | cleared by |
+|---|---|---|
+| `dirty` | typed text is not on the sheet | saving or discarding the edit |
+| `writing` | a sent mutation can still change the record | the request settling |
+| `refresh_failed` | the write landed, the re-read did not | the existing GET-only retry |
+| `conflict` | another session changed it; not yet acknowledged | reviewing the notice |
+| `loading` / `refreshing` / `opening_historical` | a snapshot is being installed | waiting |
+| `no_record` / `catalog_unavailable` / `norm_mismatch` | nothing readable to print | — structural, no button at all |
+
+The first six are *transient*: the button stays visible and disabled with the
+reason in text, because a control that vanishes gives no reason and one that
+looks live and does nothing is worse than either. The last three remove the
+affordance entirely.
+
+There is deliberately **no "print anyway"** for `dirty`. Agreeing to it would
+not put the unsaved text on the page.
+
+> **Disabling the button is not a gate.** The print root is always mounted so
+> the browser's own Ctrl+P reaches it without passing the button. The decision
+> is therefore computed once and consumed by both; when it says no, the root
+> renders a notice in place of the clinical document. A test fails if the two
+> ever diverge.
+
+**Qualifications** are not refusals. A draft, a discarded record and a
+superseded one all print, and each states what it is before the chart:
+
+| record | qualification |
+|---|---|
+| finalized, in force | none |
+| draft | `BORRADOR` + not the definitive record (+ unreviewed carried-forward count) |
+| discarded | `DESCARTADO` + `discard_reason` |
+| finalized, superseded | `REGISTRO SUPERADO` + a later record exists |
+
+Carried by border and weight, never a fill: a background is the one thing a
+print dialog can switch off. No wording calls a record invalid, annulled or
+certified.
+
+## 4e. The preflight
+
+`window.print()` takes no arguments — paper, orientation, scale and colour
+belong to the browser's own dialog. The modal therefore *asks*:
+
+- Paper: A4 · Orientation: portrait · **Scale: 100%** · Print in colour
+- **Do not use "Fit to page".** At 100% the narrowest crown is 0.545 cm²
+  against §5.17's 0.5 cm² minimum; shrinking to fit breaks the norm.
+- When findings cannot be fully drawn, their counts — from the same
+  `printDeclarations` the sheet uses, so the two cannot disagree — with a note
+  that the sheet identifies them. It never blocks, and never recommends where
+  the clinician should write anything.
+
+`document.title` is untouched: the browser derives a suggested PDF filename
+from it, and that is not somewhere a patient's name belongs.
+
 ## 5. Never
 
 - **Never** write to the record to represent a gap. Appending to
@@ -204,7 +265,7 @@ itself is not overridden — that is what `+n` is drawn with.
 |---|---|---|
 | **05F.1** | print data + DOM: `ntsPrintModel.ts`, `useNtsPrintIdentity.ts`, `NtsOdontogramPrintView.vue` | done |
 | **05F.2** | `@page`, physical sizing, isolation, page breaks: `ntsPrintLayout.ts`, the "NTS print layout" block in `main.css` | done |
-| **05F.3** | trigger, eligibility banners, draft watermark, pre-print advisories | pending |
+| **05F.3** | trigger, safety gating, qualification banners, preflight: `resolvePrintAvailability`, `NtsPrintAction.vue` | done |
 | **05F.4** | long-text policy, browser PDF QA, final regression | pending |
 
 Colour tokens for print are already pinned in `frontend/app/assets/css/main.css`

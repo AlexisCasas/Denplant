@@ -478,14 +478,28 @@ describe('NTS print layout — the shell mounts one document', () => {
 
   it('a draft prints its persisted values, never an editor buffer', async () => {
     route({ draft: record({ status: 'draft', finalized_at: null, content_hash: null, hash_algorithm: null }) })
+    await shell()
+
+    // Nothing typed: the sheet carries what the server holds.
+    expect(printRoot()!.textContent).toContain('texto persistido')
+  })
+
+  it('typing into the draft withdraws the document rather than printing it stale', async () => {
+    // 05F.2 asserted only that the buffer never reached the sheet. 05F.3 goes
+    // further: while there is unsaved text the clinical document is not
+    // rendered at all, because a sheet that silently omits what the clinician
+    // just typed is worse than no sheet.
+    route({ draft: record({ status: 'draft', finalized_at: null, content_hash: null, hash_algorithm: null }) })
     const wrapper = await shell()
 
     await wrapper.find('[data-testid="nts-observations-input"]').setValue('sin guardar')
     await nextTick()
 
     const root = printRoot()!
-    expect(root.textContent).toContain('texto persistido')
+    expect(root.querySelector('[data-testid="nts-print-unsafe"]')).not.toBeNull()
+    expect(root.querySelector('[data-testid="nts-odontogram-chart"]')).toBeNull()
     expect(root.textContent).not.toContain('sin guardar')
+    expect(root.textContent).not.toContain('texto persistido')
   })
 
   it('opening a historical record prints that record under its own norm', async () => {

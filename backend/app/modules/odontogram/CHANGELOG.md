@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+- feat(nts-05f.3): **printing becomes usable, and refuses when it should**.
+
+  05F.1 built the document, 05F.2 made it an A4 sheet. Neither could be
+  reached from the application: there was no button, and `window.print()` was
+  never called. This adds the control — and, more to the point, the conditions
+  under which it declines.
+
+  **The sheet prints the record as persisted, so unsaved text has to block
+  it.** A clinician who types an observation, does not save, prints, and files
+  the result has filed a document that omits what they just wrote. Printing is
+  refused while anything is dirty, and there is deliberately no "print
+  anyway": consenting to that would not put the text on the page. The same
+  reasoning covers a write still in flight (it can still change the record), a
+  write whose refetch failed (the screen may be behind the server — cleared by
+  the existing GET-only retry, never by re-sending), an unacknowledged
+  conflict, and any load or refresh still installing a snapshot.
+
+  **Disabling the button is not a gate.** The print root is always mounted so
+  that the browser's own Ctrl+P works, which means it can be reached without
+  passing the button at all. So the decision is computed once —
+  `resolvePrintAvailability` — and both the button and the root consume the
+  same object. When it says no, the root renders a notice instead of the
+  clinical document; a stale snapshot cannot be printed behind the
+  application's back. There is a test that fails if the two ever diverge.
+
+  **Status qualifies a document; it does not refuse one.** A draft, a
+  discarded record and a superseded one all print. Each says what it is,
+  before the chart, in words — `BORRADOR`, `DESCARTADO` (with its reason),
+  `REGISTRO SUPERADO` — carried by border and weight rather than a fill,
+  because a background is the one thing a print dialog can switch off. A draft
+  also reports how many carried-forward findings are still unreviewed, which
+  is what stops the sheet reading as a reviewed document; nothing is confirmed
+  on the clinician's behalf to produce that number. None of the wording calls
+  a record invalid, annulled or certified — DenPlant has no standing to say
+  any of those, and the norm defines none of them.
+
+  **The preflight asks for what `window.print()` cannot set.** Paper size,
+  orientation, scale and colour belong to the browser's dialog and take no
+  arguments, so the modal states them and explains the one that matters: at
+  100% the narrowest crown is 0.545 cm² against §5.17's 0.5 cm² minimum, so
+  "Fit to page" produces a sheet that does not satisfy the norm. When the
+  record carries findings the chart cannot fully draw, the preflight counts
+  them from the same `printDeclarations` the sheet uses — so the warning
+  before printing and the note on the page cannot disagree — and says the
+  sheet will identify them. It does not block, and it recommends nothing about
+  any particular rule: where extra clinical detail belongs is the clinician's
+  judgement, and nothing is written for them.
+
+  One control, not three: the sheet always prints `viewRecord`, so a Print
+  button in the current-record card *and* another in the draft card would be
+  two controls that both print the draft whenever a draft exists.
+
+  `document.title` is untouched — the browser derives a suggested PDF filename
+  from it, and that is not somewhere a patient's name belongs.
+
+  Verified in Chromium across finalized, draft, draft-with-carried-forward,
+  discarded, superseded and mixed partial/unsupported records; the preflight is
+  usable at 390 px; confirming calls `window.print()` exactly once and
+  cancelling calls it not at all.
+
 - fix(nts-05f.2a): **`describeAttributes` is now total for the catalog's own
   authoring shape**.
 

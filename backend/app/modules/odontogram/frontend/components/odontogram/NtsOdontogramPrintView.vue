@@ -41,15 +41,24 @@
  * inside §5.17 lives in `ntsPrintLayout.ts`. The split is deliberate: every
  * assertion here is a DOM tree with no media query involved.
  *
- * Still to come (05F.3): the print trigger, `window.print()`, eligibility and
- * the BORRADOR/DESCARTADO qualification.
+ * ## Whether it may be printed at all (05F.3)
+ *
+ * Not this component's decision either. The shell resolves it once, for both
+ * the print button and this root, and hands it down as `availability` — which
+ * matters because the root is always mounted and the browser's own Ctrl+P
+ * reaches it without passing the button. When the answer is no, the clinical
+ * document is not rendered and a notice takes its place.
+ *
+ * What it *does* own is the qualification: a draft, a discarded record or a
+ * superseded one still prints, and says which it is before the chart.
  */
 
 import type { NtsCatalog, NtsRecord } from '../../types/nts'
-import type { NtsPrintPatient } from '../../utils/ntsPrintModel'
+import type { NtsPrintAvailability, NtsPrintPatient } from '../../utils/ntsPrintModel'
 import {
   canRenderPrintRecord,
   formatPrintDate,
+  pendingCarriedForwardCount,
   printDateSource,
   printDeclarations,
   toPrintFooter,
@@ -79,8 +88,23 @@ const props = withDefaults(
     patient?: NtsPrintPatient | null
     /** Known only from a history row, so it is told rather than inferred. */
     isSuperseded?: boolean
+    /**
+     * The shell's single print decision, shared with the print button.
+     *
+     * The root is always mounted so the browser's own Ctrl+P reaches it
+     * without passing the button — which means disabling the button is not a
+     * gate, it is a suggestion. This prop is the gate: when the shell says
+     * printing is unsafe, the clinical document is not rendered at all and a
+     * notice takes its place, so a stale or half-saved snapshot cannot be
+     * printed behind the application's back.
+     *
+     * `null` means no caller supplied one (the component mounted directly in
+     * a test). The record/catalog coherence gate still applies — it is the
+     * same condition `resolvePrintAvailability` starts from.
+     */
+    availability?: NtsPrintAvailability | null
   }>(),
-  { patient: null, isSuperseded: false }
+  { patient: null, isSuperseded: false, availability: null }
 )
 
 const { t, locale } = useI18n()
@@ -99,13 +123,39 @@ const { t, locale } = useI18n()
  * `canRenderPrintRecord` so the view and the pure model cannot come to
  * different conclusions about the same pair.
  */
-const isPrintable = computed(() => canRenderPrintRecord(props.record, props.catalog))
+const isReadable = computed(() => canRenderPrintRecord(props.record, props.catalog))
+
+/**
+ * Blocked by a passing state rather than by a missing record.
+ *
+ * This is the Ctrl+P gate, and the only place the shell's decision acts on
+ * what gets rendered — `isReadable` answers a different question and the two
+ * are kept apart so neither can quietly stand in for the other.
+ *
+ * Worth distinguishing on the page too: "this record cannot be read under its
+ * own norm" and "save your work first" are different problems with different
+ * remedies, and the sheet should not offer the wrong one.
+ *
+ * With no availability supplied (the component mounted directly in a test)
+ * there is nothing transient to report, and `isReadable` is the whole test —
+ * which is exactly what `resolvePrintAvailability` reduces to when nothing is
+ * in flight, so the two paths agree by construction rather than by luck.
+ */
+const isUnsafe = computed(
+  () => isReadable.value && props.availability !== null && !props.availability.printable
+)
+
+/** The clinical document renders only when it is both readable and safe. */
+const isPrintable = computed(() => isReadable.value && !isUnsafe.value)
 
 const date = computed(() => formatPrintDate(printDateSource(props.record), locale.value))
 
 const professional = computed(() => toPrintProfessional(props.record))
 const footer = computed(() => toPrintFooter(props.record))
 const status = computed(() => toPrintStatus(props.record, { isSuperseded: props.isSuperseded }))
+
+/** Carried-forward findings nobody has confirmed. Counted, never confirmed. */
+const carriedForward = computed(() => pendingCarriedForwardCount(props.record))
 
 /** Specifications in the record's own sequence. Never reordered, never edited. */
 const specifications = computed(() =>
@@ -145,10 +195,28 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
     class="space-y-5 text-default"
     data-testid="nts-print-document"
   >
+    <!--
+      Blocked by a passing state, not by a missing record.
+
+      This is the Ctrl+P path: the browser can reach this document without
+      ever touching the print button, so refusing here is the only refusal
+      that actually holds. What it refuses is printing a snapshot that may be
+      behind the server or missing text the clinician has typed — never the
+      record itself, which is untouched.
+    -->
+    <p
+      v-if="isUnsafe"
+      class="text-sm"
+      data-testid="nts-print-unsafe"
+      :data-blocker="availability?.blocker ?? undefined"
+    >
+      {{ t('odontogram.nts.print.unsafePrint') }}
+    </p>
+
     <!-- A record whose norm cannot be served is not printed as a blank form:
          a blank odontogram is a clinical statement of its own. -->
     <p
-      v-if="!isPrintable"
+      v-else-if="!isPrintable"
       class="text-sm"
       data-testid="nts-print-unavailable"
     >
@@ -204,6 +272,77 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
           </template>
         </dl>
       </header>
+
+      <!--
+        2b. What kind of document this is — before the chart, so it cannot be
+        read after the fact.
+
+        Only shown when the sheet is something other than the finalized record
+        in force. It is a statement of the record's own status, not a verdict:
+        a discarded record is not "invalid" and a superseded one is not
+        "annulled" — DenPlant has no standing to say either, and the norm
+        defines neither term. Both remain legible clinical history.
+
+        Stated in words, with a border and weight rather than a fill: a
+        printer with background graphics turned off must still show it, and a
+        qualification carried only by colour is a qualification that can be
+        switched off in a print dialog.
+      -->
+      <section
+        v-if="status?.isQualified"
+        class="border-2 border-current px-3 py-2 space-y-1"
+        data-testid="nts-print-qualification"
+        :data-status="status.status"
+        :data-superseded="status.isSuperseded ? 'true' : 'false'"
+      >
+        <p
+          v-if="status.status === 'draft'"
+          class="text-sm font-bold tracking-wide"
+          data-testid="nts-print-qualification-draft"
+        >
+          {{ t('odontogram.nts.print.draftQualification') }}
+          — {{ t('odontogram.nts.print.draftNotFinal') }}
+        </p>
+
+        <p
+          v-else-if="status.status === 'discarded'"
+          class="text-sm font-bold tracking-wide"
+          data-testid="nts-print-qualification-discarded"
+        >
+          {{ t('odontogram.nts.print.discardedQualification') }}
+          — {{ t('odontogram.nts.print.discardedHint') }}
+        </p>
+
+        <!-- Finalized, but a later record exists. Said plainly, and without
+             implying this one was wrong. -->
+        <p
+          v-if="status.isSuperseded"
+          class="text-sm font-bold tracking-wide"
+          data-testid="nts-print-qualification-superseded"
+        >
+          {{ t('odontogram.nts.print.supersededQualification') }}
+          — {{ t('odontogram.nts.print.supersededHint') }}
+        </p>
+
+        <!-- Carried forward from an earlier record and never reviewed. The
+             count is what stops this sheet reading as a reviewed document;
+             nothing here confirms anything on the clinician's behalf. -->
+        <p
+          v-if="status.status === 'draft' && carriedForward > 0"
+          class="text-sm"
+          data-testid="nts-print-qualification-carried-forward"
+        >
+          {{ t('odontogram.nts.print.pendingCarriedForward', { count: carriedForward }) }}
+        </p>
+
+        <p
+          v-if="status.status === 'discarded' && record?.discard_reason"
+          class="text-sm"
+          data-testid="nts-print-qualification-discard-reason"
+        >
+          {{ t('odontogram.nts.print.discardReason') }}: {{ record.discard_reason }}
+        </p>
+      </section>
 
       <!--
         3. The graphic. The same component, the same catalog, the same
