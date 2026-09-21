@@ -2,6 +2,63 @@
 
 ## Unreleased
 
+- test(nts-05f.4): **final print QA for the NTS block** — no product change,
+  two findings.
+
+  End-to-end validation in real Chromium against the live backend contract:
+  thirteen record shapes rendered to A4 PDFs at scale 1 with the page size
+  taken from the stylesheet, plus the blocker states driven through the real
+  UI. Everything below is measured, not asserted from the docs.
+
+  **Geometry holds.** Chart 170.92 × 154.09 mm inside a 190 × 275 mm content
+  box; every PDF `MediaBox` is A4 (594.96 × 841.92 pt), never Letter.
+  Recomputed from the productive placement model — molar 0.8348 cm²,
+  premolar 0.7698, **anterior 0.5446** against §5.17's 0.5 cm² minimum. The
+  negative guard bites: at 0.99 × the minimum safe scale the anterior crown
+  falls to 0.4901 cm², below the norm.
+
+  **Ink holds.** Crown, roots, surface dividers, annotation boxes and FDI
+  numbers all measure `rgb(0,0,0)` in print media; findings `#0000CC` and
+  `#CC0000`; `+n` neutral. The covered-edge repair — which 05F.2 could only
+  verify against a probe node because no fixture produced one — rendered for
+  real this time and is black.
+
+  **Nothing is lost to pagination.** 15 specifications: all present, ordered,
+  no duplicates. 45 observation lines: all present, breaks preserved. A single
+  specification taller than a page: split across three pages with all 40
+  repetitions intact and the technical footer still complete after it. The
+  footer is `position: static` and follows content; it never overlays it.
+
+  **The gates hold, including behind the application's back.** Dirty, writing,
+  failed-refetch and conflict each withdraw the clinical document from the
+  always-mounted print root, not merely from the button — verified by driving
+  print media directly, and after a hard reload without ever opening the
+  modal. `window.print()` fires exactly once on confirm, zero on cancel, and
+  the print action issues no request and no mutation. No PHI in
+  `document.title`, the URL or the console.
+
+  Two findings worth recording:
+
+  **1. Page 2 has no identity.** A second page opens mid-content with no
+  record id, patient, norm or date. It is not an edge case: only the plain
+  finalized record fits one page, so every qualified record — draft,
+  discarded, superseded — is already two. Not fixed here: the page has 4.6 mm
+  of slack and a running header needs ~6 mm, so the fix re-tunes the whole
+  vertical budget and would push the one-page case to two. Characterised, with
+  the shape of the remedy, in `nts-188-print.md` §4f.
+
+  **2. A `condition_dependent` rule needs its state to draw at all.** A
+  pulpotomía recorded without `condition_state` resolves `unsupported` and is
+  declared on the sheet rather than drawn. That is the renderer refusing to
+  invent a clinical colour — supply the attribute and it draws complete — but
+  it means "unsupported" on a printed sheet can mean *this record is
+  incomplete*, not only *this build cannot draw it*. Worth knowing when
+  reading the note.
+
+  Coverage unchanged and re-confirmed: **35 complete, 1 partial, 2
+  unsupported**. No backend, migration, DB, renderer, geometry or catalog
+  change anywhere in the 05F block.
+
 - feat(nts-05f.3): **printing becomes usable, and refuses when it should**.
 
   05F.1 built the document, 05F.2 made it an A4 sheet. Neither could be

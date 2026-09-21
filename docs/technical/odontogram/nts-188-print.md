@@ -240,6 +240,57 @@ belong to the browser's own dialog. The modal therefore *asks*:
 `document.title` is untouched: the browser derives a suggested PDF filename
 from it, and that is not somewhere a patient's name belongs.
 
+## 4e2. Known clinical gaps the sheet declares
+
+Coverage is **35 complete, 1 partial, 2 unsupported** of the norm's 38 rules.
+The printed sheet never hides the shortfall: anything it cannot draw in full
+is named in the system note after *Observaciones*.
+
+| id | rule / area | state |
+|---|---|---|
+| **G6** | 6.1.10 fractura — freehand shape the clinician has no channel to supply | open, `unsupported` |
+| **CLINICAL-03** | 6.1.13 giroversión — direction the norm does not enumerate | open, `unsupported` |
+| **G10** | 6.1.35 sellante — fissure anatomy the chart does not model | open, `partial` (the sigla draws) |
+| **G9** | 6.1.31 multi-segment range grouping | open, editor produces one segment |
+| **CLINICAL-02** | pilar cardinality | open, no automatic bound |
+
+None of these is closed by the 05F block, which added no renderer, geometry or
+catalog change at all.
+
+> A finding can also read as `unsupported` for a second reason: a rule whose
+> colour is `condition_dependent` (6.1.27 pulpotomía, 6.1.35 sellante) cannot
+> be drawn without its `condition_state`, because the renderer will not invent
+> a clinical colour. There the shortfall is in the *record*, not in the build.
+
+## 4f. Known gap: page 2 carries no identity
+
+Measured in 05F.4 with `pdftotext`: the second page of a multi-page sheet
+begins mid-content — for a record with 15 specifications, page 2 opens at
+`5. Especificación 5: …`. It carries **no record id, no patient, no norm
+version and no date**. Separated from page 1, it is an anonymous sheet of
+clinical text.
+
+This is not rare. Only the plain finalized record fits one page (270.4 mm of
+275 mm); **any qualified record — draft, discarded, superseded — is already
+two pages**, because the qualification banner costs the remaining slack.
+
+Not fixed in 05F.4, deliberately. The obvious remedy is a running header
+repeated on every page (`position: fixed` inside `@media print`, which
+Chromium repeats per page), but it has to be given room in the page margin,
+and the page has **4.6 mm of vertical slack**. Reserving ~6 mm would push the
+one-page golden case to two pages and force the whole vertical budget in §4b
+to be re-tuned — a layout change with its own overlap risk (§31), landed at
+the close of the block without the QA budget to re-validate it.
+
+The shape of the fix, for whoever picks it up:
+
+- `@page :first` keeps today's 10 mm top margin; `@page` gets a larger one.
+- A small print-only running header, positioned into that margin, carrying
+  record id plus minimal patient identity — **not** the full document header,
+  and **not** in `document.title` (a browser derives the suggested PDF
+  filename from it).
+- Re-measure the one-page case afterwards; the budget in §4b is the baseline.
+
 ## 5. Never
 
 - **Never** write to the record to represent a gap. Appending to
