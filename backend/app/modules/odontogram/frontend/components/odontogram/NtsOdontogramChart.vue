@@ -55,6 +55,20 @@ const props = withDefaults(
      * and the norm lives in the catalog.
      */
     catalog?: NtsCatalog | null
+    /**
+     * Whether to show the advisories that sit beside the drawing.
+     *
+     * They are addressed to whoever is *editing*: "some findings are not yet
+     * drawable", "this box could not fit every sigla". On a printed sheet they
+     * would be instructions to a reader who cannot act on them, so the print
+     * view turns them off.
+     *
+     * What they report is not lost when they are hidden: the `+n` indicator is
+     * part of the drawing itself, and the printed document declares
+     * incompletely drawn findings in its own words. Nothing about the chart
+     * changes — only whether the page carries advice.
+     */
+    advisories?: boolean
   }>(),
   {
     record: null,
@@ -62,7 +76,8 @@ const props = withDefaults(
     selectable: false,
     selectedTeeth: () => [],
     anchorTeeth: () => [],
-    catalog: null
+    catalog: null,
+    advisories: true
   }
 )
 
@@ -151,7 +166,7 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
       </p>
 
       <UBadge
-        v-if="readonly"
+        v-if="readonly && advisories"
         color="neutral"
         variant="subtle"
         size="sm"
@@ -242,7 +257,7 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
       resolved by inventing a symbol, and neither is ever left unsaid.
     -->
     <UAlert
-      v-if="incomplete > 0"
+      v-if="advisories && incomplete > 0"
       color="neutral"
       variant="subtle"
       icon="i-lucide-shapes"
@@ -252,7 +267,7 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
     />
 
     <UAlert
-      v-if="hiddenSiglas > 0"
+      v-if="advisories && hiddenSiglas > 0"
       color="neutral"
       variant="subtle"
       icon="i-lucide-layers"
@@ -263,7 +278,7 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
 
     <!-- A record whose findings cannot be drawn at all still says so. -->
     <UAlert
-      v-if="!catalog && findingCount > 0"
+      v-if="advisories && !catalog && findingCount > 0"
       color="neutral"
       variant="subtle"
       icon="i-lucide-shapes"

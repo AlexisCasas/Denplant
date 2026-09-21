@@ -13,7 +13,13 @@
  */
 
 import type { NtsFinding, NtsRule } from '../../types/nts'
-import { describeAttributes, describeTargets, isPendingReview, ruleFor } from '../../utils/ntsFindingModel'
+import {
+  describeAttributes,
+  describeTargets,
+  formatTargetSummary,
+  isPendingReview,
+  ruleFor
+} from '../../utils/ntsFindingModel'
 
 const props = withDefaults(
   defineProps<{
@@ -65,21 +71,14 @@ const rows = computed<Row[]>(() =>
   })
 )
 
-/** Structured target data rendered as text; nothing is read off the drawing. */
+/**
+ * Structured target data rendered as text; nothing is read off the drawing.
+ *
+ * The formatting itself moved to `ntsFindingModel` when the printed document
+ * needed the same sentence: one description of a target, used by both.
+ */
 function targetText(row: Row): string {
-  const summary = row.targets
-  if (summary.arches.length > 0) {
-    return summary.arches.map(arch => t(`odontogram.nts.chart.${arch}`)).join(' · ')
-  }
-  if (summary.unnumberedSubject) {
-    return t('odontogram.nts.editor.unnumberedBetween', { teeth: summary.anchors.join(' / ') })
-  }
-  if (summary.scope === 'range' && summary.teeth.length > 1) {
-    return `${summary.teeth[0]} → ${summary.teeth[summary.teeth.length - 1]}`
-      + ` (${t('odontogram.nts.editor.toothCount', { count: summary.teeth.length })})`
-  }
-  if (summary.scope === 'pair') return summary.teeth.join(' + ')
-  return summary.teeth.join(' · ') || '—'
+  return formatTargetSummary(row.targets, t)
 }
 
 function roleText(row: Row): string {

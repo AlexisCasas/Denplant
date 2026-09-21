@@ -401,6 +401,36 @@ export function describeTargets(
   }
 }
 
+/** The narrow slice of `useI18n().t` this module needs. */
+export type NtsTranslate = (key: string, named?: Record<string, unknown>) => string
+
+/**
+ * A target summary as one line of text.
+ *
+ * Lives here, rather than in the component that first needed it, because the
+ * finding list and the printed document describe the same target and must
+ * describe it the same way. Two copies of this would drift, and a printed
+ * sheet that names a different tooth than the screen is the worst kind of
+ * bug this module can have.
+ *
+ * Still no clinical inference: every branch reads the structured summary and
+ * renders it through i18n. Nothing is read off the drawing.
+ */
+export function formatTargetSummary(summary: NtsTargetSummary, t: NtsTranslate): string {
+  if (summary.arches.length > 0) {
+    return summary.arches.map(arch => t(`odontogram.nts.chart.${arch}`)).join(' · ')
+  }
+  if (summary.unnumberedSubject) {
+    return t('odontogram.nts.editor.unnumberedBetween', { teeth: summary.anchors.join(' / ') })
+  }
+  if (summary.scope === 'range' && summary.teeth.length > 1) {
+    return `${summary.teeth[0]} → ${summary.teeth[summary.teeth.length - 1]}`
+      + ` (${t('odontogram.nts.editor.toothCount', { count: summary.teeth.length })})`
+  }
+  if (summary.scope === 'pair') return summary.teeth.join(' + ')
+  return summary.teeth.join(' · ') || '—'
+}
+
 /** A carried-forward finding nobody has reviewed yet. */
 export function isPendingReview(finding: NtsFinding): boolean {
   return finding.provenance === 'carried_forward'

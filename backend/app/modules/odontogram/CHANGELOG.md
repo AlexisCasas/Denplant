@@ -2,6 +2,72 @@
 
 ## Unreleased
 
+- feat(nts-05f.1): **the odontogram as a printed document — data and DOM**.
+
+  The screen surface is a place to work on a record: buttons, editors,
+  banners, a history. A printed odontogram is none of those, and the
+  difference is not a stylesheet. `NtsOdontogramPrintView` is the record
+  arranged the way the norm's Anexo arranges it — chart, then
+  *Especificaciones*, then *Observaciones* — and nothing else.
+
+  What the audit of the Anexo settled, and what this slice encodes:
+
+  - The annex has **no patient block and no signature block**. §5.2 places the
+    graphic inside the Ficha Odonto-Estomatológica and §5.3 puts the firma y
+    sello on that Ficha. So the patient line and the professional line are
+    DenPlant information, printed outside the normative content, and there is
+    **no "Firma y sello" line** at all.
+  - The professional is `recorded_by_*`, never `finalized_by`. The service
+    snapshots the person who *recorded* the finding "even when somebody else
+    presses finalize"; printing the finaliser would attribute clinical content
+    to someone who did not record it. `finalized_by_name` is therefore not a
+    gap this feature has.
+  - The technical footer carries record id, norm version, status and the
+    **whole** content hash, labelled *Huella de contenido*. Half a digest
+    attests nothing, so it is never abbreviated to fit — and it is not called
+    a signature, a certification, or evidence of legal validity.
+
+  **One drawing.** The page mounts `NtsOdontogramChart` itself, reading the
+  catalog it is handed. There is no print renderer: a second way of drawing a
+  tooth is a second clinical opinion about that tooth, and two of those can
+  disagree. The chart gained one presentational prop, `advisories`, so the
+  editing alerts beside it do not follow it onto paper — the `+n` overflow
+  marker does, because it is part of the drawing and hiding it would make the
+  sheet claim a box holds only the siglas that fit.
+
+  **Findings the drawing cannot carry** are declared on the page, after
+  *Observaciones* so that no DenPlant content is inserted between the annex's
+  three blocks. The list comes from the renderer's own `completeness`, never
+  from a list of rule ids, so it is exactly as long as the drawing is short.
+  Declaring a gap **writes nothing**: appending to `observations` would be
+  DenPlant authoring clinical text over a clinician's name, and would move the
+  content hash of a finalized document.
+
+  **The record and the catalog must name the same norm.** Not merely "a
+  catalog is present": `ruleFor` matches a finding to a rule by `rule_id`
+  alone and rule ids are stable across revisions, so a catalog for a different
+  norm does not fail loudly — it draws that norm's marks for this record's
+  findings. Measured before the gate existed: the chart rendered, catalog A's
+  sigla `FFP` appeared on a norm-B record, and the declarations were computed
+  under A. One invariant, `canRenderPrintRecord`, now answers the question for
+  both the view and the pure model, and `printDeclarations` applies it itself
+  rather than trusting its caller to have applied it first. A mismatch prints
+  the unavailable notice: no chart, no marks, no declarations, no fallback.
+
+  **Persisted, never buffered.** The page reads the record as stored. Text a
+  clinician typed and did not save has not been recorded, and a document that
+  printed it would be claiming otherwise.
+
+  Patient name and document come from the payload cache the patient page
+  already filled (`useNuxtData('patient:<id>')`) — no request, and no second
+  source of patient data. An empty cache prints no header rather than a row of
+  dashes: "Documento: —" reads as "this patient has none", which is a
+  different claim from "this page did not have it".
+
+  Still to come: `@page` and the print stylesheet (05F.2), the trigger, the
+  draft watermark and the pre-print advisories (05F.3). Nothing here depends
+  on a media query, which is what makes it testable as a DOM tree.
+
 - fix(nts-05e.4a): **a context change cannot silently discard clinical text**.
   05E.4 guarded navigation *inside* the odontogram; the controls that take the
   odontogram away live outside it, and could not see what they were about to
