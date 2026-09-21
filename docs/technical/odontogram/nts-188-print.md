@@ -50,12 +50,20 @@ and §5.3.
 
 ### Measured geometry
 
+DenPlant's figures below are read from `ntsChartGeometry.crownBox()` — the
+placement model the chart is actually drawn from — not from the layout
+constants. The two differ: each tooth's SVG is fitted into its cell with
+`preserveAspectRatio="xMidYMid meet"`, so the effective crown is a little
+smaller than crown-width × chart-scale suggests. The placement model is the
+authority.
+
 | | annex | DenPlant at 1:1 CSS px |
 |---|---|---|
 | permanent arch width | 113.0 mm | **170.9 mm** |
-| chart height (4 rows) | 141.2 mm | **154.0 mm** |
-| molar crown | 8.00 × 5.76 mm = **0.46 cm²** | 11.27 × 8.71 mm = **0.98 cm²** |
-| incisor crown | 5.80 × 5.71 mm = **0.33 cm²** | 7.81 × 8.71 mm = **0.68 cm²** |
+| chart height (4 rows) | 141.2 mm | **154.1 mm** |
+| molar crown | 8.00 × 5.76 mm = **0.46 cm²** | 10.39 × 8.03 mm = **0.835 cm²** |
+| premolar crown | 7.40 × 5.50 mm = **0.41 cm²** | 9.63 × 7.99 mm = **0.770 cm²** |
+| anterior crown | 5.80 × 5.71 mm = **0.33 cm²** | 6.99 × 7.79 mm = **0.545 cm²** |
 | cell pitch | molar ≈8.0, premolar ≈7.4, anterior ≈5.7 mm | class-proportional, same ordering |
 
 Two things follow.
@@ -64,14 +72,20 @@ Two things follow.
 reaches 0.5 cm². The scanned annex therefore cannot be used as a dimensional
 authority; §5.17's figure is a floor to meet, not a measurement to copy.
 
-**DenPlant's chart already meets §5.17 at 1:1**, with ~2× headroom on molars
-and ~1.4× on incisors, and fits A4 portrait (190 × 275 mm printable at 10 mm
-margins) with 19 mm of width and 121 mm of height to spare.
+**DenPlant's chart meets §5.17 at 1:1**, and fits A4 portrait (190 × 275 mm
+printable at 10 mm margins) with 19 mm of width and 121 mm of height to spare.
 
-> **Minimum safe print scale: 0.86.** The incisor is the binding constraint
-> (0.68 cm² × f² ≥ 0.50 → f ≥ 0.857); the molar tolerates 0.71. Anything below
-> 0.86 breaks §5.17. 05F.2 introduces the print scale and must add the
-> assertion that guards it; there is no such test yet.
+> **Minimum safe print scale: 0.958**, derived over all 52 teeth by
+> `minimumSafePrintScale()` and asserted by `ntsPrintLayout.spec.ts`. The
+> binding constraint is the **anterior** crown at 0.545 cm², which clears
+> §5.17 by only 9 % of area — about 4 % of linear scale. The molar tolerates
+> 0.77.
+>
+> The practical consequence: **the sheet must print at 100 %.** Chrome's
+> "Fit to printable area" or any manual shrink below ~96 % produces a
+> document that does not satisfy the norm. This is why the print stylesheet
+> uses no `transform: scale()` and why the chart is sized to fit the page
+> outright rather than being scaled into it.
 
 ## 3. Level of fidelity
 
@@ -95,6 +109,75 @@ a missing block cannot be told apart from one nobody filled in.
 | Technical footer: record id, norm version, status, **full** content hash | Traceability. Labelled *Huella de contenido*, never "firma digital", "certificado" or any claim of legal validity. Never truncated — half a digest attests nothing. |
 | Incompletely drawn findings declared as a **system note**, after *Observaciones* | Keeps DenPlant content out from between the annex's three blocks, while ensuring a tooth whose finding was not drawn never reads as a tooth with nothing found. |
 | Draft and discarded records are printable, but qualified | §5.6 makes a recorded finding inalterable; a working copy must not be mistakable for the document. Refusing to print would only produce screenshots. |
+
+## 4b. How the sheet is isolated
+
+The printed document is teleported to `<body>` as `.nts-print-root`, and the
+print stylesheet hides every other child of `<body>`:
+
+```css
+@media print {
+  body > *:not(.nts-print-root) { display: none !important; }
+  .nts-print-root { display: block !important; }
+}
+```
+
+That hides the Nuxt app root, the teleport target that Nuxt UI modals and
+toasts render into, and — in development — the devtools nodes, all at once.
+The alternative, marking each control `print:hidden`, is a list that goes out
+of date the next time somebody adds a button, and what would go out of date is
+a clinical document.
+
+The document is mounted **at all times**, `display: none` on screen, so that
+the browser's own Ctrl+P prints it with no click handler and no `beforeprint`
+race. `display: none` also keeps a duplicate of the record out of the
+accessibility tree. It is safe to mount twice: the print view is pure props,
+issues no request and mutates nothing, and the chart subtree declares no
+element ids, so two instances cannot collide over an `id` or a `url(#…)`.
+
+Measured vertical budget for an ordinary finalized record (Chromium, print
+media): header 19.9 mm, chart 159.8, especificaciones 12.7, observaciones
+12.7, professional 23.9, footer 29.0 — **270.4 mm** against 275 mm of
+printable page, so it fits one sheet. A record with six specifications flows
+to a second page, which is the policy, not a failure.
+
+> Trap worth knowing: `space-y-*` in this Tailwind build puts the gap on the
+> **bottom** of each child. Overriding `margin-top` alone does nothing — the
+> adjacent margins collapse to the larger one. Zero both sides first.
+
+## 4c. Ink: what is black and what is not
+
+§5.17 says the graphic prints in black; §5.12–5.13 reserve red and blue for
+the findings. On screen the structure is a theme neutral, which is right for a
+screen and wrong for a sheet. Measured in Chromium under `media: print`:
+
+| element | before | after |
+|---|---|---|
+| crown outline, surface dividers | `#64757D` | **`rgb(0,0,0)`** |
+| roots (molar / premolar / anterior) | `#64757D` | **`rgb(0,0,0)`** |
+| annotation box border | `#DCE5E8` | **`rgb(0,0,0)`** |
+| FDI number | `#202D35` | **`rgb(0,0,0)`** |
+| repaired covered edges (05D.4c) | `#64757D` | **`rgb(0,0,0)`** |
+| sigla, good | `#0000CC` | `#0000CC` |
+| sigla, bad | `#CC0000` | `#CC0000` |
+| `+n` overflow marker | `#64757D` | `#64757D` |
+
+Screen values are unchanged in all rows.
+
+**The selectors are structural, never global.** `data-region` appears only in
+`NtsToothCell`; `nts-structure-*` only on the covered-edge repair group.
+Neither can reach a clinical mark. A blanket `svg * { stroke: black }` would
+repaint the findings and destroy the colour code the norm relies on — so there
+isn't one, and a test asserts there never is.
+
+The tooth outline takes its colour from `currentColor` set in an **inline**
+style, so the override needs `!important`: a stylesheet `!important` beats a
+non-important inline declaration.
+
+**`+n` stays neutral deliberately.** The norm defines no such mark, so it is
+outside §5.17's requirement on the *graphic*; grey is what keeps it from
+reading as structure or as a finding. For the same reason the neutral token
+itself is not overridden — that is what `+n` is drawn with.
 
 ## 5. Never
 
@@ -120,7 +203,7 @@ a missing block cannot be told apart from one nobody filled in.
 | slice | scope | status |
 |---|---|---|
 | **05F.1** | print data + DOM: `ntsPrintModel.ts`, `useNtsPrintIdentity.ts`, `NtsOdontogramPrintView.vue` | done |
-| **05F.2** | `@page`, margins, `print-color-adjust`, screen-only inventory, page breaks | pending |
+| **05F.2** | `@page`, physical sizing, isolation, page breaks: `ntsPrintLayout.ts`, the "NTS print layout" block in `main.css` | done |
 | **05F.3** | trigger, eligibility banners, draft watermark, pre-print advisories | pending |
 | **05F.4** | long-text policy, browser PDF QA, final regression | pending |
 

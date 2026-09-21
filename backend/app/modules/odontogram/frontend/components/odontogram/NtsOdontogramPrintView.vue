@@ -32,11 +32,17 @@
  * buffer: a clinician who typed an observation and did not save it has not
  * recorded it, and a document that printed it would be claiming otherwise.
  *
- * ## 05F.1 scope
+ * ## Where the page itself is defined
  *
- * Data and DOM only. No `@page`, no print stylesheet, no `window.print()`, no
- * trigger, no status watermark — 05F.2 and 05F.3. Everything here is
- * assertable as a DOM tree with no media query involved, which is the point.
+ * Not here. This component owns the document's *content and order*; its
+ * physical form — A4, margins, the chart's 171 mm, the isolation that hides
+ * the rest of the application while printing — lives in one block of
+ * `main.css` labelled "NTS print layout", and the arithmetic that keeps it
+ * inside §5.17 lives in `ntsPrintLayout.ts`. The split is deliberate: every
+ * assertion here is a DOM tree with no media query involved.
+ *
+ * Still to come (05F.3): the print trigger, `window.print()`, eligibility and
+ * the BORRADOR/DESCARTADO qualification.
  */
 
 import type { NtsCatalog, NtsRecord } from '../../types/nts'

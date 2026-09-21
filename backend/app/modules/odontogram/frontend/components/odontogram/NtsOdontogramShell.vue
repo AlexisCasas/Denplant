@@ -23,8 +23,10 @@ import NtsFindingList from './NtsFindingList.vue'
 import NtsSpecificationsPanel from './NtsSpecificationsPanel.vue'
 import NtsObservationsPanel from './NtsObservationsPanel.vue'
 import NtsRecordHistory from './NtsRecordHistory.vue'
+import NtsOdontogramPrintView from './NtsOdontogramPrintView.vue'
 import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 import { useNtsUnsavedChanges } from '../../composables/useNtsUnsavedChanges'
+import { useNtsPrintIdentity } from '../../composables/useNtsPrintIdentity'
 
 const props = defineProps<{
   patientId: string
@@ -387,6 +389,41 @@ onBeforeUnmount(() => {
 // A patient or norm change must never leave the previous record on screen;
 // `load()` clears state before awaiting anything and drops the late response.
 watch([() => props.patientId, normVersion], () => void load())
+
+/**
+ * The printed document (NTS-05F.2).
+ *
+ * Mounted alongside the working surface, not instead of it, and teleported to
+ * `<body>` so that print CSS can hide every other child of the body in one
+ * rule. Hiding the application control by control would be a list that goes
+ * stale the next time somebody adds a button — and the thing going stale
+ * would be a clinical document.
+ *
+ * It is mounted **always**, not on a click: the browser's own Ctrl+P must
+ * produce the sheet, and 05F.3's button does not exist yet. On screen it is
+ * `display: none`, so it costs a second render of the chart and nothing else
+ * — the print view is pure props, issues no request and mutates nothing, and
+ * the chart subtree declares no element ids, so two instances cannot collide
+ * over an `id` or a `url(#…)` reference.
+ *
+ * It resolves nothing of its own. Record, catalog, patient and supersession
+ * are all decided here, once, and handed down.
+ */
+const { identity: printPatient } = useNtsPrintIdentity(() => props.patientId)
+
+/**
+ * Whether a later finalized record has replaced the one being printed.
+ *
+ * Derived from the history rows, which is where the server publishes it; the
+ * record itself does not carry the flag, so it is looked up rather than
+ * guessed. Unknown means `false`: claiming a document is superseded when the
+ * history has not loaded would be worse than saying nothing.
+ */
+const printSuperseded = computed(() => {
+  const id = viewRecord.value?.id
+  if (!id) return false
+  return history.value.find(row => row.id === id)?.is_superseded ?? false
+})
 </script>
 
 <template>
@@ -1153,5 +1190,35 @@ watch([() => props.patientId, normVersion], () => void load())
         </div>
       </template>
     </UModal>
+
+    <!--
+      The printed document.
+
+      Teleported to `<body>` so the print stylesheet can hide every other body
+      child in one rule instead of chasing individual controls. Wrapped in
+      `<ClientOnly>` because a teleport that runs during SSR lands outside the
+      server-rendered tree and breaks hydration — the same reason the layout
+      and the patient header already use it, and no loss here since printing
+      only ever happens in a live browser.
+
+      `display: none` on screen, so it is absent from the accessibility tree:
+      a second navigable copy of the whole record would be worse than no
+      print view at all.
+    -->
+    <ClientOnly>
+      <Teleport to="body">
+        <div
+          class="nts-print-root"
+          data-testid="nts-print-root"
+        >
+          <NtsOdontogramPrintView
+            :record="viewRecord"
+            :catalog="viewCatalog"
+            :patient="printPatient"
+            :is-superseded="printSuperseded"
+          />
+        </div>
+      </Teleport>
+    </ClientOnly>
   </div>
 </template>

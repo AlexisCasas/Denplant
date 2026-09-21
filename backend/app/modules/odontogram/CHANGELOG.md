@@ -2,6 +2,85 @@
 
 ## Unreleased
 
+- feat(nts-05f.2): **the official A4 sheet** — isolation, physical size, pagination.
+
+  05F.1 built the document; this mounts it and makes it a page.
+
+  **Isolation, not suppression.** The printed sheet is teleported to `<body>`
+  as its own root, and printing hides every *other* child of the body in one
+  rule. Hiding the application control by control would have been a list that
+  goes stale the next time somebody adds a button — and the thing going stale
+  would be a clinical document. Verified in real print media: `#__nuxt`, the
+  Nuxt teleport target, and every devtools node all resolve to
+  `display: none`; only `.nts-print-root` is `block`.
+
+  **Mounted always, not on a click.** The browser's own Ctrl+P has to produce
+  the sheet, and there is no print button until 05F.3. On screen the document
+  is `display: none`, which also keeps a second copy of the whole record out
+  of the accessibility tree. It costs one extra render of the chart: the print
+  view is pure props, issues no request, mutates nothing, and the chart
+  subtree declares no element ids, so two instances cannot collide over an
+  `id` or a `url(#…)` reference.
+
+  **§5.17 is now arithmetic the build checks.** `ntsPrintLayout.ts` converts
+  the chart's own placement geometry to millimetres — CSS defines `1px` as
+  exactly 1/96 inch for print, so the conversion is exact rather than
+  approximate — and asserts that every crown clears 0.5 cm².
+
+  That measurement corrected an earlier figure. The pre-flight quoted a
+  minimum safe scale of 0.86, derived by hand from the layout constants. Read
+  from `crownBox()` — the geometry the chart is actually drawn from, which
+  fits each tooth's SVG into its cell — the real numbers are molar 0.835 cm²,
+  premolar 0.770, **anterior 0.545**, and the minimum safe scale is **0.958**.
+  The sheet satisfies the norm at full size, but by 9 % of area, not 40 %.
+  The practical consequence is that the sheet **must print at 100 %**: any
+  "fit to page" shrink below ~96 % produces a document that does not satisfy
+  §5.17. Hence no `transform: scale()` anywhere in the print stylesheet.
+
+  **One page for the ordinary record.** Measured in Chromium at the screen's
+  own spacing, a simple finalized record came to 294.4 mm against 275 mm of
+  printable page and spilled onto a second sheet. Only the whitespace between
+  blocks was tightened — no font reduced, no clinical content scaled, the
+  chart still 171 mm — bringing it to 270.4 mm. A dense record with six
+  specifications still flows to a second page, which is the policy.
+
+  Worth recording for whoever touches this next: `space-y-*` in this Tailwind
+  build puts the gap on the **bottom** of each child, so overriding
+  `margin-top` alone did nothing at all — the margins simply collapsed to the
+  larger one. Both sides have to be zeroed first.
+
+  **§5.17's other half: the graphic prints in black.** The colour work so far
+  had covered the findings; the structure had not been measured. It was not
+  black. Measured in Chromium under `media: print`: crown outline, surface
+  dividers and roots all `#64757D`, the annotation boxes `#DCE5E8` — close to
+  invisible on paper — and the FDI numbers `#202D35`. Theme neutrals, which is
+  right on screen and wrong on a sheet the norm says prints in black.
+
+  Corrected print-only, with structural selectors: the tooth cell carries
+  `data-region` on its roots, crown regions, annotation box and FDI number,
+  and that attribute exists **only** in `NtsToothCell`; the covered-edge
+  repair carries `nts-structure-*`, which exists only on that group. Neither
+  can reach a clinical mark, which is why there is no blanket
+  `svg * { stroke: black }` — that would repaint the findings and destroy the
+  red and blue §5.12-5.13 makes carry meaning. The outline's colour comes from
+  an inline `currentColor`, so `!important` is what overrides it.
+
+  After: every structural part measures `rgb(0, 0, 0)` in print and is
+  unchanged on screen; the siglas still measure `#0000CC` and `#CC0000`; and
+  `+n` stays neutral, because the norm defines no such mark and it sits
+  outside the requirement on the *graphic* — staying grey is what stops it
+  reading as either structure or a finding. The neutral token itself is
+  deliberately not overridden, since it is what `+n` is drawn with.
+
+  **Overlay alignment**, the risk flagged in the pre-flight, holds in print
+  media: the overlay's left edge sits 0.14 mm from the canvas's, it spans
+  170.92 mm against the canvas's 171 mm, and the first and last tooth cells
+  land at 0.10 mm and 170.89 mm. Findings print in the pinned `#0000CC`, and
+  the `+n` overflow marker prints in neutral ink beside them.
+
+  Still to come in 05F.3: the print trigger, eligibility, the
+  BORRADOR/DESCARTADO qualification and the pre-print advisories.
+
 - feat(nts-05f.1): **the odontogram as a printed document — data and DOM**.
 
   The screen surface is a place to work on a record: buttons, editors,
