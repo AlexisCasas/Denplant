@@ -2,6 +2,61 @@
 
 ## Unreleased
 
+- fix(nts-05f.2a): **`describeAttributes` is now total for the catalog's own
+  authoring shape**.
+
+  05F.2's QA fed a printed record with 6.1.10 (fractura) or 6.1.13
+  (giroversión) and got a blank document: `describeAttributes` threw, the
+  exception took the whole `NtsFindingList` computed property down with it,
+  and print, mounted alongside it, inherited the same empty subtree.
+
+  Root cause: `rule?.attributes.map(...)` and `definition?.values.find(...)`.
+  The optional chaining guards `rule?.`/`definition?.` — it does nothing for
+  `.attributes`/`.values` themselves, so a rule or attribute that declares
+  none of either still threw `Cannot read properties of undefined`.
+
+  **Corrected before verifying whether it was actually a production defect —
+  it needed to be, and the answer matters.** Traced end-to-end against the
+  running backend (`GET /api/v1/odontogram/nts/catalogs/pe_nts_188_2022`):
+  the live API always sends `"attributes":[]` and `"values":[]`, never an
+  absent key, for every one of the 38 rules — confirmed for 6.1.10 and
+  6.1.13 specifically. `AttributeDef.attributes`/`.values` default to `()` in
+  the Pydantic model and FastAPI serializes the default, not an omission.
+  **So this never crashed a real clinician's screen.**
+
+  What it did crash: the catalog's own *source* file —
+  `nts/catalog/pe_nts_188_2022.json`, the pre-validation authoring format —
+  genuinely omits both keys when a rule declares nothing, and this project's
+  entire frontend test suite reads that file directly as `REAL_CATALOG`,
+  bypassing the Pydantic layer that fills the defaults on the real wire. Any
+  test — including 05F.2's own print QA script — that built a finding for
+  6.1.10 or 6.1.13 and mounted `NtsFindingList` hit exactly this crash. That
+  is real and reproducible; it is just not "screen-breaking in production
+  today" as 05F.2 characterized it.
+
+  Fixed anyway, because the hardening is cheap, correct regardless of which
+  contract is authoritative, and makes the test suite's own long-standing
+  `REAL_CATALOG` convention safe for any of the 38 rules rather than a
+  landmine for two of them. `NtsRule.attributes` and `NtsRuleAttribute.values`
+  keep their required-array types — the live contract does not demonstrate
+  otherwise — and every function in `ntsFindingModel.ts` that walked either
+  field now reads it through one guard (`rule?.attributes ?? []`) shared by
+  all of them, rather than five ad-hoc repetitions.
+
+  `describeAttributes` itself is now total by shape, not by rule id: an
+  enumerated code still resolves through the catalog's own label; a
+  `free_text` value — 6.1.13's `rotation_sense`, "el sentido de la
+  giroversión" — prints verbatim, because the norm enumerates nothing for it
+  to resolve against and dropping it silently would have been worse than the
+  original crash; an attribute key this catalog does not describe at all
+  degrades to its raw value instead of vanishing; `null`/`undefined` render
+  as nothing, never the strings `"undefined"`/`"null"`.
+
+  Coverage unchanged: 35 complete, 1 partial, 2 unsupported. Fractura and
+  giroversión are not rendered any differently — they still print in the
+  "hallazgos no representados" note, exactly as 05F.1 designed. This ticket
+  only stops the description layer from crashing on their way there.
+
 - feat(nts-05f.2): **the official A4 sheet** — isolation, physical size, pagination.
 
   05F.1 built the document; this mounts it and makes it a page.

@@ -350,6 +350,31 @@ describe('NTS print layout — the shell mounts one document', () => {
     }
   }
 
+  /** One subject target on `fdi`. */
+  function tooth(id: string, fdi: number) {
+    return {
+      id, group_index: 0, position: 0, participation: 'subject' as const, role: null,
+      target_kind: 'fdi_tooth' as const, tooth_number: fdi, arch: null,
+      local_ordinal: null, geometry: null
+    }
+  }
+
+  /** A finding citing a real rule id, targeting one tooth by default. */
+  function finding(overrides: { id: string, rule_id: string } & Record<string, unknown>) {
+    return {
+      record_id: 'rec-1',
+      norm_version: 'pe_nts_188_2022',
+      attributes: {},
+      provenance: 'observed',
+      source_finding_id: null,
+      sequence: 1,
+      created_at: '2026-01-02T10:00:00Z',
+      created_by: 'u1',
+      targets: [tooth(`t-${overrides.id}`, 16)],
+      ...overrides
+    }
+  }
+
   function route(options: {
     current?: unknown
     draft?: unknown
@@ -575,5 +600,117 @@ describe('NTS print layout — the shell mounts one document', () => {
     expect(state.get.mock.calls.length).toBeGreaterThan(before)
     const urls = state.get.mock.calls.map(call => String(call[0]))
     expect(new Set(urls).size).toBe(urls.length)
+  })
+
+  // --- NTS-05F.2a — a rule with no attributes must not blank the surface ---
+  //
+  // `describeAttributes` crashed on 6.1.10 (no `attributes` key at all) and
+  // on 6.1.13's `rotation_sense` (a `free_text` attribute with no `values`
+  // key). `NtsFindingList` calls it from a computed property, so the
+  // exception did not stay local — it took the whole finding list, and with
+  // it everything mounted alongside it, down with it. These findings are
+  // real: 6.1.10 and 6.1.13 are two of the norm's 38 rules, so any record a
+  // clinician actually records can contain one.
+
+  it('I — a fracture finding (6.1.10, no declared attributes) reaches the screen list', async () => {
+    const rec = record({
+      findings: [finding({ id: 'f-frac', rule_id: '6.1.10', targets: [tooth('t-frac', 46)] })]
+    })
+    route({ current: rec })
+    const wrapper = await shell()
+
+    const row = wrapper.find('[data-testid="nts-finding-f-frac"]')
+    expect(row.exists()).toBe(true)
+    expect(row.attributes('data-rule')).toBe('6.1.10')
+    expect(row.text()).toContain('Fractura dental')
+    expect(row.text()).toContain('46')
+  })
+
+  it('J — a giroversión finding (6.1.13, free_text with no declared values) shows its recorded text', async () => {
+    const freeText = 'Giro de 45° hacia mesial, confirmado en dos citas.'
+    const rec = record({
+      findings: [finding({
+        id: 'f-giro',
+        rule_id: '6.1.13',
+        attributes: { rotation_sense: freeText },
+        targets: [tooth('t-giro', 23)]
+      })]
+    })
+    route({ current: rec })
+    const wrapper = await shell()
+
+    const row = wrapper.find('[data-testid="nts-finding-f-giro"]')
+    expect(row.exists()).toBe(true)
+    expect(row.text()).toContain('Giroversión')
+    expect(row.text()).toContain('23')
+    // The clinician's own words, not silently dropped because the catalog
+    // enumerates no codes for a `free_text` attribute to resolve against.
+    expect(row.text()).toContain(freeText)
+  })
+
+  it('K/L/M — a record mixing supported, unsupported and partial findings prints intact', async () => {
+    const rec = record({
+      findings: [
+        // Fully drawable, to prove the rest of the chart is unaffected.
+        finding({ id: 'f-ok', rule_id: '6.1.9', targets: [tooth('t-ok', 16)] }),
+        // Unsupported: no channel for a freehand shape.
+        finding({ id: 'f-frac', rule_id: '6.1.10', targets: [tooth('t-frac', 46)] }),
+        // Unsupported: a free_text attribute with no enumerated values.
+        finding({
+          id: 'f-giro', rule_id: '6.1.13',
+          attributes: { rotation_sense: 'mesial' }, targets: [tooth('t-giro', 23)]
+        }),
+        // Partial: the sigla draws, the fissure anatomy does not.
+        finding({
+          id: 'f-seal', rule_id: '6.1.35',
+          attributes: { condition_state: 'good' }, targets: [tooth('t-seal', 37)]
+        })
+      ]
+    })
+    route({ current: rec })
+    const wrapper = await shell()
+
+    // Screen: nothing threw, all four findings are listed.
+    for (const id of ['f-ok', 'f-frac', 'f-giro', 'f-seal']) {
+      expect(wrapper.find(`[data-testid="nts-finding-${id}"]`).exists(), id).toBe(true)
+    }
+
+    // Print: the document is not blank, and the supported finding still
+    // draws — its sigla is the catalog's own for 6.1.9.
+    const root = printRoot()!
+    expect(root.querySelector('[data-testid="nts-print-unavailable"]')).toBeNull()
+    expect(root.querySelector('[data-testid="nts-odontogram-chart"]')).not.toBeNull()
+    expect(root.textContent).toContain('FFP')
+
+    // Both unsupported findings are declared, by name, after Observaciones.
+    const fracture = root.querySelector('[data-testid="nts-print-declaration-f-frac"]')
+    const giroversion = root.querySelector('[data-testid="nts-print-declaration-f-giro"]')
+    expect(fracture?.getAttribute('data-completeness')).toBe('unsupported')
+    expect(fracture?.textContent).toContain('Fractura dental')
+    expect(giroversion?.getAttribute('data-completeness')).toBe('unsupported')
+    expect(giroversion?.textContent).toContain('Giroversión')
+
+    // The sealant stays partial — 05F.2a does not touch renderer coverage.
+    const sealant = root.querySelector('[data-testid="nts-print-declaration-f-seal"]')
+    expect(sealant?.getAttribute('data-completeness')).toBe('partial')
+    expect(sealant?.textContent).toContain('Sellantes')
+  })
+
+  it('O — mounting a record with fracture and giroversión issues no mutation', async () => {
+    const rec = record({
+      findings: [
+        finding({ id: 'f-frac', rule_id: '6.1.10', targets: [tooth('t-frac', 46)] }),
+        finding({
+          id: 'f-giro', rule_id: '6.1.13',
+          attributes: { rotation_sense: 'mesial' }, targets: [tooth('t-giro', 23)]
+        })
+      ]
+    })
+    route({ current: rec })
+    await shell()
+
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.patch).not.toHaveBeenCalled()
   })
 })

@@ -440,6 +440,133 @@ describe('summaries are generic, never per-rule formatters', () => {
 })
 
 // ---------------------------------------------------------------------------
+// NTS-05F.2a — a rule that declares nothing must describe as nothing,
+// never crash
+// ---------------------------------------------------------------------------
+//
+// `NtsRule.attributes` and `NtsRuleAttribute.values` are typed as always
+// present, and the live API keeps that promise: verified end-to-end against
+// the running backend (`GET /api/v1/odontogram/nts/catalogs/pe_nts_188_2022`)
+// for this ticket, 6.1.10 comes back with `"attributes":[]` and 6.1.13's
+// `rotation_sense` with `"values":[]` — never an absent key.
+//
+// The catalog's own *source* file is a different matter. It is the
+// pre-validation authoring format — the same file this suite's own
+// "the real catalog matches..." block below reads directly — and a rule or
+// attribute that declares nothing simply omits the key there. `6.1.10
+// Fractura dental` has no `attributes` key at all; `6.1.13 Giroversión`'s
+// `rotation_sense` (`kind: 'free_text'`) has no `values` key. Before this
+// ticket, `describeAttributes` read `rule?.attributes.map(...)` and
+// `definition?.values.find(...)` — optional chaining that only guards the
+// `rule?.`/`definition?.` step, not the property access right after it — so
+// either shape threw `Cannot read properties of undefined`.
+//
+// Fixtures below are the real rules, not synthetic ones: the whole point is
+// the exact shape the catalog source file has, which `makeRule`/`attribute`
+// (always filling `attributes: []`/`values: []`) cannot reproduce.
+
+describe('an attribute description is total for the catalog SOURCE file\'s shape', () => {
+  const catalog = JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), '../backend/app/modules/odontogram/nts/catalog/pe_nts_188_2022.json'),
+      'utf8'
+    )
+  ) as { rules: Array<Record<string, unknown>> }
+
+  function findRule(ruleId: string): NtsRule {
+    const found = catalog.rules.find(r => r.rule_id === ruleId)
+    if (!found) throw new Error(`fixture rule missing from catalog: ${ruleId}`)
+    // Deliberately typed as NtsRule despite omitting a field the type
+    // declares required — that omission is the real shape under test, and
+    // is exactly what `Object.prototype.hasOwnProperty` below confirms.
+    return found as unknown as NtsRule
+  }
+
+  const FRACTURE_RULE = findRule('6.1.10')
+  const GIROVERSION_RULE = findRule('6.1.13')
+  const SEALANT_RULE = findRule('6.1.35')
+
+  it('confirms the fixture shape these tests depend on', () => {
+    expect(Object.prototype.hasOwnProperty.call(FRACTURE_RULE, 'attributes')).toBe(false)
+    const rotationSense = (GIROVERSION_RULE.attributes as unknown as Array<Record<string, unknown>>)[0]
+    expect(rotationSense).toBeTruthy()
+    expect(rotationSense!.kind).toBe('free_text')
+    expect(Object.prototype.hasOwnProperty.call(rotationSense, 'values')).toBe(false)
+  })
+
+  it('C — a rule with no attributes key describes as no attributes, not a crash', () => {
+    expect(() => describeAttributes(FRACTURE_RULE, {})).not.toThrow()
+    expect(describeAttributes(FRACTURE_RULE, {})).toEqual([])
+  })
+
+  it('D — a free_text attribute with no values key does not throw', () => {
+    expect(() => describeAttributes(GIROVERSION_RULE, { rotation_sense: 'mesial' })).not.toThrow()
+  })
+
+  it('E — the free_text value recorded is shown verbatim, never dropped', () => {
+    const freeText = 'Giro de 45° hacia mesial, confirmado en dos citas.'
+    // `definition?.values?.find(...)` degrading to "nothing shown" would
+    // pass a naive not-throwing test while silently losing the clinician's
+    // own words — the exact failure this ticket refuses to accept.
+    expect(describeAttributes(GIROVERSION_RULE, { rotation_sense: freeText }))
+      .toEqual([{ name: 'rotation_sense', label: 'rotation_sense', value: freeText }])
+  })
+
+  it('F — an enumerated attribute (sealant) still resolves its catalog label', () => {
+    // Regression: the fix must not turn every attribute into raw text.
+    expect(describeAttributes(SEALANT_RULE, { condition_state: 'good' }))
+      .toEqual([{ name: 'condition_state', label: 'condition_state', value: 'Buen estado' }])
+  })
+
+  it('G — a stored key this rule does not declare renders raw, not blank', () => {
+    expect(describeAttributes(FRACTURE_RULE, { some_future_field: 'texto libre' }))
+      .toEqual([{ name: 'some_future_field', label: 'some_future_field', value: 'texto libre' }])
+  })
+
+  it('H — null, undefined and empty values never produce garbage strings', () => {
+    const described = describeAttributes(GIROVERSION_RULE, {
+      rotation_sense: null,
+      other: undefined,
+      empty: ''
+    })
+    expect(described).toHaveLength(3)
+    for (const row of described) {
+      expect(row.value).not.toBe('undefined')
+      expect(row.value).not.toBe('null')
+      expect(row.value).not.toContain('[object Object]')
+    }
+  })
+
+  it('the sibling attribute functions tolerate the same missing-key shape', () => {
+    // `describeAttributes` is the one the crashing screen and print paths
+    // call, but every function in this module that walks `rule.attributes`
+    // had the identical unguarded pattern.
+    expect(() => editableAttributes(FRACTURE_RULE)).not.toThrow()
+    expect(editableAttributes(FRACTURE_RULE)).toEqual([])
+
+    expect(() => initialAttributes(FRACTURE_RULE)).not.toThrow()
+    expect(initialAttributes(FRACTURE_RULE)).toEqual({})
+
+    expect(() => missingRequiredAttributes(FRACTURE_RULE, {})).not.toThrow()
+    expect(missingRequiredAttributes(FRACTURE_RULE, {})).toEqual([])
+
+    expect(() => activeSpecificationRequirements(FRACTURE_RULE, {})).not.toThrow()
+    expect(activeSpecificationRequirements(GIROVERSION_RULE, { rotation_sense: 'mesial' })).toEqual([])
+  })
+
+  it('P — no rule id ever appears in the production fix', () => {
+    // The guard is `?? []` on a field, not a branch on which rule this is.
+    const source = readFileSync(
+      resolve(process.cwd(), '../backend/app/modules/odontogram/frontend/utils/ntsFindingModel.ts'),
+      'utf8'
+    )
+    expect(source).not.toMatch(/rule_id\s*===\s*['"]6\.1\.\d+['"]/)
+    expect(source).not.toContain('\'6.1.10\'')
+    expect(source).not.toContain('\'6.1.13\'')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // the synthetic fixtures describe the real catalog
 // ---------------------------------------------------------------------------
 

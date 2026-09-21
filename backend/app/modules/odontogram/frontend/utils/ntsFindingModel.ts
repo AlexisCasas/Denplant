@@ -113,21 +113,63 @@ export function expandRange(order: readonly number[], from: number, to: number):
 // ---------------------------------------------------------------------------
 
 /**
+ * `rule.attributes` as an array, whatever the source actually sent.
+ *
+ * The type says this field is always an array, and the live API keeps that
+ * promise — every rule it serves carries `attributes: []` at minimum, never
+ * an absent key. But the catalog's own *source* file (the one this module's
+ * tests, and this file's own catalog-shape assertions, read directly with
+ * `JSON.parse`) is the pre-validation authoring format, and a rule with no
+ * attributes to declare simply omits the key there. `6.1.10 Fractura dental`
+ * is exactly that shape.
+ *
+ * One guard, used everywhere this module reads `rule.attributes`, so the
+ * functions below are correct for either shape without restating `?? []` at
+ * each call site and without weakening `NtsRule.attributes` to optional —
+ * which would be false of the contract this build actually depends on.
+ *
+ * Takes `rule` however a caller has it — `describeAttributes` accepts
+ * `NtsRule | null` for a finding whose rule this catalog does not name at
+ * all, which is a second, unrelated reason for an empty result.
+ */
+function ruleAttributes(rule: NtsRule | null | undefined): NtsRuleAttribute[] {
+  return rule?.attributes ?? []
+}
+
+/**
+ * An attribute definition's own enumerated codes, whatever the source sent.
+ *
+ * Mirrors {@link ruleAttributes}: the live API always includes `values: []`
+ * for an attribute that declares none — a `free_text` attribute such as
+ * 6.1.13's `rotation_sense` states no codes because the norm enumerates none
+ * — but the catalog source file omits the key entirely for that case.
+ *
+ * `attribute` itself may be missing too: a code `finding.attributes` carries
+ * for a name this rule's catalog entry never declared.
+ */
+function attributeValues(
+  attribute: NtsRuleAttribute | null | undefined
+): NtsRuleAttribute['values'] {
+  return attribute?.values ?? []
+}
+
+/**
  * Attributes the clinician actually chooses.
  *
  * A `fixed` attribute is a constant the rule already carries (its sigla), so
  * it is filled in rather than asked for.
  */
 export function editableAttributes(rule: NtsRule): NtsRuleAttribute[] {
-  return rule.attributes.filter(attribute => attribute.kind !== 'fixed')
+  return ruleAttributes(rule).filter(attribute => attribute.kind !== 'fixed')
 }
 
 /** Initial values: every `fixed` attribute pre-filled, nothing else guessed. */
 export function initialAttributes(rule: NtsRule): Record<string, unknown> {
   const values: Record<string, unknown> = {}
-  for (const attribute of rule.attributes) {
-    if (attribute.kind === 'fixed' && attribute.values.length === 1) {
-      values[attribute.name] = attribute.values[0]!.code
+  for (const attribute of ruleAttributes(rule)) {
+    const codes = attributeValues(attribute)
+    if (attribute.kind === 'fixed' && codes.length === 1) {
+      values[attribute.name] = codes[0]!.code
     }
     if (attribute.kind === 'enum_multi') values[attribute.name] = []
   }
@@ -152,7 +194,7 @@ export function missingRequiredAttributes(
   rule: NtsRule,
   attributes: Record<string, unknown>
 ): NtsRuleAttribute[] {
-  return rule.attributes.filter(
+  return ruleAttributes(rule).filter(
     attribute => attribute.required && isBlank(attributes[attribute.name])
   )
 }
@@ -172,10 +214,10 @@ export function activeSpecificationRequirements(
 ) {
   const active = rule.specification_requirement ? [rule.specification_requirement] : []
 
-  for (const attribute of rule.attributes) {
+  for (const attribute of ruleAttributes(rule)) {
     const selected = attributes[attribute.name]
     const codes = Array.isArray(selected) ? selected : [selected]
-    for (const value of attribute.values) {
+    for (const value of attributeValues(attribute)) {
       if (value.specification_requirement && codes.includes(value.code)) {
         active.push(value.specification_requirement)
       }
@@ -345,23 +387,58 @@ export function ruleFor(rules: readonly NtsRule[], finding: NtsFinding): NtsRule
 }
 
 /**
+ * One stored code, rendered for a human — never a rule id in sight.
+ *
+ * An enumerated code (the definition lists `values`) resolves through the
+ * catalog's own label, exactly as before. Everything else is shown as the
+ * clinician recorded it: `free_text` because the norm enumerates no values
+ * for it to resolve against (6.1.13's `rotation_sense` is the shipped
+ * example — "el sentido de la giroversión" is an observed datum, not a
+ * choice from a list); an unrecognised code for the same reason a code an
+ * older client wrote and this catalog no longer defines should not vanish.
+ * Either way the branch is on *shape* — does a matching value exist — never
+ * on which rule or attribute this is.
+ *
+ * `null`/`undefined` render as `''`, not the strings `"null"`/`"undefined"`;
+ * an object a definition cannot explain (malformed data, not a normal shape)
+ * still renders as something inspectable rather than `[object Object]` or a
+ * thrown error.
+ */
+function describeCode(definition: NtsRuleAttribute | undefined, code: unknown): string {
+  if (code === null || code === undefined) return ''
+  const known = attributeValues(definition).find(v => v.code === code)
+  if (known) return known.name
+  if (typeof code === 'string') return code
+  if (typeof code === 'number' || typeof code === 'boolean') return String(code)
+  // Reachable only for a value this API never sends: `attributes` is
+  // deserialized JSON, which cannot contain a cycle, so `JSON.stringify`
+  // cannot throw on it. Kept as a last resort rather than an invented label.
+  return JSON.stringify(code)
+}
+
+/**
  * A generic, human-readable rendering of a finding's attributes.
  *
  * Built from the attribute definitions plus the stored values — never from a
  * per-rule formatter, which would be the 38 rules leaking into the frontend
- * one helper at a time. An enum shows the catalog's own label for the code.
+ * one helper at a time. Total for whatever the catalog actually sends: a
+ * rule with no attributes to declare (`attributes` absent — 6.1.10), an
+ * attribute with no codes to enumerate (`values` absent — 6.1.13), a key
+ * `finding.attributes` carries that this catalog does not describe at all,
+ * all render without throwing and without losing the clinician's own value.
  */
 export function describeAttributes(
   rule: NtsRule | null,
   attributes: Record<string, unknown>
 ): Array<{ name: string, label: string, value: string }> {
-  const definitions = new Map(rule?.attributes.map(a => [a.name, a]) ?? [])
+  const definitions = new Map(ruleAttributes(rule).map(a => [a.name, a]))
 
   return Object.entries(attributes).map(([name, raw]) => {
     const definition = definitions.get(name)
     const codes = Array.isArray(raw) ? raw : [raw]
     const rendered = codes
-      .map(code => definition?.values.find(v => v.code === code)?.name ?? String(code))
+      .map(code => describeCode(definition, code))
+      .filter(value => value.length > 0)
       .join(', ')
     return { name, label: definition?.name ?? name, value: rendered }
   })
