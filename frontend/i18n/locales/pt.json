@@ -454,6 +454,276 @@
   },
   "odontogram": {
     "title": "Odontograma",
+    "profile": {
+      "label": "Formato do odontograma",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Peru"
+      },
+      "updateError": "Não foi possível alterar o formato do odontograma",
+      "nts": {
+        "title": "Odontograma MINSA Peru",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnóstico",
+        "evolution": "Evolução",
+        "discharge": "Alta",
+        "other": "Outra"
+      },
+      "chart": {
+        "title": "Odontograma",
+        "tooth": "Dente {fdi}",
+        "deciduousTooth": "Dente decíduo {fdi}",
+        "permanentDentition": "Dentição permanente",
+        "deciduousDentition": "Dentição decídua",
+        "permanentUpper": "Permanente superior",
+        "deciduousUpper": "Decídua superior",
+        "deciduousLower": "Decídua inferior",
+        "permanentLower": "Permanente inferior",
+        "upper": "Superior",
+        "lower": "Inferior",
+        "readonly": "Apenas leitura",
+        "noRecord": "Estrutura do formulário oficial. Não corresponde a nenhum registo clínico.",
+        "findingsPending": "{count} achado(s) não desenhado(s) por completo",
+        "findingsPendingHint": "As suas marcas precisam de primitivas de desenho que chegam numa fase posterior. Todos permanecem na lista abaixo.",
+        "findingRendererPending": "Representação de achados pendente",
+        "siglasHidden": "{count} sigla(s) não cabem na sua caixa",
+        "siglasHiddenHint": "A caixa mostra «+n» onde não há espaço. Nada é removido do registo; a lista completa está abaixo."
+      },
+      "editor": {
+        "findings": "Achados",
+        "noFindings": "Sem achados registados.",
+        "newFinding": "Novo achado",
+        "editFinding": "Editar achado",
+        "addFinding": "Adicionar achado",
+        "saveFinding": "Guardar achado",
+        "confirmFinding": "Confirmar achado",
+        "removeFinding": "Retirar achado",
+        "removeExplanation": "O achado é retirado deste rascunho. O registo mantém a sua trilha de auditoria.",
+        "partialTitle": "Edição aplicada parcialmente",
+        "partialBody": "Os atributos foram guardados, mas os alvos não. Reveja os alvos do achado: o registo já mudou e não é revertido automaticamente.",
+        "refreshFailedTitle": "O achado foi guardado, mas não foi possível atualizar a vista",
+        "refreshFailedBody": "A alteração já está no servidor. Não a envie de novo — tente atualizar novamente.",
+        "refreshRetry": "Tentar atualizar novamente",
+        "refreshing": "A atualizar",
+        "edit": "Editar",
+        "searchFindings": "Procurar achado",
+        "noMatches": "Nenhum achado corresponde à procura.",
+        "targets": "Alvo",
+        "selectedTeeth": "Dentes selecionados",
+        "selectedArches": "Arcadas",
+        "anchors": "Referências",
+        "rangeSpan": "Intervalo",
+        "toothCount": "{count} dente(s)",
+        "roles": "Papéis dos dentes",
+        "noRole": "Sem papel",
+        "pickSubject": "Escolher dentes",
+        "pickAnchor": "Escolher referências",
+        "changeSelection": "Alterar seleção",
+        "changeReferences": "Alterar referências",
+        "doneSelecting": "Terminar seleção",
+        "retargetSubjectHint": "Selecione os dentes no odontograma. A seleção anterior é substituída e nada é guardado até premir Guardar.",
+        "retargetAnchorHint": "Selecione os dentes vizinhos que localizam o achado. Nada é guardado até premir Guardar.",
+        "rolesOptional": "Papel clínico dos dentes (opcional)",
+        "rolesOptionalHint": "Atribuir apenas quando aplicável.",
+        "unnumberedSubject": "Este dente não tem número FDI: é localizado pelos dentes vizinhos.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "Por rever",
+        "unknownRule": "Esta versão não reconhece a regra deste achado.",
+        "unknownRuleShort": "Regra desconhecida",
+        "attributeRequired": "Este dado é obrigatório.",
+        "needsClinicalReview": "O catálogo marca este dado como pendente de revisão clínica.",
+        "specificationRequired": "Este achado exige uma Especificação antes de finalizar o odontograma.",
+        "specificationAdvisory": "O catálogo sugere registar informação adicional em Especificaciones.",
+        "pick": {
+          "tooth": "Selecione {count} dente(s) no odontograma.",
+          "surface": "Selecione o dente no odontograma e indique as superfícies.",
+          "pair": "Selecione os dois dentes no odontograma.",
+          "range": "Selecione o primeiro e o último dente do intervalo.",
+          "archOne": "Selecione a arcada em tratamento.",
+          "archOneOrBoth": "Selecione uma arcada ou ambas.",
+          "unnumbered": "Selecione os {count} dentes vizinhos que localizam o achado."
+        },
+        "problem": {
+          "subjectCount": "São necessários {expected} dente(s); há {count}.",
+          "rangeRequired": "Selecione o intervalo de dentes.",
+          "duplicateTooth": "Um dente está repetido.",
+          "anchorCount": "São necessárias {expected} referência(s); há {count}.",
+          "anchorDistinct": "As referências devem ser dentes distintos.",
+          "archRequired": "Selecione uma arcada.",
+          "archExactlyOne": "Esta regra cobre exatamente uma arcada.",
+          "archOneOrBoth": "Esta regra cobre uma arcada ou ambas.",
+          "roleMin": "O papel {role} exige pelo menos {min} dente(s).",
+          "roleMax": "O papel {role} admite no máximo {max} dente(s)."
+        },
+        "a11y": {
+          "select": "Selecionar {tooth}",
+          "selected": "{tooth}, selecionado",
+          "anchorSelected": "{tooth}, selecionado como referência"
+        }
+      },
+      "status": {
+        "draft": "Rascunho",
+        "finalized": "Finalizado",
+        "discarded": "Descartado",
+        "superseded": "Corrigido"
+      },
+      "field": {
+        "stage": "Etapa",
+        "stageLabel": "Nome da etapa",
+        "finalizedAt": "Finalizado em",
+        "openedAt": "Aberto em",
+        "recordedBy": "Registado por",
+        "findings": "Achados",
+        "discardReason": "Motivo",
+        "discardedAt": "Descartado em",
+        "normVersion": "Versão normativa"
+      },
+      "actions": {
+        "createDraft": "Criar rascunho",
+        "finalize": "Finalizar",
+        "discardDraft": "Descartar rascunho"
+      },
+      "current": {
+        "title": "Registo vigente"
+      },
+      "draft": {
+        "title": "Rascunho em edição"
+      },
+      "history": {
+        "title": "Histórico de registos",
+        "returnToCurrent": "Voltar ao odontograma atual",
+        "viewing": "No ecrã",
+        "viewingTitle": "Está a ver um odontograma do histórico",
+        "viewingBody": "Apresentado tal como foi registado, com a versão normativa que lhe corresponde. Não pode ser alterado.",
+        "superseded": "Substituído",
+        "empty": "Sem registos anteriores.",
+        "loadFailedTitle": "Não foi possível abrir este odontograma",
+        "catalogFailedTitle": "Não foi possível carregar a versão normativa deste odontograma",
+        "catalogFailedBody": "Este registo foi feito com a versão {version}, que não está disponível. Nada é desenhado: lê-lo com outra versão mostraria achados que o registo não contém.",
+        "isCurrent": "Odontograma atual"
+      },
+      "empty": {
+        "title": "Não existe um odontograma MINSA registado para este paciente."
+      },
+      "create": {
+        "hint": "A etapa é metadado do registo; a norma não exige um conjunto fixo."
+      },
+      "discard": {
+        "explanation": "O rascunho é descartado e deixa de ser editável. Não é eliminado: fica registado com o seu motivo."
+      },
+      "carriedForward": {
+        "title": "{count} achado(s) transferido(s) por rever",
+        "hint": "Foram copiados de um registo anterior. Confirme cada um na lista de achados antes de finalizar."
+      },
+      "conflict": {
+        "title": "O odontograma mudou noutra sessão",
+        "version": "A informação foi atualizada; reveja antes de tentar de novo.",
+        "draft": "Já existe um rascunho aberto para este paciente.",
+        "state": "O rascunho já foi finalizado ou descartado. A informação foi atualizada."
+      },
+      "error": {
+        "loadTitle": "Não foi possível carregar o odontograma MINSA",
+        "clinicalTitle": "Não foi possível concluir a operação",
+        "normUnavailableTitle": "Versão normativa indisponível",
+        "normUnavailable": "Esta versão normativa não está disponível nesta instalação."
+      },
+      "specifications": {
+        "title": "Especificações",
+        "add": "Adicionar especificação",
+        "edit": "Editar especificação",
+        "remove": "Remover especificação",
+        "removeExplanation": "A entrada deixa de constar no odontograma. O registo mantém o seu rasto de auditoria.",
+        "textLabel": "Texto da especificação",
+        "emptyDraft": "Ainda não há especificações. Use «Adicionar especificação» para registar o que não cabe nos quadros.",
+        "emptyFinalized": "Sem especificações.",
+        "readonly": "Este registo está finalizado: as especificações são apresentadas apenas para leitura.",
+        "linkedTeeth": "Sobre o(s) dente(s) {teeth}",
+        "linkedFinding": "Associada a um achado deste registo",
+        "linkedUnknown": "Associada a um achado que não está carregado",
+        "overflowTitle": "Há informação que não cabe visualmente num ou mais quadros",
+        "overflowBody": "Os achados continuam registados e aparecem na lista. Se precisar de os detalhar, pode escrevê-los aqui em Especificações."
+      },
+      "observations": {
+        "title": "Observações",
+        "label": "Observações",
+        "hint": "Achados clínicos que a nomenclatura do odontograma não contempla.",
+        "empty": "Sem observações.",
+        "readonly": "Este registo está finalizado: as observações são apresentadas apenas para leitura."
+      },
+      "text": {
+        "refreshFailedTitle": "As alterações foram guardadas, mas não foi possível atualizar a vista",
+        "refreshFailedBody": "O registo no servidor já contém as alterações. Volte a lê-lo para as ver; nada será enviado de novo."
+      },
+      "unsaved": {
+        "title": "Há alterações por guardar",
+        "body": "Se continuar, o texto que escreveu e não guardou será perdido.",
+        "stay": "Continuar a editar",
+        "discard": "Descartar e continuar",
+        "leavePage": "O odontograma tem alterações por guardar. Sair mesmo assim?"
+      },
+      "print": {
+        "title": "Odontograma",
+        "unavailable": "Não é possível compor o documento: a versão normativa deste registo não está disponível.",
+        "patient": "Paciente",
+        "document": "Documento",
+        "date": "Data",
+        "specifications": "Especificações",
+        "observations": "Observações",
+        "emptySpecifications": "Sem especificações registadas.",
+        "emptyObservations": "Sem observações registadas.",
+        "incompleteFindings": "Achados não representados integralmente",
+        "systemNote": "Nota gerada pelo DenPlant. Não faz parte do gráfico normativo.",
+        "unsupportedCopy": "{target}: {label} — registado, não representado no gráfico.",
+        "partialCopy": "{target}: {label} — representação gráfica parcial.",
+        "professional": "Profissional responsável",
+        "registeredBy": "Registado por",
+        "role": "Função",
+        "professionalId": "Cédula / ID profissional",
+        "technical": "Dados técnicos do registo",
+        "recordId": "Registo",
+        "normVersion": "Versão normativa",
+        "status": "Estado",
+        "contentFingerprint": "Impressão do conteúdo",
+        "fingerprintUnavailable": "Não disponível para este estado.",
+        "print": "Imprimir",
+        "printDraft": "Imprimir rascunho",
+        "printDiscarded": "Imprimir registo descartado",
+        "prepare": "Preparar impressão",
+        "prepareHint": "A caixa de diálogo do navegador controla estas opções. Confirme-as antes de imprimir.",
+        "paper": "Papel: A4",
+        "orientation": "Orientação: vertical",
+        "scale": "Escala: 100 %",
+        "color": "Imprima a cores",
+        "colorHint": "O vermelho e o azul distinguem o estado clínico de cada achado.",
+        "doNotFit": "Não use «Ajustar à página»: reduz o gráfico abaixo do tamanho mínimo de coroa exigido pela norma.",
+        "openPrintDialog": "Abrir caixa de diálogo de impressão",
+        "cancel": "Cancelar",
+        "blockedTitle": "Ainda não é possível imprimir",
+        "dirtyBlocked": "Guarde ou descarte as suas alterações antes de imprimir. A folha é composta a partir do registo guardado.",
+        "writingBlocked": "Há uma alteração em curso. Aguarde que termine para imprimir.",
+        "refreshBlocked": "Atualize o registo antes de imprimir: a alteração foi guardada, mas não foi possível relê-la.",
+        "conflictBlocked": "Outra sessão alterou este odontograma. Reveja o aviso antes de imprimir.",
+        "loadingBlocked": "A carregar o registo. Aguarde que termine para imprimir.",
+        "unsafePrint": "O odontograma não pode ser impresso neste estado. Volte à aplicação, guarde ou atualize o registo e tente novamente.",
+        "draftQualification": "RASCUNHO",
+        "draftNotFinal": "Não é o registo definitivo.",
+        "pendingCarriedForward": "Este rascunho contém {count} achado(s) transitado(s) pendente(s) de revisão.",
+        "discardedQualification": "DESCARTADO",
+        "discardedHint": "Este registo foi descartado e não é o odontograma em vigor.",
+        "discardReason": "Motivo do descarte",
+        "supersededQualification": "REGISTO SUBSTITUÍDO",
+        "supersededHint": "Existe um registo posterior para este paciente.",
+        "incompleteWarning": "Este registo contém achados que o DenPlant não representa integralmente no gráfico.",
+        "incompleteNote": "A folha impressa inclui uma nota do sistema que os identifica.",
+        "partialCount": "Representação parcial: {count}",
+        "unsupportedCount": "Sem representação no gráfico: {count}",
+        "additionalDetailsHint": "Se precisar de registar detalhe clínico adicional, utilize as Especificações quando aplicável."
+      }
+    },
     "tooth": "Dente",
     "globals": {
       "category": "Boca inteira",
@@ -852,6 +1122,19 @@
     "followup": {
       "title": "Ações pós-consulta"
     },
+    "completionGate": {
+      "title": "Quais tratamentos foram realizados?",
+      "description": "Marque os tratamentos do plano concluídos nesta consulta. Os que ficarem desmarcados continuam pendentes no plano.",
+      "evolutionLabel": "Evolução clínica",
+      "evolutionPlaceholder": "Descreva o que foi feito nesta consulta (opcional)"
+    },
+    "noActivePlans": "Não há planos de tratamento vigentes.",
+    "noPendingTreatmentsInPlan": "Este plano não tem tratamentos pendentes.",
+    "selectPlan": "Plano de tratamento",
+    "pendingTreatments": "Tratamentos pendentes",
+    "historicalTreatments": "Tratamentos já associados a esta consulta",
+    "historicalTreatmentBadge": "Concluído",
+    "sessionN": "Sessão {n}",
     "created": "Consulta criada",
     "saved": "Consulta guardada",
     "updated": "Consulta atualizada",

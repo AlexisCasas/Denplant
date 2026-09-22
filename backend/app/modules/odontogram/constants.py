@@ -448,3 +448,31 @@ def get_tooth_type(tooth_number: int) -> ToothType:
 def is_valid_tooth_number(tooth_number: int) -> bool:
     """Check if a tooth number is valid according to FDI notation."""
     return tooth_number in ALL_TEETH
+
+
+# ---------------------------------------------------------------------------
+# Odontogram profiles (NTS phase)
+# ---------------------------------------------------------------------------
+
+
+class OdontogramProfile(StrEnum):
+    """Which odontogram format a user works with inside a clinic.
+
+    A profile is a *representation and recording* strategy, not a separate
+    clinical domain: patients, catalog, treatment plans and budgets stay
+    shared across profiles. Absence of a stored preference means
+    ``ORIGINAL`` — nothing is backfilled.
+    """
+
+    ORIGINAL = "original"
+    PE_NTS_188_2022 = "pe_nts_188_2022"
+
+
+ODONTOGRAM_PROFILES: Final[list[str]] = [p.value for p in OdontogramProfile]
+
+DEFAULT_ODONTOGRAM_PROFILE: Final[str] = OdontogramProfile.ORIGINAL.value
+
+
+def is_valid_odontogram_profile(profile: str) -> bool:
+    """Check if a profile identifier is supported."""
+    return profile in ODONTOGRAM_PROFILES

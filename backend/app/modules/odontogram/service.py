@@ -19,11 +19,19 @@ from app.modules.catalog.pricing import (
 
 from .constants import (
     ATOMIC_MULTI_TOOTH_TYPES,
+    DEFAULT_ODONTOGRAM_PROFILE,
     ToothCondition,
     TreatmentStatus,
     get_tooth_type,
+    is_valid_odontogram_profile,
 )
-from .models import OdontogramHistory, ToothRecord, Treatment, TreatmentTooth
+from .models import (
+    OdontogramHistory,
+    OdontogramUserPreference,
+    ToothRecord,
+    Treatment,
+    TreatmentTooth,
+)
 
 
 def build_treatment_response(treatment: Treatment) -> dict:
@@ -887,3 +895,49 @@ class TreatmentService:
         await db.flush()
         await event_bus.publish(EventType.ODONTOGRAM_TREATMENT_DELETED, event_data)
         return True
+
+
+class OdontogramPreferenceService:
+    """Per-user, per-clinic odontogram profile preference.
+
+    Read is non-destructive: a user without a stored row simply gets the
+    default profile back, no row is created. Rows appear only when someone
+    actually chooses a profile.
+    """
+
+    @staticmethod
+    async def _get_row(
+        db: AsyncSession, clinic_id: UUID, user_id: UUID
+    ) -> OdontogramUserPreference | None:
+        result = await db.execute(
+            select(OdontogramUserPreference).where(
+                OdontogramUserPreference.clinic_id == clinic_id,
+                OdontogramUserPreference.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_profile(db: AsyncSession, clinic_id: UUID, user_id: UUID) -> str:
+        """Return the effective profile; never writes."""
+        row = await OdontogramPreferenceService._get_row(db, clinic_id, user_id)
+        return row.profile if row is not None else DEFAULT_ODONTOGRAM_PROFILE
+
+    @staticmethod
+    async def set_profile(
+        db: AsyncSession, clinic_id: UUID, user_id: UUID, profile: str
+    ) -> str:
+        """Upsert the caller's own preference. Raises ValueError if unsupported."""
+        if not is_valid_odontogram_profile(profile):
+            raise ValueError(f"Unsupported odontogram profile: {profile}")
+
+        row = await OdontogramPreferenceService._get_row(db, clinic_id, user_id)
+        if row is None:
+            row = OdontogramUserPreference(
+                clinic_id=clinic_id, user_id=user_id, profile=profile
+            )
+            db.add(row)
+        else:
+            row.profile = profile
+        await db.flush()
+        return row.profile

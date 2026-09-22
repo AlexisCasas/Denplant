@@ -345,6 +345,15 @@ docker-compose exec backend python -m pytest --cov=app
 
 Fixtures from `conftest.py`: `db_session`, `client`, `auth_headers`.
 
+**Tests run against their own database.** `db_session` creates and drops the
+whole schema per test, so it must never point at `dental_clinic`.
+`TEST_DATABASE_URL` designates the disposable database (`dental_clinic_test`);
+`conftest` redirects `settings.DATABASE_URL` to it before `app.database`
+builds the shared engine, so event handlers write there too. If it is unset —
+or resolves to the same host/port/database as `DATABASE_URL` — the suite
+**aborts** instead of wiping your data (`tests/db_isolation.py`). One-time
+setup: `./scripts/create-test-db.sh` (see `.env.example`).
+
 ```python
 @pytest.mark.asyncio
 async def test_create_patient(client: AsyncClient, auth_headers: dict):
@@ -374,7 +383,8 @@ DEMO_MODE=false           # public demo: blocks user edits/removal + module life
 
 ## Troubleshooting
 
-- **"relation does not exist"** / tables wiped after tests: `./scripts/reset-db.sh` then `./scripts/seed-demo.sh`. Manual fallback: `DELETE FROM alembic_version;` then `python -m app.cli db upgrade`.
+- **"relation does not exist"** / tables wiped: `./scripts/reset-db.sh` then `./scripts/seed-demo.sh`. Manual fallback: `DELETE FROM alembic_version;` then `python -m app.cli db upgrade`. (Tests no longer cause this — see Testing above; they abort rather than touch `dental_clinic`.)
+- **Tests abort with `DatabaseIsolationError`**: `TEST_DATABASE_URL` is missing or points at the dev database. Run `./scripts/create-test-db.sh` and set it (`.env.example`). This is the guard working, not a bug.
 - **Frontend changes not showing**: `docker-compose up -d --build frontend`.
 - **Permission denied but should have access**: check `clinic_memberships` row, exact permission string, `/me` payload, then re-login.
 

@@ -861,6 +861,7 @@ class TreatmentPlanService:
         user_id: UUID,
         completed_without_appointment: bool = False,
         notes: str | None = None,
+        require_active_plan: bool = True,
     ) -> PlannedTreatmentItem | None:
         """Mark one session of a plan item as completed.
 
@@ -869,17 +870,26 @@ class TreatmentPlanService:
         session, the parent item is finalized: status flips to
         ``completed``, the Treatment is performed, and the existing
         ``treatment_plan.treatment_completed`` audit/recall path runs.
+
+        ``require_active_plan`` gates the money-booking risk from issue
+        #167 (completing before acceptance books catalog, not quoted,
+        prices) for callers reached through an explicit user action on
+        the plan/session UI. The odontogram-first and appointment-completed
+        paths pass ``False`` — they record a clinical fact that already
+        happened and must not fail the appointment just because the
+        linked plan hasn't been through budget acceptance yet.
         """
         item = await TreatmentPlanService._load_item_with_sessions(db, clinic_id, plan_id, item_id)
         if not item:
             return None
 
-        # Money is booked on completion, so the plan must be past quote
-        # acceptance: sessions are repriced to the accepted budget only
-        # then. Odontogram-first / appointment paths are not gated here.
-        plan = await db.get(TreatmentPlan, plan_id)
-        if not plan or plan.status != "active":
-            raise ValueError("Plan must be active to complete treatments")
+        if require_active_plan:
+            # Money is booked on completion, so the plan must be past quote
+            # acceptance: sessions are repriced to the accepted budget only
+            # then.
+            plan = await db.get(TreatmentPlan, plan_id)
+            if not plan or plan.status != "active":
+                raise ValueError("Plan must be active to complete treatments")
 
         session = next((s for s in item.sessions if s.id == session_id), None)
         if not session:
@@ -1030,6 +1040,7 @@ class TreatmentPlanService:
         user_id: UUID,
         completed_without_appointment: bool = True,
         notes: str | None = None,
+        require_active_plan: bool = True,
     ) -> PlannedTreatmentItem | None:
         """Back-compat shim: complete the next pending session of an item.
 
@@ -1037,6 +1048,14 @@ class TreatmentPlanService:
         For single-session items this behaves like the legacy flow. For
         multi-session items it advances one session per call — callers
         targeting a specific session should use ``complete_session``.
+
+        Also the entry point for the appointment-completed path: a visit
+        executes at most one session's worth of work per item, so
+        "advance the next pending session" is the correct, unambiguous
+        reading of "which session did this appointment do" without
+        needing a session_id on ``AppointmentTreatment``.
+        ``require_active_plan=False`` for that caller — see
+        ``complete_session``.
         """
         item = await TreatmentPlanService._load_item_with_sessions(db, clinic_id, plan_id, item_id)
         if not item:
@@ -1060,6 +1079,7 @@ class TreatmentPlanService:
             user_id=user_id,
             completed_without_appointment=completed_without_appointment,
             notes=notes,
+            require_active_plan=require_active_plan,
         )
 
     @staticmethod

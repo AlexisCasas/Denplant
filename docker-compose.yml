@@ -21,6 +21,10 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dental_clinic}
+      # Database pytest may create/drop schema in. Deliberately a different
+      # database from DATABASE_URL: the suite wipes whatever it points at
+      # (INFRA-01). Provision it once with ./scripts/create-test-db.sh.
+      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_TEST_DB:-dental_clinic_test}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}

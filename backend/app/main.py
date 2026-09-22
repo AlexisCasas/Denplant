@@ -2,7 +2,7 @@
 
 import json
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -16,9 +16,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.auth.financial_visibility import strip_financial_fields
 from app.core.auth.router import limiter
 from app.core.auth.router import router as auth_router
-from app.core.auth.financial_visibility import strip_financial_fields
 from app.core.log_context import (
     new_request_id,
     reset_request_context,
@@ -159,9 +159,7 @@ async def financial_response_middleware(request: Request, call_next):
 
     body = b"".join([chunk async for chunk in response.body_iterator])
     headers = {
-        key: value
-        for key, value in response.headers.items()
-        if key.lower() != "content-length"
+        key: value for key, value in response.headers.items() if key.lower() != "content-length"
     }
     try:
         payload = json.loads(body)
@@ -204,11 +202,26 @@ def _cors_headers(request: Request) -> dict[str, str]:
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    """Handler for HTTP exceptions using standard ErrorResponse format."""
-    error_response = ErrorResponse(
-        message=str(exc.detail),
-        errors=[str(exc.detail)] if exc.detail else [],
-    )
+    """Handler for HTTP exceptions using standard ErrorResponse format.
+
+    A ``detail`` that is a mapping carrying ``message`` / ``errors`` is
+    passed through, so a handler can report several validation problems at
+    once instead of collapsing them into one string. Any other ``detail``
+    behaves exactly as before.
+    """
+    detail = exc.detail
+    if isinstance(detail, Mapping) and ("message" in detail or "errors" in detail):
+        message = str(detail.get("message") or detail.get("code") or "Error")
+        errors = [str(e) for e in detail.get("errors") or []] or [message]
+        code = detail.get("code")
+        error_response = ErrorResponse(
+            message=message, errors=errors, code=str(code) if code else None
+        )
+    else:
+        error_response = ErrorResponse(
+            message=str(detail),
+            errors=[str(detail)] if detail else [],
+        )
     headers = dict(exc.headers or {})
     headers.update(_cors_headers(request))
     return JSONResponse(

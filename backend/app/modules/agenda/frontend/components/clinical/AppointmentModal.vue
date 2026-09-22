@@ -323,9 +323,11 @@ watch(() => props.open, async (isOpen) => {
         completed_without_appointment: false,
         completed_at: undefined,
         completed_by: undefined,
+        assigned_professional_id: t.assigned_professional_id ?? null,
         notes: undefined,
         created_at: '',
         updated_at: '',
+        sessions: t.sessions,
         treatment: {
           id: '',
           clinical_type: 'crown',
@@ -349,6 +351,11 @@ watch(() => props.open, async (isOpen) => {
               names: t.names,
               default_price: t.default_price != null ? String(t.default_price) : null
             }
+          : undefined,
+        // Lets PlannedTreatmentSelector pre-select the originating plan
+        // in edit mode instead of leaving the picker unresolved.
+        treatment_plan: t.plan_id
+          ? { id: t.plan_id, plan_number: t.plan_number ?? '', status: 'active' }
           : undefined
       }))
     } else {
@@ -699,6 +706,7 @@ function openPatientFile() {
                 <PlannedTreatmentSelector
                   v-model="selectedTreatments"
                   :patient-id="selectedPatient?.id"
+                  :professionals="professionals"
                 />
               </div>
             </section>

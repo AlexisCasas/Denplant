@@ -1222,8 +1222,11 @@ async def test_complete_first_session_does_not_finalize_item(
         assert session_events[0]["amount"] == "200.00"
         assert treatment_events == []
     finally:
-        event_bus._handlers.pop("treatment_plan.item_session_completed", None)  # noqa: SLF001
-        event_bus._handlers.pop("treatment_plan.treatment_completed", None)  # noqa: SLF001
+        # unsubscribe (not _handlers.pop) — pop would also remove the
+        # module handlers (payments, patient_timeline, recalls) registered
+        # at startup and poison later tests in the same pytest session.
+        event_bus.unsubscribe("treatment_plan.item_session_completed", _capture)
+        event_bus.unsubscribe("treatment_plan.treatment_completed", _capture)
 
 
 @pytest.mark.asyncio
@@ -1254,7 +1257,7 @@ async def test_complete_last_session_finalizes_item(
         assert item["status"] == "completed"
         assert len(events) == 1  # treatment_completed fires exactly once
     finally:
-        event_bus._handlers.pop("treatment_plan.treatment_completed", None)  # noqa: SLF001
+        event_bus.unsubscribe("treatment_plan.treatment_completed", _capture)
 
 
 @pytest.mark.asyncio
@@ -1292,7 +1295,7 @@ async def test_cancel_session_blocks_earned(
         # Only the completed session fired an earned event; cancelled didn't
         assert len(session_events) == 1
     finally:
-        event_bus._handlers.pop("treatment_plan.item_session_completed", None)  # noqa: SLF001
+        event_bus.unsubscribe("treatment_plan.item_session_completed", _capture)
 
 
 @pytest.mark.asyncio

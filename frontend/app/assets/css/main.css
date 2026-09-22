@@ -342,3 +342,297 @@ body {
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
+
+/* ============================================================================
+   NTS N.° 188 clinical findings — the only two colours the norm allows
+   ============================================================================
+   §5.12-5.13: blue marks a finding in good state or a non-pathological
+   characteristic; red marks a bad state, a temporary one, or a pathological
+   characteristic. §5.17 adds that the chart itself prints in black and that
+   red and blue belong exclusively to the findings.
+
+   These are deliberately NOT --color-success-* / --color-danger-*. Those are
+   product status colours and someone will re-tune them one day; here blue
+   means "good", which inverts the usual convention, and a well-meant change to
+   an error token must never be able to repaint a clinical record. They are
+   also not tied to --color-primary for the same reason.
+
+   The norm states the two colour names and no RGB, so the exact values are a
+   UI decision: chosen to stay legible on both grounds and to survive printing.
+   They do not change with the theme beyond what legibility requires — a red
+   finding is red in dark mode too.
+   ============================================================================ */
+
+:root {
+  --color-nts-finding-good: #1D4ED8;
+  --color-nts-finding-bad: #C81E1E;
+}
+
+.dark {
+  /* Lifted for contrast against the dark canvas; still unmistakably blue/red. */
+  --color-nts-finding-good: #60A5FA;
+  --color-nts-finding-bad: #F87171;
+}
+
+@media print {
+  /* Print is monochrome-hostile territory: pin the ink regardless of theme. */
+  :root,
+  .dark {
+    --color-nts-finding-good: #0000CC;
+    --color-nts-finding-bad: #CC0000;
+  }
+}
+
+/* ============================================================================
+   NTS print layout — the official A4 sheet (NTS-05F.2)
+   ============================================================================
+   Every print rule for the odontogram lives here, in one block, rather than
+   as a dozen `@media print` fragments scattered across components. There is
+   one printed document in this application and it is worth being able to read
+   its whole definition at once.
+
+   The strategy is **isolation, not suppression**. The screen application is a
+   sidebar, a sticky header, tabs, a shell full of buttons, modals and toasts;
+   hiding those one by one would be a list that silently goes out of date the
+   next time somebody adds a control. Instead the print document is teleported
+   to `<body>` as its own root, and printing hides every *other* child of
+   `<body>` — the Nuxt app root and every teleported overlay with it. Adding a
+   new button to the application can no longer put that button on a clinical
+   document.
+
+   A4 portrait and these margins are a **product decision** consistent with
+   the annex, not a requirement of NTS 188: the norm says nothing about paper
+   size, orientation or margins. What the norm does fix is §5.17 (the chart
+   prints in black, crown ≥ 0.5 cm²) and §5.12-5.13 (findings in red and blue
+   only). The colour tokens above carry the second; `ntsPrintLayout.ts`
+   carries the arithmetic for the first, and its tests fail if this sheet ever
+   stops satisfying it.
+   ============================================================================ */
+
+@page {
+  size: A4 portrait;
+  margin: 10mm 10mm 12mm 10mm;
+}
+
+/* The document exists in the DOM at all times so that the browser's own
+   Ctrl+P prints it, with no click handler and no `beforeprint` race. On
+   screen it is `display: none`, which also keeps it out of the accessibility
+   tree — a duplicate of the whole record must not be navigable. */
+.nts-print-root {
+  display: none;
+}
+
+@media print {
+  /* One document. Everything else on the page is application chrome. */
+  body > *:not(.nts-print-root) {
+    display: none !important;
+  }
+
+  .nts-print-root {
+    display: block !important;
+    /* The printable width of the page above. The sheet is a physical layout:
+       no viewport units, no breakpoints, no responsive reflow. */
+    width: 190mm;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-size: 10pt;
+    line-height: 1.4;
+    /* §5.12-5.13 make colour the carrier of clinical meaning: blue is "good",
+       red is "bad, temporary or pathological". Without this, Chrome drops
+       backgrounds and can flatten the two into one grey. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Nothing in a printed document is focused, hovered or selected. */
+  .nts-print-root *,
+  .nts-print-root *::before,
+  .nts-print-root *::after {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* --- the chart ---------------------------------------------------------
+     On screen the chart lives in a horizontal scroller, because a narrow
+     viewport cannot show 16 teeth at once. Paper has no scrollbar: a
+     container that still clipped here would cut teeth off the sheet rather
+     than let them overflow. */
+  .nts-print-root [data-testid="nts-chart-scroll"] {
+    overflow: visible !important;
+  }
+
+  /* The chart's physical size, stated rather than inferred. 646 CSS px is
+     170.9 mm by CSS's own definition of the pixel; declaring 171mm here makes
+     that a property of the sheet instead of an accident, and
+     `NTS_PRINT_CHART_DECLARED_WIDTH_MM` asserts the two agree. It rescales
+     nothing: no viewBox, no coordinate and no tooth is touched. */
+  .nts-print-root [data-testid="nts-chart-canvas"] {
+    min-width: 171mm !important;
+    width: 171mm !important;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* A chart split across two pages is not a chart. */
+  .nts-print-root [data-testid="nts-odontogram-chart"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* --- §5.17: the graphic prints in black --------------------------------
+     "El gráfico del odontograma … se imprime en color negro."
+
+     On screen the structure is drawn in a theme neutral so it sits calmly
+     under the clinical marks: measured, the crown, its surface dividers and
+     the roots all come out `#64757D`, the annotation boxes `#DCE5E8` and the
+     FDI numbers `#202D35`. None of those is black, and the annotation box at
+     `#DCE5E8` is close to invisible on paper.
+
+     The selectors are structural on purpose and there is deliberately no
+     blanket `svg * { stroke: black }`: that would repaint the findings and
+     destroy the red/blue the norm makes carry clinical meaning (§5.12-5.13).
+     `data-region` exists only in `NtsToothCell` and `nts-structure-` only on
+     the restored-edge group, so neither can reach a clinical mark.
+
+     The tooth outline takes its colour from `currentColor` set in an inline
+     style, so `!important` is what overrides it — a stylesheet `!important`
+     beats a non-important inline declaration. */
+  .nts-print-root [data-fdi][data-dentition] svg {
+    color: #000 !important;
+  }
+
+  .nts-print-root [data-fdi][data-dentition] svg path[data-region] {
+    stroke: #000 !important;
+  }
+
+  .nts-print-root [data-region="annotation"] {
+    border-color: #000 !important;
+  }
+
+  .nts-print-root [data-region="fdi"] {
+    color: #000 !important;
+  }
+
+  /* The crown edges a clinical fill covered and the overlay repairs (05D.4c)
+     are the same structure, drawn from the same neutral token, and print the
+     same black. */
+  .nts-print-root [data-testid^="nts-structure-"] path {
+    stroke: #000 !important;
+  }
+
+  /* Not restyled, on purpose: `+n` is not an NTS symbol — the norm defines no
+     such mark — so it is outside §5.17's requirement for the *graphic*. It
+     stays neutral precisely so it cannot be read as either structure or a
+     finding. See `[data-testid^="nts-box-overflow-"]` in NtsFindingLayer. */
+
+  /* --- clinical text -----------------------------------------------------
+     Never a fixed height, never a clamp, never a hidden overflow: clinical
+     text runs onto another page rather than being cut off. */
+  .nts-print-root [data-testid="nts-print-spec-list"],
+  .nts-print-root [data-testid="nts-print-observations-text"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* A single specification breaking across a page boundary is hard to read
+     and easy to misattribute; the list may break between items instead. */
+  .nts-print-root [data-testid^="nts-print-spec-item-"],
+  .nts-print-root [data-testid^="nts-print-declaration-"],
+  .nts-print-root [data-testid="nts-print-professional"],
+  .nts-print-root [data-testid="nts-print-header"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* The digest wraps across lines. It is never shortened: half a fingerprint
+     attests nothing. */
+  .nts-print-root [data-testid="nts-print-content-hash"] {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+
+  /* --- repeated identity (NTS-05F.4a) ------------------------------------
+     A `<thead>` is the only construct this Chromium repeats on every printed
+     page — `position: fixed` was measured dropping off the last page of a
+     five-page document. The strip is what stops a detached second page from
+     being an anonymous sheet of clinical text.
+
+     Deliberately small and rule-separated rather than filled: it must not
+     read as a second document header, and a background is the one thing a
+     print dialog can switch off. */
+  /* Measured cost of this strip on every page: 5.34 mm. The ordinary
+     finalized record leaves 4.6 mm of slack, so the strip is trimmed to what
+     still reads as a separated caption and the block gaps below give up the
+     rest (§9 — decorative spacing only). */
+  .nts-print-root .nts-print-continuation {
+    padding-bottom: 0.7mm;
+    margin-bottom: 1.2mm;
+    border-bottom: 0.3mm solid currentColor;
+    font-size: 7.5pt;
+    line-height: 1.2;
+  }
+
+  /* The cells exist only to carry the repeat; they add no page geometry. */
+  .nts-print-root [data-testid="nts-print-sheet"],
+  .nts-print-root [data-testid="nts-print-sheet"] > thead > tr > td,
+  .nts-print-root [data-testid="nts-print-sheet"] > tbody > tr > td {
+    padding: 0;
+    border: 0;
+  }
+
+  /* --- vertical budget ---------------------------------------------------
+     The screen stacks these blocks with generous spacing because a screen
+     scrolls. A sheet does not: measured at the screen's own rhythm the
+     ordinary finalized record came to 294 mm against 275 mm of printable
+     page, and spilled a few lines onto a second sheet.
+
+     Measured budget for that record: header 19.9, chart 166.3, especificaciones
+     12.7, observaciones 12.7, professional 25.4, footer 31.0 — 268 mm of
+     content and 26.5 mm of gaps.
+
+     What is tightened here is **only the whitespace between blocks**. No
+     clinical content is scaled, no font is reduced, and the chart keeps its
+     171 mm. A longer record still flows onto a second page — that is the
+     policy — but the common case now fits one. */
+  /* `space-y-*` in this Tailwind build puts the gap on the **bottom** of each
+     child, so overriding only `margin-top` changes nothing: adjacent margins
+     collapse to the larger of the two. Both sides are zeroed first, then the
+     gap is put back on the following sibling. */
+  /* The document's blocks are children of the sheet's body cell, not of the
+     article: 05F.4a wrapped everything in a table so a `<thead>` could repeat
+     the identity on every page. The gap rules follow them in, otherwise the
+     only element they match is the table itself and the blocks collapse
+     against each other. */
+  .nts-print-root [data-testid="nts-print-sheet"] > tbody > tr > td > *,
+  .nts-print-root [data-testid="nts-odontogram-chart"] > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* 2.0 mm, not 2.5: the continuation strip costs 5.34 mm per page and the
+     ordinary record had only 4.6 mm of slack. Five gaps at 0.5 mm less buy
+     2.5 mm back and the golden case measures 273.27 mm — one sheet again.
+     Measured, both ways: at 2.5 mm it is 277.07 mm and prints on two. */
+  .nts-print-root [data-testid="nts-print-sheet"] > tbody > tr > td > * + * {
+    margin-top: 2mm !important;
+  }
+
+  /* The metadata lists are label/value grids; on paper their row rhythm can
+     be tighter than the screen's without crowding. */
+  .nts-print-root [data-testid="nts-print-professional"] dl,
+  .nts-print-root [data-testid="nts-print-footer"] dl {
+    row-gap: 0.6mm !important;
+    margin-top: 1.5mm !important;
+  }
+
+  .nts-print-root [data-testid="nts-odontogram-chart"] > * + * {
+    margin-top: 2mm !important;
+  }
+
+  .nts-print-root [data-testid="nts-chart-canvas"] {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+}

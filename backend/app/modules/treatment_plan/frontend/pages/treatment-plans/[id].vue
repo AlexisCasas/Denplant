@@ -1,8 +1,19 @@
 <script setup lang="ts">
+import { PERMISSIONS } from '~~/app/config/permissions'
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const toast = useToast()
+const { can } = usePermissions()
+
+// The odontogram chart embedded in PlanDetailView is gated on
+// odontogram.write specifically (not treatment_plan.plans.write) —
+// mirrors patients/frontend/pages/patients/[id].vue's ClinicalTab
+// wiring so a role with plan-write but no odontogram-write (e.g.
+// receptionist) can't get an editable chart just by landing on this
+// standalone route instead of the patient ficha's Plans tab.
+const odontogramReadonly = computed(() => !can(PERMISSIONS.odontogram.write))
 
 const {
   currentPlan,
@@ -96,6 +107,7 @@ function handleCancelled() {
       v-else
       :plan="currentPlan"
       :patient-id="patientId"
+      :readonly="odontogramReadonly"
       standalone
       @updated="handleUpdated"
       @generate-budget="handleGenerateBudget"

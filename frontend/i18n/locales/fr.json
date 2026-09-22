@@ -454,6 +454,276 @@
   },
   "odontogram": {
     "title": "Odontogramme",
+    "profile": {
+      "label": "Format d'odontogramme",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Pérou"
+      },
+      "updateError": "Impossible de changer le format d'odontogramme",
+      "nts": {
+        "title": "Odontogramme MINSA Pérou",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnostic",
+        "evolution": "Évolution",
+        "discharge": "Sortie",
+        "other": "Autre"
+      },
+      "chart": {
+        "title": "Odontogramme",
+        "tooth": "Dent {fdi}",
+        "deciduousTooth": "Dent temporaire {fdi}",
+        "permanentDentition": "Denture permanente",
+        "deciduousDentition": "Denture temporaire",
+        "permanentUpper": "Permanente supérieure",
+        "deciduousUpper": "Temporaire supérieure",
+        "deciduousLower": "Temporaire inférieure",
+        "permanentLower": "Permanente inférieure",
+        "upper": "Supérieure",
+        "lower": "Inférieure",
+        "readonly": "Lecture seule",
+        "noRecord": "Structure du formulaire officiel. Elle ne correspond à aucun enregistrement clinique.",
+        "findingsPending": "{count} constatation(s) non entièrement dessinée(s)",
+        "findingsPendingHint": "Leurs marques nécessitent des primitives de dessin prévues pour une phase ultérieure. Toutes restent dans la liste ci-dessous.",
+        "findingRendererPending": "Tracé des constatations à venir",
+        "siglasHidden": "{count} sigle(s) ne tiennent pas dans leur case",
+        "siglasHiddenHint": "La case affiche « +n » lorsqu'il n'y a plus de place. Rien n'est retiré du dossier ; la liste complète est ci-dessous."
+      },
+      "editor": {
+        "findings": "Constatations",
+        "noFindings": "Aucune constatation enregistrée.",
+        "newFinding": "Nouvelle constatation",
+        "editFinding": "Modifier la constatation",
+        "addFinding": "Ajouter la constatation",
+        "saveFinding": "Enregistrer",
+        "confirmFinding": "Confirmer la constatation",
+        "removeFinding": "Retirer la constatation",
+        "removeExplanation": "La constatation est retirée de ce brouillon. L'enregistrement conserve sa piste d'audit.",
+        "partialTitle": "Modification partiellement appliquée",
+        "partialBody": "Les attributs ont été enregistrés, mais pas les cibles. Vérifiez les cibles de la constatation : l'enregistrement a déjà changé et n'est pas annulé automatiquement.",
+        "refreshFailedTitle": "La constatation a été enregistrée, mais la vue n'a pas pu être actualisée",
+        "refreshFailedBody": "La modification est déjà sur le serveur. Ne la renvoyez pas : réessayez l'actualisation.",
+        "refreshRetry": "Réessayer l'actualisation",
+        "refreshing": "Actualisation",
+        "edit": "Modifier",
+        "searchFindings": "Rechercher une constatation",
+        "noMatches": "Aucune constatation ne correspond.",
+        "targets": "Cible",
+        "selectedTeeth": "Dents sélectionnées",
+        "selectedArches": "Arcades",
+        "anchors": "Références",
+        "rangeSpan": "Étendue",
+        "toothCount": "{count} dent(s)",
+        "roles": "Rôles des dents",
+        "noRole": "Aucun rôle",
+        "pickSubject": "Choisir les dents",
+        "pickAnchor": "Choisir les références",
+        "changeSelection": "Modifier la sélection",
+        "changeReferences": "Modifier les références",
+        "doneSelecting": "Terminer la sélection",
+        "retargetSubjectHint": "Sélectionnez les dents sur l'odontogramme. La sélection précédente est remplacée et rien n'est enregistré avant d'appuyer sur Enregistrer.",
+        "retargetAnchorHint": "Sélectionnez les dents voisines qui situent la constatation. Rien n'est enregistré avant d'appuyer sur Enregistrer.",
+        "rolesOptional": "Rôle clinique des dents (facultatif)",
+        "rolesOptionalHint": "À attribuer uniquement lorsque cela s'applique.",
+        "unnumberedSubject": "Cette dent n'a pas de numéro FDI : elle est située par ses voisines.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "À revoir",
+        "unknownRule": "Cette version ne reconnaît pas la règle de cette constatation.",
+        "unknownRuleShort": "Règle inconnue",
+        "attributeRequired": "Cette donnée est obligatoire.",
+        "needsClinicalReview": "Le catalogue signale cette donnée comme en attente de revue clinique.",
+        "specificationRequired": "Cette constatation exige une Especificación avant de finaliser l'odontogramme.",
+        "specificationAdvisory": "Le catalogue suggère de consigner un détail supplémentaire dans Especificaciones.",
+        "pick": {
+          "tooth": "Sélectionnez {count} dent(s) sur l'odontogramme.",
+          "surface": "Sélectionnez la dent puis indiquez les faces.",
+          "pair": "Sélectionnez les deux dents sur l'odontogramme.",
+          "range": "Sélectionnez la première et la dernière dent de l'étendue.",
+          "archOne": "Sélectionnez l'arcade traitée.",
+          "archOneOrBoth": "Sélectionnez une arcade ou les deux.",
+          "unnumbered": "Sélectionnez les {count} dents voisines qui situent la constatation."
+        },
+        "problem": {
+          "subjectCount": "{expected} dent(s) requise(s) ; {count} sélectionnée(s).",
+          "rangeRequired": "Sélectionnez l'étendue de dents.",
+          "duplicateTooth": "Une dent est sélectionnée deux fois.",
+          "anchorCount": "{expected} référence(s) requise(s) ; {count} sélectionnée(s).",
+          "anchorDistinct": "Les références doivent être des dents distinctes.",
+          "archRequired": "Sélectionnez une arcade.",
+          "archExactlyOne": "Cette règle couvre exactement une arcade.",
+          "archOneOrBoth": "Cette règle couvre une arcade ou les deux.",
+          "roleMin": "Le rôle {role} exige au moins {min} dent(s).",
+          "roleMax": "Le rôle {role} admet au plus {max} dent(s)."
+        },
+        "a11y": {
+          "select": "Sélectionner {tooth}",
+          "selected": "{tooth}, sélectionnée",
+          "anchorSelected": "{tooth}, sélectionnée comme référence"
+        }
+      },
+      "status": {
+        "draft": "Brouillon",
+        "finalized": "Finalisé",
+        "discarded": "Abandonné",
+        "superseded": "Corrigé"
+      },
+      "field": {
+        "stage": "Étape",
+        "stageLabel": "Nom de l'étape",
+        "finalizedAt": "Finalisé le",
+        "openedAt": "Ouvert le",
+        "recordedBy": "Enregistré par",
+        "findings": "Constatations",
+        "discardReason": "Motif",
+        "discardedAt": "Abandonné le",
+        "normVersion": "Version normative"
+      },
+      "actions": {
+        "createDraft": "Créer un brouillon",
+        "finalize": "Finaliser",
+        "discardDraft": "Abandonner le brouillon"
+      },
+      "current": {
+        "title": "Enregistrement en vigueur"
+      },
+      "draft": {
+        "title": "Brouillon en cours"
+      },
+      "history": {
+        "title": "Historique des enregistrements",
+        "returnToCurrent": "Revenir à l'odontogramme actuel",
+        "viewing": "À l'écran",
+        "viewingTitle": "Vous consultez un odontogramme de l'historique",
+        "viewingBody": "Affiché tel qu'il a été enregistré, selon la version normative qui lui correspond. Il ne peut pas être modifié.",
+        "superseded": "Remplacé",
+        "empty": "Aucun enregistrement antérieur.",
+        "loadFailedTitle": "Impossible d'ouvrir cet odontogramme",
+        "catalogFailedTitle": "Impossible de charger la version normative de cet odontogramme",
+        "catalogFailedBody": "Cet enregistrement a été réalisé selon la version {version}, qui n'est pas disponible. Rien n'est dessiné : le lire selon une autre version montrerait des observations que l'enregistrement ne contient pas.",
+        "isCurrent": "Odontogramme actuel"
+      },
+      "empty": {
+        "title": "Aucun odontogramme MINSA enregistré pour ce patient."
+      },
+      "create": {
+        "hint": "L'étape est une métadonnée du dossier ; la norme n'impose pas d'ensemble fixe."
+      },
+      "discard": {
+        "explanation": "Le brouillon est abandonné et n'est plus modifiable. Il n'est pas supprimé : il reste enregistré avec son motif."
+      },
+      "carriedForward": {
+        "title": "{count} constatation(s) reportée(s) à revoir",
+        "hint": "Elles proviennent d'un enregistrement antérieur. Confirmez-les une à une dans la liste avant de finaliser."
+      },
+      "conflict": {
+        "title": "L'odontogramme a changé dans une autre session",
+        "version": "Les informations ont été actualisées ; vérifiez-les avant de réessayer.",
+        "draft": "Un brouillon est déjà ouvert pour ce patient.",
+        "state": "Le brouillon a déjà été finalisé ou abandonné. Les informations ont été actualisées."
+      },
+      "error": {
+        "loadTitle": "Impossible de charger l'odontogramme MINSA",
+        "clinicalTitle": "L'opération n'a pas pu aboutir",
+        "normUnavailableTitle": "Version normative indisponible",
+        "normUnavailable": "Cette version normative n'est pas disponible dans cette installation."
+      },
+      "specifications": {
+        "title": "Spécifications",
+        "add": "Ajouter une spécification",
+        "edit": "Modifier la spécification",
+        "remove": "Retirer la spécification",
+        "removeExplanation": "L'entrée n'apparaît plus sur l'odontogramme. Le dossier conserve sa piste d'audit.",
+        "textLabel": "Texte de la spécification",
+        "emptyDraft": "Aucune spécification pour l'instant. Utilisez « Ajouter une spécification » pour consigner ce qui ne tient pas dans les cases.",
+        "emptyFinalized": "Aucune spécification.",
+        "readonly": "Ce dossier est finalisé : les spécifications sont en lecture seule.",
+        "linkedTeeth": "Concerne la/les dent(s) {teeth}",
+        "linkedFinding": "Liée à une observation de ce dossier",
+        "linkedUnknown": "Liée à une observation non chargée",
+        "overflowTitle": "Certaines informations ne tiennent pas visuellement dans une ou plusieurs cases",
+        "overflowBody": "Les observations restent enregistrées et figurent dans la liste. Si vous devez les détailler, vous pouvez les écrire ici, dans Spécifications."
+      },
+      "observations": {
+        "title": "Observations",
+        "label": "Observations",
+        "hint": "Constatations cliniques que la nomenclature de l'odontogramme ne prévoit pas.",
+        "empty": "Aucune observation.",
+        "readonly": "Ce dossier est finalisé : les observations sont en lecture seule."
+      },
+      "text": {
+        "refreshFailedTitle": "Vos modifications ont été enregistrées, mais l'affichage n'a pas pu être actualisé",
+        "refreshFailedBody": "Le dossier sur le serveur contient déjà les modifications. Relisez-le pour les voir ; rien ne sera renvoyé."
+      },
+      "unsaved": {
+        "title": "Des modifications ne sont pas enregistrées",
+        "body": "Si vous continuez, le texte saisi et non enregistré sera perdu.",
+        "stay": "Continuer à modifier",
+        "discard": "Abandonner et continuer",
+        "leavePage": "L'odontogramme comporte des modifications non enregistrées. Quitter quand même ?"
+      },
+      "print": {
+        "title": "Odontogramme",
+        "unavailable": "Impossible de composer le document : la version normative de cet enregistrement n'est pas disponible.",
+        "patient": "Patient",
+        "document": "Document",
+        "date": "Date",
+        "specifications": "Spécifications",
+        "observations": "Observations",
+        "emptySpecifications": "Aucune spécification enregistrée.",
+        "emptyObservations": "Aucune observation enregistrée.",
+        "incompleteFindings": "Constatations non représentées intégralement",
+        "systemNote": "Note générée par DenPlant. Ne fait pas partie du graphique normatif.",
+        "unsupportedCopy": "{target} : {label} — enregistré, non représenté sur le graphique.",
+        "partialCopy": "{target} : {label} — représentation graphique partielle.",
+        "professional": "Professionnel responsable",
+        "registeredBy": "Enregistré par",
+        "role": "Rôle",
+        "professionalId": "N° d'ordre / identifiant professionnel",
+        "technical": "Données techniques de l'enregistrement",
+        "recordId": "Enregistrement",
+        "normVersion": "Version normative",
+        "status": "Statut",
+        "contentFingerprint": "Empreinte du contenu",
+        "fingerprintUnavailable": "Non disponible pour cet état.",
+        "print": "Imprimer",
+        "printDraft": "Imprimer le brouillon",
+        "printDiscarded": "Imprimer l'enregistrement abandonné",
+        "prepare": "Préparer l'impression",
+        "prepareHint": "La boîte de dialogue du navigateur contrôle ces options. Vérifiez-les avant d'imprimer.",
+        "paper": "Papier : A4",
+        "orientation": "Orientation : portrait",
+        "scale": "Échelle : 100 %",
+        "color": "Imprimez en couleur",
+        "colorHint": "Le rouge et le bleu distinguent l'état clinique de chaque constatation.",
+        "doNotFit": "N'utilisez pas « Ajuster à la page » : cela réduit le graphique sous la taille minimale de couronne exigée par la norme.",
+        "openPrintDialog": "Ouvrir la boîte de dialogue d'impression",
+        "cancel": "Annuler",
+        "blockedTitle": "Impression pas encore possible",
+        "dirtyBlocked": "Enregistrez ou abandonnez vos modifications avant d'imprimer. La feuille est composée à partir de l'enregistrement sauvegardé.",
+        "writingBlocked": "Une modification est en cours. Attendez la fin avant d'imprimer.",
+        "refreshBlocked": "Actualisez l'enregistrement avant d'imprimer : la modification a été enregistrée, mais n'a pas pu être relue.",
+        "conflictBlocked": "Une autre session a modifié cet odontogramme. Consultez l'avis avant d'imprimer.",
+        "loadingBlocked": "Chargement de l'enregistrement. Attendez la fin avant d'imprimer.",
+        "unsafePrint": "L'odontogramme ne peut pas être imprimé dans cet état. Revenez à l'application, enregistrez ou actualisez l'enregistrement, puis réessayez.",
+        "draftQualification": "BROUILLON",
+        "draftNotFinal": "Ce n'est pas l'enregistrement définitif.",
+        "pendingCarriedForward": "Ce brouillon contient {count} constatation(s) reportée(s) en attente de révision.",
+        "discardedQualification": "ABANDONNÉ",
+        "discardedHint": "Cet enregistrement a été abandonné et n'est pas l'odontogramme en vigueur.",
+        "discardReason": "Motif de l'abandon",
+        "supersededQualification": "ENREGISTREMENT REMPLACÉ",
+        "supersededHint": "Un enregistrement postérieur existe pour ce patient.",
+        "incompleteWarning": "Cet enregistrement contient des constatations que DenPlant ne représente pas intégralement sur le graphique.",
+        "incompleteNote": "La feuille imprimée comporte une note du système qui les identifie.",
+        "partialCount": "Représentation partielle : {count}",
+        "unsupportedCount": "Non représenté sur le graphique : {count}",
+        "additionalDetailsHint": "Si vous devez consigner un détail clinique supplémentaire, utilisez les Spécifications le cas échéant."
+      }
+    },
     "tooth": "Dent",
     "globals": {
       "category": "Bouche complète",
@@ -852,6 +1122,19 @@
     "followup": {
       "title": "Actions post-rendez-vous"
     },
+    "completionGate": {
+      "title": "Quels traitements ont été réalisés ?",
+      "description": "Cochez les traitements du plan réalisés lors de ce rendez-vous. Ceux non cochés resteront en attente dans le plan.",
+      "evolutionLabel": "Évolution clinique",
+      "evolutionPlaceholder": "Décrivez ce qui a été fait lors de cette visite (facultatif)"
+    },
+    "noActivePlans": "Aucun plan de traitement en cours.",
+    "noPendingTreatmentsInPlan": "Ce plan n'a aucun traitement en attente.",
+    "selectPlan": "Plan de traitement",
+    "pendingTreatments": "Traitements en attente",
+    "historicalTreatments": "Traitements déjà associés à ce rendez-vous",
+    "historicalTreatmentBadge": "Terminé",
+    "sessionN": "Séance {n}",
     "created": "Rendez-vous créé",
     "saved": "Rendez-vous enregistré",
     "updated": "Rendez-vous mis à jour",

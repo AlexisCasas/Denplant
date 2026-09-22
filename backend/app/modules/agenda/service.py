@@ -190,6 +190,7 @@ class AppointmentService:
                             selectinload(Treatment.catalog_item),
                         ),
                         selectinload(PlannedTreatmentItem.treatment_plan),
+                        selectinload(PlannedTreatmentItem.sessions),
                     ),
                     selectinload(AppointmentTreatment.catalog_item),
                 ),
@@ -296,6 +297,7 @@ class AppointmentService:
                             selectinload(Treatment.catalog_item),
                         ),
                         selectinload(PlannedTreatmentItem.treatment_plan),
+                        selectinload(PlannedTreatmentItem.sessions),
                     ),
                     selectinload(AppointmentTreatment.catalog_item),
                 ),
@@ -340,8 +342,22 @@ class AppointmentService:
         clinic_id: UUID,
         patient_id: UUID,
         planned_item_ids: list[UUID],
+        existing_planned_item_ids: frozenset[UUID] = frozenset(),
     ) -> None:
         """Validate planned treatment items for appointment.
+
+        ``existing_planned_item_ids`` are ids already linked to the
+        appointment being updated (its current ``AppointmentTreatment``
+        rows). A historical association survives its item and/or plan
+        moving past ``pending``/``active``-``draft`` (e.g. the item
+        completed, or the plan auto-completed because it was the last
+        pending item) — only a genuinely NEW id must still satisfy
+        ``plan.status in ("active", "draft")`` and ``item.status ==
+        "pending"`` to be attached.
+
+        Integrity checks (exists, same clinic, plan belongs to the same
+        patient) are enforced for every id regardless, existing or new —
+        the historical exemption never bypasses those.
 
         Raises ValueError with details if validation fails.
         """
@@ -367,6 +383,11 @@ class AppointmentService:
             plan = item.treatment_plan
             if not plan or plan.patient_id != patient_id:
                 errors.append(f"Treatment item {item_id} does not belong to patient")
+                continue
+            if item_id in existing_planned_item_ids:
+                # Already linked to this appointment — a historical
+                # association survives the item/plan moving past
+                # pending/active-draft. Never applies to a NEW id.
                 continue
             if plan.status not in ("active", "draft"):
                 errors.append(f"Treatment item {item_id} belongs to {plan.status} plan")
@@ -528,7 +549,9 @@ class AppointmentService:
         for treatment in appointment.treatments:
             await db.refresh(treatment, ["planned_item", "catalog_item"])
             if treatment.planned_item:
-                await db.refresh(treatment.planned_item, ["treatment", "treatment_plan"])
+                await db.refresh(
+                    treatment.planned_item, ["treatment", "treatment_plan", "sessions"]
+                )
                 if treatment.planned_item.treatment:
                     await db.refresh(treatment.planned_item.treatment, ["teeth", "catalog_item"])
 
@@ -581,8 +604,15 @@ class AppointmentService:
         if planned_item_ids:
             patient_id = data.get("patient_id") or appointment.patient_id
             if patient_id:
+                existing_planned_item_ids = frozenset(
+                    t.planned_treatment_item_id for t in appointment.treatments
+                )
                 await AppointmentService.validate_planned_items(
-                    db, appointment.clinic_id, patient_id, planned_item_ids
+                    db,
+                    appointment.clinic_id,
+                    patient_id,
+                    planned_item_ids,
+                    existing_planned_item_ids=existing_planned_item_ids,
                 )
 
         for key, value in data.items():
@@ -621,7 +651,9 @@ class AppointmentService:
             for treatment in appointment.treatments:
                 await db.refresh(treatment, ["planned_item", "catalog_item"])
                 if treatment.planned_item:
-                    await db.refresh(treatment.planned_item, ["treatment", "treatment_plan"])
+                    await db.refresh(
+                        treatment.planned_item, ["treatment", "treatment_plan", "sessions"]
+                    )
                     if treatment.planned_item.treatment:
                         await db.refresh(
                             treatment.planned_item.treatment, ["teeth", "catalog_item"]

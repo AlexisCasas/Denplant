@@ -482,6 +482,276 @@
   },
   "odontogram": {
     "title": "Odontograma",
+    "profile": {
+      "label": "Formato de odontograma",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Perú"
+      },
+      "updateError": "No se pudo cambiar el formato de odontograma",
+      "nts": {
+        "title": "Odontograma MINSA Perú",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnóstico",
+        "evolution": "Evolución",
+        "discharge": "Alta",
+        "other": "Otra"
+      },
+      "chart": {
+        "title": "Odontograma",
+        "tooth": "Diente {fdi}",
+        "deciduousTooth": "Diente deciduo {fdi}",
+        "permanentDentition": "Dentición permanente",
+        "deciduousDentition": "Dentición decidua",
+        "permanentUpper": "Permanente superior",
+        "deciduousUpper": "Decidua superior",
+        "deciduousLower": "Decidua inferior",
+        "permanentLower": "Permanente inferior",
+        "upper": "Superior",
+        "lower": "Inferior",
+        "readonly": "Solo lectura",
+        "noRecord": "Estructura del formato oficial. No corresponde a ningún registro clínico.",
+        "findingsPending": "{count} hallazgo(s) no dibujado(s) por completo",
+        "findingsPendingHint": "Sus marcas requieren primitivas de dibujo que llegan en una fase posterior. Todos los hallazgos siguen en la lista inferior.",
+        "findingRendererPending": "Representación de hallazgos pendiente",
+        "siglasHidden": "{count} sigla(s) no caben en su recuadro",
+        "siglasHiddenHint": "El recuadro muestra «+n» donde no hay espacio. No se elimina nada del registro; la lista completa está abajo."
+      },
+      "editor": {
+        "findings": "Hallazgos",
+        "noFindings": "Sin hallazgos registrados.",
+        "newFinding": "Nuevo hallazgo",
+        "editFinding": "Editar hallazgo",
+        "addFinding": "Agregar hallazgo",
+        "saveFinding": "Guardar hallazgo",
+        "confirmFinding": "Confirmar hallazgo",
+        "removeFinding": "Retirar hallazgo",
+        "removeExplanation": "El hallazgo se retira de este borrador. El registro conserva su traza de auditoría.",
+        "partialTitle": "Edición aplicada parcialmente",
+        "partialBody": "Los atributos se guardaron, pero los objetivos no. Revisa los objetivos del hallazgo: el registro ya cambió y no se deshace automáticamente.",
+        "refreshFailedTitle": "El hallazgo se guardó, pero no se pudo actualizar la vista",
+        "refreshFailedBody": "El cambio ya está en el servidor. No vuelvas a enviarlo: reintenta la actualización.",
+        "refreshRetry": "Reintentar actualización",
+        "refreshing": "Actualizando",
+        "edit": "Editar",
+        "searchFindings": "Buscar hallazgo",
+        "noMatches": "Ningún hallazgo coincide con la búsqueda.",
+        "targets": "Objetivo",
+        "selectedTeeth": "Piezas seleccionadas",
+        "selectedArches": "Arcadas",
+        "anchors": "Referencias",
+        "rangeSpan": "Rango",
+        "toothCount": "{count} pieza(s)",
+        "roles": "Roles de las piezas",
+        "noRole": "Sin rol",
+        "pickSubject": "Elegir piezas",
+        "pickAnchor": "Elegir referencias",
+        "changeSelection": "Cambiar selección",
+        "changeReferences": "Cambiar referencias",
+        "doneSelecting": "Terminar selección",
+        "retargetSubjectHint": "Selecciona las piezas en el odontograma. La selección anterior se reemplaza y no se guarda hasta pulsar Guardar.",
+        "retargetAnchorHint": "Selecciona las piezas vecinas que ubican el hallazgo. No se guarda hasta pulsar Guardar.",
+        "rolesOptional": "Rol clínico de las piezas (opcional)",
+        "rolesOptionalHint": "Asignar únicamente cuando corresponda.",
+        "unnumberedSubject": "Esta pieza no tiene número FDI: se ubica mediante las piezas vecinas.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "Por revisar",
+        "unknownRule": "Esta versión no reconoce la regla de este hallazgo.",
+        "unknownRuleShort": "Regla desconocida",
+        "attributeRequired": "Este dato es obligatorio.",
+        "needsClinicalReview": "El catálogo marca este dato como pendiente de revisión clínica.",
+        "specificationRequired": "Este hallazgo requiere una Especificación antes de finalizar el odontograma.",
+        "specificationAdvisory": "El catálogo sugiere registrar información adicional en Especificaciones.",
+        "pick": {
+          "tooth": "Selecciona {count} pieza(s) en el odontograma.",
+          "surface": "Selecciona la pieza en el odontograma e indica las superficies.",
+          "pair": "Selecciona las dos piezas en el odontograma.",
+          "range": "Selecciona la pieza inicial y la final del rango.",
+          "archOne": "Selecciona la arcada en tratamiento.",
+          "archOneOrBoth": "Selecciona una arcada o ambas.",
+          "unnumbered": "Selecciona las {count} piezas vecinas que ubican el hallazgo."
+        },
+        "problem": {
+          "subjectCount": "Se requieren {expected} pieza(s); hay {count}.",
+          "rangeRequired": "Selecciona el rango de piezas.",
+          "duplicateTooth": "Una pieza está repetida.",
+          "anchorCount": "Se requieren {expected} referencia(s); hay {count}.",
+          "anchorDistinct": "Las referencias deben ser piezas distintas.",
+          "archRequired": "Selecciona una arcada.",
+          "archExactlyOne": "Esta regla cubre exactamente una arcada.",
+          "archOneOrBoth": "Esta regla cubre una arcada o ambas.",
+          "roleMin": "El rol {role} requiere al menos {min} pieza(s).",
+          "roleMax": "El rol {role} admite como máximo {max} pieza(s)."
+        },
+        "a11y": {
+          "select": "Seleccionar {tooth}",
+          "selected": "{tooth}, seleccionado",
+          "anchorSelected": "{tooth}, seleccionado como referencia"
+        }
+      },
+      "status": {
+        "draft": "Borrador",
+        "finalized": "Finalizado",
+        "discarded": "Descartado",
+        "superseded": "Corregido"
+      },
+      "field": {
+        "stage": "Etapa",
+        "stageLabel": "Nombre de la etapa",
+        "finalizedAt": "Finalizado el",
+        "openedAt": "Abierto el",
+        "recordedBy": "Registrado por",
+        "findings": "Hallazgos",
+        "discardReason": "Motivo",
+        "discardedAt": "Descartado el",
+        "normVersion": "Versión normativa"
+      },
+      "actions": {
+        "createDraft": "Crear borrador",
+        "finalize": "Finalizar",
+        "discardDraft": "Descartar borrador"
+      },
+      "current": {
+        "title": "Registro vigente"
+      },
+      "draft": {
+        "title": "Borrador en edición"
+      },
+      "history": {
+        "title": "Historial de registros",
+        "returnToCurrent": "Volver al odontograma actual",
+        "viewing": "En pantalla",
+        "viewingTitle": "Está viendo un odontograma del historial",
+        "viewingBody": "Se muestra tal como fue registrado, con la versión normativa que le corresponde. No puede modificarse.",
+        "superseded": "Reemplazado",
+        "empty": "Sin registros anteriores.",
+        "loadFailedTitle": "No se pudo abrir este odontograma",
+        "catalogFailedTitle": "No se pudo cargar la versión normativa de este odontograma",
+        "catalogFailedBody": "Este registro fue hecho con la versión {version}, que no está disponible. No se dibuja nada: interpretarlo con otra versión mostraría hallazgos que el registro no contiene.",
+        "isCurrent": "Odontograma actual"
+      },
+      "empty": {
+        "title": "Este paciente no tiene ningún odontograma MINSA registrado."
+      },
+      "create": {
+        "hint": "La etapa es metadato del registro; la norma no exige un conjunto fijo."
+      },
+      "discard": {
+        "explanation": "El borrador se descarta y deja de ser editable. No se elimina: queda registrado con su motivo."
+      },
+      "carriedForward": {
+        "title": "{count} hallazgo(s) arrastrado(s) sin revisar",
+        "hint": "Se copiaron de un registro anterior. Confirma cada uno en la lista de hallazgos antes de finalizar."
+      },
+      "conflict": {
+        "title": "El odontograma cambió en otra sesión",
+        "version": "Se actualizó la información; revísala antes de volver a intentarlo.",
+        "draft": "Ya existe un borrador abierto para este paciente.",
+        "state": "El borrador ya fue finalizado o descartado. Se actualizó la información."
+      },
+      "error": {
+        "loadTitle": "No se pudo cargar el odontograma MINSA",
+        "clinicalTitle": "No se pudo completar la operación",
+        "normUnavailableTitle": "Versión normativa no disponible",
+        "normUnavailable": "Esta versión normativa no está disponible en esta instalación."
+      },
+      "specifications": {
+        "title": "Especificaciones",
+        "add": "Agregar especificación",
+        "edit": "Editar especificación",
+        "remove": "Quitar especificación",
+        "removeExplanation": "La entrada deja de figurar en el odontograma. El registro conserva su traza de auditoría.",
+        "textLabel": "Texto de la especificación",
+        "emptyDraft": "Aún no hay especificaciones. Use «Agregar especificación» para registrar lo que no cabe en los recuadros.",
+        "emptyFinalized": "Sin especificaciones.",
+        "readonly": "Este registro está finalizado: las especificaciones se muestran solo para lectura.",
+        "linkedTeeth": "Sobre la(s) pieza(s) {teeth}",
+        "linkedFinding": "Asociada a un hallazgo del registro",
+        "linkedUnknown": "Asociada a un hallazgo que no está cargado",
+        "overflowTitle": "Hay información que no cabe visualmente en uno o más recuadros",
+        "overflowBody": "Los hallazgos siguen registrados y aparecen en la lista. Si necesita detallarlos, puede escribirlos aquí en Especificaciones."
+      },
+      "observations": {
+        "title": "Observaciones",
+        "label": "Observaciones",
+        "hint": "Hallazgos clínicos que no están contemplados en la nomenclatura del odontograma.",
+        "empty": "Sin observaciones.",
+        "readonly": "Este registro está finalizado: las observaciones se muestran solo para lectura."
+      },
+      "text": {
+        "refreshFailedTitle": "Los cambios se guardaron, pero no se pudo actualizar la vista",
+        "refreshFailedBody": "El registro en el servidor ya contiene los cambios. Vuelva a leerlo para verlos; no se enviará nada de nuevo."
+      },
+      "unsaved": {
+        "title": "Hay cambios sin guardar",
+        "body": "Si continúa, el texto que escribió y no guardó se perderá.",
+        "stay": "Seguir editando",
+        "discard": "Descartar y continuar",
+        "leavePage": "Hay cambios sin guardar en el odontograma. ¿Salir de todos modos?"
+      },
+      "print": {
+        "title": "Odontograma",
+        "unavailable": "No se puede componer el documento: la versión normativa de este registro no está disponible.",
+        "patient": "Paciente",
+        "document": "Documento",
+        "date": "Fecha",
+        "specifications": "Especificaciones",
+        "observations": "Observaciones",
+        "emptySpecifications": "Sin especificaciones registradas.",
+        "emptyObservations": "Sin observaciones registradas.",
+        "incompleteFindings": "Hallazgos no representados completamente",
+        "systemNote": "Nota generada por DenPlant. No forma parte del gráfico normativo.",
+        "unsupportedCopy": "{target}: {label} — registrado, no representado gráficamente.",
+        "partialCopy": "{target}: {label} — representación gráfica parcial.",
+        "professional": "Profesional responsable",
+        "registeredBy": "Registrado por",
+        "role": "Rol",
+        "professionalId": "C.O.P. / Id. profesional",
+        "technical": "Datos técnicos del registro",
+        "recordId": "Registro",
+        "normVersion": "Versión normativa",
+        "status": "Estado",
+        "contentFingerprint": "Huella de contenido",
+        "fingerprintUnavailable": "No disponible para este estado.",
+        "print": "Imprimir",
+        "printDraft": "Imprimir borrador",
+        "printDiscarded": "Imprimir registro descartado",
+        "prepare": "Preparar impresión",
+        "prepareHint": "El diálogo del navegador controla estas opciones. Confírmalas antes de imprimir.",
+        "paper": "Papel: A4",
+        "orientation": "Orientación: vertical",
+        "scale": "Escala: 100 %",
+        "color": "Imprime a color",
+        "colorHint": "El rojo y el azul distinguen el estado clínico de cada hallazgo.",
+        "doNotFit": "No uses «Ajustar a página»: reduce el gráfico por debajo del tamaño mínimo de corona que exige la norma.",
+        "openPrintDialog": "Abrir diálogo de impresión",
+        "cancel": "Cancelar",
+        "blockedTitle": "Todavía no se puede imprimir",
+        "dirtyBlocked": "Guarda o descarta tus cambios antes de imprimir. La hoja se compone con el registro guardado.",
+        "writingBlocked": "Hay un cambio en curso. Espera a que termine para imprimir.",
+        "refreshBlocked": "Actualiza el registro antes de imprimir: el cambio se guardó, pero no se pudo volver a leer.",
+        "conflictBlocked": "Otro registro cambió este odontograma. Revisa el aviso antes de imprimir.",
+        "loadingBlocked": "Cargando el registro. Espera a que termine para imprimir.",
+        "unsafePrint": "El odontograma no puede imprimirse en este estado. Vuelve a la aplicación, guarda o actualiza el registro e inténtalo nuevamente.",
+        "draftQualification": "BORRADOR",
+        "draftNotFinal": "No es el registro definitivo.",
+        "pendingCarriedForward": "Este borrador contiene {count} hallazgo(s) arrastrado(s) pendiente(s) de revisión.",
+        "discardedQualification": "DESCARTADO",
+        "discardedHint": "Este registro fue descartado y no es el odontograma vigente.",
+        "discardReason": "Motivo del descarte",
+        "supersededQualification": "REGISTRO SUPERADO",
+        "supersededHint": "Existe un registro posterior para este paciente.",
+        "incompleteWarning": "Este registro contiene hallazgos que DenPlant no representa completamente en el gráfico.",
+        "incompleteNote": "La hoja impresa incluye una nota del sistema que los identifica.",
+        "partialCount": "Representación parcial: {count}",
+        "unsupportedCount": "Sin representación gráfica: {count}",
+        "additionalDetailsHint": "Si necesitas registrar detalle clínico adicional, utiliza Especificaciones cuando corresponda."
+      }
+    },
     "tooth": "Diente",
     "globals": {
       "category": "Boca completa",
@@ -873,6 +1143,19 @@
     "followup": {
       "title": "Acciones tras finalizar la cita"
     },
+    "completionGate": {
+      "title": "¿Qué tratamientos se realizaron?",
+      "description": "Marca los tratamientos del plan que se completaron en esta cita. Los que dejes sin marcar seguirán pendientes en el plan.",
+      "evolutionLabel": "Evolución clínica",
+      "evolutionPlaceholder": "Describe lo realizado en esta visita (opcional)"
+    },
+    "noActivePlans": "No hay planes de tratamiento vigentes.",
+    "noPendingTreatmentsInPlan": "Este plan no tiene tratamientos pendientes.",
+    "selectPlan": "Plan de tratamiento",
+    "pendingTreatments": "Tratamientos pendientes",
+    "historicalTreatments": "Tratamientos ya asociados a esta cita",
+    "historicalTreatmentBadge": "Completado",
+    "sessionN": "Sesión {n}",
     "created": "Cita creada",
     "saved": "Cita guardada",
     "updated": "Cita actualizada",

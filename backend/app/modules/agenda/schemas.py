@@ -60,6 +60,18 @@ class AppointmentTreatmentResponse(BaseModel):
 # --- Treatment brief ----------------------------------------------------
 
 
+class AppointmentTreatmentSessionBrief(BaseModel):
+    """Minimal per-session info so edit-mode can reproduce getSessionLabel()."""
+
+    id: UUID
+    sequence: int
+    label: str | None = None
+    amount: float
+    status: str  # pending, completed, cancelled
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AppointmentTreatmentBrief(BaseModel):
     """Brief treatment info for appointment responses.
 
@@ -83,6 +95,10 @@ class AppointmentTreatmentBrief(BaseModel):
     plan_number: str | None = None
     # Completion tracking
     completed_in_appointment: bool = False
+    # QW-01 fix 3: lets edit-mode rehydration render the same "odontólogo" /
+    # "sesión" info CREATE mode gets from PlannedTreatmentItemResponse.
+    assigned_professional_id: UUID | None = None
+    sessions: list[AppointmentTreatmentSessionBrief] = []
 
     @classmethod
     def from_appointment_treatment(cls, apt_treatment: "Any") -> "AppointmentTreatmentBrief":
@@ -129,6 +145,21 @@ class AppointmentTreatmentBrief(BaseModel):
             if planned_item and planned_item.treatment_plan
             else None,
             completed_in_appointment=apt_treatment.completed_in_appointment,
+            assigned_professional_id=planned_item.assigned_professional_id
+            if planned_item
+            else None,
+            sessions=[
+                AppointmentTreatmentSessionBrief(
+                    id=s.id,
+                    sequence=s.sequence,
+                    label=s.label,
+                    amount=float(s.amount),
+                    status=s.status,
+                )
+                for s in planned_item.sessions
+            ]
+            if planned_item and planned_item.sessions
+            else [],
         )
 
 

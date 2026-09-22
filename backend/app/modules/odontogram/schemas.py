@@ -475,4 +475,29 @@ class TimelineResponse(BaseModel):
     total: int = Field(default=0)
 
 
+# ----------------------------------------------------------------------------
+# Odontogram profile preference schemas
+# ----------------------------------------------------------------------------
+
+
+class OdontogramPreferenceResponse(BaseModel):
+    """Effective odontogram profile for the current user + clinic."""
+
+    profile: str = Field(
+        ...,
+        description="Active odontogram profile: 'original' or 'pe_nts_188_2022'",
+    )
+
+
+class OdontogramPreferenceUpdate(BaseModel):
+    """Body for ``PUT /preferences``.
+
+    ``clinic_id`` / ``user_id`` are deliberately absent: both are derived
+    from the authenticated clinic context, so a caller can only ever change
+    their own preference.
+    """
+
+    profile: Literal["original", "pe_nts_188_2022"]
+
+
 OdontogramResponse.model_rebuild()
