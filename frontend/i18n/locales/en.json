@@ -1818,6 +1818,7 @@
     "clinicalCategory": "Clinical category",
     "noOdontogramMapping": "No association",
     "odontogramMappingHint": "Treatment characteristics will be automatically adjusted based on the selected type.",
+    "odontogramLegacyTypeUnsupported": "The legacy type \"{type}\" is no longer supported. Select a valid treatment type before saving.",
     "selectCategory": "Select category...",
     "selectVatType": "Select VAT type...",
     "selectScope": "Select scope...",

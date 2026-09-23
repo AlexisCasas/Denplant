@@ -8,10 +8,12 @@ import type {
   TreatmentCatalogItemCreate
 } from '~~/app/types'
 import {
-  ALL_TREATMENT_TYPES,
+  CATALOG_ODONTOGRAM_TREATMENT_TYPES,
   TREATMENT_CATEGORIES,
-  VISUALIZATION_RULES,
-  isSurfaceTreatment
+  buildCatalogOdontogramMapping,
+  isOdontogramMappingIncomplete,
+  isSurfaceTreatment,
+  resolveCatalogOdontogramType
 } from '~~/app/config/odontogramConstants'
 
 const props = defineProps<{
@@ -74,6 +76,9 @@ const itemName = computed({
 // Odontogram mapping
 const odontogramType = ref<string | undefined>(undefined)
 const clinicalCategory = ref<string | undefined>(undefined)
+// Stored legacy type with no safe modern equivalent (e.g. bridge_pontic). Shown
+// read-only; saving is blocked until the user picks a writable type.
+const unsupportedLegacyType = ref<string | undefined>(undefined)
 
 // Sessions
 interface SessionRow {
@@ -140,11 +145,15 @@ watch(
         is_active: newItem.is_active
       }
       if (newItem.odontogram_mapping) {
-        odontogramType.value = newItem.odontogram_mapping.odontogram_treatment_type
+        const stored = newItem.odontogram_mapping.odontogram_treatment_type
+        const resolved = resolveCatalogOdontogramType(stored)
+        odontogramType.value = resolved
+        unsupportedLegacyType.value = resolved ? undefined : stored
         clinicalCategory.value = newItem.odontogram_mapping.clinical_category
       } else {
         odontogramType.value = undefined
         clinicalCategory.value = undefined
+        unsupportedLegacyType.value = undefined
       }
       if (newItem.sessions && newItem.sessions.length > 0) {
         sessionsEnabled.value = true
@@ -180,6 +189,7 @@ watch(
       }
       odontogramType.value = undefined
       clinicalCategory.value = undefined
+      unsupportedLegacyType.value = undefined
       sessionsEnabled.value = false
       sessions.value = []
     }
@@ -255,7 +265,7 @@ const categoryOptions = computed(() =>
 
 const odontogramTypeOptions = computed<{ value: string | undefined, label: string }[]>(() => [
   { value: undefined, label: t('catalog.noOdontogramMapping') },
-  ...ALL_TREATMENT_TYPES.map(type => ({
+  ...CATALOG_ODONTOGRAM_TREATMENT_TYPES.map(type => ({
     value: type,
     label: t(`odontogram.treatments.${type}`, type)
   }))
@@ -270,6 +280,7 @@ const clinicalCategoryOptions = computed<{ value: string, label: string }[]>(() 
 
 watch(odontogramType, (newType) => {
   if (newType) {
+    unsupportedLegacyType.value = undefined
     const category = TREATMENT_CATEGORIES.find(c => c.treatments.includes(newType))
     if (category) {
       clinicalCategory.value = category.key
@@ -278,15 +289,10 @@ watch(odontogramType, (newType) => {
   }
 })
 
-function getVisualizationRules(treatmentType: string): string[] {
-  const rules: string[] = []
-  for (const [rule, treatments] of Object.entries(VISUALIZATION_RULES)) {
-    if (treatments.includes(treatmentType)) {
-      rules.push(rule)
-    }
-  }
-  return rules
-}
+const clinicalHasError = computed(() =>
+  !!unsupportedLegacyType.value
+  || isOdontogramMappingIncomplete(odontogramType.value, clinicalCategory.value)
+)
 
 const isValid = computed(() => {
   if (!formData.value.internal_code || !itemName.value || !formData.value.category_id) {
@@ -297,6 +303,7 @@ const isValid = computed(() => {
     if (sessions.value.some(s => !s.label || s.default_price < 0)) return false
     if (!sessionsSumMatches.value) return false
   }
+  if (clinicalHasError.value) return false
   return true
 })
 
@@ -321,13 +328,13 @@ function handleSubmit() {
     ...formData.value,
     sessions: sessionsEnabled.value ? sessionsToPayload() : []
   }
-  if (odontogramType.value && clinicalCategory.value) {
-    payload.odontogram_mapping = {
-      odontogram_treatment_type: odontogramType.value,
-      visualization_rules: getVisualizationRules(odontogramType.value),
-      visualization_config: {},
-      clinical_category: clinicalCategory.value
-    }
+  const mapping = buildCatalogOdontogramMapping(
+    odontogramType.value,
+    clinicalCategory.value,
+    props.item?.odontogram_mapping
+  )
+  if (mapping) {
+    payload.odontogram_mapping = mapping
   }
 
   if (isCreateMode.value) {
@@ -432,7 +439,7 @@ function handleClose() {
               />
               {{ tab.label }}
               <span
-                v-if="(tab.id === 'general' && generalHasError) || (tab.id === 'pricing' && pricingHasError)"
+                v-if="(tab.id === 'general' && generalHasError) || (tab.id === 'pricing' && pricingHasError) || (tab.id === 'clinical' && clinicalHasError)"
                 class="w-1.5 h-1.5 rounded-full bg-danger-accent absolute top-2 right-1"
               />
             </button>
@@ -855,7 +862,10 @@ function handleClose() {
                         :placeholder="t('catalog.selectOdontogramType')"
                       />
                     </UFormField>
-                    <UFormField :label="t('catalog.clinicalCategory')">
+                    <UFormField
+                      :label="t('catalog.clinicalCategory')"
+                      :error="isOdontogramMappingIncomplete(odontogramType, clinicalCategory) ? t('validation.required') : false"
+                    >
                       <USelect
                         v-model="clinicalCategory"
                         :items="clinicalCategoryOptions"
@@ -866,6 +876,16 @@ function handleClose() {
                       />
                     </UFormField>
                   </div>
+                  <p
+                    v-if="unsupportedLegacyType"
+                    class="text-xs text-danger-accent flex items-start gap-1.5"
+                  >
+                    <UIcon
+                      name="i-lucide-alert-triangle"
+                      class="w-3.5 h-3.5 mt-0.5 shrink-0"
+                    />
+                    {{ t('catalog.odontogramLegacyTypeUnsupported', { type: unsupportedLegacyType }) }}
+                  </p>
                   <p
                     v-if="odontogramType"
                     class="text-xs text-info-accent flex items-start gap-1.5"

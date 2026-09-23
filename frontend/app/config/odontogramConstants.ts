@@ -5,7 +5,13 @@
  * All odontogram components should import from here instead of defining locally.
  */
 
-import type { MultiToothTreatmentConfig } from '~/types'
+import type {
+  ClinicalType,
+  MultiToothTreatmentConfig,
+  OdontogramMapping,
+  OdontogramMappingCreate,
+  VisualizationRuleLayer
+} from '~/types'
 
 // ============================================================================
 // Visualization Rules
@@ -304,6 +310,173 @@ export function getVisualizationRules(treatmentType: string): VisualizationRule[
 export function hasVisualizationRule(treatmentType: string, rule: VisualizationRule): boolean {
   const normalized = normalizeTreatmentType(treatmentType)
   return VISUALIZATION_RULES[rule].includes(normalized)
+}
+
+/**
+ * Maps PULP_FILL_CONFIG's `level` to the `extent` values the backend/odontogram
+ * data model documents for the `pulp_fill` layer (see `TreatmentOdontogramMapping.
+ * visualization_rules` in `backend/app/modules/catalog/models.py` and the seed data
+ * in `backend/app/modules/catalog/seed.py`, which is the source of truth for this
+ * correspondence: full -> "full", two_thirds -> "partial_2_3", half -> "partial_1_2").
+ */
+const PULP_EXTENT_BY_LEVEL: Record<PulpFillLevel, string> = {
+  full: 'full',
+  two_thirds: 'partial_2_3',
+  half: 'partial_1_2'
+}
+
+/**
+ * Build the structured visualization-rule layers the backend expects
+ * (`OdontogramMapping(Create).visualization_rules: list[dict]`) for a given
+ * treatment type, reusing the existing per-layer config sources instead of
+ * inventing new clinical values. One entry per matching Rule 1-4 bucket.
+ */
+export function getVisualizationRuleLayers(treatmentType: string): VisualizationRuleLayer[] {
+  const normalized = normalizeTreatmentType(treatmentType)
+  const layers: VisualizationRuleLayer[] = []
+
+  if (hasVisualizationRule(normalized, 'pulp_fill')) {
+    const pulp = PULP_FILL_CONFIG[normalized]
+    if (pulp) {
+      layers.push({ layer: 'pulp_fill', color: pulp.color, extent: PULP_EXTENT_BY_LEVEL[pulp.level] })
+    }
+  }
+  if (hasVisualizationRule(normalized, 'occlusal_surface')) {
+    const occlusal = OCCLUSAL_VISUALIZATION[normalized]
+    if (occlusal) {
+      layers.push({ layer: 'occlusal_surface', color: occlusal.color, kind: occlusal.type })
+    }
+  }
+  if (hasVisualizationRule(normalized, 'lateral_icon')) {
+    layers.push({ layer: 'lateral_icon', icon: normalized, color: getTreatmentColor(normalized) })
+  }
+  if (hasVisualizationRule(normalized, 'pattern_fill')) {
+    const pattern = PATTERN_CONFIG[normalized]
+    if (pattern) {
+      layers.push({ layer: 'cenital_pattern', pattern: pattern.type, color: pattern.color })
+    }
+  }
+
+  return layers
+}
+
+// ============================================================================
+// Catalog-writable clinical types
+// ============================================================================
+
+/**
+ * The only values the catalog editor may write as `odontogram_treatment_type`.
+ * Mirrors the backend `TreatmentType` enum (`odontogram/constants.py`), because a
+ * Treatment created from the mapping uses it as `clinical_type`. Deliberately
+ * separate from ALL_TREATMENT_TYPES, which still carries legacy/render-only
+ * values (filling, root_canal, bridge_pontic, pontic, bridge_abutment).
+ */
+export const CATALOG_ODONTOGRAM_TREATMENT_TYPES = [
+  // Diagnóstico
+  'pulpitis',
+  'caries',
+  'incipient_caries',
+  'pigmentation',
+  'fracture',
+  'missing',
+  'periapical_small',
+  'periapical_medium',
+  'periapical_large',
+  'rotated',
+  'displaced',
+  'unerupted',
+  // Restauradora
+  'filling_composite',
+  'filling_amalgam',
+  'filling_temporary',
+  'sealant',
+  'veneer',
+  'inlay',
+  'overlay',
+  'crown',
+  'crown_on_implant',
+  'provisional_crown_on_implant',
+  'bridge',
+  'splint',
+  // Cirugía
+  'extraction',
+  'implant',
+  'apicoectomy',
+  // Endodoncia
+  'root_canal_full',
+  'root_canal_two_thirds',
+  'root_canal_half',
+  'post',
+  'root_canal_overfill',
+  // Ortodoncia
+  'bracket',
+  'tube',
+  'band',
+  'attachment',
+  'retainer'
+] as const satisfies readonly ClinicalType[]
+
+export type CatalogOdontogramTreatmentType = typeof CATALOG_ODONTOGRAM_TREATMENT_TYPES[number]
+
+export function isCatalogOdontogramTreatmentType(value: unknown): value is CatalogOdontogramTreatmentType {
+  return typeof value === 'string'
+    && (CATALOG_ODONTOGRAM_TREATMENT_TYPES as readonly string[]).includes(value)
+}
+
+/**
+ * Legacy values the catalog editor may upgrade on read because the modern type
+ * is a true 1:1 equivalent. `bridge_pontic` is intentionally absent: a modern
+ * `bridge` is multi-tooth with pillar/pontic roles, so there is no safe mapping
+ * from an old single-tooth pontic — the user must choose a type explicitly.
+ */
+const CATALOG_SAFE_LEGACY_NORMALIZATION: Readonly<Record<string, CatalogOdontogramTreatmentType>> = {
+  filling: 'filling_composite',
+  root_canal: 'root_canal_full'
+}
+
+/**
+ * Resolve a stored mapping type for the catalog editor. Returns a writable type,
+ * or `undefined` when the stored value has no safe modern equivalent (the caller
+ * then shows it as legacy/unsupported instead of re-writing it).
+ */
+export function resolveCatalogOdontogramType(stored: string | null | undefined): CatalogOdontogramTreatmentType | undefined {
+  if (!stored) return undefined
+  if (isCatalogOdontogramTreatmentType(stored)) return stored
+  return CATALOG_SAFE_LEGACY_NORMALIZATION[stored]
+}
+
+/** A selected odontogram type needs a clinical category; "no mapping" needs none. */
+export function isOdontogramMappingIncomplete(
+  treatmentType: string | null | undefined,
+  clinicalCategory: string | null | undefined
+): boolean {
+  return !!treatmentType && !clinicalCategory
+}
+
+/**
+ * Build the odontogram mapping payload the catalog editor sends. Returns `null`
+ * unless the type is backend-writable, so an invalid clinical type can never
+ * reach the API from the editor.
+ *
+ * When `existing` is stored with exactly the same type, its visualization
+ * rules/config are kept as-is: catalog items (e.g. seeded crown variants) carry
+ * per-item colours/patterns that the type defaults would overwrite. A changed
+ * type — including a legacy value upgraded on read (filling → filling_composite)
+ * — gets the modern defaults instead.
+ */
+export function buildCatalogOdontogramMapping(
+  treatmentType: string | null | undefined,
+  clinicalCategory: string | null | undefined,
+  existing?: OdontogramMapping | null
+): OdontogramMappingCreate | null {
+  if (!isCatalogOdontogramTreatmentType(treatmentType) || !clinicalCategory) return null
+  const kept = existing && existing.odontogram_treatment_type === treatmentType ? existing : null
+  return {
+    odontogram_treatment_type: treatmentType,
+    visualization_rules: kept ? kept.visualization_rules : getVisualizationRuleLayers(treatmentType),
+    visualization_config: kept ? kept.visualization_config : { color: getTreatmentColor(treatmentType) },
+    clinical_category: clinicalCategory
+  }
 }
 
 // ============================================================================
