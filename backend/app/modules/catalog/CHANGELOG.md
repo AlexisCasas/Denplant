@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- fix(HOTFIX-CATALOG-01): `CatalogItemModal` sent `odontogram_mapping.visualization_rules` as bare rule names (`["occlusal_surface"]`), which the API rejects with 422 (`list[dict]`); it now sends structured layers built by `getVisualizationRuleLayers`. The odontogram-type selector offers only `CATALOG_ODONTOGRAM_TREATMENT_TYPES` (the backend `TreatmentType` values, now including `bridge`/`splint`; no `filling`/`root_canal`/`bridge_pontic`/`pontic`/`bridge_abutment`). Stored legacy `filling`/`root_canal` load as `filling_composite`/`root_canal_full`; any other unsupported stored type (e.g. `bridge_pontic`) is shown as a warning and blocks saving until a valid type is chosen. A selected type now requires a clinical category before saving. Editing an item whose stored type is unchanged keeps its existing `visualization_rules`/`visualization_config` verbatim; only a changed (or legacy-upgraded) type gets the default rules.
+
 - fix(security): dentist catalog responses and catalog UI omit prices, costs, VAT and pricing configuration.
 
 - fix(#184): type-check clean — VAT-type toasts use semantic colours; `useCatalog` passes typed payloads to `useApi` without `Record` casts; `CatalogItemModal` builds a typed payload (create narrows the required fields instead of casting), option lists are typed to the form's unions, `UTextarea :rows` is a number; VAT badge colours are `UiColor`.

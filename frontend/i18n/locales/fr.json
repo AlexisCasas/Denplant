@@ -1818,6 +1818,7 @@
     "clinicalCategory": "Catégorie clinique",
     "noOdontogramMapping": "Aucune association",
     "odontogramMappingHint": "Les caractéristiques du traitement seront automatiquement ajustées en fonction du type sélectionné.",
+    "odontogramLegacyTypeUnsupported": "L'ancien type \"{type}\" n'est plus pris en charge. Sélectionnez un type de traitement valide avant d'enregistrer.",
     "selectCategory": "Sélectionner une catégorie...",
     "selectVatType": "Sélectionner un type de TVA...",
     "selectScope": "Sélectionner un périmètre...",

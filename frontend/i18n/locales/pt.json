@@ -1818,6 +1818,7 @@
     "clinicalCategory": "Categoria clínica",
     "noOdontogramMapping": "Sem associação",
     "odontogramMappingHint": "As características do tratamento serão ajustadas automaticamente com base no tipo selecionado.",
+    "odontogramLegacyTypeUnsupported": "O tipo antigo \"{type}\" já não é suportado. Selecione um tipo de tratamento válido antes de guardar.",
     "selectCategory": "Selecionar categoria...",
     "selectVatType": "Selecionar tipo de IVA...",
     "selectScope": "Selecionar âmbito...",
