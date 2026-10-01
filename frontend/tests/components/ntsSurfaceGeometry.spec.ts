@@ -49,6 +49,7 @@ import {
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import type {
   NtsPoint,
+  NtsRootGeometry,
   NtsTooth
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import {
@@ -696,13 +697,16 @@ describe('G — a trifurcated root is not three separate triangles', () => {
     }
   })
 
-  it('a root still draws as one closed triangle, and the cell still gets a path each', () => {
+  it('a root keeps its full triangle for measuring, and the cell still gets a path each', () => {
     const geometry = toothGeometry(tooth(16))
     expect(geometry.roots).toHaveLength(3)
     for (const shape of geometry.rootShapes) {
       expect(shape.d).toMatch(/^M[-\d.]+,[-\d.]+ L[-\d.]+,[-\d.]+ L[-\d.]+,[-\d.]+ Z$/)
     }
-    expect(geometry.roots).toEqual(geometry.rootShapes.map(s => s.d))
+    // What is stroked is each root's `visual`; only the side roots of a
+    // three-rooted tooth differ from their full outline (see QW1-C below).
+    expect(geometry.roots).toEqual(geometry.rootShapes.map(s => s.visual))
+    expect(geometry.roots[1]).toBe(geometry.rootShapes[1]!.d)
   })
 
   it('one- and two-rooted teeth are untouched', () => {
@@ -1195,7 +1199,7 @@ describe('NTS-05D.4d — the attachment spans the crown, not a cluster in its mi
     expect(upper[2]!.base.x).toBe(molar[1]!.base.x)
   })
 
-  it('the roots still overlap, and visibly', () => {
+  it('the root BASES still overlap (only what is stroked changed, see QW1-C)', () => {
     for (const t of TRIFURCATED_TEETH) {
       const { crown, rootShapes } = toothGeometry(t)
       for (let i = 0; i < rootShapes.length - 1; i++) {
@@ -1267,11 +1271,152 @@ describe('NTS-05D.4d — the attachment spans the crown, not a cluster in its mi
     ])
   })
 
-  it('a three-rooted tooth draws the paths this ticket settled on', () => {
-    expect(toothGeometry(tooth(16)).roots).toEqual([
+  it('a three-rooted tooth measures from the outlines this ticket settled on', () => {
+    expect(toothGeometry(tooth(16)).rootShapes.map(s => s.d)).toEqual([
       'M7.9,82 L22.86,2 L43.1,82 Z',
       'M29.9,82 L47.5,2 L65.1,82 Z',
       'M51.9,82 L72.14,2 L87.1,82 Z'
     ])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// QW1-C — three roots, the middle one in front, no crossing strokes
+// ---------------------------------------------------------------------------
+
+type Pt = { x: number, y: number }
+
+/** Every straight segment of an `M … L … [Z]` path, as point pairs. */
+function segmentsOf(path: string): Array<[Pt, Pt]> {
+  const points = [...path.matchAll(/[ML]([-\d.]+),([-\d.]+)/g)].map(m => ({ x: Number(m[1]), y: Number(m[2]) }))
+  const closed = /Z\s*$/.test(path)
+  const out: Array<[Pt, Pt]> = []
+  for (let i = 0; i < points.length - 1; i++) out.push([points[i]!, points[i + 1]!])
+  if (closed) out.push([points[points.length - 1]!, points[0]!])
+  return out
+}
+
+/** Proper crossing: the segments pass through each other's interior. */
+function cross(a: [Pt, Pt], b: [Pt, Pt]): boolean {
+  const side = (p: Pt, q: Pt, r: Pt) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
+  const eps = 1e-6
+  const d1 = side(a[0], a[1], b[0])
+  const d2 = side(a[0], a[1], b[1])
+  const d3 = side(b[0], b[1], a[0])
+  const d4 = side(b[0], b[1], a[1])
+  return d1 * d2 < -eps && d3 * d4 < -eps
+}
+
+describe('QW1-C — a three-rooted tooth reads as three roots, the middle one in front', () => {
+  it('the inventory is exactly the upper molars, permanent and deciduous', () => {
+    expect(TRIFURCATED_TEETH.map(t => t.fdi).sort((a, b) => a - b))
+      .toEqual([16, 17, 18, 26, 27, 28, 54, 55, 64, 65])
+  })
+
+  it.each([16, 17, 18, 26, 27, 28, 54, 55, 64, 65])('%i: no two drawn strokes cross', (fdi) => {
+    const segments = toothGeometry(tooth(fdi)).roots.flatMap(segmentsOf)
+    for (let i = 0; i < segments.length; i++) {
+      for (let j = i + 1; j < segments.length; j++) {
+        expect(cross(segments[i]!, segments[j]!), `${fdi}: ${i}x${j}`).toBe(false)
+      }
+    }
+  })
+
+  it('the old drawing did cross (the detector detects the defect)', () => {
+    const full = toothGeometry(tooth(16)).rootShapes.flatMap(s => segmentsOf(s.d))
+    let crossings = 0
+    for (let i = 0; i < full.length; i++) {
+      for (let j = i + 1; j < full.length; j++) if (cross(full[i]!, full[j]!)) crossings += 1
+    }
+    expect(crossings).toBeGreaterThan(0)
+  })
+
+  it.each(TRIFURCATED_TEETH.map(t => t.fdi))('%i: the middle root is drawn complete, the sides are open', (fdi) => {
+    const { roots, rootShapes } = toothGeometry(tooth(fdi))
+    expect(roots).toHaveLength(3)
+    expect(roots[1]).toBe(rootShapes[1]!.d)
+    expect(roots[1]).toMatch(/Z$/)
+    // A side root keeps its outer flank up to the apex and stops at the
+    // middle root: open path, three points, no closing base edge.
+    for (const side of [roots[0]!, roots[2]!]) {
+      expect(side).not.toMatch(/Z$/)
+      expect(side.match(/[ML]/g)).toHaveLength(3)
+    }
+  })
+
+  it.each(TRIFURCATED_TEETH.map(t => t.fdi))('%i: each side root still reaches its own apex and its own base corner', (fdi) => {
+    const { roots, rootShapes } = toothGeometry(tooth(fdi))
+    const [left, , right] = rootShapes as [NtsRootGeometry, NtsRootGeometry, NtsRootGeometry]
+    const first = segmentsOf(roots[0]!)
+    const last = segmentsOf(roots[2]!)
+    expect(first[0]![0]).toEqual({ x: left.left, y: left.base.y })
+    expect(first[0]![1]).toEqual({ x: left.tip.x, y: left.tip.y })
+    expect(last[0]![0]).toEqual({ x: right.right, y: right.base.y })
+    expect(last[0]![1]).toEqual({ x: right.tip.x, y: right.tip.y })
+  })
+
+  it.each(TRIFURCATED_TEETH.map(t => t.fdi))('%i: the side roots end ON the flank of the middle root, not inside it', (fdi) => {
+    const { roots, rootShapes } = toothGeometry(tooth(fdi))
+    const middle = rootShapes[1]!
+    for (const [path, flankBase] of [[roots[0]!, middle.left], [roots[2]!, middle.right]] as const) {
+      const end = segmentsOf(path)[1]![1]
+      const from = { x: flankBase, y: middle.base.y }
+      const to = { x: middle.tip.x, y: middle.tip.y }
+      // Collinear with the middle root's flank (within rounding) ...
+      const area = (to.x - from.x) * (end.y - from.y) - (to.y - from.y) * (end.x - from.x)
+      expect(Math.abs(area) / Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThan(0.05)
+      // ... and between its base and its apex.
+      expect(end.y).toBeLessThan(middle.base.y)
+      expect(end.y).toBeGreaterThan(middle.tip.y)
+    }
+  })
+
+  it('three distinct apices remain, at the same places', () => {
+    for (const t of TRIFURCATED_TEETH) {
+      const tips = toothGeometry(t).rootShapes.map(s => s.tip.x)
+      expect(new Set(tips).size).toBe(3)
+    }
+  })
+
+  it('the attachment width is unchanged', () => {
+    for (const t of TRIFURCATED_TEETH) {
+      expect(attachmentEnvelope(t), String(t.fdi)).toBeGreaterThan(0.88)
+      expect(attachmentEnvelope(t), String(t.fdi)).toBeLessThan(0.92)
+    }
+  })
+
+  it('golden: tooth 16 draws these three paths', () => {
+    expect(toothGeometry(tooth(16)).roots).toEqual([
+      'M7.9,82 L22.86,2 L36.04,54.09',
+      'M29.9,82 L47.5,2 L65.1,82 Z',
+      'M87.1,82 L72.14,2 L58.96,54.09'
+    ])
+  })
+
+  it('rootShapes, rootBox and rootAxes still read the full outlines', () => {
+    const geometry = toothGeometry(tooth(16))
+    expect(geometry.rootShapes.map(s => s.d)).toEqual([
+      'M7.9,82 L22.86,2 L43.1,82 Z',
+      'M29.9,82 L47.5,2 L65.1,82 Z',
+      'M51.9,82 L72.14,2 L87.1,82 Z'
+    ])
+    expect(rootAxes(16)).toHaveLength(3)
+    expect(rootBox(16)).not.toBeNull()
+  })
+
+  it('one- and two-rooted teeth: visual equals outline, byte for byte', () => {
+    for (const t of NTS_ALL_TEETH.filter(t => rootCountFor(t) !== 3)) {
+      const { roots, rootShapes } = toothGeometry(t)
+      expect(roots, String(t.fdi)).toEqual(rootShapes.map(s => s.d))
+    }
+  })
+
+  it('screen and print draw the same roots: both go through toothGeometry().roots', () => {
+    const dir = resolve(process.cwd(), '../backend/app/modules/odontogram/frontend/components/odontogram')
+    const cell = readFileSync(resolve(dir, 'NtsToothCell.vue'), 'utf8')
+    const print = readFileSync(resolve(dir, 'NtsOdontogramPrintView.vue'), 'utf8')
+    expect(cell).toContain('geometry.roots')
+    // The sheet embeds the chart component, never its own copy of the roots.
+    expect(print).not.toMatch(/rootShapes|\.roots\b/)
   })
 })

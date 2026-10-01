@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- fix(nts): **three-rooted teeth (16/17/18/26/27/28/54/55/64/65) no longer draw crossing root outlines.**
+
+  The cell stroked three complete overlapping triangles, so the side roots
+  crossed the middle one in an X. `NtsRootGeometry` gains `visual`, the path
+  the cell strokes: the middle root stays a complete triangle and each side
+  root keeps its outer flank up to its apex and its inner flank only down to
+  the middle root's flank. No background fill is used (dark mode and print are
+  unaffected). `rootShapes` (`d`, tips, bases, `left`/`right`), `rootBox`,
+  `rootAxes` and every overlay are unchanged; one- and two-rooted teeth are
+  byte-identical.
+
+- fix(nts): **graphic polish of the fixed orthodontic appliance and the diastema** (frontend only; no rule, catalog, persistence or backend change).
+
+  - Fixed appliance (6.1.1): the connector ran to the *cell borders* of the
+    span (`rangeSpan`) while the endpoint squares sit at the tooth centres, so
+    the line stuck out past each square. When a rule also declares
+    `range_endpoints` symbols at the same band, the connector now joins those
+    markers and stops at their inner edges. Both read their position from one
+    shared helper (`rangeEndpointMarkers`). `rangeSpan` is unchanged.
+  - Diastema (6.1.6): drawn as `)(` (the previous path bulged outward, `( )`,
+    contradicting its own comment) and sized from the pair's crown gutter and
+    crown height instead of from the first tooth, so it is symmetric, does not
+    depend on selection order and no longer reaches ~30% into each crown.
+
 - fix(nts-05f.4a): **every printed page carries the record's identity.**
 
   05F.4 measured the gap and left it open: page 2 of a multi-page sheet began

@@ -300,7 +300,17 @@ function region(id: string, points: NtsPoint[]): NtsCrownRegion {
  * `d` is still emitted from exactly these points, so nothing drawn changes.
  */
 export interface NtsRootGeometry {
+  /**
+   * The root's full outline, from which every measurement is taken. Anchors,
+   * axes and overlays read this one and never `visual`.
+   */
   d: string
+  /**
+   * What the cell actually strokes. Equal to `d` for every root except the
+   * side roots of a trifurcated tooth, where the part of the outline that
+   * would run across the middle root is left out.
+   */
+  visual: string
   /** Where the root meets the crown: the midpoint of its base edge. */
   base: { x: number, y: number }
   /** The apex. */
@@ -315,9 +325,9 @@ export interface NtsToothGeometry {
   /** Outline of the crown, centred in its column. */
   crown: { x: number, y: number, width: number, height: number }
   regions: NtsCrownRegion[]
-  /** Path strings only — what the cell renders. Derived from `rootShapes`. */
+  /** Path strings only — what the cell renders. Derived from each root's `visual`. */
   roots: string[]
-  /** The same roots, measurable. Added by 05D.1; `roots` is unchanged. */
+  /** The same roots, measurable. Their `d` is the full outline, whatever `roots` draws. */
   rootShapes: NtsRootGeometry[]
 }
 
@@ -485,8 +495,10 @@ function rootShapes(tooth: NtsTooth, box: CrownBox): NtsRootGeometry[] {
     const left = r(box.left + i * slice + pad)
     const right = r(box.left + (i + 1) * slice - pad)
     const apex = r(box.left + i * slice + slice / 2)
+    const d = `M${left},${base} L${apex},${tip} L${right},${base} Z`
     return {
-      d: `M${left},${base} L${apex},${tip} L${right},${base} Z`,
+      d,
+      visual: d,
       base: { x: apex, y: base },
       tip: { x: apex, y: tip },
       left,
@@ -514,13 +526,15 @@ function trifurcated(
   const baseSpread = width * TRIFURCATED.baseSpread
   const tipSpread = width * TRIFURCATED.tipSpread
 
-  return [-1, 0, 1].map(side => {
+  const shapes = [-1, 0, 1].map(side => {
     const baseCentre = centre + baseSpread * side
     const apex = r(centre + tipSpread * side)
     const left = r(baseCentre - half)
     const right = r(baseCentre + half)
+    const d = `M${left},${base} L${apex},${tip} L${right},${base} Z`
     return {
-      d: `M${left},${base} L${apex},${tip} L${right},${base} Z`,
+      d,
+      visual: d,
       // The base midpoint stays the root's own, so a mark placed on a root
       // lands on that root and not on the trunk they share.
       base: { x: r(baseCentre), y: base },
@@ -529,6 +543,56 @@ function trifurcated(
       right
     }
   })
+
+  // The middle root is the one in front. Each side root keeps its outer flank
+  // and the part of its inner flank that is not behind it.
+  const [first, middle, last] = shapes as [NtsRootGeometry, NtsRootGeometry, NtsRootGeometry]
+  first.visual = sideRootVisual(first, middle, -1, base)
+  last.visual = sideRootVisual(last, middle, 1, base)
+  return shapes
+}
+
+/**
+ * The visible outline of a side root of a trifurcated tooth.
+ *
+ * Open path: outer base corner → apex → the point where the inner flank meets
+ * the middle root's flank. Past that point the inner flank would cross the
+ * middle root, so it is not drawn, and the base edge lies on the crown's own
+ * outline. Derived from the same corners as `d`, so nothing depends on the
+ * background colour and a printed sheet strokes exactly what the screen does.
+ * If the flanks never meet, the full outline is kept.
+ */
+function sideRootVisual(
+  side: NtsRootGeometry,
+  middle: NtsRootGeometry,
+  direction: -1 | 1,
+  base: number
+): string {
+  const inward = direction === -1 ? side.right : side.left
+  const outward = direction === -1 ? side.left : side.right
+  const middleBase = direction === -1 ? middle.left : middle.right
+  const hit = segmentIntersection(
+    { x: side.tip.x, y: side.tip.y }, { x: inward, y: base },
+    { x: middle.tip.x, y: middle.tip.y }, { x: middleBase, y: base }
+  )
+  if (!hit) return side.d
+  return `M${outward},${base} L${side.tip.x},${side.tip.y} L${r(hit.x)},${r(hit.y)}`
+}
+
+/** Where two segments cross, or `null` when they do not. */
+function segmentIntersection(
+  a1: NtsPoint, a2: NtsPoint, b1: NtsPoint, b2: NtsPoint
+): NtsPoint | null {
+  const dax = a2.x - a1.x
+  const day = a2.y - a1.y
+  const dbx = b2.x - b1.x
+  const dby = b2.y - b1.y
+  const denominator = dax * dby - day * dbx
+  if (denominator === 0) return null
+  const t = ((b1.x - a1.x) * dby - (b1.y - a1.y) * dbx) / denominator
+  const u = ((b1.x - a1.x) * day - (b1.y - a1.y) * dax) / denominator
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null
+  return { x: a1.x + t * dax, y: a1.y + t * day }
 }
 
 /**
@@ -575,7 +639,7 @@ export function toothGeometry(tooth: NtsTooth): NtsToothGeometry {
       ]),
       ...centralRegions(box, centralRegionCountFor(tooth))
     ],
-    roots: shapes.map(shape => shape.d),
+    roots: shapes.map(shape => shape.visual),
     rootShapes: shapes
   }
 }
