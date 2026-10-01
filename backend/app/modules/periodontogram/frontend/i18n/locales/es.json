@@ -56,7 +56,9 @@
       "furcaLP": "Furca L/P",
       "furcaLPTitle": "Furca lingual/palatina (0/I/II/III)",
       "gingivalWidth": "Anchura encía",
-      "siteMarkerAria": "Sitio {code}, sondaje {depth}"
+      "siteMarkerAria": "Sitio {code}, sondaje {depth}",
+      "sum": "Suma",
+      "sumTitle": "{code} suma: sondaje + margen (solo lectura)"
     },
     "loading": "Cargando periodontograma…",
     "errors": {
