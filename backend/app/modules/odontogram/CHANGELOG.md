@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(QW4): **Diagnóstico gives the chart the full width.** The notes right rail, its mobile button and its slideover are gone (the notes live in the Clinical tab's Evolución mode); `DiagnosisMode` no longer renders `odontogram.diagnosis.sidebar`. A compact "Añadir nota" button emits `add-note` with the last tooth the clinician was on, if any. `ClinicalModeToggle` draws the fifth option when `show-evolution` is set.
+
 - fix(nts): **three-rooted teeth (16/17/18/26/27/28/54/55/64/65) no longer draw crossing root outlines.**
 
   The cell stroked three complete overlapping triangles, so the side roots

@@ -86,6 +86,9 @@ None.
     drives the Cobros sub-mode in the Administración tab.
   - `patient.detail.sidebar` — deprecated, kept registered for
     community modules. Renders as a section at the bottom of Resumen.
+  - `patient.clinical.evolution` — the fifth mode of `ClinicalTab`
+    (Evolución), filled by `clinical_notes`. Ctx `{ patientId,
+    readonly? }`. The tab is hidden without `clinical_notes.notes.read`.
   - `patient.diagnosis.subtabs` — optional sub-tabs rendered inside
     the *Diagnosis* mode of `ClinicalTab`, alongside the implicit
     "Odontograma" tab. Ctx `{ patientId, readonly? }`. Order

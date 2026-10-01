@@ -6,7 +6,8 @@
       "treatment": "Treatment",
       "treatment_plan": "Plan",
       "appointment_clinical": "Clinical",
-      "appointment_administrative": "Administrative"
+      "appointment_administrative": "Administrative",
+      "evolution": "Evolution"
     },
     "appointment": {
       "addByType": "Add {label} note",
@@ -62,7 +63,8 @@
       "treatment": "Treatment",
       "treatmentOnTooth": "{label} (tooth {n})",
       "plan": "Plan",
-      "planNamed": "Plan: {label}"
+      "planNamed": "Plan: {label}",
+      "appointment": "Appointment"
     },
     "actions": {
       "showMore": "Show more",
@@ -119,6 +121,35 @@
       "admin_phone_call": "Patient call: \nReason: \nAction taken: \nFollow-up: ",
       "admin_reschedule": "Reschedule request: \nCurrent date: \nNew proposal: ",
       "general_follow_up": "Findings: \nProcedure performed: \nPatient instructions: "
+    },
+    "evolution": {
+      "title": "Patient evolution",
+      "count": "{n} notes",
+      "newEvolution": "New evolution",
+      "newDiagnosisNote": "New diagnosis note",
+      "newDiagnosisNoteTooth": "New diagnosis note · tooth {n}",
+      "printPreparing": "Loading the full history…",
+      "printFailed": "The history could not be loaded for printing.",
+      "printIncomplete": "Only part of the history could be loaded; the printout is incomplete.",
+      "filtersLabel": "Note types",
+      "filterAll": "All clinical",
+      "empty": {
+        "title": "No clinical notes yet",
+        "help": "Evolution, diagnosis, treatment, plan and appointment notes appear here, newest first."
+      },
+      "print": {
+        "label": "Print evolution",
+        "documentTitle": "Patient evolution",
+        "clinic": "Clinic",
+        "patient": "Patient",
+        "document": "ID",
+        "printedOn": "Printed on",
+        "totalNotes": "{n} notes, oldest first",
+        "noNotes": "This patient has no clinical notes.",
+        "author": "Professional",
+        "attachments": "Attachments",
+        "unknownAuthor": "Unknown professional"
+      }
     }
   }
 }

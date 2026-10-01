@@ -592,7 +592,7 @@ export interface ToothRecordWithTreatments extends ToothRecord {
 // the odontogram layer's <ClinicalModeToggle>.
 // ============================================================================
 
-export type ClinicalMode = 'history' | 'diagnosis' | 'plans' | 'appointments'
+export type ClinicalMode = 'history' | 'diagnosis' | 'plans' | 'appointments' | 'evolution'
 
 // ============================================================================
 // VAT Type Types
@@ -2166,13 +2166,14 @@ export interface CompleteItemRequest {
 }
 
 // Clinical notes — owned by the ``clinical_notes`` module since issue #60.
-// Polymorphic over four note_type / owner_type pairings:
-//   administrative + diagnosis → owner_type='patient'
+// Polymorphic over five note_type / owner_type pairings:
+//   administrative + diagnosis + evolution → owner_type='patient'
 //   treatment                  → owner_type='treatment' (odontogram.Treatment.id)
 //   treatment_plan             → owner_type='plan' (treatment_plans.id)
 export type NoteType
   = | 'administrative'
     | 'diagnosis'
+    | 'evolution'
     | 'treatment'
     | 'treatment_plan'
     | 'appointment_clinical'

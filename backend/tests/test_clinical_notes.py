@@ -385,3 +385,205 @@ async def test_appointment_response_no_legacy_notes_field(
     resp = await client.get(f"/api/v1/agenda/appointments/{apt.id}", headers=auth_headers)
     assert resp.status_code == 200, resp.text
     assert "notes" not in resp.json()["data"]
+
+
+# ---------------------------------------------------------------------------
+# Evolution notes (clinical_notes cn_0005) — patient-owned, tooth-less
+# ---------------------------------------------------------------------------
+
+
+def _evolution_payload(patient_id: str, **overrides) -> dict:
+    return {
+        "note_type": "evolution",
+        "owner_type": "patient",
+        "owner_id": patient_id,
+        "body": "Paciente refiere mejoría tras la última sesión",
+        **overrides,
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_evolution_note_is_patient_owned_without_tooth(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
+):
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    resp = await client.post(
+        "/api/v1/clinical_notes/notes",
+        headers=auth_headers,
+        json=_evolution_payload(ctx["patient_id"]),
+    )
+    assert resp.status_code == 201, resp.text
+    note = resp.json()["data"]
+    assert note["note_type"] == "evolution"
+    assert note["owner_type"] == "patient"
+    assert note["owner_id"] == ctx["patient_id"]
+    assert note["tooth_number"] is None
+
+
+@pytest.mark.asyncio
+async def test_evolution_rejects_a_tooth(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
+):
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    resp = await client.post(
+        "/api/v1/clinical_notes/notes",
+        headers=auth_headers,
+        json=_evolution_payload(ctx["patient_id"], tooth_number=47),
+    )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("owner_type", ["treatment", "plan", "appointment"])
+async def test_evolution_rejects_any_other_owner(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    db_session: AsyncSession,
+    owner_type: str,
+):
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    resp = await client.post(
+        "/api/v1/clinical_notes/notes",
+        headers=auth_headers,
+        json=_evolution_payload(ctx["patient_id"], owner_type=owner_type, owner_id=str(uuid4())),
+    )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_database_matrix_rejects_evolution_outside_the_contract(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
+):
+    """The CHECK is the backstop behind the schema validator."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.modules.clinical_notes.models import ClinicalNote
+
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    me = await client.get("/api/v1/auth/me", headers=auth_headers)
+    user_id = UUID(me.json()["data"]["user"]["id"])
+    clinic_id = UUID(ctx["clinic_id"])
+    patient_id = UUID(ctx["patient_id"])
+
+    bad_rows = [
+        {"owner_type": "plan", "owner_id": uuid4(), "tooth_number": None},
+        {"owner_type": "patient", "owner_id": patient_id, "tooth_number": 11},
+    ]
+    for bad in bad_rows:
+        db_session.add(
+            ClinicalNote(
+                clinic_id=clinic_id,
+                note_type="evolution",
+                body="x",
+                author_id=user_id,
+                **bad,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            await db_session.flush()
+        await db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_recent_feed_lists_evolution_and_filters_by_it(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
+):
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    for note_type, body in (
+        ("administrative", "Admin"),
+        ("diagnosis", "Diag"),
+        ("evolution", "Evo"),
+    ):
+        resp = await client.post(
+            "/api/v1/clinical_notes/notes",
+            headers=auth_headers,
+            json={
+                "note_type": note_type,
+                "owner_type": "patient",
+                "owner_id": ctx["patient_id"],
+                "body": body,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+
+    everything = await client.get(
+        f"/api/v1/clinical_notes/patients/{ctx['patient_id']}/recent", headers=auth_headers
+    )
+    assert {r["body"] for r in everything.json()["data"]} == {"Admin", "Diag", "Evo"}
+
+    only_evolution = await client.get(
+        f"/api/v1/clinical_notes/patients/{ctx['patient_id']}/recent?types=evolution",
+        headers=auth_headers,
+    )
+    assert only_evolution.status_code == 200, only_evolution.text
+    rows = only_evolution.json()["data"]
+    assert [r["body"] for r in rows] == ["Evo"]
+    assert rows[0]["linked"]["kind"] == "patient"
+    assert rows[0]["linked"]["tooth_number"] is None
+
+    # The Evolución tab's default: every clinical type, no administrative ones.
+    clinical = await client.get(
+        f"/api/v1/clinical_notes/patients/{ctx['patient_id']}/recent"
+        "?types=evolution&types=diagnosis&types=treatment&types=treatment_plan"
+        "&types=appointment_clinical",
+        headers=auth_headers,
+    )
+    assert {r["body"] for r in clinical.json()["data"]} == {"Diag", "Evo"}
+
+
+@pytest.mark.asyncio
+async def test_creating_an_evolution_note_publishes_its_own_event(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
+):
+    from app.core.events import EventType, event_bus
+
+    captured: list[dict] = []
+
+    async def _spy(data: dict) -> None:
+        captured.append(data)
+
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    event_bus.subscribe(EventType.CLINICAL_NOTE_EVOLUTION_CREATED, _spy)
+    try:
+        resp = await client.post(
+            "/api/v1/clinical_notes/notes",
+            headers=auth_headers,
+            json=_evolution_payload(ctx["patient_id"]),
+        )
+    finally:
+        event_bus.unsubscribe(EventType.CLINICAL_NOTE_EVOLUTION_CREATED, _spy)
+
+    assert resp.status_code == 201, resp.text
+    assert EventType.CLINICAL_NOTE_EVOLUTION_CREATED == "clinical_notes.evolution_created"
+    assert len(captured) == 1
+    assert captured[0]["note_type"] == "evolution"
+    assert captured[0]["owner_type"] == "patient"
+    assert captured[0]["patient_id"] == ctx["patient_id"]
+    assert captured[0]["tooth_number"] is None
+
+
+@pytest.mark.asyncio
+async def test_existing_note_types_are_still_valid(
+    client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
+):
+    """cn_0005 widened the constraints; nothing that was legal before broke."""
+    ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+    treatment_id = await _seed_treatment(db_session, ctx["clinic_id"], ctx["patient_id"])
+    cases = [
+        ("administrative", "patient", ctx["patient_id"], None),
+        ("diagnosis", "patient", ctx["patient_id"], 36),
+        ("treatment", "treatment", treatment_id, None),
+    ]
+    for note_type, owner_type, owner_id, tooth in cases:
+        resp = await client.post(
+            "/api/v1/clinical_notes/notes",
+            headers=auth_headers,
+            json={
+                "note_type": note_type,
+                "owner_type": owner_type,
+                "owner_id": owner_id,
+                "tooth_number": tooth,
+                "body": f"legacy {note_type}",
+            },
+        )
+        assert resp.status_code == 201, (note_type, resp.text)

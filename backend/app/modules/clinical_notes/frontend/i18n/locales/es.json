@@ -6,7 +6,8 @@
       "treatment": "Tratamiento",
       "treatment_plan": "Plan",
       "appointment_clinical": "Clínica",
-      "appointment_administrative": "Administrativa"
+      "appointment_administrative": "Administrativa",
+      "evolution": "Evolución"
     },
     "appointment": {
       "addByType": "Añadir nota {label}",
@@ -62,7 +63,8 @@
       "treatment": "Tratamiento",
       "treatmentOnTooth": "{label} (diente {n})",
       "plan": "Plan",
-      "planNamed": "Plan: {label}"
+      "planNamed": "Plan: {label}",
+      "appointment": "Cita"
     },
     "actions": {
       "showMore": "Ver más",
@@ -119,6 +121,35 @@
       "admin_phone_call": "Llamada del paciente: \nMotivo: \nAcción tomada: \nSeguimiento: ",
       "admin_reschedule": "Solicita cambio de cita: \nFecha actual: \nNueva propuesta: ",
       "general_follow_up": "Hallazgos: \nProcedimiento realizado: \nIndicaciones al paciente: "
+    },
+    "evolution": {
+      "title": "Evolución del paciente",
+      "count": "{n} notas",
+      "newEvolution": "Nueva evolución",
+      "newDiagnosisNote": "Nueva nota de diagnóstico",
+      "newDiagnosisNoteTooth": "Nueva nota de diagnóstico · diente {n}",
+      "printPreparing": "Cargando todo el histórico…",
+      "printFailed": "No se pudo cargar el histórico para imprimir.",
+      "printIncomplete": "Solo se pudo cargar una parte del histórico; la impresión está incompleta.",
+      "filtersLabel": "Tipos de nota",
+      "filterAll": "Todas las clínicas",
+      "empty": {
+        "title": "Sin notas clínicas todavía",
+        "help": "Las notas de evolución, diagnóstico, tratamiento, plan y cita aparecen aquí, de más reciente a más antigua."
+      },
+      "print": {
+        "label": "Imprimir evolución",
+        "documentTitle": "Evolución del paciente",
+        "clinic": "Clínica",
+        "patient": "Paciente",
+        "document": "Documento",
+        "printedOn": "Impreso el",
+        "totalNotes": "{n} notas, de más antigua a más reciente",
+        "noNotes": "Este paciente no tiene notas clínicas.",
+        "author": "Profesional",
+        "attachments": "Adjuntos",
+        "unknownAuthor": "Profesional desconocido"
+      }
     }
   }
 }

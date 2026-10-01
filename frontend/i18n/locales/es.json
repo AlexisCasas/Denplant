@@ -991,7 +991,8 @@
       "history": "Histórico",
       "diagnosis": "Diagnóstico",
       "plans": "Planes de tratamiento",
-      "appointments": "Citas"
+      "appointments": "Citas",
+      "evolution": "Evolución"
     },
     "history": {
       "stateAt": "Estado a fecha",
@@ -1009,7 +1010,8 @@
       "continuePlan": "Continuar Plan \"{name}\"",
       "selectPlan": "Seleccionar plan",
       "continue": "Continuar",
-      "odontogramTab": "Odontograma"
+      "odontogramTab": "Odontograma",
+      "addNote": "Añadir nota"
     },
     "plans": {
       "title": "Planes de Tratamiento",

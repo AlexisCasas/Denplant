@@ -48,6 +48,9 @@ from app.database import Base, TimestampMixin
 # Note types — discriminator surfaced to the UI for filtering + color-coding.
 NOTE_TYPE_ADMINISTRATIVE = "administrative"
 NOTE_TYPE_DIAGNOSIS = "diagnosis"
+# Longitudinal, patient-wide clinical entry (the "Evolución" tab). Not a
+# diagnosis: it carries no tooth and is owned by the patient.
+NOTE_TYPE_EVOLUTION = "evolution"
 NOTE_TYPE_TREATMENT = "treatment"
 NOTE_TYPE_TREATMENT_PLAN = "treatment_plan"
 NOTE_TYPE_APPOINTMENT_CLINICAL = "appointment_clinical"
@@ -55,6 +58,7 @@ NOTE_TYPE_APPOINTMENT_ADMINISTRATIVE = "appointment_administrative"
 NOTE_TYPES = (
     NOTE_TYPE_ADMINISTRATIVE,
     NOTE_TYPE_DIAGNOSIS,
+    NOTE_TYPE_EVOLUTION,
     NOTE_TYPE_TREATMENT,
     NOTE_TYPE_TREATMENT_PLAN,
     NOTE_TYPE_APPOINTMENT_CLINICAL,
@@ -111,7 +115,7 @@ class ClinicalNote(Base, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint(
-            "note_type IN ('administrative', 'diagnosis', 'treatment', "
+            "note_type IN ('administrative', 'diagnosis', 'evolution', 'treatment', "
             "'treatment_plan', 'appointment_clinical', 'appointment_administrative')",
             name="ck_clinical_notes_note_type",
         ),
@@ -122,6 +126,7 @@ class ClinicalNote(Base, TimestampMixin):
         CheckConstraint(
             "(note_type = 'administrative' AND owner_type = 'patient' AND tooth_number IS NULL) "
             "OR (note_type = 'diagnosis' AND owner_type = 'patient') "
+            "OR (note_type = 'evolution' AND owner_type = 'patient' AND tooth_number IS NULL) "
             "OR (note_type = 'treatment' AND owner_type = 'treatment' AND tooth_number IS NULL) "
             "OR (note_type = 'treatment_plan' AND owner_type = 'plan' "
             "AND tooth_number IS NULL) "

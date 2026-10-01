@@ -970,7 +970,8 @@
       "history": "வரலாறு",
       "diagnosis": "நோய் கண்டறிதல்",
       "plans": "சிகிச்சை திட்டங்கள்",
-      "appointments": "சந்திப்புகள்"
+      "appointments": "சந்திப்புகள்",
+      "evolution": "முன்னேற்றம்"
     },
     "history": {
       "stateAt": "நிலை",
@@ -988,7 +989,8 @@
       "continuePlan": "\"{name}\" திட்டத்தைத் தொடரவும்",
       "selectPlan": "திட்டத்தைத் தேர்ந்தெடுக்கவும்",
       "continue": "தொடரவும்",
-      "odontogramTab": "பல் வரைபடம்"
+      "odontogramTab": "பல் வரைபடம்",
+      "addNote": "குறிப்பு சேர்"
     },
     "plans": {
       "title": "சிகிச்சை திட்டங்கள்",

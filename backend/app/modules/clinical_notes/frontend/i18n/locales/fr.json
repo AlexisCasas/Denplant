@@ -6,7 +6,8 @@
       "treatment": "Traitement",
       "treatment_plan": "Plan",
       "appointment_clinical": "Clinique",
-      "appointment_administrative": "Administratif"
+      "appointment_administrative": "Administratif",
+      "evolution": "Évolution"
     },
     "appointment": {
       "addByType": "Ajouter une note {label}",
@@ -62,7 +63,8 @@
       "treatment": "Traitement",
       "treatmentOnTooth": "{label} (dent {n})",
       "plan": "Plan",
-      "planNamed": "Plan : {label}"
+      "planNamed": "Plan : {label}",
+      "appointment": "Rendez-vous"
     },
     "actions": {
       "showMore": "Afficher plus",
@@ -119,6 +121,35 @@
       "admin_phone_call": "Appel du patient : \nMotif : \nAction entreprise : \nSuivi : ",
       "admin_reschedule": "Demande de report : \nDate actuelle : \nNouvelle proposition : ",
       "general_follow_up": "Observations : \nProcédure réalisée : \nConsignes au patient : "
+    },
+    "evolution": {
+      "title": "Évolution du patient",
+      "count": "{n} notes",
+      "newEvolution": "Nouvelle évolution",
+      "newDiagnosisNote": "Nouvelle note de diagnostic",
+      "newDiagnosisNoteTooth": "Nouvelle note de diagnostic · dent {n}",
+      "printPreparing": "Chargement de tout l'historique…",
+      "printFailed": "L'historique n'a pas pu être chargé pour l'impression.",
+      "printIncomplete": "Seule une partie de l'historique a pu être chargée ; l'impression est incomplète.",
+      "filtersLabel": "Types de note",
+      "filterAll": "Toutes les cliniques",
+      "empty": {
+        "title": "Aucune note clinique pour le moment",
+        "help": "Les notes d'évolution, de diagnostic, de traitement, de plan et de rendez-vous apparaissent ici, de la plus récente à la plus ancienne."
+      },
+      "print": {
+        "label": "Imprimer l'évolution",
+        "documentTitle": "Évolution du patient",
+        "clinic": "Cabinet",
+        "patient": "Patient",
+        "document": "Document",
+        "printedOn": "Imprimé le",
+        "totalNotes": "{n} notes, de la plus ancienne à la plus récente",
+        "noNotes": "Ce patient n'a aucune note clinique.",
+        "author": "Professionnel",
+        "attachments": "Pièces jointes",
+        "unknownAuthor": "Professionnel inconnu"
+      }
     }
   }
 }

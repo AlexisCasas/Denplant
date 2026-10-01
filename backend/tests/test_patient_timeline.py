@@ -492,3 +492,43 @@ async def test_endpoint_returns_404_for_unknown_patient(
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Evolution notes (clinical_notes cn_0005)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_on_clinical_note_created_records_an_evolution_note(
+    db_session: AsyncSession, test_clinic: Clinic, test_patient: Patient
+):
+    await timeline_events.on_clinical_note_created(
+        {
+            **_base_payload(test_clinic, test_patient),
+            "note_id": str(uuid4()),
+            "note_type": "evolution",
+            "owner_type": "patient",
+            "owner_id": str(test_patient.id),
+            "tooth_number": None,
+            "body_excerpt": "Mejoría tras la sesión",
+            "user_id": None,
+        }
+    )
+
+    entries = await _entries_for(db_session, test_patient.id)
+    assert len(entries) == 1
+    assert entries[0].event_type == "clinical_notes.evolution_created"
+    assert entries[0].event_category == "note"
+    assert entries[0].title == "Nota de evolución"
+    assert entries[0].description == "Mejoría tras la sesión"
+
+
+def test_timeline_subscribes_to_the_evolution_event() -> None:
+    from app.modules.patient_timeline import PatientTimelineModule
+
+    handlers = PatientTimelineModule().get_event_handlers()
+    assert (
+        handlers[EventType.CLINICAL_NOTE_EVOLUTION_CREATED]
+        is timeline_events.on_clinical_note_created
+    )

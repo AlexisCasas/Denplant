@@ -19,7 +19,21 @@ export default defineNuxtPlugin(() => {
     permission: 'clinical_notes.notes.read'
   })
 
-  // Diagnosis-mode right rail (odontogram).
+  // Clinical tab → Evolución: the consolidated clinical-notes history,
+  // where new evolution notes are written and the whole history prints.
+  // ``patients`` renders the slot and never imports this module.
+  registerSlot('patient.clinical.evolution', {
+    id: 'clinical_notes.patient.clinical.evolution',
+    component: defineAsyncComponent(
+      () => import('../components/EvolutionNotesView.vue')
+    ),
+    order: 10,
+    permission: 'clinical_notes.notes.read'
+  })
+
+  // Diagnosis-mode right rail (odontogram). No longer rendered by the host
+  // (the notes moved to Evolución and the chart takes the width), but the
+  // registration stays: slot points are contracts.
   registerSlot('odontogram.diagnosis.sidebar', {
     id: 'clinical_notes.odontogram.diagnosis.sidebar',
     component: defineAsyncComponent(

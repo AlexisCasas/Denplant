@@ -970,7 +970,8 @@
       "history": "History",
       "diagnosis": "Diagnosis",
       "plans": "Treatment plans",
-      "appointments": "Appointments"
+      "appointments": "Appointments",
+      "evolution": "Evolution"
     },
     "history": {
       "stateAt": "State at",
@@ -988,7 +989,8 @@
       "continuePlan": "Continue Plan \"{name}\"",
       "selectPlan": "Select plan",
       "continue": "Continue",
-      "odontogramTab": "Odontogram"
+      "odontogramTab": "Odontogram",
+      "addNote": "Add note"
     },
     "plans": {
       "title": "Treatment Plans",
