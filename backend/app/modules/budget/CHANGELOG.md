@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- feat(QW-BUDGET): **printable budget: figures, clinic identity, logo, immutable signed PDF.**
+  - `pdf.py` is split into `build_pdf_context` (every figure and string, derived and formatted — the rules live here), `render_html` (presentation only, the part a client template replaces) and WeasyPrint. All database text is HTML-escaped.
+  - The table has a VAT column per line; the totals block is derived for display (`Subtotal − line discounts − global discount = Taxable base`, `+ VAT = Total`). The global discount is spread by `pricing.allocate_global_discount` only, VAT is the remainder to `budget.total`, so the shown total is exactly `budget.total`. Persisted formulas are unchanged.
+  - Clinic block prints name, legal name, tax id, address, phone, email and the logo; empty fields are omitted. Catalog names fall back es → en → fr → pt → ta (as billing).
+  - **Fix:** the signed-PDF paths built a partial `Clinic` from a raw SQL row without `currency`, so rendering raised, the acceptance swallowed it (every signature had `document_hash = NULL`) and the public signed-PDF download failed. Every route now passes the `Clinic` entity, and the PDF refuses anything else.
+  - **Signed PDFs are stored.** On acceptance the PDF is rendered once, written to storage, its SHA-256 goes to `BudgetSignature.document_hash` and the location to `signature_data.signed_pdf` (no migration). Downloads return those exact bytes (`X-Document-Source: stored`), verified against the hash. Changing logo, name, address or template no longer touches a signed document. The hash is no longer printed inside the PDF (a file cannot contain its own digest). Legacy signatures (no stored file) are not modified and fall back to on-the-fly rendering (`X-Document-Source: regenerated`).
+  - Known, out of scope: `treatment_plan` sends only `teeth[0]` (and its surfaces) to the budget, so a multi-tooth treatment prints one tooth.
+- fix(seed): demo budgets take the global discount from the VAT-inclusive items total, like `BudgetService._recalculate_totals` (PRES-2024-0005 was 549.50, now 545.30 on a fresh seed). Existing databases are not recalculated.
+
 - fix(security): deny dentists access to budget HTTP endpoints and monetary PDFs.
 
 - fix(#184): type-check clean — item helpers on the detail page accept the readonly item view.

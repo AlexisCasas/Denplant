@@ -1522,6 +1522,30 @@
       "setPasswordSubtitle": "Denplant-க்கு அழைக்கப்பட்டுள்ளீர்கள். உள்நுழைய உங்கள் கடவுச்சொல்லை உருவாக்கவும்.",
       "setPasswordSubmit": "சேமித்து உள்நுழை",
       "invalidToken": "இந்த இணைப்பு செல்லாதது அல்லது ஏற்கனவே பயன்படுத்தப்பட்டது. உங்கள் கிளினிக் நிர்வாகியிடம் புதியதைக் கேளுங்கள்."
+    },
+    "logo": {
+      "title": "Visual identity",
+      "description": "The clinic logo appears on budgets and on documents generated from now on.",
+      "none": "No logo",
+      "alt": "Clinic logo",
+      "upload": "Upload logo",
+      "replace": "Replace logo",
+      "remove": "Remove logo",
+      "confirmRemove": "Yes, remove",
+      "recommended": "Recommended size: {width}×{height} px (about 2.5:1), with a transparent background for PNG.",
+      "formats": "PNG, JPEG or WebP · up to {mb} MB · up to {max}×{max} px. SVG is not accepted.",
+      "pdfBox": "On the PDF it is printed inside a 50×20 mm box, never stretched.",
+      "signedNote": "Budgets that are already signed keep the logo they were signed with.",
+      "saved": "Logo updated",
+      "removed": "Logo removed",
+      "errors": {
+        "type": "The file must be a PNG, JPEG or WebP image.",
+        "size": "The file is larger than {mb} MB.",
+        "empty": "The file is empty.",
+        "dimensions": "The image is larger than {max}×{max} px.",
+        "animated": "Animated images are not accepted.",
+        "unreadable": "The image could not be read. Try another file."
+      }
     }
   },
   "selector": {

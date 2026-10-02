@@ -1522,6 +1522,30 @@
       "setPasswordSubtitle": "Vous êtes invité sur Denplant. Créez votre mot de passe pour vous connecter.",
       "setPasswordSubmit": "Enregistrer et se connecter",
       "invalidToken": "Ce lien est invalide ou déjà utilisé. Demandez-en un nouveau à l'administrateur de votre cabinet."
+    },
+    "logo": {
+      "title": "Identité visuelle",
+      "description": "Le logo du cabinet apparaît sur les devis et sur les documents générés à partir de maintenant.",
+      "none": "Aucun logo",
+      "alt": "Logo du cabinet",
+      "upload": "Téléverser le logo",
+      "replace": "Remplacer le logo",
+      "remove": "Supprimer le logo",
+      "confirmRemove": "Oui, supprimer",
+      "recommended": "Taille recommandée : {width}×{height} px (environ 2,5:1), fond transparent pour un PNG.",
+      "formats": "PNG, JPEG ou WebP · {mb} Mo maximum · {max}×{max} px maximum. Le SVG n'est pas accepté.",
+      "pdfBox": "Dans le PDF, il est imprimé dans un cadre de 50×20 mm, sans déformation.",
+      "signedNote": "Les devis déjà signés conservent le logo avec lequel ils ont été signés.",
+      "saved": "Logo mis à jour",
+      "removed": "Logo supprimé",
+      "errors": {
+        "type": "Le fichier doit être une image PNG, JPEG ou WebP.",
+        "size": "Le fichier dépasse {mb} Mo.",
+        "empty": "Le fichier est vide.",
+        "dimensions": "L'image dépasse {max}×{max} px.",
+        "animated": "Les images animées ne sont pas acceptées.",
+        "unreadable": "Impossible de lire l'image. Essayez un autre fichier."
+      }
     }
   },
   "selector": {

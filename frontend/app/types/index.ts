@@ -67,6 +67,16 @@ export interface OnboardingState {
   skipped?: Record<string, string>
 }
 
+/** What the server tells a client about the clinic logo (never its storage path). */
+export interface ClinicLogo {
+  mime_type: string | null
+  width: number | null
+  height: number | null
+  size: number | null
+  sha256: string | null
+  updated_at: string | null
+}
+
 export interface Clinic {
   id: string
   name: string
@@ -84,6 +94,8 @@ export interface Clinic {
     onboarding?: OnboardingState
   }
   cabinets: Cabinet[]
+  /** Derived from `settings.branding.logo`; `null` when the clinic has no logo. */
+  logo?: ClinicLogo | null
   created_at: string
   updated_at: string
 }

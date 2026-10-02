@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError
 from slowapi import Limiter
@@ -15,6 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.core.clinic_branding import (
+    MAX_LOGO_BYTES,
+    LogoValidationError,
+    load_logo,
+    logo_metadata,
+    remove_logo,
+    save_logo,
+)
 from app.core.events import EventType, event_bus
 from app.core.plugins import module_registry
 from app.core.schemas import ApiResponse, PaginatedApiResponse
@@ -38,6 +46,7 @@ from .permissions import (
 )
 from .schemas import (
     AuthResponse,
+    ClinicLogoMeta,
     ClinicMetadataResponse,
     ClinicMetadataUpdate,
     ClinicResponse,
@@ -813,6 +822,70 @@ async def update_clinic_metadata(
     clinic = result.scalar_one()
 
     return ApiResponse(data=ClinicMetadataResponse.model_validate(clinic))
+
+
+# --- Clinic logo (visual identity) ---------------------------------------
+#
+# The file lives in storage and ``clinic.settings.branding.logo`` holds only
+# its reference (see ``app.core.clinic_branding``). Reading needs
+# ``admin.clinic.read``; changing it needs ``admin.clinic.write``. Both act on
+# the caller's own clinic, taken from the context, never from the request.
+
+_LOGO_ERROR_STATUS = {
+    "too_large": 413,
+    "unsupported_type": 415,
+}
+
+
+@router.get("/clinic/logo")
+async def get_clinic_logo(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.read"))],
+) -> Response:
+    """The current logo image. 404 when the clinic has none."""
+    loaded = await load_logo(ctx.clinic)
+    if loaded is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No logo")
+    data, mime = loaded
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Cache-Control": "private, no-cache", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.post("/clinic/logo", response_model=ApiResponse[ClinicLogoMeta])
+async def upload_clinic_logo(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: Annotated[UploadFile, File()],
+) -> ApiResponse[ClinicLogoMeta]:
+    """Upload or replace the clinic logo (PNG, JPEG or WebP, ≤ 1 MB, ≤ 2000×2000 px)."""
+    # One byte over the limit is enough to know it is too large, without
+    # reading an arbitrarily large body into memory.
+    raw = await file.read(MAX_LOGO_BYTES + 1)
+    try:
+        await save_logo(ctx.clinic, raw)
+    except LogoValidationError as exc:
+        raise HTTPException(
+            status_code=_LOGO_ERROR_STATUS.get(exc.code, status.HTTP_400_BAD_REQUEST),
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    await db.commit()
+    return ApiResponse(data=ClinicLogoMeta(**(logo_metadata(ctx.clinic) or {})))
+
+
+@router.delete("/clinic/logo", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_clinic_logo(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Remove the clinic logo. Idempotent."""
+    await remove_logo(ctx.clinic)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

@@ -1543,6 +1543,30 @@
       "setPasswordSubtitle": "Te han invitado a Denplant. Crea tu contraseña para entrar.",
       "setPasswordSubmit": "Guardar y entrar",
       "invalidToken": "Este enlace no es válido o ya se ha usado. Pide uno nuevo al administrador de tu clínica."
+    },
+    "logo": {
+      "title": "Identidad visual",
+      "description": "El logo de la clínica aparece en los presupuestos y en los documentos que se generen a partir de ahora.",
+      "none": "Sin logo",
+      "alt": "Logo de la clínica",
+      "upload": "Subir logo",
+      "replace": "Sustituir logo",
+      "remove": "Eliminar logo",
+      "confirmRemove": "Sí, eliminar",
+      "recommended": "Tamaño recomendado: {width}×{height} px (relación aproximada 2,5:1), con fondo transparente si es PNG.",
+      "formats": "PNG, JPEG o WebP · máximo {mb} MB · máximo {max}×{max} px. No se admite SVG.",
+      "pdfBox": "En el PDF se imprime dentro de una caja de 50×20 mm, sin deformarlo.",
+      "signedNote": "Los presupuestos ya firmados conservan el logo con el que se firmaron.",
+      "saved": "Logo actualizado",
+      "removed": "Logo eliminado",
+      "errors": {
+        "type": "El archivo debe ser PNG, JPEG o WebP.",
+        "size": "El archivo supera {mb} MB.",
+        "empty": "El archivo está vacío.",
+        "dimensions": "La imagen supera {max}×{max} px.",
+        "animated": "No se admiten imágenes animadas.",
+        "unreadable": "No se pudo leer la imagen. Prueba con otro archivo."
+      }
     }
   },
   "selector": {

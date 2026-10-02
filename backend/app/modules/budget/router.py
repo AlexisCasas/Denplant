@@ -1,5 +1,6 @@
 """Budget module API router."""
 
+import logging
 from datetime import UTC, date, datetime
 from typing import Annotated
 from uuid import UUID
@@ -41,7 +42,15 @@ from .schemas import (
     TreatmentPlanBrief,
 )
 from .service import BudgetHistoryService, BudgetItemService, BudgetService
+from .signed_pdf import (
+    SOURCE_REGENERATED,
+    SOURCE_STORED,
+    SignedPdfIntegrityError,
+    load_signed_pdf,
+)
 from .workflow import BudgetWorkflowError, BudgetWorkflowService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(require_financial_visibility)])
 
@@ -818,13 +827,26 @@ async def download_signed_budget_pdf(
     from app.core.auth.models import Clinic
 
     clinic = await db.get(Clinic, ctx.clinic_id)
-    pdf_bytes = await BudgetPDFService.generate_pdf(
-        budget,
-        clinic,
-        is_preview=False,
-        locale=locale,
-        signature=signature,
-    )
+
+    # The signed document is the file stored at acceptance; a legacy signature
+    # (no stored file) is rendered on the fly and the response says so.
+    try:
+        pdf_bytes = await load_signed_pdf(signature)
+    except SignedPdfIntegrityError as exc:
+        logger.error("Signed PDF integrity failure: %s", exc)
+        raise HTTPException(
+            status_code=500, detail="The signed document failed its integrity check"
+        ) from exc
+    source = SOURCE_STORED
+    if pdf_bytes is None:
+        source = SOURCE_REGENERATED
+        pdf_bytes = await BudgetPDFService.generate_pdf(
+            budget,
+            clinic,
+            is_preview=False,
+            locale=locale,
+            signature=signature,
+        )
 
     filename = f"presupuesto_{budget.budget_number}_v{budget.version}_firmado.pdf"
     return Response(
@@ -832,6 +854,7 @@ async def download_signed_budget_pdf(
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Document-Source": source,
             "Cache-Control": "private, no-store",
         },
     )
