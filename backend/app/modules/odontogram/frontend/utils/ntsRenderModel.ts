@@ -611,8 +611,22 @@ function placeSymbol(
       if (teeth.length !== 2) return { reason: 'wrong_target_count' }
       const point = interproximalPoint(teeth[0]!, teeth[1]!, 'crown')
       if (!point) return { reason: 'targets_not_adjacent' }
-      const reference = crownBox(teeth[0]!)!
-      return { at: point, bounds: squareAround(point, reference, 0.9) }
+      // Sized from the pair itself, never from "the first tooth": the symbol
+      // lives in the gutter the two crowns leave between them, so its width is
+      // a little over that gutter (about an outline stroke into each crown) and
+      // its height is half the shorter crown. Sorting the pair by position
+      // first makes the result independent of selection order.
+      const first = crownBox(teeth[0]!)
+      const second = crownBox(teeth[1]!)
+      if (!first || !second) return { reason: 'tooth_not_on_chart' }
+      const [left, right] = first.x <= second.x ? [first, second] : [second, first]
+      const gutter = Math.max(0, right.x - (left.x + left.width))
+      const width = gutter * 1.5
+      const height = Math.min(left.height, right.height) * 0.5
+      return {
+        at: point,
+        bounds: { x: point.x - width / 2, y: point.y - height / 2, width, height }
+      }
     }
 
     case 'between_apices': {
@@ -914,7 +928,8 @@ function verticalLines(
 function resolveConnector(
   mark: CatalogMark,
   finding: NtsFinding,
-  base: DrawableBase
+  base: DrawableBase,
+  siblings: readonly CatalogMark[]
 ): NtsRenderInstruction[] {
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
     { ...base, kind: 'unsupported', layer: NTS_LAYERS.line, reason, markKind: mark.kind }
@@ -929,7 +944,32 @@ function resolveConnector(
   if (spans.length === 0) return fail('no_targets')
 
   if (style === 'straight_line') {
-    // Joins the marks at the extremes of the span, which is the span itself.
+    // When the rule also marks the extremes of the span, the line joins those
+    // markers and stops at their inner edges: a span runs to the cell borders,
+    // which is further than the markers reach, and the stub left over would
+    // read as the line continuing past them.
+    const joinsMarkers = siblings.some(other =>
+      other.kind === 'symbol'
+      && other.target_selector === 'range_endpoints'
+      && other.params.at === token
+    )
+    if (joinsMarkers) {
+      const strokes: NtsPoint[][] = []
+      for (const teeth of subjectGroups(finding)) {
+        const markers = rangeEndpointMarkers(teeth, level)
+        if (markers.length < 2) continue
+        const from = markers[0]!.bounds
+        const to = markers[markers.length - 1]!.bounds
+        const y = markers[0]!.at.y
+        if (from.x + from.width >= to.x) continue
+        strokes.push([{ x: from.x + from.width, y }, { x: to.x, y }])
+      }
+      // A lone endpoint has nothing to join: no stroke, never a stub.
+      if (subjectGroups(finding).length > 0) {
+        return [{ ...base, kind: 'connector', layer: NTS_LAYERS.line, style: 'straight_line', strokes }]
+      }
+    }
+
     return [{
       ...base,
       kind: 'connector',
@@ -1358,7 +1398,8 @@ export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRe
   let drawn = 0
   let total = 0
 
-  for (const mark of marksOf(rule)) {
+  const marks = marksOf(rule)
+  for (const mark of marks) {
     total += 1
 
     // Without a colour there is nothing to draw: both of the norm's colours
@@ -1392,7 +1433,7 @@ export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRe
       mark.kind === 'box_siglas' ? [resolveBox(mark, rule, finding, drawable)]
         : mark.kind === 'symbol' ? resolveSymbol(mark, rule, finding, drawable)
           : mark.kind === 'line' ? resolveLine(mark, finding, drawable)
-            : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable)
+            : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable, marks)
               : mark.kind === 'shape_fill' ? resolveArea(mark, finding, drawable, 'shape_fill')
                 : mark.kind === 'outline' ? resolveArea(mark, finding, drawable, 'outline')
                   : resolveArrow(mark, finding, drawable)
@@ -1513,20 +1554,33 @@ function resolveSelectedSymbols(
 
   const instructions: NtsSymbolInstruction[] = []
   for (const teeth of subjectGroups(finding)) {
-    const span = rangeSpan(teeth, level)
-    if (!span || teeth.length === 0) continue
-    const ordered = orderedByColumn(teeth)
-    const ends = ordered.length === 1 ? [ordered[0]!] : [ordered[0]!, ordered[ordered.length - 1]!]
-
-    for (const fdi of ends) {
-      const placement = toothPlacement(fdi)
-      if (!placement) continue
-      const point = { x: placement.center.x, y: span.y }
-      instructions.push(emit({ at: point, bounds: squareAround(point, placement.crown, 0.35) }))
-    }
+    for (const marker of rangeEndpointMarkers(teeth, level)) instructions.push(emit(marker))
   }
 
   return instructions.length > 0 ? instructions : fail('no_targets')
+}
+
+/**
+ * The marker drawn on each extreme of a span, in row order.
+ *
+ * One definition shared by the endpoint symbols and by the connector that
+ * joins them, so the line can end exactly where the marker begins without
+ * either one knowing the other's size.
+ */
+function rangeEndpointMarkers(teeth: readonly number[], level: NtsLevel): Placed[] {
+  const span = rangeSpan(teeth, level)
+  if (!span || teeth.length === 0) return []
+  const ordered = orderedByColumn(teeth)
+  const ends = ordered.length === 1 ? [ordered[0]!] : [ordered[0]!, ordered[ordered.length - 1]!]
+
+  const markers: Placed[] = []
+  for (const fdi of ends) {
+    const placement = toothPlacement(fdi)
+    if (!placement) continue
+    const point = { x: placement.center.x, y: span.y }
+    markers.push({ at: point, bounds: squareAround(point, placement.crown, 0.35) })
+  }
+  return markers
 }
 
 /** Teeth sorted by where they sit on the chart, not by their number. */

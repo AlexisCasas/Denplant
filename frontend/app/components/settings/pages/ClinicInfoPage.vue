@@ -275,5 +275,7 @@ function formatAddress(address?: Record<string, string>): string {
         </UButton>
       </div>
     </form>
+
+    <ClinicLogoSection />
   </SectionCard>
 </template>

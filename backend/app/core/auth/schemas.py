@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 def _validate_iana_timezone(value: str | None) -> str | None:
@@ -112,6 +112,17 @@ class _ClinicCabinetBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClinicLogoMeta(BaseModel):
+    """What a client may know about the clinic logo (never its storage path)."""
+
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
+    size: int | None = None
+    sha256: str | None = None
+    updated_at: str | None = None
+
+
 class ClinicMetadataResponse(BaseModel):
     """Schema for clinic metadata detail response."""
 
@@ -126,8 +137,18 @@ class ClinicMetadataResponse(BaseModel):
     currency: str
     settings: dict
     cabinets: list[_ClinicCabinetBrief]
+    # Derived from ``settings.branding.logo``; ``None`` when the clinic has no logo.
+    logo: ClinicLogoMeta | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def _fill_logo(self) -> "ClinicMetadataResponse":
+        branding = self.settings.get("branding") if isinstance(self.settings, dict) else None
+        logo = branding.get("logo") if isinstance(branding, dict) else None
+        if isinstance(logo, dict):
+            self.logo = ClinicLogoMeta(**{k: logo.get(k) for k in ClinicLogoMeta.model_fields})
+        return self
 
 
 class MeResponse(BaseModel):

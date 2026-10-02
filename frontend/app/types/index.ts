@@ -67,6 +67,16 @@ export interface OnboardingState {
   skipped?: Record<string, string>
 }
 
+/** What the server tells a client about the clinic logo (never its storage path). */
+export interface ClinicLogo {
+  mime_type: string | null
+  width: number | null
+  height: number | null
+  size: number | null
+  sha256: string | null
+  updated_at: string | null
+}
+
 export interface Clinic {
   id: string
   name: string
@@ -84,6 +94,8 @@ export interface Clinic {
     onboarding?: OnboardingState
   }
   cabinets: Cabinet[]
+  /** Derived from `settings.branding.logo`; `null` when the clinic has no logo. */
+  logo?: ClinicLogo | null
   created_at: string
   updated_at: string
 }
@@ -592,7 +604,7 @@ export interface ToothRecordWithTreatments extends ToothRecord {
 // the odontogram layer's <ClinicalModeToggle>.
 // ============================================================================
 
-export type ClinicalMode = 'history' | 'diagnosis' | 'plans' | 'appointments'
+export type ClinicalMode = 'history' | 'diagnosis' | 'plans' | 'appointments' | 'evolution'
 
 // ============================================================================
 // VAT Type Types
@@ -2166,13 +2178,14 @@ export interface CompleteItemRequest {
 }
 
 // Clinical notes — owned by the ``clinical_notes`` module since issue #60.
-// Polymorphic over four note_type / owner_type pairings:
-//   administrative + diagnosis → owner_type='patient'
+// Polymorphic over five note_type / owner_type pairings:
+//   administrative + diagnosis + evolution → owner_type='patient'
 //   treatment                  → owner_type='treatment' (odontogram.Treatment.id)
 //   treatment_plan             → owner_type='plan' (treatment_plans.id)
 export type NoteType
   = | 'administrative'
     | 'diagnosis'
+    | 'evolution'
     | 'treatment'
     | 'treatment_plan'
     | 'appointment_clinical'

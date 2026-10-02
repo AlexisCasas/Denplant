@@ -69,6 +69,26 @@ at draft creation to pre-fill `is_present` / `is_implant` per tooth.
 - **No FK to odontogram.** Coupling is via service read at draft creation
   and via the event bus. Do not add cross-module FKs.
 
+- **The profile strip draws two independent series.** Margen and Sondaje are
+  each measured from the baseline (the CEJ); neither is added to the other or
+  to the previous site. Suma (probing + margin) is a numeric row, not a line,
+  and is never persisted. All the geometry is in
+  `frontend/utils/periodontalProfileGeometry.ts`; the component only draws it.
+- **A tooth is its own drawing.** Segments are built per tooth, so 14 never
+  joins 15 and 11 never joins 21. `null` = not measured: no point, and it
+  ends the segment. `0` = a measurement: a point on the baseline. Test for
+  `=== null`, never truthiness.
+- **Direction is geometry, not sign.** A positive value runs from the baseline
+  toward the root, a negative one the other way; which way that is on screen
+  depends on `depth-up` / `depth-down`. Negatives are not clamped (the backend
+  admits margin -5…10) and the strip SVG is `overflow: visible` to show them.
+- **Probing colour:** 0–3 mm normal, >= 4 mm red (a dot on the site). That is a
+  display threshold, not the deep-pocket index (>= 5 mm, `indices.py`).
+- **Known, deliberately untouched:** the three sites of a column are always
+  drawn MV V DV left to right, even in quadrants 1 and 4 where the mesial side
+  is on the right; and a tooth with `is_present=false` still draws any values
+  stored for it.
+
 ## Related ADRs
 
 - `docs/adr/0001-modular-plugin-architecture.md`

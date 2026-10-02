@@ -65,7 +65,9 @@
       "furcaLP": "Furca L/P",
       "furcaLPTitle": "Lingual/palatal furcation (0/I/II/III)",
       "gingivalWidth": "Gingival width",
-      "siteMarkerAria": "Site {code}, probing {depth}"
+      "siteMarkerAria": "Site {code}, probing {depth}",
+      "sum": "Sum",
+      "sumTitle": "{code} sum: probing + margin (read only)"
     },
     "chart": {
       "ariaLabel": "Periodontogram — upper and lower arches"

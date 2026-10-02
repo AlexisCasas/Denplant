@@ -15,13 +15,13 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 | `billing` | 0.1.0 | official | patients, catalog, budget, payments | auto | no | 3 | 3 | 3 | yes |
 | `budget` | 0.1.0 | official | patients, catalog, odontogram | auto | no | 5 | 9 | 3 | yes |
 | `catalog` | 0.1.0 | official | — | auto | no | 3 | 0 | 1 | yes |
-| `clinical_notes` | 0.2.0 | official | patients, odontogram, treatment_plan, media, agenda | auto | no | 2 | 6 | 0 | yes |
+| `clinical_notes` | 0.2.0 | official | patients, odontogram, treatment_plan, media, agenda | auto | no | 2 | 7 | 0 | yes |
 | `copilot` | 0.1.0 | official | — | auto | yes | 5 | 3 | 1 | yes |
 | `media` | 0.2.0 | official | patients | auto | no | 4 | 7 | 1 | yes |
 | `migration_import` | 0.1.0 | official | patients, patients_clinical, clinical_notes, agenda, schedules, recalls, catalog, budget, odontogram, treatment_plan, billing, payments, media | manual | yes | 4 | 5 | 0 | yes |
 | `notifications` | 0.1.0 | official | patients, agenda, budget, billing, catalog | auto | no | 8 | 7 | 6 | yes |
 | `odontogram` | 0.3.0 | official | patients, catalog | auto | no | 4 | 7 | 0 | yes |
-| `patient_timeline` | 0.1.0 | official | patients | auto | no | 1 | 0 | 35 | yes |
+| `patient_timeline` | 0.1.0 | official | patients | auto | no | 1 | 0 | 36 | yes |
 | `patients` | 0.1.0 | official | — | auto | no | 2 | 3 | 0 | yes |
 | `patients_clinical` | 0.1.0 | official | patients | auto | no | 4 | 1 | 0 | yes |
 | `payments` | 0.1.0 | official | patients, budget | auto | no | 4 | 3 | 2 | yes |
@@ -176,6 +176,7 @@ Polymorphic clinical notes (administrative, diagnosis, treatment, treatment plan
   - `clinical_notes.appointment_administrative_created`
   - `clinical_notes.appointment_clinical_created`
   - `clinical_notes.diagnosis_created`
+  - `clinical_notes.evolution_created`
   - `clinical_notes.plan_created`
   - `clinical_notes.treatment_created`
 - **Events consumed:** —
@@ -349,6 +350,7 @@ Patient timeline — unified activity log.
   - `budget.viewed`
   - `clinical_notes.administrative_created`
   - `clinical_notes.diagnosis_created`
+  - `clinical_notes.evolution_created`
   - `clinical_notes.plan_created`
   - `clinical_notes.treatment_created`
   - `document.uploaded`

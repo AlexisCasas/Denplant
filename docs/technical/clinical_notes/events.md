@@ -17,6 +17,7 @@ attributes these from the `EventType` constants referenced in that file.
 | Event | When | Consumers |
 |-------|------|-----------|
 | `clinical_notes.diagnosis_created` | A diagnosis note is created | patient_timeline |
+| `clinical_notes.evolution_created` | An evolution note is created | patient_timeline |
 | `clinical_notes.treatment_created` | A treatment note is created | patient_timeline |
 | `clinical_notes.plan_created` | A treatment-plan note is created | patient_timeline |
 | `clinical_notes.administrative_created` | An administrative note is created | patient_timeline |

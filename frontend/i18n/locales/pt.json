@@ -970,7 +970,8 @@
       "history": "Histórico",
       "diagnosis": "Diagnóstico",
       "plans": "Planos de tratamento",
-      "appointments": "Consultas"
+      "appointments": "Consultas",
+      "evolution": "Evolução"
     },
     "history": {
       "stateAt": "Estado em",
@@ -988,7 +989,8 @@
       "continuePlan": "Continuar o plano \"{name}\"",
       "selectPlan": "Selecionar plano",
       "continue": "Continuar",
-      "odontogramTab": "Odontograma"
+      "odontogramTab": "Odontograma",
+      "addNote": "Adicionar nota"
     },
     "plans": {
       "title": "Planos de tratamento",
@@ -1520,6 +1522,30 @@
       "setPasswordSubtitle": "Foi convidado para o Denplant. Crie a sua palavra-passe para entrar.",
       "setPasswordSubmit": "Guardar e entrar",
       "invalidToken": "Esta ligação é inválida ou já foi usada. Peça uma nova ao administrador da sua clínica."
+    },
+    "logo": {
+      "title": "Identidade visual",
+      "description": "O logótipo da clínica aparece nos orçamentos e nos documentos gerados a partir de agora.",
+      "none": "Sem logótipo",
+      "alt": "Logótipo da clínica",
+      "upload": "Carregar logótipo",
+      "replace": "Substituir logótipo",
+      "remove": "Remover logótipo",
+      "confirmRemove": "Sim, remover",
+      "recommended": "Tamanho recomendado: {width}×{height} px (cerca de 2,5:1), com fundo transparente se for PNG.",
+      "formats": "PNG, JPEG ou WebP · máximo {mb} MB · máximo {max}×{max} px. SVG não é aceite.",
+      "pdfBox": "No PDF é impresso dentro de uma caixa de 50×20 mm, sem deformar.",
+      "signedNote": "Os orçamentos já assinados mantêm o logótipo com que foram assinados.",
+      "saved": "Logótipo atualizado",
+      "removed": "Logótipo removido",
+      "errors": {
+        "type": "O ficheiro tem de ser PNG, JPEG ou WebP.",
+        "size": "O ficheiro excede {mb} MB.",
+        "empty": "O ficheiro está vazio.",
+        "dimensions": "A imagem excede {max}×{max} px.",
+        "animated": "Não são aceites imagens animadas.",
+        "unreadable": "Não foi possível ler a imagem. Tente outro ficheiro."
+      }
     }
   },
   "selector": {

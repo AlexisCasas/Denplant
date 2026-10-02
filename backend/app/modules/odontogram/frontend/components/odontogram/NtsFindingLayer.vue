@@ -222,14 +222,26 @@ function trianglePath(s: NtsSymbolInstruction): string {
   return `M${x + width / 2},${y} L${x + width},${y + height} L${x},${y + height} Z`
 }
 
-/** ")(" — the norm's inverted parenthesis, drawn either side of the gap. */
+/**
+ * ")(" — the norm's inverted parenthesis, one stroke either side of the gap.
+ *
+ * Each stroke bulges toward the centre. Drawn from the symbol's own bounds, so
+ * its width is the gutter between the two crowns and it never reaches into
+ * them by more than that.
+ */
 function invertedParenthesisPath(s: NtsSymbolInstruction): string {
-  const r = radiusOf(s)
-  const { x, y } = s.at
-  const gap = r * 0.45
+  const { y, width, height } = s.bounds
+  const centre = s.at.x
+  const half = width / 2
+  const top = y
+  const bottom = y + height
+  // The quadratic peaks halfway to its control point, so the control sits at
+  // twice the distance the bulge should reach.
+  const outer = half
+  const control = half * 0.5
   return [
-    `M${x - gap},${y - r} Q${x - gap - r * 0.7},${y} ${x - gap},${y + r}`,
-    `M${x + gap},${y - r} Q${x + gap + r * 0.7},${y} ${x + gap},${y + r}`
+    `M${centre - outer},${top} Q${centre + control},${(top + bottom) / 2} ${centre - outer},${bottom}`,
+    `M${centre + outer},${top} Q${centre - control},${(top + bottom) / 2} ${centre + outer},${bottom}`
   ].join(' ')
 }
 

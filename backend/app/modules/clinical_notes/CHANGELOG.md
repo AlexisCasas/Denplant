@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- feat(QW4): **Evolución — patient evolution notes.**
+  - New `note_type = 'evolution'`: patient-owned, `tooth_number` always NULL.
+    Migration `cn_0005` widens `ck_clinical_notes_note_type` and
+    `ck_clinical_notes_type_owner_matrix` (no column change, no data rewritten;
+    the downgrade removes evolution rows first). New event
+    `clinical_notes.evolution_created`, recorded by `patient_timeline`.
+  - `EvolutionNotesView` (slot `patient.clinical.evolution`): consolidated
+    clinical history from `/patients/{id}/recent`, filters by clinical type,
+    "+ Nueva evolución", edit/delete of own notes, and "Imprimir evolución"
+    (the whole history, oldest first, via `window.print()`).
+  - Deep link `?newNote=diagnosis&tooth=<FDI>` from Diagnóstico opens a
+    diagnosis note bound to that tooth; the parameters are consumed on read.
+  - `NoteCard` gains optional `absoluteDate`, `alwaysExpanded` and
+    `showAppointmentContext`; defaults unchanged.
+  - `DiagnosisNotesSidebar` is no longer rendered by Diagnóstico; its slot
+    registration is kept.
+  - Known gap: legacy `AppointmentTreatment.notes` are not part of the feed.
+
 - security: enforce the central patient access policy for note owners, note IDs, attachments, and aggregate feeds.
 
 - fix(#184): type-check clean — `sourceBadgeColor()` returns `UiColor` (plan notes use `neutral`, the design-system role, instead of `secondary`).

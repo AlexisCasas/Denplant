@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(QW4): the Clinical tab has a fifth mode, **Evolución** (Diagnóstico | Planes | Citas | Histórico | Evolución), rendered through the new `patient.clinical.evolution` slot — `patients` never imports the component that fills it. Hidden without `clinical_notes.notes.read`. `?clinicalMode=` is validated against one shared list (`~~/app/utils/clinicalModes`), and `DiagnosisModeContainer` forwards the new `add-note` event.
+
 - Add dentist patient visibility based on server-side creator ownership or a
   non-cancelled appointment assignment, without backfilling historical rows.
 

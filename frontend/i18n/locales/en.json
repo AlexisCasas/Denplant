@@ -970,7 +970,8 @@
       "history": "History",
       "diagnosis": "Diagnosis",
       "plans": "Treatment plans",
-      "appointments": "Appointments"
+      "appointments": "Appointments",
+      "evolution": "Evolution"
     },
     "history": {
       "stateAt": "State at",
@@ -988,7 +989,8 @@
       "continuePlan": "Continue Plan \"{name}\"",
       "selectPlan": "Select plan",
       "continue": "Continue",
-      "odontogramTab": "Odontogram"
+      "odontogramTab": "Odontogram",
+      "addNote": "Add note"
     },
     "plans": {
       "title": "Treatment Plans",
@@ -1520,6 +1522,30 @@
       "setPasswordSubtitle": "You've been invited to Denplant. Create your password to sign in.",
       "setPasswordSubmit": "Save and sign in",
       "invalidToken": "This link is invalid or already used. Ask your clinic administrator for a new one."
+    },
+    "logo": {
+      "title": "Visual identity",
+      "description": "The clinic logo appears on budgets and on documents generated from now on.",
+      "none": "No logo",
+      "alt": "Clinic logo",
+      "upload": "Upload logo",
+      "replace": "Replace logo",
+      "remove": "Remove logo",
+      "confirmRemove": "Yes, remove",
+      "recommended": "Recommended size: {width}×{height} px (about 2.5:1), with a transparent background for PNG.",
+      "formats": "PNG, JPEG or WebP · up to {mb} MB · up to {max}×{max} px. SVG is not accepted.",
+      "pdfBox": "On the PDF it is printed inside a 50×20 mm box, never stretched.",
+      "signedNote": "Budgets that are already signed keep the logo they were signed with.",
+      "saved": "Logo updated",
+      "removed": "Logo removed",
+      "errors": {
+        "type": "The file must be a PNG, JPEG or WebP image.",
+        "size": "The file is larger than {mb} MB.",
+        "empty": "The file is empty.",
+        "dimensions": "The image is larger than {max}×{max} px.",
+        "animated": "Animated images are not accepted.",
+        "unreadable": "The image could not be read. Try another file."
+      }
     }
   },
   "selector": {

@@ -1,16 +1,20 @@
 <script setup lang="ts">
 /**
- * ClinicalTab - Main clinical tab with four modes
+ * ClinicalTab - Main clinical tab with five modes
  *
- * Modes (chronological order):
- * - history: View past odontogram states (read-only)
+ * Modes (display order: Diagnóstico | Planes | Citas | Histórico | Evolución):
  * - diagnosis: Record current conditions
  * - plans: Create and manage treatment plans
  * - appointments: View and manage patient appointments
+ * - history: View past odontogram states (read-only)
+ * - evolution: The clinical-notes history. Rendered through the
+ *   ``patient.clinical.evolution`` slot — this layer never imports the
+ *   component that fills it.
  */
 
 import type { ClinicalMode, TreatmentPlan } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
+import { clinicalModeFromQuery } from '~~/app/utils/clinicalModes'
 
 const props = defineProps<{
   patientId: string
@@ -24,6 +28,15 @@ const emit = defineEmits<{
 const { can } = usePermissions()
 const router = useRouter()
 const route = useRoute()
+
+// Evolución is the notes history; without read access the mode does not exist.
+const canReadNotes = computed(() => can(PERMISSIONS.clinicalNotes.read))
+const modeAccess = computed(() => ({ evolution: canReadNotes.value }))
+
+const evolutionCtx = computed(() => ({
+  patientId: props.patientId,
+  readonly: props.readonly
+}))
 
 // ============================================================================
 // State
@@ -56,8 +69,7 @@ watch(currentMode, (mode) => {
 
 // Initialize from URL on mount
 onMounted(() => {
-  const modes: readonly ClinicalMode[] = ['history', 'diagnosis', 'plans', 'appointments']
-  const queryMode = modes.find(m => m === route.query.clinicalMode)
+  const queryMode = clinicalModeFromQuery(route.query.clinicalMode, modeAccess.value)
   if (queryMode) currentMode.value = queryMode
 
   // Check for planId in URL
@@ -87,6 +99,27 @@ function handleContinuePlan(planId: string) {
   currentMode.value = 'plans'
 }
 
+/**
+ * "Añadir nota" from Diagnóstico: go to Evolución. With a tooth in hand the
+ * deep link also asks for a diagnosis note bound to it (``newNote=diagnosis``,
+ * ``tooth=<FDI>``); without one, nothing is invented. The navigation is awaited
+ * before the mode changes so the mode watcher, which spreads the live query,
+ * carries the parameters along instead of dropping them.
+ */
+async function handleAddNote(tooth: number | null) {
+  if (!canReadNotes.value) return
+  await router.replace({
+    query: {
+      ...route.query,
+      clinicalMode: 'evolution',
+      newNote: tooth === null ? undefined : 'diagnosis',
+      tooth: tooth === null ? undefined : String(tooth),
+      planId: undefined
+    }
+  })
+  currentMode.value = 'evolution'
+}
+
 function handlePlanCreated(plan: TreatmentPlan) {
   showPlanModal.value = false
   targetPlanId.value = plan.id
@@ -113,7 +146,10 @@ watch(currentMode, (newMode) => {
 <template>
   <div class="clinical-tab space-y-4">
     <!-- Mode Toggle -->
-    <ClinicalModeToggle v-model="currentMode" />
+    <ClinicalModeToggle
+      v-model="currentMode"
+      :show-evolution="canReadNotes"
+    />
 
     <!-- Mode Content -->
     <HistoryMode
@@ -125,8 +161,10 @@ watch(currentMode, (newMode) => {
       v-else-if="currentMode === 'diagnosis'"
       :patient-id="patientId"
       :readonly="readonly"
+      :can-add-note="canReadNotes"
       @create-plan="handleCreatePlan"
       @continue-plan="handleContinuePlan"
+      @add-note="handleAddNote"
     />
 
     <PlansMode
@@ -142,6 +180,12 @@ watch(currentMode, (newMode) => {
     <AppointmentsMode
       v-else-if="currentMode === 'appointments'"
       :patient-id="patientId"
+    />
+
+    <ModuleSlot
+      v-else-if="currentMode === 'evolution' && canReadNotes"
+      name="patient.clinical.evolution"
+      :ctx="evolutionCtx"
     />
 
     <!-- Create Plan Modal (shared across modes) -->

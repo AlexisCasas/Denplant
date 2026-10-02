@@ -65,7 +65,9 @@
       "furcaLP": "Furca L/P",
       "furcaLPTitle": "Furca lingual/palatina (0/I/II/III)",
       "gingivalWidth": "Largura gengival",
-      "siteMarkerAria": "Local {code}, sondagem {depth}"
+      "siteMarkerAria": "Local {code}, sondagem {depth}",
+      "sum": "Soma",
+      "sumTitle": "{code} soma: sondagem + margem (só leitura)"
     },
     "chart": {
       "ariaLabel": "Periodontograma — arcadas superior e inferior"

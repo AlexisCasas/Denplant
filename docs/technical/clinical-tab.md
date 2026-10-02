@@ -1,5 +1,10 @@
 # Plan Técnico: Rediseño Tab Clínico
 
+> **Actualización (QW4):** el tab tiene hoy cinco modos — Diagnóstico | Planes | Citas | Histórico | Evolución.
+> *Evolución* (historial consolidado de notas clínicas, nueva evolución e impresión) se monta por el slot
+> `patient.clinical.evolution` desde `clinical_notes`; Diagnóstico ya no tiene el rail de notas y el odontograma
+> usa todo el ancho. Ver [`clinical_notes/overview.md`](./clinical_notes/overview.md).
+
 **Documento de diseño:** [clinical-tab-redesign.md](../features/clinical-tab-redesign.md)
 
 ---

@@ -646,6 +646,7 @@ async def on_pair_created(data: dict) -> None:
 _NOTE_TYPE_TITLES = {
     "administrative": "Nota administrativa",
     "diagnosis": "Nota de diagnóstico",
+    "evolution": "Nota de evolución",
     "treatment": "Nota clínica en tratamiento",
     "treatment_plan": "Nota clínica en plan de tratamiento",
 }

@@ -133,11 +133,37 @@ contract.
   budget cannot unlock another.
 - **`BUDGET_PUBLIC_SECRET_KEY`** signs the public session cookies and
   is independent from the global `SECRET_KEY`. Falls back in dev only.
-- **Signed PDF tamper-evidence.** On accept, the workflow renders
-  the signed PDF and stores its SHA-256 on
-  ``BudgetSignature.document_hash``. The same hash is shown to
-  staff and is what binds the signature to that exact PDF. Don't
-  bypass this on new acceptance paths.
+- **The signed PDF is a stored file.** On accept, the workflow renders
+  it ONCE (`BudgetWorkflowService._store_signed_document`), writes the
+  bytes to storage (`signed_pdf.py`, path
+  `budget-signed/{clinic}/{budget}/{signature}.pdf`), records the SHA-256
+  in ``BudgetSignature.document_hash`` and the location in
+  ``signature_data["signed_pdf"]`` (JSONB, no migration). Every
+  download returns those bytes and verifies them against the hash
+  (`SignedPdfIntegrityError` → 500, never a substitute document).
+  Changing the clinic's logo/name/address or the template cannot alter a
+  signed document. Don't bypass this on new acceptance paths.
+  The hash is evidence kept OUTSIDE the file: never print it inside the
+  PDF. A client-supplied ``signed_pdf`` key in ``signature_data`` is
+  stripped on accept, and a reference is honoured only if its path is
+  exactly the one generated for that signature.
+- **Legacy signatures** (made before the stored PDF: no ``signed_pdf``,
+  no hash) are never modified or backfilled. Their download renders on
+  the fly and answers ``X-Document-Source: regenerated``. A render
+  failure at acceptance is logged (``logger.exception``) and leaves the
+  new signature in the same legacy state; it does not undo the acceptance.
+- **The PDF takes a ``Clinic`` entity, always.** A raw SQL row or any
+  column subset lacks ``currency`` (and tomorrow, something else);
+  `build_pdf_context` raises ``TypeError`` for it. Fetch ``db.get(Clinic, id)``.
+- **PDF = context + template.** `build_pdf_context` owns every figure and
+  string (the rules); `render_html` is presentation only and escapes all
+  database text. The totals block is derived for display from the
+  persisted fields; the global discount is spread ONLY by
+  `pricing.allocate_global_discount`, VAT is the remainder to
+  ``budget.total`` so the printed total is exactly ``budget.total``.
+- **Known gap (out of scope):** `treatment_plan` publishes only
+  ``teeth[0]`` and its surfaces, so a multi-tooth treatment reaches the
+  budget (and the PDF) with one tooth.
 - **Public signed-PDF download** uses the same per-token cookie as
   the rest of the public flow — never expose the signed PDF on a
   cookie-less route. Audit rows go to ``BudgetAccessLog`` with

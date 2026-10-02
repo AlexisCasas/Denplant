@@ -2152,3 +2152,169 @@ describe('NTS-05D.4c — an area carries the structure it has to repair', () => 
     expect(instruction.components[0]!.boundary).toHaveLength(expected.boundary.length)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Quick Win 1 — graphic polish of the fixed appliance and the diastema
+// ---------------------------------------------------------------------------
+
+describe('QW1-A — the fixed appliance line ends where its markers begin', () => {
+  const ortho = CATALOG.rules.find(r => r.rule_id === '6.1.1')!
+  const render = (teeth: number[], state = 'good') =>
+    resolveFinding(
+      finding({ rule_id: '6.1.1', attributes: { condition_state: state }, targets: span(teeth) }),
+      ortho
+    )
+
+  it.each([
+    [[16, 15, 14, 13]],
+    [[11, 12, 13, 14, 15]],
+    [[11, 21]], // crosses the midline
+    [[31, 32, 33, 34, 35, 36]],
+    [[55, 54, 53]]
+  ])('%j: the stroke runs from the inner edge of one square to the inner edge of the other', (teeth) => {
+    const result = render(teeth)
+    const [left, right] = symbols(result).slice().sort((a, b) => a.at.x - b.at.x)
+    const stroke = connectors(result)[0]!.strokes[0]!
+
+    expect(symbols(result)).toHaveLength(2)
+    expect(connectors(result)[0]!.strokes).toHaveLength(1)
+    expect(stroke[0]!.x).toBeCloseTo(left!.bounds.x + left!.bounds.width, 6)
+    expect(stroke[1]!.x).toBeCloseTo(right!.bounds.x, 6)
+    expect(stroke[0]!.y).toBeCloseTo(left!.at.y, 6)
+    expect(stroke[1]!.y).toBeCloseTo(right!.at.y, 6)
+  })
+
+  it('no part of the line lies outside the outer edges of the two markers', () => {
+    const result = render([16, 15, 14, 13])
+    const markers = symbols(result)
+    const lo = Math.min(...markers.map(m => m.bounds.x))
+    const hi = Math.max(...markers.map(m => m.bounds.x + m.bounds.width))
+    for (const point of connectors(result)[0]!.strokes.flat()) {
+      expect(point.x).toBeGreaterThan(lo)
+      expect(point.x).toBeLessThan(hi)
+    }
+  })
+
+  it('it no longer reaches the cell borders that rangeSpan reports', () => {
+    const stroke = connectors(render([16, 15, 14, 13]))[0]!.strokes[0]!
+    const full = rangeSpan([16, 13], 'apex')!
+    expect(stroke[0]!.x).toBeGreaterThan(full.x1 + 1)
+    expect(stroke[1]!.x).toBeLessThan(full.x2 - 1)
+  })
+
+  it('colour still follows the condition state, on line and markers alike', () => {
+    for (const state of ['good', 'bad']) {
+      const result = render([16, 15, 14, 13], state)
+      const paints = new Set([...symbols(result), ...connectors(result)].map(i => i.paint))
+      expect(paints.size).toBe(1)
+    }
+    const good = connectors(render([16, 13], 'good'))[0]!.paint
+    const bad = connectors(render([16, 13], 'bad'))[0]!.paint
+    expect(good).not.toBe(bad)
+  })
+
+  it('the order the targets arrive in does not change the line', () => {
+    const forward = connectors(render([16, 15, 14, 13]))[0]!.strokes
+    const reversed = connectors(render([13, 14, 15, 16]))[0]!.strokes
+    expect(reversed).toEqual(forward)
+  })
+
+  it('defensive: a lone tooth gets no line, because there is nothing to join', () => {
+    // Not a claim that a one-tooth appliance is valid: the norm names two
+    // endpoints. This only pins that the renderer never draws a stub.
+    const result = render([16])
+    expect(connectors(result).flatMap(c => c.strokes)).toHaveLength(0)
+  })
+
+  it('a connector with no endpoint markers beside it still runs the whole span', () => {
+    // Behaviour for rules that declare a bare connector is unchanged.
+    const r = rule({
+      rule_id: 'X.A1',
+      scope: 'range',
+      render: {
+        color_semantics: 'good_or_non_pathological',
+        marks: [connectorMark('straight_line', 'apex_level')]
+      }
+    })
+    const stroke = connectors(resolveFinding(
+      finding({ rule_id: 'X.A1', targets: span([16, 15, 14, 13]) }), r
+    ))[0]!.strokes[0]!
+    const full = rangeSpan([16, 13], 'apex')!
+    expect(stroke[0]!.x).toBeCloseTo(full.x1, 6)
+    expect(stroke[1]!.x).toBeCloseTo(full.x2, 6)
+  })
+})
+
+describe('QW1-B — the diastema is ")(" in the gutter, sized from the pair', () => {
+  const diastema = CATALOG.rules.find(r => r.rule_id === '6.1.6')!
+  const draw = (a: number, b: number) => {
+    const result = resolveFinding(finding({
+      rule_id: '6.1.6',
+      targets: [target({ id: 'a', position: 0, tooth_number: a }),
+        target({ id: 'b', position: 1, tooth_number: b })]
+    }), diastema)
+    return symbols(result)[0]!
+  }
+  const crownsOf = (a: number, b: number) =>
+    [crownBox(a)!, crownBox(b)!].sort((p, q) => p.x - q.x) as [NtsBoxLike, NtsBoxLike]
+  type NtsBoxLike = { x: number, y: number, width: number, height: number }
+
+  // incisor|incisor, incisor|canine, canine|premolar, premolar|molar, deciduous
+  it.each([[11, 21], [12, 13], [13, 14], [15, 16], [31, 32], [85, 84], [54, 55]])(
+    '%i/%i: centred on the border between the crowns',
+    (a, b) => {
+      const symbol = draw(a, b)
+      const [left, right] = crownsOf(a, b)
+      const middle = (left.x + left.width + right.x) / 2
+      expect(symbol.shape).toBe('inverted_parenthesis')
+      // The border between the cells; the crowns' own gutter is centred on it
+      // to within layout rounding (well under a tenth of a chart unit).
+      expect(Math.abs(symbol.at.x - middle)).toBeLessThan(0.1)
+      expect(symbol.bounds.x + symbol.bounds.width / 2).toBeCloseTo(symbol.at.x, 6)
+    }
+  )
+
+  it.each([[11, 21], [12, 13], [13, 14], [15, 16], [85, 84]])(
+    '%i/%i: it does not reach into either crown by more than the gutter itself',
+    (a, b) => {
+      const symbol = draw(a, b)
+      const [left, right] = crownsOf(a, b)
+      const gutter = right.x - (left.x + left.width)
+      const intrusionLeft = (left.x + left.width) - symbol.bounds.x
+      const intrusionRight = symbol.bounds.x + symbol.bounds.width - right.x
+      expect(intrusionLeft).toBeLessThanOrEqual(gutter + 1e-6)
+      expect(intrusionRight).toBeLessThanOrEqual(gutter + 1e-6)
+      // Far less than the ~30% of a crown the previous drawing covered.
+      expect(intrusionLeft).toBeLessThan(left.width * 0.1)
+      expect(intrusionRight).toBeLessThan(right.width * 0.1)
+    }
+  )
+
+  it('the symbol stays inside the crown height', () => {
+    const symbol = draw(12, 13)
+    const crown = crownBox(12)!
+    expect(symbol.bounds.y).toBeGreaterThanOrEqual(crown.y)
+    expect(symbol.bounds.y + symbol.bounds.height).toBeLessThanOrEqual(crown.y + crown.height)
+  })
+
+  it('selection order changes nothing', () => {
+    const a = draw(12, 13)
+    const b = draw(13, 12)
+    expect(b.at).toEqual(a.at)
+    expect(b.bounds).toEqual(a.bounds)
+  })
+
+  it('the size comes from the pair, not from a per-class constant', () => {
+    const widths = [[11, 21], [13, 14], [15, 16]].map(([a, b]) => draw(a!, b!).bounds.width)
+    // The gutter is the same layout constant for every class (to rounding).
+    for (const w of widths) expect(w).toBeCloseTo(widths[0]!, 0)
+  })
+
+  it('the layer draws ")(": each stroke bulges toward the centre', () => {
+    const layer = source('components/odontogram/NtsFindingLayer.vue')
+    const body = layer.slice(layer.indexOf('function invertedParenthesisPath')).slice(0, 900)
+    // Left stroke: control point to the right of its end points; right: mirrored.
+    expect(body).toContain('M${centre - outer},${top} Q${centre + control}')
+    expect(body).toContain('M${centre + outer},${top} Q${centre - control}')
+  })
+})
