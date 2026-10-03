@@ -607,13 +607,15 @@
         "recordedBy": "Registrado por",
         "findings": "Hallazgos",
         "discardReason": "Motivo",
+        "continueReason": "Motivo de continuación",
         "discardedAt": "Descartado el",
         "normVersion": "Versión normativa"
       },
       "actions": {
         "createDraft": "Crear borrador",
         "finalize": "Finalizar",
-        "discardDraft": "Descartar borrador"
+        "discardDraft": "Descartar borrador",
+        "continue": "Continuar diagnóstico"
       },
       "current": {
         "title": "Registro vigente"
@@ -643,6 +645,9 @@
       "discard": {
         "explanation": "El borrador se descarta y deja de ser editable. No se elimina: queda registrado con su motivo."
       },
+      "continue": {
+        "explanation": "Se creará una nueva versión editable a partir del diagnóstico actual. El diagnóstico finalizado permanecerá sin cambios en el historial."
+      },
       "carriedForward": {
         "title": "{count} hallazgo(s) arrastrado(s) sin revisar",
         "hint": "Se copiaron de un registro anterior. Confirma cada uno en la lista de hallazgos antes de finalizar."
@@ -651,7 +656,7 @@
         "title": "El odontograma cambió en otra sesión",
         "version": "Se actualizó la información; revísala antes de volver a intentarlo.",
         "draft": "Ya existe un borrador abierto para este paciente.",
-        "state": "El borrador ya fue finalizado o descartado. Se actualizó la información."
+        "state": "El registro ya fue finalizado, descartado o reemplazado en otra sesión. Se actualizó la información."
       },
       "error": {
         "loadTitle": "No se pudo cargar el odontograma MINSA",

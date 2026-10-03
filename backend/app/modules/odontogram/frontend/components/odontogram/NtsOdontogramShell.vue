@@ -15,6 +15,7 @@
  * so the layer's auto-imports are unavailable there.
  */
 
+import { PERMISSIONS } from '~~/app/config/permissions'
 import type { NtsFinding } from '../../types/nts'
 import { useNtsOdontogramRecord } from '../../composables/useNtsOdontogramRecord'
 import NtsOdontogramChart from './NtsOdontogramChart.vue'
@@ -37,6 +38,7 @@ const props = defineProps<{
 }>()
 
 const { t, locale } = useI18n()
+const { can } = usePermissions()
 
 const normVersion = computed(() => props.normVersion ?? 'pe_nts_188_2022')
 
@@ -93,6 +95,7 @@ const {
   reload,
   recoverFromConflict,
   createDraft,
+  continueFromCurrent,
   finalizeDraft,
   discardDraft,
   dismissConflict
@@ -112,6 +115,9 @@ type Stage = typeof STAGES[number]
 const createOpen = ref(false)
 const createStage = ref<Stage>('diagnosis')
 const createStageLabel = ref('')
+
+const continueOpen = ref(false)
+const continueReason = ref('')
 
 const discardOpen = ref(false)
 const discardReason = ref('')
@@ -184,6 +190,22 @@ function saveEditor(): void {
 const canSubmitCreate = computed(
   () => createStage.value !== 'other' || createStageLabel.value.trim().length > 0
 )
+const canSubmitContinue = computed(() => continueReason.value.trim().length > 0)
+/**
+ * Whether the record in force can be continued into a new version.
+ *
+ * A convenience for the UI, never a defence: the server refuses a stale or
+ * unauthorized request. The record in force is never superseded by
+ * construction, so no `is_superseded` check is needed here; a historical
+ * view is inspection and never offers it.
+ */
+const canContinue = computed(
+  () => hasCurrent.value
+    && !hasDraft.value
+    && !isHistorical.value
+    && !isWriting.value
+    && can(PERMISSIONS.odontogram.write)
+)
 const canSubmitDiscard = computed(() => discardReason.value.trim().length > 0)
 
 function formatDate(value: string | null): string {
@@ -209,6 +231,19 @@ async function submitCreate() {
     createOpen.value = false
     createStageLabel.value = ''
   }
+}
+
+function closeContinue() {
+  continueOpen.value = false
+  continueReason.value = ''
+}
+
+async function submitContinue() {
+  if (!canSubmitContinue.value) return
+  const ok = await continueFromCurrent(continueReason.value)
+  // On a conflict the authoritative state has been refetched and the alert
+  // explains it; the dialog has nothing left to offer either way.
+  if (ok || conflict.value) closeContinue()
 }
 
 async function submitDiscard() {
@@ -616,19 +651,30 @@ const printDeclarationList = computed(
           data-testid="nts-current-record"
         >
           <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-file-check-2"
-                class="w-5 h-5 text-primary-accent"
-              />
-              <span class="font-medium">{{ t('odontogram.nts.current.title') }}</span>
-              <UBadge
-                color="success"
-                variant="subtle"
-                size="sm"
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-file-check-2"
+                  class="w-5 h-5 text-primary-accent"
+                />
+                <span class="font-medium">{{ t('odontogram.nts.current.title') }}</span>
+                <UBadge
+                  color="success"
+                  variant="subtle"
+                  size="sm"
+                >
+                  {{ t('odontogram.nts.status.finalized') }}
+                </UBadge>
+              </div>
+              <UButton
+                v-if="canContinue"
+                size="xs"
+                icon="i-lucide-git-branch-plus"
+                data-testid="nts-continue-open"
+                @click="continueOpen = true"
               >
-                {{ t('odontogram.nts.status.finalized') }}
-              </UBadge>
+                {{ t('odontogram.nts.actions.continue') }}
+              </UButton>
             </div>
           </template>
 
@@ -1137,6 +1183,47 @@ const printDeclarationList = computed(
             @click="submitCreate()"
           >
             {{ t('odontogram.nts.actions.createDraft') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Continue the diagnosis: a new version, the finalized one untouched -->
+    <UModal
+      v-model:open="continueOpen"
+      :title="t('odontogram.nts.actions.continue')"
+      @update:open="$event || closeContinue()"
+    >
+      <template #body>
+        <div class="space-y-3">
+          <p class="text-sm">
+            {{ t('odontogram.nts.continue.explanation') }}
+          </p>
+          <UFormField :label="t('odontogram.nts.field.continueReason')">
+            <UInput
+              v-model="continueReason"
+              data-testid="nts-continue-reason"
+            />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2 w-full">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            data-testid="nts-continue-cancel"
+            @click="closeContinue()"
+          >
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton
+            :loading="isMutating"
+            :disabled="!canSubmitContinue || isWriting"
+            data-testid="nts-continue-submit"
+            @click="submitContinue()"
+          >
+            {{ t('odontogram.nts.actions.continue') }}
           </UButton>
         </div>
       </template>

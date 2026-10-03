@@ -579,13 +579,15 @@
         "recordedBy": "Enregistré par",
         "findings": "Constatations",
         "discardReason": "Motif",
+        "continueReason": "Motif de la poursuite",
         "discardedAt": "Abandonné le",
         "normVersion": "Version normative"
       },
       "actions": {
         "createDraft": "Créer un brouillon",
         "finalize": "Finaliser",
-        "discardDraft": "Abandonner le brouillon"
+        "discardDraft": "Abandonner le brouillon",
+        "continue": "Poursuivre le diagnostic"
       },
       "current": {
         "title": "Enregistrement en vigueur"
@@ -615,6 +617,9 @@
       "discard": {
         "explanation": "Le brouillon est abandonné et n'est plus modifiable. Il n'est pas supprimé : il reste enregistré avec son motif."
       },
+      "continue": {
+        "explanation": "Une nouvelle version modifiable sera créée à partir du diagnostic actuel. Le diagnostic finalisé restera inchangé dans l'historique."
+      },
       "carriedForward": {
         "title": "{count} constatation(s) reportée(s) à revoir",
         "hint": "Elles proviennent d'un enregistrement antérieur. Confirmez-les une à une dans la liste avant de finaliser."
@@ -623,7 +628,7 @@
         "title": "L'odontogramme a changé dans une autre session",
         "version": "Les informations ont été actualisées ; vérifiez-les avant de réessayer.",
         "draft": "Un brouillon est déjà ouvert pour ce patient.",
-        "state": "Le brouillon a déjà été finalisé ou abandonné. Les informations ont été actualisées."
+        "state": "L'enregistrement a déjà été finalisé, abandonné ou remplacé dans une autre session. Les informations ont été actualisées."
       },
       "error": {
         "loadTitle": "Impossible de charger l'odontogramme MINSA",

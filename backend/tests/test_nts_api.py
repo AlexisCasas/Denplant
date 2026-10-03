@@ -782,6 +782,166 @@ async def test_carry_forward_without_a_source_is_refused(api, env):
     assert response.status_code == 409
 
 
+async def _finalized_with_caries(api, env, **draft_body) -> dict:
+    """Open a draft, add one finding and finalize it."""
+    draft = await _create_draft(api, env, **draft_body)
+    added = await api.post(
+        f"{BASE}/records/{draft['id']}/findings",
+        headers=env.dentist,
+        json={"expected_version": 1, **CARIES},
+    )
+    assert added.status_code == 201, added.text
+    finalized = await api.post(
+        f"{BASE}/records/{draft['id']}/finalize",
+        headers=env.dentist,
+        json={"expected_version": 2},
+    )
+    assert finalized.status_code == 200, finalized.text
+    return finalized.json()["data"]
+
+
+async def _continue(api, env, predecessor: dict, reason: str) -> dict:
+    """Continue ``predecessor`` the way the UI does: carry-forward + supersession."""
+    return await _create_draft(
+        api,
+        env,
+        stage=predecessor["stage"],
+        stage_label=predecessor["stage_label"],
+        seed="carry_forward",
+        supersedes_record_id=predecessor["id"],
+        supersession_reason=reason,
+    )
+
+
+async def _confirm_all_and_finalize(api, env, draft: dict) -> dict:
+    version = draft["version"]
+    for finding in draft["findings"]:
+        confirmed = await api.post(
+            f"{BASE}/records/{draft['id']}/findings/{finding['id']}/confirm",
+            headers=env.dentist,
+            json={"expected_version": version},
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        version += 1
+    finalized = await api.post(
+        f"{BASE}/records/{draft['id']}/finalize",
+        headers=env.dentist,
+        json={"expected_version": version},
+    )
+    assert finalized.status_code == 200, finalized.text
+    return finalized.json()["data"]
+
+
+@pytest.mark.asyncio
+async def test_continuing_a_finalized_record_opens_a_linked_carry_forward_draft(api, env):
+    v1 = await _finalized_with_caries(api, env)
+    before = (await api.get(f"{BASE}/records/{v1['id']}", headers=env.dentist)).json()["data"]
+
+    v2 = await _continue(api, env, v1, "Seguimiento a los 6 meses")
+
+    assert v2["status"] == "draft"
+    assert v2["id"] != v1["id"]
+    assert v2["supersedes_record_id"] == v1["id"]
+    assert v2["supersession_reason"] == "Seguimiento a los 6 meses"
+    assert v2["norm_version"] == v1["norm_version"]
+    assert v2["stage"] == v1["stage"]
+
+    # the clinical content travels, flagged for individual review
+    assert len(v2["findings"]) == 1
+    carried, source = v2["findings"][0], before["findings"][0]
+    assert carried["id"] != source["id"]
+    assert carried["rule_id"] == source["rule_id"]
+    assert carried["provenance"] == "carried_forward"
+    assert carried["source_finding_id"] == source["id"]
+    assert [t["tooth_number"] for t in carried["targets"]] == [46]
+
+    # v1 is untouched, and still the record in force while v2 is a draft
+    after = (await api.get(f"{BASE}/records/{v1['id']}", headers=env.dentist)).json()["data"]
+    for field in ("status", "content_hash", "version", "updated_at", "supersedes_record_id"):
+        assert after[field] == before[field], field
+    assert after["status"] == "finalized"
+    current = await api.get(
+        f"{BASE}/patients/{env.patient}/records/current",
+        headers=env.dentist,
+        params={"norm_version": NORM},
+    )
+    assert current.json()["data"]["id"] == v1["id"]
+    draft = await api.get(
+        f"{BASE}/patients/{env.patient}/records/draft",
+        headers=env.dentist,
+        params={"norm_version": NORM},
+    )
+    assert draft.json()["data"]["id"] == v2["id"]
+
+    # v2 cannot be finalized until each carried finding is reviewed
+    blocked = await api.post(
+        f"{BASE}/records/{v2['id']}/finalize",
+        headers=env.dentist,
+        json={"expected_version": v2["version"]},
+    )
+    assert blocked.status_code == 422
+    assert any("carried-forward" in e for e in blocked.json()["errors"])
+
+
+@pytest.mark.asyncio
+async def test_the_continuation_chain_stays_linear_across_three_versions(api, env):
+    v1 = await _finalized_with_caries(api, env)
+    v2 = await _confirm_all_and_finalize(api, env, await _continue(api, env, v1, "v1 -> v2"))
+    v3 = await _confirm_all_and_finalize(api, env, await _continue(api, env, v2, "v2 -> v3"))
+
+    assert v2["supersedes_record_id"] == v1["id"]
+    assert v3["supersedes_record_id"] == v2["id"]
+    # provenance survives the review: the trail still points at the earlier finding
+    assert v3["findings"][0]["provenance"] == "observed"
+    assert v3["findings"][0]["source_finding_id"] == v2["findings"][0]["id"]
+
+    current = await api.get(
+        f"{BASE}/patients/{env.patient}/records/current",
+        headers=env.dentist,
+        params={"norm_version": NORM},
+    )
+    assert current.json()["data"]["id"] == v3["id"]
+
+    history = await api.get(f"{BASE}/patients/{env.patient}/records", headers=env.dentist)
+    rows = {r["id"]: r for r in history.json()["data"]}
+    assert history.json()["total"] == 3
+    assert rows[v1["id"]]["is_superseded"] is True
+    assert rows[v2["id"]]["is_superseded"] is True
+    assert rows[v3["id"]]["is_superseded"] is False
+    assert all(r["status"] == "finalized" for r in rows.values())
+
+
+@pytest.mark.asyncio
+async def test_a_superseded_record_cannot_be_continued_again(api, env):
+    v1 = await _finalized_with_caries(api, env)
+    await _confirm_all_and_finalize(api, env, await _continue(api, env, v1, "v1 -> v2"))
+
+    # a second session, still looking at v1, tries to branch from it
+    response = await api.post(
+        f"{BASE}/patients/{env.patient}/records",
+        headers=env.dentist,
+        json={
+            "norm_version": NORM,
+            "stage": v1["stage"],
+            "seed": "carry_forward",
+            "supersedes_record_id": v1["id"],
+            "supersession_reason": "otra rama",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "nts_state_conflict"
+    # nothing was created: no draft, still exactly two records
+    draft = await api.get(
+        f"{BASE}/patients/{env.patient}/records/draft",
+        headers=env.dentist,
+        params={"norm_version": NORM},
+    )
+    assert draft.json()["data"] is None
+    history = await api.get(f"{BASE}/patients/{env.patient}/records", headers=env.dentist)
+    assert history.json()["total"] == 2
+
+
 # ===========================================================================
 # supersession and history
 # ===========================================================================

@@ -319,8 +319,14 @@ class NtsRecordService:
         )
 
         if seed is DraftSeed.CARRY_FORWARD:
-            source = predecessor or await NtsRecordService.get_current_record(
-                db, clinic_id, patient_id, norm_version
+            # The predecessor was validated with a plain row select, so its
+            # collections are not loaded; read it as an aggregate before copying.
+            source = (
+                await NtsRecordService.get_record(db, clinic_id, predecessor.id)
+                if predecessor is not None
+                else await NtsRecordService.get_current_record(
+                    db, clinic_id, patient_id, norm_version
+                )
             )
             if source is None:
                 raise NtsStateConflictError(

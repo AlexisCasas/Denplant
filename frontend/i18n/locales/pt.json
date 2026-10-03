@@ -579,13 +579,15 @@
         "recordedBy": "Registado por",
         "findings": "Achados",
         "discardReason": "Motivo",
+        "continueReason": "Motivo da continuação",
         "discardedAt": "Descartado em",
         "normVersion": "Versão normativa"
       },
       "actions": {
         "createDraft": "Criar rascunho",
         "finalize": "Finalizar",
-        "discardDraft": "Descartar rascunho"
+        "discardDraft": "Descartar rascunho",
+        "continue": "Continuar diagnóstico"
       },
       "current": {
         "title": "Registo vigente"
@@ -615,6 +617,9 @@
       "discard": {
         "explanation": "O rascunho é descartado e deixa de ser editável. Não é eliminado: fica registado com o seu motivo."
       },
+      "continue": {
+        "explanation": "Será criada uma nova versão editável a partir do diagnóstico atual. O diagnóstico finalizado permanecerá sem alterações no histórico."
+      },
       "carriedForward": {
         "title": "{count} achado(s) transferido(s) por rever",
         "hint": "Foram copiados de um registo anterior. Confirme cada um na lista de achados antes de finalizar."
@@ -623,7 +628,7 @@
         "title": "O odontograma mudou noutra sessão",
         "version": "A informação foi atualizada; reveja antes de tentar de novo.",
         "draft": "Já existe um rascunho aberto para este paciente.",
-        "state": "O rascunho já foi finalizado ou descartado. A informação foi atualizada."
+        "state": "O registro já foi finalizado, descartado ou substituído em outra sessão. A informação foi atualizada."
       },
       "error": {
         "loadTitle": "Não foi possível carregar o odontograma MINSA",
