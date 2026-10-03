@@ -45,6 +45,13 @@ const props = withDefaults(
      * selection it is given.
      */
     selectable?: boolean
+    /**
+     * What a click on a tooth means while `selectable`: `pick` (the editor is
+     * choosing teeth for a rule) or `register` (the idle shortcut that opens
+     * the finding entry for that tooth). Only changes how the teeth announce
+     * themselves; the chart still just reports the click.
+     */
+    purpose?: 'pick' | 'register'
     selectedTeeth?: readonly number[]
     anchorTeeth?: readonly number[]
     /**
@@ -74,6 +81,7 @@ const props = withDefaults(
     record: null,
     readonly: false,
     selectable: false,
+    purpose: 'pick',
     selectedTeeth: () => [],
     anchorTeeth: () => [],
     catalog: null,
@@ -206,6 +214,7 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
           :row="row"
           :scale="CHART_SCALE"
           :selectable="selectable"
+          :purpose="purpose"
           :selected-teeth="selectedTeeth"
           :anchor-teeth="anchorTeeth"
           :class="row.id === 'deciduousUpper' ? 'pt-3' : row.id === 'permanentLower' ? 'pt-3' : ''"

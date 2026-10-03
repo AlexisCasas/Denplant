@@ -562,7 +562,8 @@
         "a11y": {
           "select": "Selecionar {tooth}",
           "selected": "{tooth}, selecionado",
-          "anchorSelected": "{tooth}, selecionado como referência"
+          "anchorSelected": "{tooth}, selecionado como referência",
+          "register": "Registrar achado em {tooth}"
         }
       },
       "status": {
@@ -619,6 +620,10 @@
       },
       "continue": {
         "explanation": "Será criada uma nova versão editável a partir do diagnóstico atual. O diagnóstico finalizado permanecerá sem alterações no histórico."
+      },
+      "entry": {
+        "title": "Registrar achado — Dente {fdi}",
+        "hint": "Escolha o achado; o dente ficará selecionado."
       },
       "planReference": {
         "title": "Achados do diagnóstico",

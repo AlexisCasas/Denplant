@@ -35,8 +35,17 @@ const props = withDefaults(
     selected?: boolean
     /** Picked as a spatial reference rather than as the clinical subject. */
     anchor?: boolean
+    /**
+     * What a click on this tooth *means* while it is selectable.
+     *
+     * `pick` is the editor choosing teeth for a rule: a toggle, so it carries
+     * `aria-pressed`. `register` is the idle shortcut — a click opens a dialog
+     * to record a finding on this tooth — which is an action, not a toggle, so
+     * it must not claim a pressed state and announces that it opens a dialog.
+     */
+    purpose?: 'pick' | 'register'
   }>(),
-  { selectable: false, selected: false, anchor: false }
+  { selectable: false, selected: false, anchor: false, purpose: 'pick' }
 )
 
 const emit = defineEmits<{ select: [fdi: number] }>()
@@ -73,6 +82,9 @@ const label = computed(() =>
  * highlight alone carries none of that.
  */
 const actionLabel = computed(() => {
+  if (props.purpose === 'register') {
+    return t('odontogram.nts.editor.a11y.register', { tooth: label.value })
+  }
   if (props.selected) {
     return t('odontogram.nts.editor.a11y.selected', { tooth: label.value })
   }
@@ -109,7 +121,8 @@ const stateClass = computed(() => {
     :data-quadrant="tooth.quadrant"
     :data-selected="selected ? 'true' : undefined"
     :data-anchor="anchor ? 'true' : undefined"
-    :aria-pressed="selectable ? selected || anchor : undefined"
+    :aria-pressed="selectable && purpose === 'pick' ? selected || anchor : undefined"
+    :aria-haspopup="selectable && purpose === 'register' ? 'dialog' : undefined"
     :aria-label="selectable ? actionLabel : undefined"
     @click="selectable && emit('select', tooth.fdi)"
   >

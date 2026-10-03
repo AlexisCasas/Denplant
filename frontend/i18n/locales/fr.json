@@ -562,7 +562,8 @@
         "a11y": {
           "select": "Sélectionner {tooth}",
           "selected": "{tooth}, sélectionnée",
-          "anchorSelected": "{tooth}, sélectionnée comme référence"
+          "anchorSelected": "{tooth}, sélectionnée comme référence",
+          "register": "Enregistrer un résultat sur {tooth}"
         }
       },
       "status": {
@@ -619,6 +620,10 @@
       },
       "continue": {
         "explanation": "Une nouvelle version modifiable sera créée à partir du diagnostic actuel. Le diagnostic finalisé restera inchangé dans l'historique."
+      },
+      "entry": {
+        "title": "Enregistrer un résultat — Dent {fdi}",
+        "hint": "Choisissez le résultat ; la dent sera sélectionnée."
       },
       "planReference": {
         "title": "Résultats du diagnostic",
