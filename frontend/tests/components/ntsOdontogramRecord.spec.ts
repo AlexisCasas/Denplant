@@ -502,6 +502,180 @@ describe('§37 — late-response race', () => {
 })
 
 // ---------------------------------------------------------------------------
+// TASK-2026-00024 — continue a finalized diagnosis as a new version
+// ---------------------------------------------------------------------------
+
+describe('useNtsOdontogramRecord — continueFromCurrent', () => {
+  const v1 = () => makeRecord({
+    id: 'v1',
+    status: 'finalized',
+    version: 4,
+    stage: 'other',
+    stage_label: 'Control 6 meses',
+    finalized_at: '2026-01-02T11:00:00Z'
+  })
+
+  async function mountRecord() {
+    return await runInSetup(() =>
+      useNtsOdontogramRecord({ patientId: () => 'p1', normVersion: 'pe_nts_188_2022' })
+    )
+  }
+
+  it('sends the exact carry-forward payload, built from the current record', async () => {
+    routeGets({ current: v1(), records: [makeSummary({ id: 'v1' })] })
+    state.post.mockResolvedValue({ data: makeRecord({ id: 'v2', version: 1 }) })
+
+    const record = await mountRecord()
+    await record.load()
+    const ok = await record.continueFromCurrent('Seguimiento')
+
+    expect(ok).toBe(true)
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(state.post).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/patients/p1/records',
+      {
+        norm_version: 'pe_nts_188_2022',
+        stage: 'other',
+        stage_label: 'Control 6 meses',
+        seed: 'carry_forward',
+        supersedes_record_id: 'v1',
+        supersession_reason: 'Seguimiento'
+      }
+    )
+  })
+
+  it('trims the reason', async () => {
+    routeGets({ current: v1() })
+    state.post.mockResolvedValue({ data: makeRecord({ id: 'v2' }) })
+
+    const record = await mountRecord()
+    await record.load()
+    await record.continueFromCurrent('   nueva evaluación  ')
+
+    const [, body] = state.post.mock.calls[0]!
+    expect((body as { supersession_reason: string }).supersession_reason).toBe('nueva evaluación')
+  })
+
+  it('a blank reason never reaches the API', async () => {
+    routeGets({ current: v1() })
+
+    const record = await mountRecord()
+    await record.load()
+
+    expect(await record.continueFromCurrent('')).toBe(false)
+    expect(await record.continueFromCurrent('   ')).toBe(false)
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('without a current record there is nothing to continue', async () => {
+    const record = await mountRecord()
+    await record.load()
+
+    expect(await record.continueFromCurrent('motivo')).toBe(false)
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('a draft conflict refetches, shows the existing draft and never retries', async () => {
+    routeGets({ current: v1() })
+    const record = await mountRecord()
+    await record.load()
+
+    state.post.mockRejectedValue(apiError(409, 'nts_draft_conflict'))
+    routeGets({ current: v1(), draft: makeRecord({ id: 'rec-existing', version: 2 }) })
+
+    expect(await record.continueFromCurrent('motivo')).toBe(false)
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(record.conflict.value).toBe('draft')
+    expect(record.draft.value?.id).toBe('rec-existing')
+    expect(record.currentRecord.value?.id).toBe('v1')
+  })
+
+  it('a state conflict refetches and never retries', async () => {
+    routeGets({ current: v1() })
+    const record = await mountRecord()
+    await record.load()
+
+    // Another session finalized a successor in the meantime.
+    state.post.mockRejectedValue(apiError(409, 'nts_state_conflict'))
+    routeGets({ current: makeRecord({ id: 'v2', status: 'finalized', supersedes_record_id: 'v1' }) })
+
+    expect(await record.continueFromCurrent('motivo')).toBe(false)
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(record.conflict.value).toBe('state')
+    expect(record.currentRecord.value?.id).toBe('v2')
+  })
+
+  it('the predecessor stays current while the successor is a draft', async () => {
+    routeGets({ current: v1() })
+    state.post.mockResolvedValue({ data: makeRecord({ id: 'v2', version: 1 }) })
+    const record = await mountRecord()
+    await record.load()
+
+    routeGets({
+      current: v1(),
+      draft: makeRecord({ id: 'v2', version: 1, supersedes_record_id: 'v1' }),
+      records: [
+        makeSummary({ id: 'v2', status: 'draft', supersedes_record_id: 'v1', finalized_at: null }),
+        makeSummary({ id: 'v1' })
+      ]
+    })
+    await record.continueFromCurrent('motivo')
+
+    expect(record.draft.value?.id).toBe('v2')
+    expect(record.currentRecord.value?.id).toBe('v1')
+    expect(record.currentRecord.value?.status).toBe('finalized')
+    expect(record.history.value.find(r => r.id === 'v1')?.is_superseded).toBe(false)
+  })
+
+  it('discarding the successor leaves the predecessor current', async () => {
+    routeGets({
+      current: v1(),
+      draft: makeRecord({ id: 'v2', version: 3, supersedes_record_id: 'v1' })
+    })
+    const record = await mountRecord()
+    await record.load()
+
+    state.post.mockResolvedValue({ data: makeRecord({ id: 'v2', status: 'discarded' }) })
+    routeGets({
+      current: v1(),
+      records: [
+        makeSummary({ id: 'v2', status: 'discarded', supersedes_record_id: 'v1', finalized_at: null }),
+        makeSummary({ id: 'v1' })
+      ]
+    })
+    expect(await record.discardDraft('no procede')).toBe(true)
+
+    expect(record.hasDraft.value).toBe(false)
+    expect(record.currentRecord.value?.id).toBe('v1')
+    expect(record.history.value.find(r => r.id === 'v1')?.is_superseded).toBe(false)
+  })
+
+  it('finalizing the successor makes it current and the predecessor superseded', async () => {
+    routeGets({
+      current: v1(),
+      draft: makeRecord({ id: 'v2', version: 3, supersedes_record_id: 'v1' })
+    })
+    const record = await mountRecord()
+    await record.load()
+
+    state.post.mockResolvedValue({ data: makeRecord({ id: 'v2', status: 'finalized' }) })
+    routeGets({
+      current: makeRecord({ id: 'v2', status: 'finalized', supersedes_record_id: 'v1' }),
+      records: [
+        makeSummary({ id: 'v2', supersedes_record_id: 'v1' }),
+        makeSummary({ id: 'v1', is_superseded: true })
+      ]
+    })
+    expect(await record.finalizeDraft()).toBe(true)
+
+    expect(record.hasDraft.value).toBe(false)
+    expect(record.currentRecord.value?.id).toBe('v2')
+    expect(record.history.value.find(r => r.id === 'v1')?.is_superseded).toBe(true)
+    expect(record.history.value.find(r => r.id === 'v2')?.is_superseded).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // §42 — zero findings is a legitimate record
 // ---------------------------------------------------------------------------
 

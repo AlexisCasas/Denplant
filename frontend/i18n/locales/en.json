@@ -579,13 +579,15 @@
         "recordedBy": "Recorded by",
         "findings": "Findings",
         "discardReason": "Reason",
+        "continueReason": "Reason for continuing",
         "discardedAt": "Discarded on",
         "normVersion": "Norm version"
       },
       "actions": {
         "createDraft": "Create draft",
         "finalize": "Finalize",
-        "discardDraft": "Discard draft"
+        "discardDraft": "Discard draft",
+        "continue": "Continue diagnosis"
       },
       "current": {
         "title": "Record in force"
@@ -615,6 +617,9 @@
       "discard": {
         "explanation": "The draft is discarded and can no longer be edited. It is not deleted: it stays on record with its reason."
       },
+      "continue": {
+        "explanation": "A new editable version will be created from the current diagnosis. The finalized diagnosis will remain unchanged in the history."
+      },
       "carriedForward": {
         "title": "{count} carried-forward finding(s) awaiting review",
         "hint": "They were copied from an earlier record. Confirm each one in the findings list before finalizing."
@@ -623,7 +628,7 @@
         "title": "The odontogram changed in another session",
         "version": "The information was refreshed; review it before trying again.",
         "draft": "A draft is already open for this patient.",
-        "state": "The draft was already finalized or discarded. The information was refreshed."
+        "state": "The record was already finalized, discarded or replaced in another session. The information was refreshed."
       },
       "error": {
         "loadTitle": "Could not load the MINSA odontogram",

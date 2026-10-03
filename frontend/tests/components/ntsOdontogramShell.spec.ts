@@ -67,6 +67,16 @@ mockNuxtImport('useClinicState', () => () => ({
   currentClinic: { get value() { return { id: 'clinic-a' } } }
 }))
 
+/**
+ * Permissions the signed-in user holds. The real `usePermissions` reads
+ * `/me`, which does not exist here; the shell only asks `can()`.
+ */
+const WRITE = 'odontogram.write'
+const perms = vi.hoisted(() => ({ granted: new Set<string>(['odontogram.write']) }))
+mockNuxtImport('usePermissions', () => () => ({
+  can: (permission: string) => perms.granted.has(permission)
+}))
+
 const CATALOG = {
   norm_version: 'pe_nts_188_2022',
   norm_label: 'NTS N.° 188-MINSA/DGIESP-2022',
@@ -3156,5 +3166,283 @@ describe('NTS-05E.4 — lifecycle and history, integrated', () => {
     // patient's historical record does not survive it.
     expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TASK-2026-00024 — "Continuar diagnóstico"
+// ---------------------------------------------------------------------------
+
+describe('NTS — continue a finalized diagnosis', () => {
+  const mounted: Array<{ unmount: () => void }> = []
+  afterEach(() => {
+    mounted.forEach(w => w.unmount())
+    mounted.length = 0
+    perms.granted = new Set([WRITE])
+  })
+
+  const carriedFinding = (id = 'f-c') => ({
+    id, record_id: 'v2', norm_version: 'pe_nts_188_2022', rule_id: '6.1.9',
+    attributes: {}, provenance: 'carried_forward' as const, source_finding_id: 'older',
+    sequence: 1, created_at: '2026-01-02T10:00:00Z', created_by: 'u1',
+    targets: [{
+      id: `t-${id}`, group_index: 0, position: 0, participation: 'subject', role: null,
+      target_kind: 'fdi_tooth', tooth_number: 16, arch: null, local_ordinal: null, geometry: null
+    }]
+  })
+
+  function v1(overrides: Record<string, unknown> = {}) {
+    return chartRecord({
+      id: 'v1',
+      status: 'finalized',
+      version: 4,
+      stage: 'other',
+      stage_label: 'Control',
+      finalized_at: '2026-01-02T11:00:00Z',
+      finalized_by: 'u1',
+      content_hash: 'abc',
+      hash_algorithm: 'sha256',
+      canonicalization_version: 1,
+      ...overrides
+    })
+  }
+
+  function summaryRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'v1', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'other',
+      stage_label: 'Control', status: 'finalized', version: 4,
+      recorded_at: '2026-01-02T10:00:00Z', finalized_at: '2026-01-02T11:00:00Z',
+      discarded_at: null, supersedes_record_id: null, content_hash: 'abc',
+      is_superseded: false, ...overrides
+    }
+  }
+
+  function route(options: {
+    current?: unknown
+    draft?: unknown
+    summaries?: unknown[]
+    records?: Record<string, unknown>
+  } = {}) {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: REAL_CATALOG }
+      if (url.includes('/records/current')) return { data: options.current ?? null }
+      if (url.includes('/records/draft')) return { data: options.draft ?? null }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        const rows = options.summaries ?? []
+        return { data: rows, total: rows.length, page: 1, page_size: 20 }
+      }
+      const byId = url.match(/\/nts\/records\/([^/?]+)$/)
+      if (byId && options.records?.[byId[1]!]) return { data: options.records[byId[1]!] }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function shell() {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' }
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  const OPEN = '[data-testid="nts-continue-open"]'
+
+  /** The dialog is teleported to <body>; drive it through the document. */
+  function dialogField(testid: string): HTMLInputElement | null {
+    const host = document.querySelector(`[data-testid="${testid}"]`)
+    return (host instanceof HTMLInputElement ? host : host?.querySelector('input')) ?? null
+  }
+
+  async function typeReason(text: string) {
+    const input = dialogField('nts-continue-reason')!
+    input.value = text
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+  }
+
+  const submit = () => document.querySelector('[data-testid="nts-continue-submit"]') as HTMLButtonElement | null
+
+  it('is offered on the record in force when nothing else is going on', async () => {
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    expect(wrapper.find(OPEN).exists()).toBe(true)
+    expect(wrapper.find(OPEN).text()).toBe('Continue diagnosis')
+  })
+
+  it('is not offered without odontogram.write', async () => {
+    perms.granted = new Set()
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    expect(wrapper.find('[data-testid="nts-current-record"]').exists()).toBe(true)
+    expect(wrapper.find(OPEN).exists()).toBe(false)
+  })
+
+  it('is not offered when there is no record in force', async () => {
+    route({})
+    const wrapper = await shell()
+    expect(wrapper.find(OPEN).exists()).toBe(false)
+  })
+
+  it('is not offered while a draft is open', async () => {
+    route({ current: v1(), draft: chartRecord({ id: 'v2', supersedes_record_id: 'v1' }) })
+    const wrapper = await shell()
+
+    expect(wrapper.find('[data-testid="nts-draft"]').exists()).toBe(true)
+    expect(wrapper.find(OPEN).exists()).toBe(false)
+  })
+
+  it('is not offered in a historical view', async () => {
+    route({
+      current: v1({ id: 'v2' }),
+      summaries: [summaryRow({ id: 'v2' }), summaryRow({ id: 'v1', is_superseded: true })],
+      records: { v1: v1({ id: 'v1' }) }
+    })
+    const wrapper = await shell()
+    expect(wrapper.find(OPEN).exists()).toBe(true)
+
+    await wrapper.find('[data-testid="nts-history-open-1"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-historical-banner"]').exists()).toBe(true)
+    expect(wrapper.find(OPEN).exists()).toBe(false)
+  })
+
+  it('a superseded historical record never offers it', async () => {
+    route({
+      current: v1({ id: 'v2' }),
+      summaries: [summaryRow({ id: 'v2' }), summaryRow({ id: 'v1', is_superseded: true })],
+      records: { v1: v1({ id: 'v1' }) }
+    })
+    const wrapper = await shell()
+
+    await wrapper.find('[data-testid="nts-history-open-1"]').trigger('click')
+    await settle()
+
+    expect(wrapper.find('[data-testid="nts-history-superseded-1"]').exists()).toBe(true)
+    expect(wrapper.find(OPEN).exists()).toBe(false)
+  })
+
+  it('opens a dialog that explains the new version and asks for a reason', async () => {
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    await wrapper.find(OPEN).trigger('click')
+    await nextTick()
+
+    expect(document.body.textContent).toContain('A new editable version will be created')
+    expect(dialogField('nts-continue-reason')).not.toBeNull()
+    expect(submit()?.disabled).toBe(true)
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('cancelling clears the dialog and sends nothing', async () => {
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    await wrapper.find(OPEN).trigger('click')
+    await nextTick()
+    await typeReason('seguimiento')
+    ;(document.querySelector('[data-testid="nts-continue-cancel"]') as HTMLElement).click()
+    await settle()
+
+    expect(state.post).not.toHaveBeenCalled()
+    // Reopening starts from a clean field.
+    await wrapper.find(OPEN).trigger('click')
+    await nextTick()
+    expect(dialogField('nts-continue-reason')?.value ?? '').toBe('')
+  })
+
+  it('the reason is mandatory: blank text keeps the button disabled', async () => {
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    await wrapper.find(OPEN).trigger('click')
+    await nextTick()
+    await typeReason('   ')
+    expect(submit()?.disabled).toBe(true)
+
+    await typeReason('motivo')
+    expect(submit()?.disabled).toBe(false)
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('submitting creates the carry-forward draft; the finalized record stays in force', async () => {
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    await wrapper.find(OPEN).trigger('click')
+    await nextTick()
+    await typeReason('  nueva evaluación  ')
+
+    state.post.mockResolvedValue({ data: chartRecord({ id: 'v2', version: 1 }) })
+    route({
+      current: v1(),
+      draft: chartRecord({
+        id: 'v2', version: 1, supersedes_record_id: 'v1', supersession_reason: 'nueva evaluación',
+        findings: [carriedFinding()]
+      }),
+      summaries: [summaryRow({ id: 'v2', status: 'draft', finalized_at: null }), summaryRow()]
+    })
+    submit()!.click()
+    await settle()
+
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(state.post).toHaveBeenCalledWith(
+      '/api/v1/odontogram/nts/patients/p1/records',
+      {
+        norm_version: 'pe_nts_188_2022',
+        stage: 'other',
+        stage_label: 'Control',
+        seed: 'carry_forward',
+        supersedes_record_id: 'v1',
+        supersession_reason: 'nueva evaluación'
+      }
+    )
+    // v1 is still the record in force while v2 is a draft, and the CTA is gone.
+    expect(wrapper.find('[data-testid="nts-current-record"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-draft"]').exists()).toBe(true)
+    expect(wrapper.find(OPEN).exists()).toBe(false)
+    expect(document.querySelector('[data-testid="nts-continue-submit"]')).toBeNull()
+  })
+
+  it('the carried-forward findings are pending review and Finalize stays blocked', async () => {
+    route({
+      current: v1(),
+      draft: chartRecord({
+        id: 'v2', version: 1, supersedes_record_id: 'v1', findings: [carriedFinding()]
+      }),
+      summaries: [summaryRow()]
+    })
+    const wrapper = await shell()
+
+    expect(wrapper.find('[data-testid="nts-carried-forward"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-confirm-f-c"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-finalize-draft"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('a draft conflict shows the existing draft and closes the dialog', async () => {
+    route({ current: v1(), summaries: [summaryRow()] })
+    const wrapper = await shell()
+
+    await wrapper.find(OPEN).trigger('click')
+    await nextTick()
+    await typeReason('motivo')
+
+    state.post.mockRejectedValue({
+      statusCode: 409,
+      data: { message: 'draft', code: 'nts_draft_conflict', errors: ['draft'] }
+    })
+    route({ current: v1(), draft: chartRecord({ id: 'other-draft' }), summaries: [summaryRow()] })
+    submit()!.click()
+    await settle()
+
+    expect(state.post).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="nts-conflict"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-draft"]').exists()).toBe(true)
+    expect(document.querySelector('[data-testid="nts-continue-submit"]')).toBeNull()
   })
 })

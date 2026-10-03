@@ -26,6 +26,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   NtsApiError,
   NtsCatalog,
+  NtsDraftCreatePayload,
   NtsRecord,
   NtsRecordSummary,
   NtsSpecification
@@ -322,20 +323,18 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     conflict.value = null
   }
 
-  /** Open an empty draft. 05A never offers `carry_forward`. */
-  async function createDraft(input: {
-    stage: string
-    stageLabel?: string | null
-  }): Promise<boolean> {
+  /**
+   * Send a draft-creation payload under the record-wide write lock.
+   *
+   * Shared by the two ways a draft is opened (empty, or continued from the
+   * record in force) so both get the same conflict policy: a 409 refetches the
+   * authoritative state and is never retried.
+   */
+  async function submitDraft(payload: NtsDraftCreatePayload): Promise<boolean> {
     if (!beginWrite()) return false
     beginMutation()
     try {
-      const created = await nts.createDraft(patientId.value, {
-        norm_version: normVersion.value,
-        stage: input.stage,
-        stage_label: input.stageLabel ?? null,
-        seed: 'empty'
-      })
+      const created = await nts.createDraft(patientId.value, payload)
       draft.value = created
       await load({ background: true })
       return true
@@ -343,7 +342,8 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
       const failure = applyFailure(raw)
       const kind = conflictKind(failure)
       if (kind) {
-        // A draft already exists — show it rather than a dead-end error.
+        // A draft already exists, or the record moved on — show the
+        // authoritative state rather than a dead-end error.
         await recoverFromConflict(kind)
       }
       return false
@@ -351,6 +351,44 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
       isMutating.value = false
       endWrite()
     }
+  }
+
+  /** Open an empty draft. */
+  async function createDraft(input: {
+    stage: string
+    stageLabel?: string | null
+  }): Promise<boolean> {
+    return await submitDraft({
+      norm_version: normVersion.value,
+      stage: input.stage,
+      stage_label: input.stageLabel ?? null,
+      seed: 'empty'
+    })
+  }
+
+  /**
+   * Continue the diagnosis: open a new editable version seeded from the
+   * finalized record in force.
+   *
+   * The finalized record is never touched. The new draft names it as its
+   * predecessor and carries its findings forward for individual review; the
+   * predecessor stays current until the draft is finalized. Everything is
+   * read from the record itself, not from the profile: a record owns its
+   * norm version, stage and label.
+   */
+  async function continueFromCurrent(reason: string): Promise<boolean> {
+    const source = currentRecord.value
+    const trimmed = reason.trim()
+    if (!source || !trimmed) return false
+
+    return await submitDraft({
+      norm_version: source.norm_version,
+      stage: source.stage,
+      stage_label: source.stage_label,
+      seed: 'carry_forward',
+      supersedes_record_id: source.id,
+      supersession_reason: trimmed
+    })
   }
 
   /**
@@ -766,6 +804,7 @@ export function useNtsOdontogramRecord(options: UseNtsOdontogramRecordOptions) {
     /** Exposed so the finding editor shares one conflict policy, not two. */
     recoverFromConflict,
     createDraft,
+    continueFromCurrent,
     finalizeDraft,
     discardDraft,
     openHistorical,
