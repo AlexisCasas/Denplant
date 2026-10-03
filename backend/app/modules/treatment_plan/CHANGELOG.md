@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat: **`PlanDetailView` shows the diagnosis findings as a reference** (TASK-2026-00021). Mounts the odontogram layer's `NtsCurrentFindingsPanel` as the first element of the right column, above the treatment list. The panel is read-only, decides for itself whether to render (MINSA profile, `odontogram.read`) and keeps its failures to itself; nothing is persisted in this module, no `Treatment` is created or linked, and the plan model is unchanged.
+
 - security: scope treatment-plan patient, plan, item, session, and budget-link routes through the central patient access policy.
 
 - fix(security): dentist treatment-plan responses omit plan, budget, treatment and session monetary fields.

@@ -620,6 +620,15 @@
       "continue": {
         "explanation": "Une nouvelle version modifiable sera créée à partir du diagnostic actuel. Le diagnostic finalisé restera inchangé dans l'historique."
       },
+      "planReference": {
+        "title": "Résultats du diagnostic",
+        "lastDiagnosis": "Dernier diagnostic : {date}",
+        "location": "Localisation",
+        "noDiagnosis": "Aucun diagnostic finalisé pour l'instant.",
+        "noFindings": "Le diagnostic en vigueur n'enregistre aucun résultat.",
+        "errorTitle": "Impossible de charger les résultats",
+        "error": "Le plan reste disponible. Réessayez pour voir la référence du diagnostic."
+      },
       "carriedForward": {
         "title": "{count} constatation(s) reportée(s) à revoir",
         "hint": "Elles proviennent d'un enregistrement antérieur. Confirmez-les une à une dans la liste avant de finaliser."
