@@ -628,6 +628,11 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
 
       <!-- Right column: Treatment list + clinical notes, stacked and auto-height. -->
       <div class="min-[960px]:col-span-2 flex flex-col gap-4 self-start">
+        <!-- Read-only reference to the diagnosis in force. Owned by the
+             odontogram layer: it decides for itself whether to render
+             (MINSA profile, odontogram.read) and its failures stay inside it. -->
+        <NtsCurrentFindingsPanel :patient-id="patientId" />
+
         <UCard
           class="plan-list-card"
           :class="{ 'plan-list-pulse': listPulse }"

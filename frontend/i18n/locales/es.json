@@ -648,6 +648,15 @@
       "continue": {
         "explanation": "Se creará una nueva versión editable a partir del diagnóstico actual. El diagnóstico finalizado permanecerá sin cambios en el historial."
       },
+      "planReference": {
+        "title": "Hallazgos del diagnóstico",
+        "lastDiagnosis": "Último diagnóstico: {date}",
+        "location": "Ubicación",
+        "noDiagnosis": "Aún no hay diagnóstico finalizado.",
+        "noFindings": "El diagnóstico vigente no registra hallazgos.",
+        "errorTitle": "No se pudieron cargar los hallazgos",
+        "error": "El plan sigue disponible. Reintenta para ver la referencia del diagnóstico."
+      },
       "carriedForward": {
         "title": "{count} hallazgo(s) arrastrado(s) sin revisar",
         "hint": "Se copiaron de un registro anterior. Confirma cada uno en la lista de hallazgos antes de finalizar."

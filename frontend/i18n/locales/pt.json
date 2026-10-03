@@ -620,6 +620,15 @@
       "continue": {
         "explanation": "Será criada uma nova versão editável a partir do diagnóstico atual. O diagnóstico finalizado permanecerá sem alterações no histórico."
       },
+      "planReference": {
+        "title": "Achados do diagnóstico",
+        "lastDiagnosis": "Último diagnóstico: {date}",
+        "location": "Localização",
+        "noDiagnosis": "Ainda não há diagnóstico finalizado.",
+        "noFindings": "O diagnóstico vigente não registra achados.",
+        "errorTitle": "Não foi possível carregar os achados",
+        "error": "O plano continua disponível. Tente novamente para ver a referência do diagnóstico."
+      },
       "carriedForward": {
         "title": "{count} achado(s) transferido(s) por rever",
         "hint": "Foram copiados de um registo anterior. Confirme cada um na lista de achados antes de finalizar."
