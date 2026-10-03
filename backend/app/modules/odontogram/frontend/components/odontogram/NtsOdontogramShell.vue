@@ -16,11 +16,12 @@
  */
 
 import { PERMISSIONS } from '~~/app/config/permissions'
-import type { NtsFinding } from '../../types/nts'
+import type { NtsFinding, NtsRule } from '../../types/nts'
 import { useNtsOdontogramRecord } from '../../composables/useNtsOdontogramRecord'
 import NtsOdontogramChart from './NtsOdontogramChart.vue'
 import NtsFindingEditor from './NtsFindingEditor.vue'
 import NtsFindingList from './NtsFindingList.vue'
+import NtsToothFindingEntry from './NtsToothFindingEntry.vue'
 import NtsSpecificationsPanel from './NtsSpecificationsPanel.vue'
 import NtsObservationsPanel from './NtsObservationsPanel.vue'
 import NtsRecordHistory from './NtsRecordHistory.vue'
@@ -30,6 +31,7 @@ import { printDeclarations, resolvePrintAvailability } from '../../utils/ntsPrin
 import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 import { useNtsUnsavedChanges } from '../../composables/useNtsUnsavedChanges'
 import { useNtsPrintIdentity } from '../../composables/useNtsPrintIdentity'
+import { isContextualRuleSupported } from '../../utils/ntsContextualRules'
 
 const props = defineProps<{
   patientId: string
@@ -159,10 +161,138 @@ const editor = useNtsFindingEditor({
   lock: { begin: beginWrite, end: endWrite }
 })
 
-/** Teeth may only be picked while a rule that needs them is open. */
-const chartSelectable = computed(
-  () => editor.isOpen.value && editor.pickMode.value !== 'none'
+/**
+ * The idle shortcut: with a draft open for editing and no editor open, a click
+ * on a tooth starts "record a finding here".
+ *
+ * A convenience for the UI, never a defence — the server decides what is
+ * written. Every condition is one the existing flow already respects:
+ * `canEdit` is a draft in view with a catalog (so never finalized, never
+ * historical), nothing else is writing, and the user may write. While the
+ * editor is open the click belongs to the editor instead (see below).
+ */
+const canRegisterFinding = computed(
+  () => editor.canEdit.value
+    && !editor.isOpen.value
+    && !isHistorical.value
+    && !isWriting.value
+    && can(PERMISSIONS.odontogram.write)
 )
+
+/**
+ * Teeth may be picked while a rule that needs them is open, or — when the
+ * editor is closed — to start a finding from the tooth.
+ */
+const chartSelectable = computed(
+  () => (editor.isOpen.value && editor.pickMode.value !== 'none')
+    || canRegisterFinding.value
+)
+const chartPurpose = computed(() => (editor.isOpen.value ? 'pick' : 'register'))
+
+/** The tooth the shortcut was started from, until a rule is chosen or it is cancelled. */
+const entry = ref<{ fdi: number, rowOrder: number[] } | null>(null)
+
+/** Rules the shortcut may seed; the full catalog stays behind "+ Agregar hallazgo". */
+const contextualRules = computed(
+  () => (catalog.value?.rules ?? []).filter(isContextualRuleSupported)
+)
+
+function onToothSelect(fdi: number, rowOrder: number[]): void {
+  // The editor, when open, owns every click — exactly as before.
+  if (editor.isOpen.value) {
+    editor.pickTooth(fdi, rowOrder)
+    return
+  }
+  if (!canRegisterFinding.value) return
+  entry.value = { fdi, rowOrder }
+}
+
+/**
+ * Close the entry dialog and forget the tooth. Nothing was written, so there is
+ * nothing to undo; `restoreFocus` hands focus back to the tooth that opened it.
+ */
+function closeEntry(restoreFocus = false): void {
+  const closing = entry.value
+  entry.value = null
+  if (!restoreFocus || !closing) return
+  void nextTick(() => {
+    const button = document.querySelector(`button[data-fdi="${closing.fdi}"]`)
+    if (button instanceof HTMLElement) button.focus()
+  })
+}
+
+/** Set once a rule is chosen from a tooth; cleared when the editor scrolls into view or closes. */
+const pendingEditorScroll = ref(false)
+
+/**
+ * A rule was chosen for the clicked tooth: hand it to the existing editor.
+ *
+ * Exactly the three calls the "+ Agregar hallazgo" flow makes, plus the click
+ * the clinician already made. Nothing is sent: the POST happens when the
+ * editor's own Save is pressed.
+ */
+function onChooseRule(rule: NtsRule): void {
+  const target = entry.value
+  if (!target || !canRegisterFinding.value) {
+    closeEntry()
+    return
+  }
+  editor.startCreate()
+  editor.selectRule(rule)
+  editor.pickTooth(target.fdi, target.rowOrder)
+  pendingEditorScroll.value = true
+  closeEntry()
+}
+
+// Anything that moves the ground under the dialog closes it: another patient,
+// another draft, a write starting, the draft going away, the history opening.
+watch(canRegisterFinding, (available) => {
+  if (!available) closeEntry()
+})
+watch(() => draft.value?.id ?? null, () => closeEntry())
+watch(() => props.patientId, () => closeEntry())
+
+const editorPanel = ref<HTMLElement | null>(null)
+
+/**
+ * Whether the rule's targets are structurally complete.
+ *
+ * No selection problems — except for a range, which the editor itself builds
+ * in two clicks (start, then end) and which already validates with a single
+ * tooth because the norm states no minimum span. The clinician is still
+ * mid-gesture after the first click, so a range is only complete once a span
+ * has been picked. This only times the scroll; what may be saved is still
+ * decided by `editor.problems` and the server.
+ */
+const targetsComplete = computed(
+  () => editor.problems.value.length === 0
+    && (editor.rule.value?.scope !== 'range' || editor.selection.value.teeth.length > 1)
+)
+
+/**
+ * Bring the editor into view once the rule's targets are structurally
+ * complete — and only then.
+ *
+ * A pair or a range still needs the chart for its next click, so scrolling
+ * away would hide the thing the clinician has to click. Missing attributes
+ * do not count: they are filled in at the editor, which is where we scroll.
+ */
+watch(
+  () => pendingEditorScroll.value && editor.isOpen.value && targetsComplete.value,
+  (ready) => {
+    if (!ready) return
+    pendingEditorScroll.value = false
+    const panel = editorPanel.value
+    if (!panel || typeof panel.scrollIntoView !== 'function') return
+    const reduced = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    panel.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' })
+  },
+  { flush: 'post' }
+)
+watch(() => editor.isOpen.value, (open) => {
+  if (!open) pendingEditorScroll.value = false
+})
 const selectedTeeth = computed(() =>
   editor.pickMode.value === 'anchor' && editor.selection.value.teeth.length === 0
     ? []
@@ -959,9 +1089,10 @@ const printDeclarationList = computed(
           :catalog="viewCatalog"
           :readonly="chartReadonly"
           :selectable="chartSelectable"
+          :purpose="chartPurpose"
           :selected-teeth="selectedTeeth"
           :anchor-teeth="editor.selection.value.anchors"
-          @tooth-select="(fdi, rowOrder) => editor.pickTooth(fdi, rowOrder)"
+          @tooth-select="onToothSelect"
           @overflow="hiddenSiglas = $event"
         />
 
@@ -1066,6 +1197,7 @@ const printDeclarationList = computed(
              is a locked clinical document and is shown read-only. -->
         <div
           v-if="editor.isOpen.value"
+          ref="editorPanel"
           data-testid="nts-editor-panel"
         >
           <NtsFindingEditor
@@ -1138,6 +1270,15 @@ const printDeclarationList = computed(
         />
       </template>
     </template>
+
+    <!-- Record a finding on the tooth just clicked. Choosing hands over to the
+         editor; cancelling leaves nothing behind. -->
+    <NtsToothFindingEntry
+      :fdi="entry?.fdi ?? null"
+      :rules="contextualRules"
+      @choose="onChooseRule"
+      @cancel="closeEntry(true)"
+    />
 
     <!-- Create draft -->
     <UModal

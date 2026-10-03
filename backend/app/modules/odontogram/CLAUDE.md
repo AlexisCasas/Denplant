@@ -152,6 +152,15 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   `required`, `target_roles`, `anchor`, `arch_cardinality` and
   `target_identity` are the whole contract. Test it with synthetic rules, or
   the test cannot tell metadata from recognition.
+- **Clicking a tooth is a shortcut into the editor, not a second editor.** With
+  the editor closed, `NtsOdontogramShell` opens `NtsToothFindingEntry` and, on
+  choice, replays `startCreate` → `selectRule` → `pickTooth`. Which rules it
+  offers is `isContextualRuleSupported` (metadata only: a numbered tooth
+  subject, not a `multi_segment` range). Do not add a rule id or a scope list
+  to it, and do not turn the click into an anchor or a surface.
+- **A selectable tooth has a purpose.** `pick` is a toggle (`aria-pressed`);
+  `register` opens a dialog (`aria-haspopup`, no pressed state). Do not reuse
+  one for the other.
 - **A carried-forward finding is confirmed one at a time.** There is no bulk
   endpoint and no "confirm all" control, by design.
 - **Never present a `Treatment` as an NTS finding.** The norm separates

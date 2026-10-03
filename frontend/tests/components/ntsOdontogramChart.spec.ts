@@ -1304,3 +1304,51 @@ describe('NTS-05D.4c — neutral structure over a clinical fill', () => {
     expect(Number(cellSvg.attributes('stroke-width'))).toBe(NTS_TOOTH_STROKE)
   })
 })
+
+// ---------------------------------------------------------------------------
+// TASK-2026-00022 — what a click on a tooth means (purpose)
+// ---------------------------------------------------------------------------
+
+describe('NtsToothCell — purpose of a selectable tooth', () => {
+  it('pick (the default) keeps the toggle semantics: aria-pressed and "Select"', async () => {
+    const wrapper = await mountChart({ selectable: true, selectedTeeth: [16] })
+
+    const cells = wrapper.findAll('[data-fdi]')
+    expect(cells).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi][aria-haspopup]')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="nts-tooth-11"]').attributes('aria-label')).toBe('Select Tooth 11')
+    expect(wrapper.find('[data-testid="nts-tooth-16"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-testid="nts-tooth-11"]').attributes('aria-pressed')).toBe('false')
+  })
+
+  it('an explicit pick behaves exactly like the default', async () => {
+    const wrapper = await mountChart({ selectable: true, purpose: 'pick' })
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+  })
+
+  it('register announces an action that opens a dialog, and claims no pressed state', async () => {
+    const wrapper = await mountChart({ selectable: true, purpose: 'register' })
+
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-fdi][aria-haspopup="dialog"]')).toHaveLength(52)
+    expect(wrapper.find('[data-testid="nts-tooth-16"]').attributes('aria-label')).toBe('Record a finding on Tooth 16')
+    expect(wrapper.find('[data-testid="nts-tooth-51"]').attributes('aria-label')).toBe('Record a finding on Deciduous tooth 51')
+  })
+
+  it('register still reports the click with the tooth and its own row, as pick does', async () => {
+    const wrapper = await mountChart({ selectable: true, purpose: 'register' })
+    await wrapper.find('[data-testid="nts-tooth-13"]').trigger('click')
+
+    const [fdi, rowOrder] = wrapper.emitted('toothSelect')![0]!
+    expect(fdi).toBe(13)
+    expect(rowOrder).toEqual(PERMANENT_UPPER)
+  })
+
+  it('without selectable the purpose changes nothing: teeth stay inert', async () => {
+    const wrapper = await mountChart({ purpose: 'register' })
+
+    expect(wrapper.findAll('[data-fdi]').every(el => el.element.tagName === 'DIV')).toBe(true)
+    expect(wrapper.findAll('[data-fdi][aria-haspopup]')).toHaveLength(0)
+  })
+})

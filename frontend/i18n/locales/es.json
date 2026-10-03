@@ -590,7 +590,8 @@
         "a11y": {
           "select": "Seleccionar {tooth}",
           "selected": "{tooth}, seleccionado",
-          "anchorSelected": "{tooth}, seleccionado como referencia"
+          "anchorSelected": "{tooth}, seleccionado como referencia",
+          "register": "Registrar hallazgo en {tooth}"
         }
       },
       "status": {
@@ -647,6 +648,10 @@
       },
       "continue": {
         "explanation": "Se creará una nueva versión editable a partir del diagnóstico actual. El diagnóstico finalizado permanecerá sin cambios en el historial."
+      },
+      "entry": {
+        "title": "Registrar hallazgo — Pieza {fdi}",
+        "hint": "Elige el hallazgo; la pieza quedará seleccionada."
       },
       "planReference": {
         "title": "Hallazgos del diagnóstico",

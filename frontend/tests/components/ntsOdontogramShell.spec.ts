@@ -3446,3 +3446,460 @@ describe('NTS — continue a finalized diagnosis', () => {
     expect(document.querySelector('[data-testid="nts-continue-submit"]')).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// TASK-2026-00022 — record a finding by clicking a tooth
+// ---------------------------------------------------------------------------
+
+describe('NTS — contextual finding entry from a tooth', () => {
+  const mounted: Array<{ unmount: () => void }> = []
+  const scrollSpy = vi.fn()
+
+  beforeEach(() => {
+    scrollSpy.mockReset()
+    Element.prototype.scrollIntoView = scrollSpy
+  })
+  afterEach(() => {
+    mounted.forEach(w => w.unmount())
+    mounted.length = 0
+    perms.granted = new Set([WRITE])
+  })
+
+  // Fixtures are chosen by scope/grouping, but these ids exist in the shipped
+  // catalog and only name *which* rule a test clicks; the production code is
+  // never told one.
+  /**
+   * The catalog as the live API serves it. The source file omits the keys a
+   * rule has nothing to say for (`attributes`, `target_roles`, `values`, ...);
+   * the API always sends them, and the editor reads them without guarding.
+   */
+  const LIVE_CATALOG = {
+    ...REAL_CATALOG,
+    rules: REAL_CATALOG.rules.map((rule: Record<string, unknown>) => ({
+      attributes: [],
+      target_roles: [],
+      anchor: null,
+      arch_cardinality: null,
+      range_grouping: null,
+      target_identity: 'numbered',
+      ...rule,
+      attributes: ((rule.attributes as Array<Record<string, unknown>> | undefined) ?? [])
+        .map(attribute => ({ values: [], ...attribute }))
+    }))
+  }
+
+  const TOOTH = '6.1.12'
+  const SURFACE = '6.1.16'
+  const PAIR = '6.1.6'
+  const RANGE = '6.1.1'
+
+  function route(options: {
+    current?: unknown
+    draft?: unknown
+    catalog?: unknown
+  } = {}) {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: options.catalog ?? LIVE_CATALOG }
+      if (url.includes('/records/current')) return { data: options.current ?? null }
+      if (url.includes('/records/draft')) return { data: options.draft ?? null }
+      if (url.endsWith('/nts/patients/p1/records')) return { data: [], total: 0, page: 1, page_size: 20 }
+      throw new Error(`unrouted GET ${url}`)
+    })
+  }
+
+  async function shell(options: { attached?: boolean } = {}) {
+    const wrapper = await mountSuspended(NtsOdontogramShell, {
+      props: { patientId: 'p1', normVersion: 'pe_nts_188_2022' },
+      ...(options.attached ? { attachTo: document.body } : {})
+    })
+    mounted.push(wrapper)
+    await settle()
+    return wrapper
+  }
+
+  const tooth = (fdi: number) => `[data-testid="nts-tooth-${fdi}"]`
+  const dialogRule = (id: string) => document.querySelector(`[data-testid="nts-rule-${id}"]`) as HTMLElement | null
+  const dialogOpen = () => document.querySelector('[data-testid="nts-finding-picker"]') !== null
+  const selected = (wrapper: { findAll: (s: string) => Array<{ attributes: (a: string) => string | undefined }> }) =>
+    wrapper.findAll('[data-selected="true"]').map(el => Number(el.attributes('data-fdi')))
+
+  async function click(wrapper: { find: (s: string) => { trigger: (e: string) => Promise<void> } }, selector: string) {
+    await wrapper.find(selector).trigger('click')
+    await settle()
+  }
+
+  async function choose(id: string) {
+    dialogRule(id)!.click()
+    await settle()
+  }
+
+  function draftRecord(findings: unknown[] = []) {
+    return chartRecord({ id: 'rec-1', version: 3, findings })
+  }
+
+  // --- when the shortcut exists ---------------------------------------------
+
+  it('a draft with the editor closed: a tooth click opens the entry dialog for that tooth', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    await click(wrapper, tooth(16))
+
+    expect(dialogOpen()).toBe(true)
+    expect(document.body.textContent).toContain('Record finding — Tooth 16')
+    expect(wrapper.find('[data-testid="nts-editor-panel"]').exists()).toBe(false)
+    expect(state.post).not.toHaveBeenCalled()
+  })
+
+  it('a finalized record with no draft: teeth are inert', async () => {
+    route({ current: chartRecord({ status: 'finalized' }) })
+    const wrapper = await shell()
+
+    expect(wrapper.find(tooth(16)).element.tagName).toBe('DIV')
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(false)
+  })
+
+  it('a historical record: teeth are inert', async () => {
+    state.get.mockImplementation(async (url: string) => {
+      if (url === '/api/v1/odontogram/preferences') return { data: { profile: state.profile } }
+      if (url.includes('/nts/catalogs/')) return { data: REAL_CATALOG }
+      if (url.includes('/records/current')) return { data: chartRecord({ id: 'cur', status: 'finalized' }) }
+      if (url.includes('/records/draft')) return { data: null }
+      if (url.endsWith('/nts/patients/p1/records')) {
+        return {
+          data: [{
+            id: 'old', patient_id: 'p1', norm_version: 'pe_nts_188_2022', stage: 'diagnosis',
+            stage_label: null, status: 'finalized', version: 2, recorded_at: '2026-01-01T10:00:00Z',
+            finalized_at: '2026-01-01T11:00:00Z', discarded_at: null, supersedes_record_id: null,
+            content_hash: 'a', is_superseded: true
+          }],
+          total: 1,
+          page: 1,
+          page_size: 20
+        }
+      }
+      if (url.endsWith('/nts/records/old')) return { data: chartRecord({ id: 'old', status: 'finalized' }) }
+      throw new Error(`unrouted GET ${url}`)
+    })
+    const wrapper = await shell()
+    await click(wrapper, '[data-testid="nts-history-open-0"]')
+
+    expect(wrapper.find(tooth(16)).element.tagName).toBe('DIV')
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(false)
+  })
+
+  it('without odontogram.write there is no shortcut', async () => {
+    perms.granted = new Set()
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    expect(wrapper.find(tooth(16)).element.tagName).toBe('DIV')
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(false)
+  })
+
+  it('while a write is in flight there is no shortcut', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    let release: (value: unknown) => void = () => {}
+    state.patch.mockImplementation(() => new Promise((resolve) => {
+      release = resolve
+    }))
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('texto')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find(tooth(16)).element.tagName).toBe('DIV')
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(false)
+
+    release({ data: draftRecord() })
+    await settle()
+  })
+
+  // --- what the dialog offers -----------------------------------------------
+
+  it('offers only rules whose subject a clicked tooth can be, by metadata', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    await click(wrapper, tooth(16))
+
+    const offered = Array.from(document.querySelectorAll('[data-testid^="nts-rule-"]'))
+    const scopes = offered.map(el => el.getAttribute('data-scope'))
+    expect(offered.length).toBeGreaterThan(0)
+    expect(scopes).not.toContain('arch')
+
+    const byMetadata = (predicate: (rule: Record<string, unknown>) => boolean) =>
+      LIVE_CATALOG.rules.filter(predicate).map((r: { rule_id: string }) => r.rule_id)
+    const ids = offered.map(el => el.getAttribute('data-testid')!.replace('nts-rule-', ''))
+    for (const id of byMetadata(r => r.target_identity === 'unnumbered')) expect(ids).not.toContain(id)
+    for (const id of byMetadata(r => r.range_grouping === 'multi_segment')) expect(ids).not.toContain(id)
+    for (const id of byMetadata(r => r.scope === 'arch')) expect(ids).not.toContain(id)
+    // Everything else the catalog has is offered.
+    const expected = byMetadata(r =>
+      r.scope !== 'arch' && r.target_identity !== 'unnumbered' && r.range_grouping !== 'multi_segment'
+    )
+    expect(ids.sort()).toEqual(expected.sort())
+  })
+
+  it('a multi-segment range is excluded by its metadata, not by its id', async () => {
+    // Flip the grouping on a rule that is normally offered: it must vanish,
+    // and the rule that really is multi-segment must come back when flipped.
+    const catalog = JSON.parse(JSON.stringify(LIVE_CATALOG))
+    for (const rule of catalog.rules) {
+      if (rule.rule_id === RANGE) rule.range_grouping = 'multi_segment'
+      if (rule.range_grouping === 'multi_segment' && rule.rule_id !== RANGE) rule.range_grouping = 'single_segment'
+    }
+    route({ draft: draftRecord(), catalog })
+    const wrapper = await shell()
+    await click(wrapper, tooth(16))
+
+    expect(dialogRule(RANGE)).toBeNull()
+    const other = catalog.rules.find((r: { scope: string, rule_id: string }) => r.scope === 'range' && r.rule_id !== RANGE)
+    expect(dialogRule(other.rule_id)).not.toBeNull()
+  })
+
+  // --- choosing a rule -------------------------------------------------------
+
+  it('cancelling leaves no editor, no selection and no request, and returns focus to the tooth', async () => {
+    route({ draft: draftRecord() })
+    // Focus only exists on a node that is in the document.
+    const wrapper = await shell({ attached: true })
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(true)
+
+    ;(document.querySelector('[data-testid="nts-tooth-entry-cancel"]') as HTMLElement).click()
+    await settle()
+
+    expect(dialogOpen()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-editor-panel"]').exists()).toBe(false)
+    expect(selected(wrapper)).toEqual([])
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.put).not.toHaveBeenCalled()
+    expect(state.patch).not.toHaveBeenCalled()
+    expect(document.activeElement?.getAttribute('data-fdi')).toBe('16')
+  })
+
+  it('tooth rule: the clicked tooth is seeded, the editor opens, nothing is sent, and it scrolls', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    const requests = state.get.mock.calls.length
+
+    await click(wrapper, tooth(16))
+    await choose(TOOTH)
+
+    expect(dialogOpen()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-editor-panel"]').exists()).toBe(true)
+    expect(selected(wrapper)).toEqual([16])
+    expect(state.post).not.toHaveBeenCalled()
+    expect(state.get.mock.calls.length).toBe(requests)
+    expect(scrollSpy).toHaveBeenCalledTimes(1)
+    expect(scrollSpy.mock.calls[0]![0]).toMatchObject({ block: 'nearest' })
+  })
+
+  it('surface rule: the tooth is the target and the surface stays an attribute', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    await click(wrapper, tooth(36))
+    await choose(SURFACE)
+
+    expect(selected(wrapper)).toEqual([36])
+    expect(wrapper.find('[data-testid="nts-attribute-editor"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-attribute-editor"]').text()).toContain('Oclusal/Incisal')
+    // The whole tooth is the target: no SVG region is a control.
+    expect(wrapper.findAll('[data-region]').filter(el => el.element.tagName === 'BUTTON')).toHaveLength(0)
+    expect(scrollSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('pair rule: first tooth seeded without scrolling; the second click completes it and scrolls', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    await click(wrapper, tooth(16))
+    await choose(PAIR)
+    expect(selected(wrapper)).toEqual([16])
+    expect(scrollSpy).not.toHaveBeenCalled()
+    // The chart keeps picking for the open editor.
+    expect(wrapper.find(tooth(26)).attributes('aria-pressed')).toBeDefined()
+
+    await click(wrapper, tooth(26))
+
+    expect(selected(wrapper).sort()).toEqual([16, 26])
+    expect(dialogOpen()).toBe(false)
+    expect(scrollSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('range rule: start seeded, no scroll; an end on the same row expands the span and scrolls', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    await click(wrapper, tooth(13))
+    await choose(RANGE)
+    expect(selected(wrapper)).toEqual([13])
+    expect(scrollSpy).not.toHaveBeenCalled()
+
+    await click(wrapper, tooth(23))
+
+    // Layout order across the midline: 13 12 11 | 21 22 23.
+    expect(selected(wrapper).sort((a, b) => a - b)).toEqual([11, 12, 13, 21, 22, 23])
+    expect(scrollSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('range rule: an end on another row leaves the selection invalid and does not scroll', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    await click(wrapper, tooth(13))
+    await choose(RANGE)
+    await click(wrapper, tooth(53))
+
+    expect(selected(wrapper)).toEqual([])
+    expect(scrollSpy).not.toHaveBeenCalled()
+  })
+
+  // --- the editor owns the click once it is open ------------------------------
+
+  it('with the editor open, a tooth click picks for it and opens no dialog', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    await click(wrapper, tooth(16))
+    await choose(PAIR)
+
+    await click(wrapper, tooth(26))
+
+    expect(dialogOpen()).toBe(false)
+    expect(selected(wrapper).sort()).toEqual([16, 26])
+  })
+
+  it('an editor opened on an existing finding keeps the chart inert and opens no dialog', async () => {
+    const existing = {
+      id: 'f1', record_id: 'rec-1', norm_version: 'pe_nts_188_2022', rule_id: TOOTH,
+      attributes: {}, provenance: 'observed', source_finding_id: null, sequence: 1,
+      created_at: '2026-01-02T10:00:00Z', created_by: 'u1',
+      targets: [{
+        id: 't1', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'fdi_tooth', tooth_number: 21, arch: null, local_ordinal: null, geometry: null
+      }]
+    }
+    route({ draft: draftRecord([existing]) })
+    const wrapper = await shell()
+
+    await click(wrapper, '[data-testid="nts-edit-f1"]')
+    expect(wrapper.find('[data-testid="nts-editor-panel"]').exists()).toBe(true)
+    expect(wrapper.find(tooth(16)).element.tagName).toBe('DIV')
+
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(false)
+    expect(selected(wrapper)).toEqual([21])
+  })
+
+  it('"+ Agregar hallazgo" is untouched: it still offers every rule, arches included', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+
+    await click(wrapper, '[data-testid="nts-add-finding"]')
+
+    const ids = Array.from(wrapper.element.querySelectorAll('[data-testid^="nts-rule-"]'))
+    expect(ids).toHaveLength(LIVE_CATALOG.rules.length)
+    expect(ids.some(el => el.getAttribute('data-scope') === 'arch')).toBe(true)
+    expect(dialogOpen()).toBe(false)
+  })
+
+  // --- saving -----------------------------------------------------------------
+
+  it('saving uses the existing createFinding: one POST with the seeded tooth', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    await click(wrapper, tooth(16))
+    await choose(TOOTH)
+    expect(state.post).not.toHaveBeenCalled()
+
+    state.post.mockResolvedValue({ data: { finding: {}, record_version: 4 } })
+    await click(wrapper, '[data-testid="nts-editor-save"]')
+
+    expect(state.post).toHaveBeenCalledTimes(1)
+    const [url, body] = state.post.mock.calls[0]!
+    expect(url).toBe('/api/v1/odontogram/nts/records/rec-1/findings')
+    expect(body).toMatchObject({
+      expected_version: 3,
+      rule_id: TOOTH,
+      targets: [{ participation: 'subject', target_kind: 'fdi_tooth', tooth_number: 16 }]
+    })
+  })
+
+  it('a carried-forward draft: the new finding is added without touching the pending ones', async () => {
+    const pending = {
+      id: 'cf1', record_id: 'rec-1', norm_version: 'pe_nts_188_2022', rule_id: TOOTH,
+      attributes: {}, provenance: 'carried_forward', source_finding_id: 'older', sequence: 1,
+      created_at: '2026-01-02T10:00:00Z', created_by: 'u1',
+      targets: [{
+        id: 't1', group_index: 0, position: 0, participation: 'subject', role: null,
+        target_kind: 'fdi_tooth', tooth_number: 21, arch: null, local_ordinal: null, geometry: null
+      }]
+    }
+    route({ draft: draftRecord([pending]) })
+    const wrapper = await shell()
+
+    await click(wrapper, tooth(16))
+    await choose(TOOTH)
+
+    expect(state.post).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="nts-confirm-cf1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-finalize-draft"]').attributes('disabled')).toBeDefined()
+
+    state.post.mockResolvedValue({ data: { finding: {}, record_version: 4 } })
+    await click(wrapper, '[data-testid="nts-editor-save"]')
+    const urls = state.post.mock.calls.map(([url]) => url as string)
+    expect(urls).toEqual(['/api/v1/odontogram/nts/records/rec-1/findings'])
+  })
+
+  it('once the editor is open, leaving the page is still protected', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    const unsaved = useNtsUnsavedChanges()
+
+    await click(wrapper, tooth(16))
+    expect(unsaved.dirty.value).toBe(false)
+    await choose(TOOTH)
+
+    expect(unsaved.dirty.value).toBe(true)
+  })
+
+  // --- closing defensively -------------------------------------------------------
+
+  it('the dialog closes when the patient changes', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(true)
+
+    await wrapper.setProps({ patientId: 'p2' })
+    await settle()
+
+    expect(dialogOpen()).toBe(false)
+  })
+
+  it('the dialog closes when a write starts', async () => {
+    route({ draft: draftRecord() })
+    const wrapper = await shell()
+    await click(wrapper, tooth(16))
+    expect(dialogOpen()).toBe(true)
+
+    let release: (value: unknown) => void = () => {}
+    state.patch.mockImplementation(() => new Promise((resolve) => {
+      release = resolve
+    }))
+    await wrapper.find('[data-testid="nts-observations-input"]').setValue('texto')
+    await wrapper.find('[data-testid="nts-observations-save"]').trigger('click')
+    await settle()
+
+    expect(dialogOpen()).toBe(false)
+    release({ data: draftRecord() })
+    await settle()
+  })
+})

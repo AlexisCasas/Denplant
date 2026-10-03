@@ -24,8 +24,10 @@ withDefaults(
     selectable?: boolean
     selectedTeeth?: readonly number[]
     anchorTeeth?: readonly number[]
+    /** What a click means; see `NtsToothCell`. */
+    purpose?: 'pick' | 'register'
   }>(),
-  { selectable: false, selectedTeeth: () => [], anchorTeeth: () => [] }
+  { selectable: false, selectedTeeth: () => [], anchorTeeth: () => [], purpose: 'pick' }
 )
 
 const emit = defineEmits<{ select: [fdi: number, rowOrder: number[]] }>()
@@ -45,6 +47,7 @@ const emit = defineEmits<{ select: [fdi: number, rowOrder: number[]] }>()
       :tooth="tooth"
       :scale="scale"
       :selectable="selectable"
+      :purpose="purpose"
       :selected="selectedTeeth.includes(tooth.fdi)"
       :anchor="anchorTeeth.includes(tooth.fdi)"
       @select="emit('select', $event, row.teeth.map(t => t.fdi))"
