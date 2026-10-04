@@ -15,7 +15,7 @@ from collections.abc import Awaitable
 from typing import Annotated, TypeVar
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -24,6 +24,8 @@ from app.database import get_db
 
 from .exceptions import (
     PatientNotFoundError,
+    PdfRenderFailed,
+    PdfUnavailable,
     PrescriberNotEligibleError,
     PrescriptionError,
     PrescriptionNotFoundError,
@@ -31,6 +33,7 @@ from .exceptions import (
     PrescriptionValidationError,
     VoidNotAllowedError,
 )
+from .pdf import PrescriptionPDFService, pdf_filename, resolve_locale
 from .schemas import (
     PrescriptionCreate,
     PrescriptionResponse,
@@ -55,6 +58,8 @@ _ERROR_MAP: dict[type[PrescriptionError], tuple[int, str]] = {
         status.HTTP_422_UNPROCESSABLE_ENTITY,
         "prescription_validation",
     ),
+    PdfUnavailable: (status.HTTP_503_SERVICE_UNAVAILABLE, "pdf_unavailable"),
+    PdfRenderFailed: (status.HTTP_500_INTERNAL_SERVER_ERROR, "pdf_render_failed"),
 }
 
 
@@ -151,3 +156,38 @@ async def void_prescription(
     a voided prescription cannot be voided again or restored."""
     prescription = await _guard(PrescriptionService.void(db, ctx, prescription_id, data.reason))
     return ApiResponse(data=PrescriptionResponse.model_validate(prescription))
+
+
+@router.get(
+    "/{prescription_id}/pdf",
+    summary="The prescription as an A4 PDF for printing and handwritten signature",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def download_prescription_pdf(
+    prescription_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("prescriptions.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    locale: Annotated[str | None, Query(pattern="^(es|en)$")] = None,
+) -> Response:
+    """Rendered on every request from the prescription's own snapshots, so an
+    issued and a voided one both print exactly what they said when issued (the
+    voided one under an ANULADA mark). Only the logo is the clinic's current
+    one. Nothing is stored and nothing is written: this is not a signed or
+    electronic document, just a sheet to sign by hand."""
+    prescription = await _guard(PrescriptionService.get_accessible(db, ctx, prescription_id))
+    pdf_bytes = await _guard(
+        PrescriptionPDFService.generate_pdf(
+            prescription, ctx.clinic, locale=resolve_locale(locale, ctx.clinic.settings)
+        )
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{pdf_filename(prescription.number)}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

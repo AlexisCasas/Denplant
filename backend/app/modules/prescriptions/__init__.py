@@ -8,8 +8,10 @@ a snapshot taken at issue, so it never rewrites itself when the patient, the
 user or the clinic change.
 
 This is **not** an electronic prescription: nothing is digitally signed, and
-the module has no PDF, no pharmacy integration and no drug knowledge of any
-kind (no catalog, dose calculation, interaction or contraindication checks).
+the module has no pharmacy integration and no drug knowledge of any kind (no
+catalog, dose calculation, interaction or contraindication checks). Its PDF is
+an A4 sheet rendered on demand for printing and handwritten signature; it is
+never stored.
 It is also unrelated to ``patients_clinical.Medication``, which records what a
 patient *takes*.
 """

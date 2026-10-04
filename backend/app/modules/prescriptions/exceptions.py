@@ -9,6 +9,8 @@ Free of FastAPI so the rules never learn HTTP; the router maps them.
 :class:`VoidNotAllowedError`         403   ``void_not_allowed``
 :class:`PrescriptionStateError`      409   ``prescription_state_conflict``
 :class:`PrescriptionValidationError` 422   ``prescription_validation``
+:class:`PdfUnavailable`              503   ``pdf_unavailable``
+:class:`PdfRenderFailed`             500   ``pdf_render_failed``
 ==================================  =====  ============================
 """
 
@@ -63,3 +65,20 @@ class PrescriptionValidationError(PrescriptionError):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(message)
+
+
+class PdfUnavailable(PrescriptionError):  # noqa: N818  (names fixed by the design)
+    """The PDF renderer cannot be loaded on this server.
+
+    Never answered with a stand-in: a response that says ``application/pdf``
+    must be a PDF.
+    """
+
+
+class PdfRenderFailed(PrescriptionError):  # noqa: N818  (names fixed by the design)
+    """The renderer failed on this document.
+
+    The message is deliberately generic: what went wrong inside the renderer is
+    logged against the prescription id, and what is on the prescription never
+    reaches an error body.
+    """

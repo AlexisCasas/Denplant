@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- feat: **A4 PDF of a prescription** (`GET /prescriptions/{id}/pdf`, `prescriptions.read`, `?locale=es|en`). Rendered on every request with WeasyPrint from the prescription's own snapshots, for printing and handwritten signature - not an electronic prescription, nothing is digitally signed, and nothing is stored, hashed or audited.
+  - Every name, number, address, medication and date comes from the `*_snapshot` columns; the age is measured at `issue_date` (`age.py`: years from one year of age, months below it, a 29-Feb birthday is 1 March in a common year). Only the clinic logo is live, and a missing logo or a storage failure never blocks the print.
+  - A voided prescription prints with all its content under an `ANULADA` watermark on every page and a banner; the void reason, date and actor are not printed.
+  - Page 1 has the full clinic header; pages 2+ a short strip (number, patient, page X of Y). The signature follows the last medication in normal flow.
+  - Headers: `Content-Type: application/pdf`, `Content-Disposition: inline` with `receta-RX-YYYY-NNNNNN.pdf`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`.
+  - Text is HTML-escaped and the renderer loads `data:` resources only. WeasyPrint missing is 503 `pdf_unavailable`, a render failure 500 `pdf_render_failed`; HTML is never served as `application/pdf`.
+  - Tests share fixtures through `tests/prescriptions_fixtures.py`.
+
 - feat: **new module — backend base (phase A).** Issue, list, read and void
   medication prescriptions written by a dentist, for printing and handwritten
   signature. This is not an electronic prescription and nothing is digitally
@@ -25,5 +33,5 @@
     prescriber or an admin may void, with a mandatory reason.
   - The patient's date of birth is required; `valid_until` is required with no
     default.
-- Out of scope in this phase, on purpose: PDF, frontend, events, AI tools,
+- Out of scope, on purpose: frontend, events, AI tools,
   any drug knowledge, and any link with `patients_clinical.Medication`.

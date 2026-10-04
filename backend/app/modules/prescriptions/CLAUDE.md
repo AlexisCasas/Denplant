@@ -1,8 +1,8 @@
 # Prescriptions module
 
 Issues, stores and lists medication prescriptions written by a dentist, for
-printing and handwritten signature. **Phase A is backend only**: no PDF, no UI,
-no events.
+printing and handwritten signature. **Backend only** so far: model, API and an
+A4 PDF rendered on demand; no UI yet and no events.
 
 ## Public API
 
@@ -12,6 +12,7 @@ Routes mounted at `/api/v1/prescriptions` (no trailing slash).
 - `GET  /prescriptions?patient_id=…`  — a patient's history, newest first, paginated; `prescriptions.read`
 - `GET  /prescriptions/{id}`          — detail: every snapshot + items by position; `prescriptions.read`
 - `POST /prescriptions/{id}/void`     — void with a mandatory `reason`; `prescriptions.void`
+- `GET  /prescriptions/{id}/pdf`      — A4 PDF, `?locale=es|en`; `prescriptions.read`
 
 There is **no** `PUT`, `PATCH` or `DELETE`, and there never will be: an issued
 prescription is not edited or deleted. A mistake is voided and re-issued.
@@ -92,6 +93,37 @@ consumer (for example `patient_timeline`) exists. Do not touch `core/events`.
   *takes*; this module records what a dentist *prescribes*. No FK, no sync.
 - **No medication knowledge anywhere**: no catalog, normalisation, dose
   calculation, interaction or contraindication check. Items are free text.
+- **The PDF is a rendering of the snapshots, not a stored file** (`pdf.py`).
+  `build_pdf_context(prescription, *, logo, locale)` is pure: it receives the
+  prescription with its items, the already-resolved logo and a locale, and can
+  reach no patient, user or clinic. Every name, number and address comes from
+  the `*_snapshot` columns and the age is measured at `issue_date` from the
+  frozen date of birth (`age.py`; a 29-feb birthday is 1 March in a common
+  year). The one live input is the clinic logo (`logo_data_uri`); if it is
+  missing or storage fails the sheet still prints, without it.
+- **Printing writes nothing**: no file, no hash, no audit event, no domain
+  event, no counter. Nothing is signed and the sheet never says "firma digital"
+  or "receta electrónica": it leaves a line for the prescriber's handwritten
+  signature and stamp.
+- **A voided prescription prints with everything it had**, under an `ANULADA`
+  watermark on every page and a banner. The void reason, date and actor are
+  internal and are never printed.
+- **PDF rendering rules**: all human text goes through `html.escape` (line
+  breaks are kept with CSS `white-space: pre-line`, never as markup); the
+  renderer may load `data:` resources only (`URLFetcher(allowed_protocols=
+  ("data",))`, or `data_only_url_fetcher` on older WeasyPrint); it runs in
+  `asyncio.to_thread`. If WeasyPrint cannot be imported the answer is 503
+  `pdf_unavailable`, and a render failure is 500 `pdf_render_failed` with a
+  generic body. Never return HTML as `application/pdf` (the budget PDF's
+  fallback does; this one must not). Logs carry the prescription id and the
+  error type, never what is written on it.
+- **Layout**: page 1 has the full clinic header; pages 2+ get a short strip
+  (number, patient, `Página X de Y`) from a running element, not the whole
+  clinic again. Items avoid breaking inside; the signature is in normal flow
+  after the last item, never `fixed`/`absolute`.
+- **Locale**: `?locale=es|en`, else `clinic.settings.communication_language`,
+  else Spanish (anything unsupported is Spanish, not English). Not
+  `Accept-Language`, not `Patient.preferred_language`.
 - **Known debt:** `PatientAccessPolicy` excludes archived patients, so their
   prescriptions cannot be read. Legal/document access to archived patients needs
   a transversal policy; this module does not special-case it.

@@ -6,8 +6,8 @@ last_verified_commit: 9e40e4f1
 # Prescriptions — technical overview
 
 Medication prescriptions written by a dentist, **for printing and handwritten
-signature**. Phase A (this document) is the backend: model, migration, security
-and API. There is no PDF, no frontend and no event yet.
+signature**. So far this is the backend: model, migration, security, API and an
+A4 PDF rendered on demand. There is no frontend and no event yet.
 
 It is **not** an electronic prescription: nothing is digitally signed, and the
 module has no pharmacy or DIGEMID integration and no drug knowledge (no
@@ -31,6 +31,7 @@ one.
 - `GET /api/v1/prescriptions?patient_id=…` — history, newest first
 - `GET /api/v1/prescriptions/{prescription_id}` — detail
 - `POST /api/v1/prescriptions/{prescription_id}/void` — void
+- `GET /api/v1/prescriptions/{prescription_id}/pdf` — A4 PDF, optional `?locale=es|en`
 
 No `PUT`, `PATCH` or `DELETE`.
 
@@ -81,6 +82,33 @@ Who may issue (`dentist` with a registration number), who may void (original
 prescriber or admin), patient scope (`PatientAccessPolicy`), the required date of
 birth and the required `valid_until` live in `PrescriptionService`, because the
 permission table cannot express them. See the module `CLAUDE.md`.
+
+## The PDF
+
+An A4 sheet for printing and **handwritten** signature. It is not an electronic
+prescription and nothing is digitally signed; it says so and leaves a line for
+the prescriber's signature and stamp.
+
+- **Rendered on every request**, never stored: no file, hash, audit event or
+  domain event, and nothing is written.
+- **Frozen content**: every name, number, address, medication and date comes from
+  the prescription's snapshots; the age is measured at `issue_date`
+  (`< 1 year` is written in months). Only the **logo** is live: a reprint carries
+  the clinic's current branding, and a missing logo never blocks the print.
+- **Voided** prescriptions print with all their content under an `ANULADA`
+  watermark on every page and a banner; the void reason, date and actor are not
+  printed.
+- **Pages**: full header on page 1, then a short strip (number, patient,
+  `Página X de Y`); medications do not split when they fit; the signature follows
+  the last medication in normal flow.
+- **Response**: `Content-Type: application/pdf`, `Content-Disposition: inline;
+  filename="receta-RX-YYYY-NNNNNN.pdf"` (from the number alone), `Cache-Control:
+  no-store`, `X-Content-Type-Options: nosniff`.
+- **Locale**: `?locale=es|en`, else the clinic's `communication_language`, else Spanish.
+- **Errors**: 503 `pdf_unavailable` when WeasyPrint cannot be loaded, 500
+  `pdf_render_failed` when rendering fails; never HTML served as a PDF.
+- **Security**: all human text is HTML-escaped; the renderer loads `data:`
+  resources only.
 
 ## Known limits
 
