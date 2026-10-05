@@ -1,0 +1,75 @@
+{
+  "prescriptions": {
+    "title": "Histórico de recetas",
+    "total": "Total: {count}",
+    "loading": "Cargando recetas…",
+    "empty": "Aún no hay recetas registradas.",
+    "columns": {
+      "date": "Fecha",
+      "number": "Número",
+      "prescriber": "Odontólogo",
+      "items": "Medicamentos",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "status": {
+      "issued": "Emitida",
+      "voided": "Anulada"
+    },
+    "actions": {
+      "view": "Ver",
+      "print": "Imprimir",
+      "retry": "Reintentar",
+      "close": "Cerrar",
+      "previous": "Anterior",
+      "next": "Siguiente"
+    },
+    "aria": {
+      "view": "Ver la receta {number}",
+      "print": "Imprimir la receta {number}"
+    },
+    "pagination": {
+      "label": "Paginación de recetas",
+      "pageOf": "Página {page} de {pages}"
+    },
+    "error": {
+      "list": "No se pudieron cargar las recetas.",
+      "detail": "No se pudo cargar la receta.",
+      "pdf": "No se pudo abrir el PDF de la receta."
+    },
+    "pdf": {
+      "downloaded": "El navegador bloqueó la ventana emergente; el PDF se ha descargado."
+    },
+    "detail": {
+      "title": "Receta {number}",
+      "description": "Detalle de solo lectura de la receta emitida.",
+      "receipt": "Receta",
+      "number": "Número",
+      "status": "Estado",
+      "issueDate": "Fecha de emisión",
+      "validUntil": "Vigencia hasta",
+      "patient": "Paciente",
+      "name": "Nombre",
+      "document": "Documento",
+      "birthDate": "Fecha de nacimiento",
+      "prescriber": "Odontólogo",
+      "professionalId": "Colegiatura",
+      "medications": "Medicamentos",
+      "strength": "Concentración",
+      "form": "Forma farmacéutica",
+      "commercialName": "Nombre comercial",
+      "presentation": "Presentación",
+      "dose": "Dosis",
+      "route": "Vía",
+      "frequency": "Frecuencia",
+      "duration": "Duración",
+      "quantity": "Cantidad",
+      "instructions": "Indicaciones",
+      "voided": {
+        "title": "Receta anulada",
+        "reason": "Motivo",
+        "at": "Anulada el"
+      }
+    }
+  }
+}

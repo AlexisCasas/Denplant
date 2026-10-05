@@ -46,6 +46,12 @@ class PrescriptionsModule(BaseModule):
             "admin": ["*"],
             "dentist": ["read", "prescribe", "void"],
         },
+        # A Nuxt layer with no navigation entry: the history lives in the
+        # patient's Clinical tab, through the ``patient.clinical.prescriptions`` slot.
+        "frontend": {
+            "layer_path": "frontend",
+            "navigation": [],
+        },
     }
 
     def get_models(self) -> list:

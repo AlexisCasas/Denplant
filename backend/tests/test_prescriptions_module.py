@@ -28,6 +28,12 @@ def test_the_manifest_is_valid_and_deliberate(module) -> None:
     assert manifest.role_permissions
 
 
+def test_it_ships_a_read_only_frontend_layer_with_no_navigation(module) -> None:
+    # Phase C: a layer that fills the Clinical tab's slot, not a top-level page.
+    frontend = module.get_manifest().frontend
+    assert frontend == {"layer_path": "frontend", "navigation": []}
+
+
 def test_it_declares_exactly_three_permissions(module) -> None:
     assert module.get_permissions() == ["read", "prescribe", "void"]
 

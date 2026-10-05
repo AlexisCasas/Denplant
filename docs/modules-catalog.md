@@ -26,7 +26,7 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 | `patients_clinical` | 0.1.0 | official | patients | auto | no | 4 | 1 | 0 | yes |
 | `payments` | 0.1.0 | official | patients, budget | auto | no | 4 | 3 | 2 | yes |
 | `periodontogram` | 0.1.0 | official | patients, odontogram | manual | yes | 2 | 1 | 2 | yes |
-| `prescriptions` | 0.1.0 | official | patients | auto | no | 3 | 0 | 0 | no |
+| `prescriptions` | 0.1.0 | official | patients | auto | no | 3 | 0 | 0 | yes |
 | `recalls` | 0.1.0 | official | patients, agenda | auto | yes | 3 | 4 | 5 | yes |
 | `reports` | 0.1.0 | official | patients, agenda, catalog, budget, billing, payments | auto | no | 3 | 0 | 0 | yes |
 | `schedules` | 0.1.0 | official | agenda | auto | yes | 8 | 0 | 4 | yes |
@@ -465,7 +465,7 @@ Immutable, numbered medication prescriptions for printing and handwritten signat
 - **Category:** official
 - **Install policy:** installable=True · auto_install=True · removable=False
 - **Depends:** `patients`
-- **Frontend layer:** —
+- **Frontend layer:** `frontend`
 - **Permissions:**
   - `prescriptions.prescribe`
   - `prescriptions.read`

@@ -1,8 +1,9 @@
 # Prescriptions module
 
 Issues, stores and lists medication prescriptions written by a dentist, for
-printing and handwritten signature. **Backend only** so far: model, API and an
-A4 PDF rendered on demand; no UI yet and no events.
+printing and handwritten signature. Backend (model, API, A4 PDF) plus a **read-only frontend** (phase C):
+history, detail and PDF in the patient's Clinical tab. No create or void UI yet
+and no events.
 
 ## Public API
 
@@ -16,6 +17,37 @@ Routes mounted at `/api/v1/prescriptions` (no trailing slash).
 
 There is **no** `PUT`, `PATCH` or `DELETE`, and there never will be: an issued
 prescription is not edited or deleted. A mistake is voided and re-issued.
+
+## Frontend (phase C, read-only)
+
+Layer `frontend/`, no navigation. It fills the slot
+`patient.clinical.prescriptions` (gated by `prescriptions.read`) of the patient's
+Clinical tab; `patients` renders the slot and never imports the component.
+Phase C only **reads**: list (10 per page, newest first), detail modal and PDF.
+There is no create form, no void action and no use of `prescribe` / `void`.
+
+- **Prescription write eligibility must never be inferred from the ClinicalTab
+  readonly flag.** `ctx.readonly` belongs to the clinical record, says nothing
+  about prescriptions, and `PrescriptionsView` deliberately does not read it.
+  Who may prescribe or void is decided by the backend (role, professional id,
+  permission), never by the UI deducing it.
+- **Date-only fields (`issue_date`, `valid_until`, date of birth) are never
+  parsed with `new Date('YYYY-MM-DD')`**: that is UTC and shows the previous day
+  west of Greenwich (Lima). `utils/prescriptionDates.ts` builds the date in UTC
+  and formats it with `timeZone: 'UTC'`. Only instants (`issued_at`, `voided_at`)
+  go through `formatDateTime`.
+- **PDF**: raw `fetch` with a Bearer token (not `useApi`: it needs a Blob). The
+  window is opened with `window.open('', '_blank')` synchronously in the click,
+  before any `await`, so popup blockers stay quiet; `opener = null`. On 401 it
+  calls `auth.refresh()` and retries **exactly once**. If the popup was blocked
+  it downloads through an anchor with a sanitised file name. Blob URLs are kept,
+  capped at 10 and revoked on unmount and on patient change; one PDF at a time
+  per prescription.
+- State is local to the instance, protected by `AbortController` + a generation
+  token; a patient change clears everything and aborts what was in flight.
+- The detail shows the snapshots, the date of birth (no age, the API does not
+  send one) and, for a voided prescription, `ANULADA` + reason + instant. It
+  does not show who voided it: the API sends only `voided_by` as a UUID.
 
 ## Dependencies
 

@@ -35,6 +35,23 @@ one.
 
 No `PUT`, `PATCH` or `DELETE`.
 
+## Frontend (read-only)
+
+Layer at `backend/app/modules/prescriptions/frontend/`, no navigation. The
+"Recetas" mode of the Clinical tab renders the slot
+`patient.clinical.prescriptions` (permission `prescriptions.read`).
+
+- `PrescriptionsView` — paginated history (10 per page), two actions per row:
+  view and print.
+- `PrescriptionDetailModal` — snapshots, items by position, date of birth (no
+  age); a voided prescription shows `ANULADA`, the reason and the instant.
+- `usePrescriptions` — local state, `AbortController` + generation token, PDF flow.
+
+Rules: the Clinical tab's `readonly` flag is never used to decide anything about
+prescriptions; date-only values are formatted without UTC parsing; the PDF is
+fetched with the user's token, refreshed at most once on 401, opened in a window
+created inside the click (download fallback when blocked).
+
 ## Data
 
 | Table | Holds |

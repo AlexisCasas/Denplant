@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
  * ClinicalModeToggle — full-width pill-bar over clinical tab modes.
- * Order: Diagnóstico | Planes | Citas | Histórico | Evolución.
+ * Order: Diagnóstico | Planes | Citas | Recetas | Histórico | Evolución.
  * Evolución is the clinical-notes history: the host passes ``show-evolution``
  * only when the user may read notes, so the option is absent otherwise.
+ * Recetas is the prescriptions history, offered the same way through
+ * ``show-prescriptions`` (``prescriptions.read``).
  * Optional badges surface contextual counts (e.g. "Planes 2") so the
  * user sees workload before clicking in.
  */
@@ -14,6 +16,7 @@ interface ModeBadges {
   diagnosis?: string | number
   plans?: string | number
   appointments?: string | number
+  prescriptions?: string | number
   history?: string | number
   evolution?: string | number
 }
@@ -23,7 +26,9 @@ const props = withDefaults(defineProps<{
   badges?: ModeBadges
   /** Whether the Evolución option exists for this user. */
   showEvolution?: boolean
-}>(), { showEvolution: false })
+  /** Whether the Recetas option exists for this user. */
+  showPrescriptions?: boolean
+}>(), { showEvolution: false, showPrescriptions: false })
 
 const emit = defineEmits<{
   'update:modelValue': [mode: ClinicalMode]
@@ -35,12 +40,16 @@ const MODE_ICONS: Record<ClinicalMode, string> = {
   diagnosis: 'i-lucide-stethoscope',
   plans: 'i-lucide-clipboard-list',
   appointments: 'i-lucide-calendar',
+  prescriptions: 'i-lucide-pill',
   history: 'i-lucide-history',
   evolution: 'i-lucide-notebook-pen'
 }
 
 const options = computed(() =>
-  visibleClinicalModes({ evolution: props.showEvolution }).map(mode => ({
+  visibleClinicalModes({
+    evolution: props.showEvolution,
+    prescriptions: props.showPrescriptions
+  }).map(mode => ({
     value: mode,
     label: t(`clinical.modes.${mode}`),
     icon: MODE_ICONS[mode],

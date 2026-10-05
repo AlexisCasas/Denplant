@@ -1,0 +1,75 @@
+{
+  "prescriptions": {
+    "title": "Prescription history",
+    "total": "Total: {count}",
+    "loading": "Loading prescriptions…",
+    "empty": "No prescriptions recorded yet.",
+    "columns": {
+      "date": "Date",
+      "number": "Number",
+      "prescriber": "Dentist",
+      "items": "Medications",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "issued": "Issued",
+      "voided": "Voided"
+    },
+    "actions": {
+      "view": "View",
+      "print": "Print",
+      "retry": "Retry",
+      "close": "Close",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "aria": {
+      "view": "View prescription {number}",
+      "print": "Print prescription {number}"
+    },
+    "pagination": {
+      "label": "Prescriptions pagination",
+      "pageOf": "Page {page} of {pages}"
+    },
+    "error": {
+      "list": "The prescriptions could not be loaded.",
+      "detail": "The prescription could not be loaded.",
+      "pdf": "The prescription PDF could not be opened."
+    },
+    "pdf": {
+      "downloaded": "The browser blocked the pop-up window; the PDF was downloaded instead."
+    },
+    "detail": {
+      "title": "Prescription {number}",
+      "description": "Read-only detail of the issued prescription.",
+      "receipt": "Prescription",
+      "number": "Number",
+      "status": "Status",
+      "issueDate": "Issue date",
+      "validUntil": "Valid until",
+      "patient": "Patient",
+      "name": "Name",
+      "document": "Document",
+      "birthDate": "Date of birth",
+      "prescriber": "Dentist",
+      "professionalId": "Registration no.",
+      "medications": "Medications",
+      "strength": "Strength",
+      "form": "Pharmaceutical form",
+      "commercialName": "Trade name",
+      "presentation": "Presentation",
+      "dose": "Dose",
+      "route": "Route",
+      "frequency": "Frequency",
+      "duration": "Duration",
+      "quantity": "Quantity",
+      "instructions": "Instructions",
+      "voided": {
+        "title": "Voided prescription",
+        "reason": "Reason",
+        "at": "Voided on"
+      }
+    }
+  }
+}

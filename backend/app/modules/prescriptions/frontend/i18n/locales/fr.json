@@ -1,0 +1,75 @@
+{
+  "prescriptions": {
+    "title": "Historique des ordonnances",
+    "total": "Total : {count}",
+    "loading": "Chargement des ordonnances…",
+    "empty": "Aucune ordonnance enregistrée pour le moment.",
+    "columns": {
+      "date": "Date",
+      "number": "Numéro",
+      "prescriber": "Dentiste",
+      "items": "Médicaments",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "status": {
+      "issued": "Émise",
+      "voided": "Annulée"
+    },
+    "actions": {
+      "view": "Voir",
+      "print": "Imprimer",
+      "retry": "Réessayer",
+      "close": "Fermer",
+      "previous": "Précédent",
+      "next": "Suivant"
+    },
+    "aria": {
+      "view": "Voir l'ordonnance {number}",
+      "print": "Imprimer l'ordonnance {number}"
+    },
+    "pagination": {
+      "label": "Pagination des ordonnances",
+      "pageOf": "Page {page} sur {pages}"
+    },
+    "error": {
+      "list": "Impossible de charger les ordonnances.",
+      "detail": "Impossible de charger l'ordonnance.",
+      "pdf": "Impossible d'ouvrir le PDF de l'ordonnance."
+    },
+    "pdf": {
+      "downloaded": "Le navigateur a bloqué la fenêtre contextuelle ; le PDF a été téléchargé."
+    },
+    "detail": {
+      "title": "Ordonnance {number}",
+      "description": "Détail en lecture seule de l'ordonnance émise.",
+      "receipt": "Ordonnance",
+      "number": "Numéro",
+      "status": "Statut",
+      "issueDate": "Date d'émission",
+      "validUntil": "Valable jusqu'au",
+      "patient": "Patient",
+      "name": "Nom",
+      "document": "Document",
+      "birthDate": "Date de naissance",
+      "prescriber": "Dentiste",
+      "professionalId": "N° d'inscription",
+      "medications": "Médicaments",
+      "strength": "Dosage",
+      "form": "Forme pharmaceutique",
+      "commercialName": "Nom commercial",
+      "presentation": "Présentation",
+      "dose": "Dose",
+      "route": "Voie",
+      "frequency": "Fréquence",
+      "duration": "Durée",
+      "quantity": "Quantité",
+      "instructions": "Indications",
+      "voided": {
+        "title": "Ordonnance annulée",
+        "reason": "Motif",
+        "at": "Annulée le"
+      }
+    }
+  }
+}

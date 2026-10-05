@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- feat: **read-only frontend (phase C)** - "Recetas" tab in the patient's Clinical tab (between Citas and Histórico, visible with `prescriptions.read`).
+  - Manifest `frontend: {layer_path: "frontend", navigation: []}`; the layer registers the slot `patient.clinical.prescriptions` and `patients` never imports it.
+  - History (10 per page, newest first, own Anterior / Página X de Y / Siguiente paginator), detail modal with the snapshots, and the authenticated PDF (popup opened inside the click, one refresh retry on 401, download fallback if the popup is blocked).
+  - Date-only fields are never parsed as UTC instants (no off-by-one day in Lima).
+  - Strings in es, en, fr, pt and ta. No create, no void, no backend change.
+
 - feat: **A4 PDF of a prescription** (`GET /prescriptions/{id}/pdf`, `prescriptions.read`, `?locale=es|en`). Rendered on every request with WeasyPrint from the prescription's own snapshots, for printing and handwritten signature - not an electronic prescription, nothing is digitally signed, and nothing is stored, hashed or audited.
   - Every name, number, address, medication and date comes from the `*_snapshot` columns; the age is measured at `issue_date` (`age.py`: years from one year of age, months below it, a 29-Feb birthday is 1 March in a common year). Only the clinic logo is live, and a missing logo or a storage failure never blocks the print.
   - A voided prescription prints with all its content under an `ANULADA` watermark on every page and a banner; the void reason, date and actor are not printed.

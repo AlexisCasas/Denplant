@@ -1,0 +1,75 @@
+{
+  "prescriptions": {
+    "title": "Histórico de receitas",
+    "total": "Total: {count}",
+    "loading": "Carregando receitas…",
+    "empty": "Ainda não há receitas registradas.",
+    "columns": {
+      "date": "Data",
+      "number": "Número",
+      "prescriber": "Dentista",
+      "items": "Medicamentos",
+      "status": "Situação",
+      "actions": "Ações"
+    },
+    "status": {
+      "issued": "Emitida",
+      "voided": "Anulada"
+    },
+    "actions": {
+      "view": "Ver",
+      "print": "Imprimir",
+      "retry": "Tentar novamente",
+      "close": "Fechar",
+      "previous": "Anterior",
+      "next": "Próxima"
+    },
+    "aria": {
+      "view": "Ver a receita {number}",
+      "print": "Imprimir a receita {number}"
+    },
+    "pagination": {
+      "label": "Paginação de receitas",
+      "pageOf": "Página {page} de {pages}"
+    },
+    "error": {
+      "list": "Não foi possível carregar as receitas.",
+      "detail": "Não foi possível carregar a receita.",
+      "pdf": "Não foi possível abrir o PDF da receita."
+    },
+    "pdf": {
+      "downloaded": "O navegador bloqueou a janela pop-up; o PDF foi baixado."
+    },
+    "detail": {
+      "title": "Receita {number}",
+      "description": "Detalhe somente leitura da receita emitida.",
+      "receipt": "Receita",
+      "number": "Número",
+      "status": "Situação",
+      "issueDate": "Data de emissão",
+      "validUntil": "Válida até",
+      "patient": "Paciente",
+      "name": "Nome",
+      "document": "Documento",
+      "birthDate": "Data de nascimento",
+      "prescriber": "Dentista",
+      "professionalId": "Registro profissional",
+      "medications": "Medicamentos",
+      "strength": "Concentração",
+      "form": "Forma farmacêutica",
+      "commercialName": "Nome comercial",
+      "presentation": "Apresentação",
+      "dose": "Dose",
+      "route": "Via",
+      "frequency": "Frequência",
+      "duration": "Duração",
+      "quantity": "Quantidade",
+      "instructions": "Indicações",
+      "voided": {
+        "title": "Receita anulada",
+        "reason": "Motivo",
+        "at": "Anulada em"
+      }
+    }
+  }
+}
