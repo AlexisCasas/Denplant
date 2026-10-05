@@ -6,20 +6,31 @@
  * renders the slot and never imports this component.
  *
  * A patient's prescriptions, newest first, with two actions per row: see it and
- * print it. It is read-only: nothing is created, edited or voided here (that
- * is a later phase, with its own permissions).
+ * print it. From here a dentist writes a new one ("Nueva receta") and, from the
+ * detail, an issued one is voided. Nothing is ever edited or deleted.
  *
  * ``ctx.readonly`` is the Clinical tab's flag and belongs to another domain. It
  * says nothing about prescriptions, so it is deliberately not read: who may
  * prescribe or void must never be inferred from it.
  *
- * Visibility is decided by the slot (``prescriptions.read``). The backend
- * decides again on every request.
+ * Who may write is the backend's rule, mirrored here (``utils/prescriptionRules``):
+ * the permission **and** the role of the current membership
+ * (``useAuth().currentRole``, never inferred from permissions: ``admin`` holds
+ * the ``*`` wildcard) **and**, to issue, a registered professional id. The slot
+ * decides who sees the tab (``prescriptions.read``). The backend decides again
+ * on every request.
  */
 
+import { PERMISSIONS } from '~~/app/config/permissions'
+
 import { usePrescriptions } from '../composables/usePrescriptions'
+import type { PrescriptionCreatePayload } from '../types/prescriptions'
 import { formatDateOnly } from '../utils/prescriptionDates'
+import { voidErrorKey } from '../utils/prescriptionForm'
+import { canVoid, dateOfBirthMissing, issueAccess } from '../utils/prescriptionRules'
+import PrescriptionCreateModal from './PrescriptionCreateModal.vue'
 import PrescriptionDetailModal from './PrescriptionDetailModal.vue'
+import PrescriptionVoidModal from './PrescriptionVoidModal.vue'
 
 const props = defineProps<{
   ctx: { patientId: string, readonly?: boolean }
@@ -45,8 +56,138 @@ const {
   retryDetail,
   closeDetail,
   isPdfBusy,
-  openPdf
+  openPdf,
+  submitting,
+  createError,
+  createPrescription,
+  clearCreateError,
+  voiding,
+  voidError,
+  voidPrescription,
+  clearVoidError
 } = usePrescriptions(() => props.ctx.patientId)
+
+// --- who may write ---------------------------------------------------------
+
+const auth = useAuth()
+const { can } = usePermissions()
+const { currentClinic } = useClinicState()
+
+interface CachedPatient { first_name?: string, last_name?: string, date_of_birth?: string | null }
+
+/** The patient page's own record, if it holds one: never fetched again here. */
+const cachedPatient = computed(() =>
+  useNuxtData<CachedPatient | null>(`patient:${props.ctx.patientId}`).data.value ?? null
+)
+
+const access = computed(() => issueAccess({
+  hasPrescribePermission: can(PERMISSIONS.prescriptions.prescribe),
+  role: auth.currentRole.value,
+  professionalId: auth.user.value?.professional_id
+}))
+
+/** True only when the cached record is there and has no date of birth. */
+const dobMissing = computed(() => dateOfBirthMissing(cachedPatient.value))
+
+const canIssue = computed(() => access.value === 'allowed' && !dobMissing.value)
+
+const issueNotice = computed(() => {
+  if (access.value === 'missing-professional-id') return t('prescriptions.create.notices.noProfessionalId')
+  if (access.value === 'allowed' && dobMissing.value) return t('prescriptions.create.notices.dobRequired')
+  return null
+})
+
+const patientName = computed(() => {
+  const patient = cachedPatient.value
+  const name = `${patient?.first_name ?? ''} ${patient?.last_name ?? ''}`.trim()
+  return name || null
+})
+
+const prescriberName = computed(() =>
+  `${auth.user.value?.first_name ?? ''} ${auth.user.value?.last_name ?? ''}`.trim()
+)
+
+const mayVoidDetail = computed(() => !!detail.value && canVoid({
+  hasVoidPermission: can(PERMISSIONS.prescriptions.void),
+  role: auth.currentRole.value,
+  userId: auth.user.value?.id,
+  prescriberUserId: detail.value.prescriber_user_id,
+  status: detail.value.status
+}))
+
+// --- the two dialogs --------------------------------------------------------
+
+const createOpen = ref(false)
+const voidOpen = ref(false)
+
+// A draft never outlives its patient: the dialogs are mounted with `v-if`, so
+// closing them here destroys what was typed.
+watch(() => props.ctx.patientId, () => {
+  createOpen.value = false
+  voidOpen.value = false
+})
+
+// No open detail, nothing to void (it was closed, or it no longer exists).
+watch(detailId, (id) => {
+  if (id === null) voidOpen.value = false
+})
+
+function openCreate(): void {
+  if (!canIssue.value) return
+  clearCreateError()
+  createOpen.value = true
+}
+
+function closeCreate(): void {
+  createOpen.value = false
+  clearCreateError()
+}
+
+async function submitCreate(body: Omit<PrescriptionCreatePayload, 'patient_id'>): Promise<void> {
+  const outcome = await createPrescription(body)
+  if (outcome !== 'done') return
+  createOpen.value = false
+  toast.add({
+    description: t('prescriptions.create.success', { number: detail.value?.number ?? '' }),
+    color: 'success',
+    icon: 'i-lucide-check'
+  })
+}
+
+function openVoid(): void {
+  if (!mayVoidDetail.value) return
+  clearVoidError()
+  voidOpen.value = true
+}
+
+function closeVoid(): void {
+  voidOpen.value = false
+  clearVoidError()
+}
+
+/** Outcomes that mean "this void no longer applies": say so and close. */
+const VOID_FINAL = ['void_not_allowed', 'prescription_state_conflict', 'prescription_not_found']
+
+async function submitVoid(reason: string): Promise<void> {
+  const target = detail.value
+  if (!target) return
+  const outcome = await voidPrescription(target.id, reason)
+  if (outcome === 'done') {
+    voidOpen.value = false
+    toast.add({
+      description: t('prescriptions.void.success', { number: target.number }),
+      color: 'success',
+      icon: 'i-lucide-check'
+    })
+  } else if (outcome === 'failed' && voidError.value?.code && VOID_FINAL.includes(voidError.value.code)) {
+    voidOpen.value = false
+    toast.add({
+      description: t(`prescriptions.void.errors.${voidErrorKey(voidError.value)}`),
+      color: 'warning',
+      icon: 'i-lucide-info'
+    })
+  }
+}
 
 /**
  * Print. Called straight from the click: the composable opens the window
@@ -84,15 +225,44 @@ async function print(id: string, number: string): Promise<void> {
       >
         {{ t('prescriptions.title') }}
       </h2>
-      <UBadge
-        v-if="rows.length > 0 || !listLoading"
-        color="neutral"
-        variant="subtle"
-        data-testid="prescriptions-total"
-      >
-        {{ t('prescriptions.total', { count: total }) }}
-      </UBadge>
+      <div class="flex items-center gap-2 flex-wrap">
+        <UBadge
+          v-if="rows.length > 0 || !listLoading"
+          color="neutral"
+          variant="subtle"
+          data-testid="prescriptions-total"
+        >
+          {{ t('prescriptions.total', { count: total }) }}
+        </UBadge>
+        <!-- Not for an admin (the wildcard is not a dentist), nor for anyone but a dentist. -->
+        <UButton
+          v-if="access !== 'hidden'"
+          icon="i-lucide-plus"
+          size="sm"
+          :disabled="!canIssue"
+          :aria-describedby="issueNotice ? 'rx-issue-notice' : undefined"
+          data-testid="prescription-new"
+          @click="openCreate"
+        >
+          {{ t('prescriptions.actions.new') }}
+        </UButton>
+      </div>
     </header>
+
+    <p
+      v-if="access !== 'hidden' && issueNotice"
+      id="rx-issue-notice"
+      class="flex items-start gap-2 rounded-token-md bg-warning/10 px-3 py-2 text-sm"
+      role="status"
+      data-testid="prescription-new-notice"
+    >
+      <UIcon
+        name="i-lucide-info"
+        class="w-4 h-4 mt-0.5 shrink-0"
+        aria-hidden="true"
+      />
+      {{ issueNotice }}
+    </p>
 
     <!-- A failure here is a notice, not a collapse: the rest of the record stays. -->
     <UAlert
@@ -292,9 +462,32 @@ async function print(id: string, number: string): Promise<void> {
       :loading="detailLoading"
       :error="detailError"
       :printing="detail ? isPdfBusy(detail.id) : false"
+      :can-void="mayVoidDetail"
       @close="closeDetail()"
       @retry="retryDetail()"
       @print="detail && print(detail.id, detail.number)"
+      @void="openVoid()"
+    />
+
+    <PrescriptionCreateModal
+      v-if="createOpen"
+      :patient-name="patientName"
+      :prescriber-name="prescriberName"
+      :professional-id="(auth.user.value?.professional_id ?? '').trim()"
+      :clinic-name="currentClinic?.name ?? null"
+      :submitting="submitting"
+      :error="createError"
+      @close="closeCreate()"
+      @submit="submitCreate"
+    />
+
+    <PrescriptionVoidModal
+      v-if="voidOpen && detail"
+      :number="detail.number"
+      :voiding="voiding"
+      :error="voidError"
+      @close="closeVoid()"
+      @submit="submitVoid"
     />
   </section>
 </template>

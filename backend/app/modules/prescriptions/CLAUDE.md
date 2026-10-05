@@ -1,9 +1,9 @@
 # Prescriptions module
 
 Issues, stores and lists medication prescriptions written by a dentist, for
-printing and handwritten signature. Backend (model, API, A4 PDF) plus a **read-only frontend** (phase C):
-history, detail and PDF in the patient's Clinical tab. No create or void UI yet
-and no events.
+printing and handwritten signature. Backend (model, API, A4 PDF) plus a frontend (phases C and D):
+history, detail and PDF in the patient's Clinical tab, plus issuing and voiding
+(phase D). No events.
 
 ## Public API
 
@@ -18,19 +18,65 @@ Routes mounted at `/api/v1/prescriptions` (no trailing slash).
 There is **no** `PUT`, `PATCH` or `DELETE`, and there never will be: an issued
 prescription is not edited or deleted. A mistake is voided and re-issued.
 
-## Frontend (phase C, read-only)
+## Frontend (phases C + D)
 
 Layer `frontend/`, no navigation. It fills the slot
 `patient.clinical.prescriptions` (gated by `prescriptions.read`) of the patient's
 Clinical tab; `patients` renders the slot and never imports the component.
-Phase C only **reads**: list (10 per page, newest first), detail modal and PDF.
-There is no create form, no void action and no use of `prescribe` / `void`.
+It reads (list, detail, PDF) and writes in exactly two ways: **issue** a
+prescription ("Nueva receta") and **void** an issued one ("Anular receta", only
+inside the detail). There is no edit, no delete, no duplicate and no draft.
 
 - **Prescription write eligibility must never be inferred from the ClinicalTab
   readonly flag.** `ctx.readonly` belongs to the clinical record, says nothing
   about prescriptions, and `PrescriptionsView` deliberately does not read it.
-  Who may prescribe or void is decided by the backend (role, professional id,
-  permission), never by the UI deducing it.
+- **The role is not inferred from permissions.** `admin` holds the `*` wildcard,
+  which matches `prescriptions.prescribe` and `prescriptions.void`, so the
+  permission alone would show "Nueva receta" to an admin the backend refuses.
+  The UI uses `useAuth().currentRole`, which is `me.clinics[0].role` from
+  `/auth/me` (the membership the backend itself acts on when no `clinic_id` is
+  sent). `User.role` is **not** that: the API never sends one. Never derive the
+  role from permissions, a wildcard, `professional_id` or `is_professional`.
+- **Issue eligibility** (`utils/prescriptionRules.ts`, mirrors
+  `require_eligible_prescriber`): permission `prescriptions.prescribe` AND
+  `currentRole === 'dentist'` AND a non-blank `user.professional_id`. A dentist
+  without it sees the button disabled with a notice; every other role sees
+  nothing. If the patient page's cache (`useNuxtData('patient:<id>')`) is there
+  and has no `date_of_birth`, the form is blocked with a notice; if the cache is
+  absent the backend decides. No age is ever typed.
+- **Void eligibility** (mirrors `PrescriptionService.void`): permission
+  `prescriptions.void` AND status `issued` AND (`currentRole === 'admin'` OR
+  (`currentRole === 'dentist'` AND `user.id === prescriber_user_id`)). The
+  button lives only in the detail, never in a history row.
+- **Issuing is immutable.** The form has a mandatory confirmation step ("once
+  issued it can no longer be edited; to correct it, void it and issue a new
+  one") and no request is made before it. The POST carries exactly
+  `patient_id`, `valid_until` and `items`; the header (patient, dentist,
+  registration number, clinic) is read-only and never sent. On success the
+  response is shown as the detail (one source of truth) and the history reloads
+  from page 1; nothing is printed automatically. On failure the draft is kept.
+- **No drafts.** The form state lives in `PrescriptionCreateModal`
+  (`usePrescriptionDraft`), mounted with `v-if`: closing it or changing patient
+  destroys it. No `useState`, `localStorage`, `sessionStorage` or server draft.
+  Closing a form with text asks first; a patient change discards without asking.
+- **`valid_until`** is required, empty at first, with no default and no `min`:
+  the backend compares it with the issue date in the *clinic's* timezone, which
+  the browser's day may contradict. It is checked only for being a real calendar
+  day and is sent as the typed `YYYY-MM-DD` string.
+- **Field limits are the backend's** (`schemas.py`): required fields are trimmed
+  and 1 to 200/100 characters; optional ones are trimmed and omitted when empty;
+  1 to 50 medications; void reason 1 to 2000. Free text only.
+- **No pharmacological intelligence**: no search, vademecum, autocomplete,
+  structured units, dose calculation, interaction or contraindication check, and
+  no link to `patients_clinical.Medication`.
+- **Errors** are mapped by the backend's `code` (`utils/prescriptionForm.ts`),
+  never by its text, and FastAPI's validation array becomes "review the fields".
+  Writes pass `silentForbidden: true` to `useApi` (an opt-in added in Phase D) so
+  a 403 is explained once, by the form, not also by the generic toast.
+- **Void races**: a conflict (`prescription_state_conflict`), `void_not_allowed`
+  or `prescription_not_found` closes the void dialog, says what happened and
+  reloads the detail and list; nothing is retried. A write already sent is not
+  aborted by a patient change, but its answer is dropped (write generation).
 - **Date-only fields (`issue_date`, `valid_until`, date of birth) are never
   parsed with `new Date('YYYY-MM-DD')`**: that is UTC and shows the previous day
   west of Greenwich (Lima). `utils/prescriptionDates.ts` builds the date in UTC

@@ -7,8 +7,10 @@
  * current data. There is no age (it is not in the API, and the rule that
  * computes it lives in the backend); the date of birth is shown instead.
  *
- * There is no action that changes anything here. The only button besides
- * closing prints the PDF.
+ * Nothing here edits a prescription. Besides closing and printing, the one
+ * action is "Anular receta", shown only when the parent says the current user
+ * may void this one (``canVoid``: an issued prescription, by its prescriber or
+ * an admin). It does not void anything itself: it asks for the reason first.
  *
  * A voided prescription says so, with the reason and the instant it was voided.
  * It does not say *who* voided it: the API sends only a technical identifier,
@@ -25,12 +27,15 @@ const props = defineProps<{
   error: boolean
   /** A PDF of this prescription is being prepared. */
   printing: boolean
+  /** The current user may void this prescription (decided by the parent). */
+  canVoid?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
   retry: []
   print: []
+  void: []
 }>()
 
 const { t, locale } = useI18n()
@@ -333,7 +338,19 @@ const title = computed(() =>
     </template>
 
     <template #footer>
-      <div class="flex justify-end gap-2 w-full">
+      <div class="flex flex-wrap items-center justify-end gap-2 w-full">
+        <UButton
+          v-if="detail && canVoid"
+          color="error"
+          variant="outline"
+          icon="i-lucide-ban"
+          class="mr-auto"
+          :aria-label="t('prescriptions.aria.void', { number: detail.number })"
+          data-testid="prescription-detail-void-action"
+          @click="emit('void')"
+        >
+          {{ t('prescriptions.actions.void') }}
+        </UButton>
         <UButton
           color="neutral"
           variant="ghost"

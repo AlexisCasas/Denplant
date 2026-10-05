@@ -17,18 +17,34 @@
  *    carries no `Authorization`. The window is opened inside the click, before
  *    any `await`, because a popup opened after the response is blocked.
  *
- * Nothing here writes: no create, no void.
+ * Phase D adds the two writes, each with its own state (`submitting` /
+ * `voiding`) and its own error, apart from the reads above:
+ *
+ * - **create** issues a prescription. The POST carries exactly `patient_id`,
+ *   `valid_until` and `items`. On success the response (the whole document) is
+ *   shown as the detail, so there is one source of truth, and the history is
+ *   reloaded from page 1.
+ * - **void** voids an issued prescription with a reason. The response replaces
+ *   the open detail.
+ *
+ * A write that was already sent is not aborted by a patient change, but its
+ * answer is dropped: the write generation moved, so it can never be applied to
+ * another patient.
  */
 
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   PdfOutcome,
+  PrescriptionCreatePayload,
   PrescriptionDetail,
   PrescriptionDetailResponse,
   PrescriptionListItem,
-  PrescriptionListResponse
+  PrescriptionListResponse,
+  WriteError,
+  WriteOutcome
 } from '../types/prescriptions'
+import { writeErrorOf } from '../utils/prescriptionForm'
 
 export const PAGE_SIZE = 10
 
@@ -79,6 +95,14 @@ export function usePrescriptions(patientId: MaybeRefOrGetter<string>) {
   let pdfGeneration = 0
   const pdfControllers = new Set<AbortController>()
   const blobUrls: string[] = []
+
+  // --- writes --------------------------------------------------------------
+  const submitting = ref(false)
+  const createError = ref<WriteError | null>(null)
+  const voiding = ref(false)
+  const voidError = ref<WriteError | null>(null)
+
+  let writeGeneration = 0
 
   const pageCount = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
@@ -172,6 +196,123 @@ export function usePrescriptions(patientId: MaybeRefOrGetter<string>) {
 
   async function retryDetail(): Promise<boolean> {
     return detailId.value ? await fetchDetail(detailId.value) : false
+  }
+
+  /** Show a document we already hold (the answer to a write) as the detail. */
+  function showDetail(document: PrescriptionDetail): void {
+    detailGeneration += 1
+    detailController?.abort()
+    detailController = null
+    detailId.value = document.id
+    detail.value = document
+    detailLoading.value = false
+    detailError.value = false
+  }
+
+  /**
+   * Fetch the open detail again without blanking it: used after a write came
+   * back with news (it was already voided, the actor changed, ...).
+   */
+  async function refreshDetail(id: string): Promise<void> {
+    const token = ++detailGeneration
+    detailController?.abort()
+    const controller = new AbortController()
+    detailController = controller
+    try {
+      const response = await api.get<PrescriptionDetailResponse>(
+        `/api/v1/prescriptions/${encodeURIComponent(id)}`,
+        { signal: controller.signal }
+      )
+      if (token === detailGeneration) detail.value = response.data
+    } catch {
+      // The detail on screen stays as it was; the caller already explained why.
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // writes
+  // ------------------------------------------------------------------------
+
+  /**
+   * Issue a prescription for the current patient.
+   *
+   * The body is built here from the patient this instance is bound to, so a
+   * draft can never name another one. `silentForbidden`: a 403 is explained by
+   * the form itself, not by the generic toast as well.
+   */
+  async function createPrescription(
+    input: Omit<PrescriptionCreatePayload, 'patient_id'>
+  ): Promise<WriteOutcome> {
+    if (submitting.value) return 'busy'
+    const id = toValue(patientId)
+    if (!id) return 'failed'
+
+    const generation = writeGeneration
+    submitting.value = true
+    createError.value = null
+    try {
+      const response = await api.post<PrescriptionDetailResponse>(
+        '/api/v1/prescriptions',
+        { patient_id: id, valid_until: input.valid_until, items: input.items },
+        { silentForbidden: true }
+      )
+      if (generation !== writeGeneration) return 'stale'
+      showDetail(response.data)
+      void fetchList(1)
+      return 'done'
+    } catch (error) {
+      if (generation !== writeGeneration) return 'stale'
+      createError.value = writeErrorOf(error)
+      return 'failed'
+    } finally {
+      if (generation === writeGeneration) submitting.value = false
+    }
+  }
+
+  /**
+   * Void an issued prescription. Never retried: if somebody else got there
+   * first, the answer is a conflict, and the detail and the history are
+   * reloaded to show what is true now.
+   */
+  async function voidPrescription(id: string, reason: string): Promise<WriteOutcome> {
+    if (voiding.value) return 'busy'
+
+    const generation = writeGeneration
+    voiding.value = true
+    voidError.value = null
+    try {
+      const response = await api.post<PrescriptionDetailResponse>(
+        `/api/v1/prescriptions/${encodeURIComponent(id)}/void`,
+        { reason },
+        { silentForbidden: true }
+      )
+      if (generation !== writeGeneration) return 'stale'
+      if (detailId.value === id) showDetail(response.data)
+      void fetchList(page.value)
+      return 'done'
+    } catch (error) {
+      if (generation !== writeGeneration) return 'stale'
+      const failure = writeErrorOf(error)
+      voidError.value = failure
+      if (failure.code === 'prescription_not_found') {
+        if (detailId.value === id) clearDetail()
+        void fetchList(page.value)
+      } else if (failure.code === 'prescription_state_conflict' || failure.code === 'void_not_allowed') {
+        if (detailId.value === id) void refreshDetail(id)
+        void fetchList(page.value)
+      }
+      return 'failed'
+    } finally {
+      if (generation === writeGeneration) voiding.value = false
+    }
+  }
+
+  function clearCreateError(): void {
+    createError.value = null
+  }
+
+  function clearVoidError(): void {
+    voidError.value = null
   }
 
   // ------------------------------------------------------------------------
@@ -303,6 +444,12 @@ export function usePrescriptions(patientId: MaybeRefOrGetter<string>) {
 
     clearDetail()
 
+    writeGeneration += 1
+    submitting.value = false
+    createError.value = null
+    voiding.value = false
+    voidError.value = null
+
     pdfGeneration += 1
     for (const controller of pdfControllers) controller.abort()
     pdfControllers.clear()
@@ -341,6 +488,15 @@ export function usePrescriptions(patientId: MaybeRefOrGetter<string>) {
     fetchDetail,
     retryDetail,
     closeDetail: clearDetail,
+    // writes
+    submitting,
+    createError,
+    createPrescription,
+    clearCreateError,
+    voiding,
+    voidError,
+    voidPrescription,
+    clearVoidError,
     // pdf
     pdfFailedId,
     isPdfBusy,

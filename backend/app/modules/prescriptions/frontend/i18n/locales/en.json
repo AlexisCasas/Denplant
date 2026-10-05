@@ -22,11 +22,15 @@
       "retry": "Retry",
       "close": "Close",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "new": "New prescription",
+      "void": "Void prescription",
+      "cancel": "Cancel"
     },
     "aria": {
       "view": "View prescription {number}",
-      "print": "Print prescription {number}"
+      "print": "Print prescription {number}",
+      "void": "Void prescription {number}"
     },
     "pagination": {
       "label": "Prescriptions pagination",
@@ -69,6 +73,91 @@
         "title": "Voided prescription",
         "reason": "Reason",
         "at": "Voided on"
+      }
+    },
+    "create": {
+      "title": "New prescription",
+      "description": "Fill in the prescription. Once issued it can no longer be edited.",
+      "header": {
+        "patient": "Patient",
+        "prescriber": "Dentist",
+        "professionalId": "Professional ID",
+        "clinic": "Clinic"
+      },
+      "validUntil": "Valid until",
+      "validUntilHint": "Last day the prescription is valid.",
+      "medications": "Medications",
+      "medication": "Medication {n}",
+      "addMedication": "Add medication",
+      "removeMedication": "Remove medication {n}",
+      "maxItems": "The maximum of {max} medications has been reached.",
+      "required": "Required",
+      "requiredNote": "Fields marked * are required.",
+      "counter": "{count}/{max}",
+      "issue": "Issue prescription",
+      "summary": "Please review the highlighted fields.",
+      "success": "Prescription {number} issued.",
+      "fields": {
+        "activeIngredient": "Active ingredient (INN)",
+        "commercialName": "Brand name",
+        "strength": "Strength",
+        "pharmaceuticalForm": "Pharmaceutical form",
+        "presentation": "Presentation",
+        "dose": "Dose",
+        "route": "Route",
+        "frequency": "Frequency",
+        "duration": "Duration",
+        "totalQuantity": "Total quantity",
+        "instructions": "Instructions"
+      },
+      "validation": {
+        "required": "This field is required.",
+        "tooLong": "At most {max} characters.",
+        "validUntilRequired": "Enter the date until which the prescription is valid.",
+        "validUntilInvalid": "The date is not valid."
+      },
+      "notices": {
+        "noProfessionalId": "Your professional ID is not registered. Contact the administrator.",
+        "dobRequired": "Complete the patient's date of birth before issuing a prescription."
+      },
+      "confirm": {
+        "title": "Confirm issuing",
+        "text": "Once issued, the prescription can no longer be edited. To correct it you must void it and issue a new one.",
+        "back": "Back"
+      },
+      "discard": {
+        "title": "Discard the prescription?",
+        "text": "Your changes will be lost.",
+        "keep": "Keep editing",
+        "confirm": "Discard"
+      },
+      "errors": {
+        "prescriber_not_eligible": "Only a dentist can issue prescriptions.",
+        "prescriber_professional_id_required": "Your professional ID is not registered. Contact the administrator.",
+        "patient_date_of_birth_required": "Complete the patient's date of birth before issuing a prescription.",
+        "patient_date_of_birth_invalid": "The patient's date of birth is not valid.",
+        "clinic_timezone_invalid": "The clinic has no valid timezone configured. Contact the administrator.",
+        "valid_until_before_issue_date": "The validity cannot end before the day of issue.",
+        "patient_not_found": "The patient was not found.",
+        "request_validation": "Please review the prescription fields.",
+        "generic": "The prescription could not be issued. Please try again."
+      }
+    },
+    "void": {
+      "title": "Void prescription",
+      "description": "Void prescription {number}.",
+      "warning": "Voiding cannot be undone.",
+      "reason": "Reason for voiding",
+      "reasonRequired": "Enter the reason for voiding.",
+      "confirm": "Void prescription",
+      "success": "Prescription {number} voided.",
+      "errors": {
+        "void_not_allowed": "Only the dentist who issued the prescription, or an administrator, can void it.",
+        "prescription_state_conflict": "This prescription was already voided.",
+        "void_reason_required": "Enter the reason for voiding.",
+        "prescription_not_found": "The prescription no longer exists or is not available.",
+        "request_validation": "Please review the reason for voiding.",
+        "generic": "The prescription could not be voided. Please try again."
       }
     }
   }

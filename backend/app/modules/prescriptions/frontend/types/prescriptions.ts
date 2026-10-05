@@ -103,3 +103,52 @@ export interface PrescriptionDetailResponse {
  * `failed`      nothing could be shown.
  */
 export type PdfOutcome = 'opened' | 'downloaded' | 'busy' | 'cancelled' | 'failed'
+
+// ---------------------------------------------------------------------------
+// Writing (Phase D)
+// ---------------------------------------------------------------------------
+
+/** One medication as the API accepts it. Free text; nothing is looked up. */
+export interface PrescriptionItemPayload {
+  active_ingredient: string
+  strength: string
+  pharmaceutical_form: string
+  dose: string
+  route: string
+  frequency: string
+  duration: string
+  total_quantity: string
+  commercial_name?: string
+  presentation?: string
+  instructions?: string
+}
+
+/**
+ * `POST /prescriptions` takes these three keys and nothing else
+ * (`extra="forbid"`): clinic, prescriber, number, status, dates and snapshots
+ * all come from the server.
+ */
+export interface PrescriptionCreatePayload {
+  patient_id: string
+  valid_until: string
+  items: PrescriptionItemPayload[]
+}
+
+/** `POST /prescriptions/{id}/void`. */
+export interface PrescriptionVoidPayload {
+  reason: string
+}
+
+/** How a failed write came back: the HTTP status and the backend's own code. */
+export interface WriteError {
+  status: number | null
+  code: string | null
+}
+
+/**
+ * `done`    it worked;
+ * `failed`  the server refused it (see the composable's error state);
+ * `busy`    the same kind of write is already running;
+ * `stale`   the patient changed meanwhile: the answer was dropped.
+ */
+export type WriteOutcome = 'done' | 'failed' | 'busy' | 'stale'

@@ -1,6 +1,10 @@
 /**
  * Recetas: the history, the detail and the PDF, through the real components.
  *
+ * This file covers what Phase C shipped: the read-only history, detail and PDF.
+ * The user here is a signed-in reader with no write permission, so no write
+ * control appears; the writes are in `prescriptionsWrite.spec.ts`.
+ *
  * `useApi`, `useAuth`, `useToast` and `useI18n` are doubled; the layer is
  * imported by relative path (`frontend/module_layers` does not resolve on this
  * Windows host). `useI18n` answers from the module's real `es.json`, and a key
@@ -36,6 +40,10 @@ const state = vi.hoisted(() => {
     refresh: vi.fn(),
     toastAdd: vi.fn(),
     token: 'tok-1',
+    role: null as string | null,
+    user: { id: 'u1', first_name: 'Ana', last_name: 'Reader', professional_id: undefined as string | undefined },
+    permissions: new Set<string>(),
+    cache: null as unknown,
     locale: 'es',
     messages: {} as Record<string, unknown>,
     t: (key: string, params: Record<string, unknown> = {}): string => {
@@ -53,7 +61,15 @@ const state = vi.hoisted(() => {
 mockNuxtImport('useApi', () => () => ({ get: state.get }))
 mockNuxtImport('useAuth', () => () => ({
   accessToken: { get value() { return state.token } },
+  currentRole: { get value() { return state.role } },
+  user: { get value() { return state.user } },
   refresh: state.refresh
+}))
+mockNuxtImport('usePermissions', () => () => ({
+  can: (permission: string) => state.permissions.has(permission)
+}))
+mockNuxtImport('useNuxtData', () => () => ({
+  data: { get value() { return state.cache } }
 }))
 mockNuxtImport('useToast', () => () => ({ add: state.toastAdd }))
 mockNuxtImport('useI18n', () => () => ({
@@ -197,6 +213,9 @@ beforeEach(() => {
   state.messages = { ...readLocale('es'), common: { error: 'Error' } }
   state.locale = 'es'
   state.token = 'tok-1'
+  state.role = null
+  state.permissions = new Set()
+  state.cache = null
   for (const fn of [state.get, state.fetch, state.open, state.refresh, state.toastAdd]) fn.mockReset()
   state.get.mockResolvedValue(envelope([]))
   state.refresh.mockResolvedValue(true)
@@ -1222,13 +1241,12 @@ describe('the layer', () => {
       entry.isDirectory() ? walk(resolve(dir, entry.name)) : [resolve(dir, entry.name)])
   const sources = walk(MODULE).filter(f => /\.(vue|ts)$/.test(f))
 
-  it('has no way to write: no create, no void, no write permission', () => {
+  it('never edits or deletes: no PUT, PATCH or DELETE, ever', () => {
     expect(sources.length).toBeGreaterThanOrEqual(6)
     for (const file of sources) {
       const text = readFileSync(file, 'utf8')
-      expect(text, file).not.toMatch(/\.(post|put|patch|del)\(/)
-      expect(text, file).not.toMatch(/\/void\b|prescriptions\.(prescribe|void)|PERMISSIONS/)
-      expect(text, file).not.toMatch(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i)
+      expect(text, file).not.toMatch(/\.(put|patch|del)\(/)
+      expect(text, file).not.toMatch(/method:\s*['"](PUT|PATCH|DELETE)['"]/i)
     }
   })
 

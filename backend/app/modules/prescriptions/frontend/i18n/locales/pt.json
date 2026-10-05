@@ -22,11 +22,15 @@
       "retry": "Tentar novamente",
       "close": "Fechar",
       "previous": "Anterior",
-      "next": "Próxima"
+      "next": "Próxima",
+      "new": "Nova receita",
+      "void": "Anular receita",
+      "cancel": "Cancelar"
     },
     "aria": {
       "view": "Ver a receita {number}",
-      "print": "Imprimir a receita {number}"
+      "print": "Imprimir a receita {number}",
+      "void": "Anular a receita {number}"
     },
     "pagination": {
       "label": "Paginação de receitas",
@@ -69,6 +73,91 @@
         "title": "Receita anulada",
         "reason": "Motivo",
         "at": "Anulada em"
+      }
+    },
+    "create": {
+      "title": "Nova receita",
+      "description": "Preencha a receita. Depois de emitida, não poderá mais ser editada.",
+      "header": {
+        "patient": "Paciente",
+        "prescriber": "Dentista",
+        "professionalId": "Registro profissional",
+        "clinic": "Clínica"
+      },
+      "validUntil": "Válida até",
+      "validUntilHint": "Último dia em que a receita é válida.",
+      "medications": "Medicamentos",
+      "medication": "Medicamento {n}",
+      "addMedication": "Adicionar medicamento",
+      "removeMedication": "Remover medicamento {n}",
+      "maxItems": "O máximo de {max} medicamentos foi atingido.",
+      "required": "Obrigatório",
+      "requiredNote": "Os campos com * são obrigatórios.",
+      "counter": "{count}/{max}",
+      "issue": "Emitir receita",
+      "summary": "Revise os campos assinalados.",
+      "success": "Receita {number} emitida.",
+      "fields": {
+        "activeIngredient": "Princípio ativo (DCI)",
+        "commercialName": "Nome comercial",
+        "strength": "Concentração",
+        "pharmaceuticalForm": "Forma farmacêutica",
+        "presentation": "Apresentação",
+        "dose": "Dose",
+        "route": "Via",
+        "frequency": "Frequência",
+        "duration": "Duração",
+        "totalQuantity": "Quantidade total",
+        "instructions": "Indicações"
+      },
+      "validation": {
+        "required": "Este campo é obrigatório.",
+        "tooLong": "No máximo {max} caracteres.",
+        "validUntilRequired": "Indique até que data a receita é válida.",
+        "validUntilInvalid": "A data não é válida."
+      },
+      "notices": {
+        "noProfessionalId": "O seu registro profissional não está cadastrado. Contacte o administrador.",
+        "dobRequired": "Preencha a data de nascimento do paciente antes de emitir uma receita."
+      },
+      "confirm": {
+        "title": "Confirmar emissão",
+        "text": "Depois de emitida, a receita não poderá ser editada. Para corrigi-la, será preciso anulá-la e emitir uma nova.",
+        "back": "Voltar"
+      },
+      "discard": {
+        "title": "Descartar a receita?",
+        "text": "As alterações serão perdidas.",
+        "keep": "Continuar editando",
+        "confirm": "Descartar"
+      },
+      "errors": {
+        "prescriber_not_eligible": "Somente um dentista pode emitir receitas.",
+        "prescriber_professional_id_required": "O seu registro profissional não está cadastrado. Contacte o administrador.",
+        "patient_date_of_birth_required": "Preencha a data de nascimento do paciente antes de emitir uma receita.",
+        "patient_date_of_birth_invalid": "A data de nascimento do paciente não é válida.",
+        "clinic_timezone_invalid": "A clínica não tem um fuso horário válido. Contacte o administrador.",
+        "valid_until_before_issue_date": "A validade não pode terminar antes do dia de emissão.",
+        "patient_not_found": "Paciente não encontrado.",
+        "request_validation": "Revise os campos da receita.",
+        "generic": "Não foi possível emitir a receita. Tente novamente."
+      }
+    },
+    "void": {
+      "title": "Anular receita",
+      "description": "Anular a receita {number}.",
+      "warning": "A anulação não pode ser revertida.",
+      "reason": "Motivo da anulação",
+      "reasonRequired": "Indique o motivo da anulação.",
+      "confirm": "Anular receita",
+      "success": "Receita {number} anulada.",
+      "errors": {
+        "void_not_allowed": "Somente o dentista que emitiu a receita, ou um administrador, pode anulá-la.",
+        "prescription_state_conflict": "Esta receita já foi anulada.",
+        "void_reason_required": "Indique o motivo da anulação.",
+        "prescription_not_found": "A receita já não existe ou não está disponível.",
+        "request_validation": "Revise o motivo da anulação.",
+        "generic": "Não foi possível anular a receita. Tente novamente."
       }
     }
   }

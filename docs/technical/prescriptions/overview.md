@@ -35,22 +35,44 @@ one.
 
 No `PUT`, `PATCH` or `DELETE`.
 
-## Frontend (read-only)
+## Frontend
 
 Layer at `backend/app/modules/prescriptions/frontend/`, no navigation. The
 "Recetas" mode of the Clinical tab renders the slot
 `patient.clinical.prescriptions` (permission `prescriptions.read`).
 
-- `PrescriptionsView` — paginated history (10 per page), two actions per row:
-  view and print.
+- `PrescriptionsView` — paginated history (10 per page); two actions per row
+  (view, print); "Nueva receta" for an eligible dentist.
 - `PrescriptionDetailModal` — snapshots, items by position, date of birth (no
-  age); a voided prescription shows `ANULADA`, the reason and the instant.
-- `usePrescriptions` — local state, `AbortController` + generation token, PDF flow.
+  age); a voided prescription shows `ANULADA`, the reason and the instant;
+  "Anular receta" for whoever may void it.
+- `PrescriptionCreateModal` / `PrescriptionItemFields` — the form, its
+  confirmation and its discard prompt, with the draft in memory only
+  (`usePrescriptionDraft`).
+- `PrescriptionVoidModal` — required reason, irreversible-action warning.
+- `usePrescriptions` — local state, `AbortController` + generation tokens, PDF
+  flow, `createPrescription` and `voidPrescription`.
 
-Rules: the Clinical tab's `readonly` flag is never used to decide anything about
-prescriptions; date-only values are formatted without UTC parsing; the PDF is
-fetched with the user's token, refreshed at most once on 401, opened in a window
-created inside the click (download fallback when blocked).
+Rules:
+
+- **Issuing is immutable**: a confirmation precedes the only request, which
+  sends `patient_id`, `valid_until` and `items` and nothing else. A mistake is
+  voided and re-issued; there is no edit.
+- **Write eligibility is the backend's, mirrored** (`utils/prescriptionRules.ts`).
+  Issue: `prescriptions.prescribe` + `currentRole === 'dentist'` + a professional
+  id. Void: `prescriptions.void` + issued + (`admin` or the original
+  prescriber). `currentRole` is `/auth/me` -> `clinics[0].role`; it is never
+  inferred from permissions, because `admin`'s `*` wildcard matches both
+  permissions. The Clinical tab's `readonly` flag is never used.
+- **No drafts persisted anywhere**; the form is destroyed on close or on a patient
+  change.
+- **No pharmacological intelligence**: free text only, no search, calculation or
+  warnings.
+- Date-only values are formatted without UTC parsing; `valid_until` is not
+  compared with the browser's today, the backend compares it with the clinic's
+  issue date.
+- The PDF is fetched with the user's token, refreshed at most once on 401, opened
+  in a window created inside the click (download fallback when blocked).
 
 ## Data
 

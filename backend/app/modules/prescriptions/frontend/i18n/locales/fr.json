@@ -22,11 +22,15 @@
       "retry": "Réessayer",
       "close": "Fermer",
       "previous": "Précédent",
-      "next": "Suivant"
+      "next": "Suivant",
+      "new": "Nouvelle ordonnance",
+      "void": "Annuler l'ordonnance",
+      "cancel": "Annuler"
     },
     "aria": {
       "view": "Voir l'ordonnance {number}",
-      "print": "Imprimer l'ordonnance {number}"
+      "print": "Imprimer l'ordonnance {number}",
+      "void": "Annuler l'ordonnance {number}"
     },
     "pagination": {
       "label": "Pagination des ordonnances",
@@ -69,6 +73,91 @@
         "title": "Ordonnance annulée",
         "reason": "Motif",
         "at": "Annulée le"
+      }
+    },
+    "create": {
+      "title": "Nouvelle ordonnance",
+      "description": "Remplissez l'ordonnance. Une fois émise, elle ne pourra plus être modifiée.",
+      "header": {
+        "patient": "Patient",
+        "prescriber": "Dentiste",
+        "professionalId": "N° d'inscription",
+        "clinic": "Clinique"
+      },
+      "validUntil": "Valable jusqu'au",
+      "validUntilHint": "Dernier jour de validité de l'ordonnance.",
+      "medications": "Médicaments",
+      "medication": "Médicament {n}",
+      "addMedication": "Ajouter un médicament",
+      "removeMedication": "Supprimer le médicament {n}",
+      "maxItems": "Le maximum de {max} médicaments est atteint.",
+      "required": "Obligatoire",
+      "requiredNote": "Les champs marqués * sont obligatoires.",
+      "counter": "{count}/{max}",
+      "issue": "Émettre l'ordonnance",
+      "summary": "Veuillez vérifier les champs signalés.",
+      "success": "Ordonnance {number} émise.",
+      "fields": {
+        "activeIngredient": "Principe actif (DCI)",
+        "commercialName": "Nom commercial",
+        "strength": "Dosage",
+        "pharmaceuticalForm": "Forme pharmaceutique",
+        "presentation": "Présentation",
+        "dose": "Dose",
+        "route": "Voie",
+        "frequency": "Fréquence",
+        "duration": "Durée",
+        "totalQuantity": "Quantité totale",
+        "instructions": "Indications"
+      },
+      "validation": {
+        "required": "Ce champ est obligatoire.",
+        "tooLong": "{max} caractères au maximum.",
+        "validUntilRequired": "Indiquez la date jusqu'à laquelle l'ordonnance est valable.",
+        "validUntilInvalid": "La date n'est pas valide."
+      },
+      "notices": {
+        "noProfessionalId": "Votre numéro d'inscription n'est pas enregistré. Contactez l'administrateur.",
+        "dobRequired": "Renseignez la date de naissance du patient avant d'émettre une ordonnance."
+      },
+      "confirm": {
+        "title": "Confirmer l'émission",
+        "text": "Une fois émise, l'ordonnance ne peut plus être modifiée. Pour la corriger, il faut l'annuler et en émettre une nouvelle.",
+        "back": "Retour"
+      },
+      "discard": {
+        "title": "Abandonner l'ordonnance ?",
+        "text": "Les modifications seront perdues.",
+        "keep": "Continuer à modifier",
+        "confirm": "Abandonner"
+      },
+      "errors": {
+        "prescriber_not_eligible": "Seul un dentiste peut émettre des ordonnances.",
+        "prescriber_professional_id_required": "Votre numéro d'inscription n'est pas enregistré. Contactez l'administrateur.",
+        "patient_date_of_birth_required": "Renseignez la date de naissance du patient avant d'émettre une ordonnance.",
+        "patient_date_of_birth_invalid": "La date de naissance du patient n'est pas valide.",
+        "clinic_timezone_invalid": "La clinique n'a pas de fuseau horaire valide. Contactez l'administrateur.",
+        "valid_until_before_issue_date": "La validité ne peut pas se terminer avant le jour d'émission.",
+        "patient_not_found": "Patient introuvable.",
+        "request_validation": "Veuillez vérifier les champs de l'ordonnance.",
+        "generic": "L'ordonnance n'a pas pu être émise. Veuillez réessayer."
+      }
+    },
+    "void": {
+      "title": "Annuler l'ordonnance",
+      "description": "Annuler l'ordonnance {number}.",
+      "warning": "L'annulation est irréversible.",
+      "reason": "Motif de l'annulation",
+      "reasonRequired": "Indiquez le motif de l'annulation.",
+      "confirm": "Annuler l'ordonnance",
+      "success": "Ordonnance {number} annulée.",
+      "errors": {
+        "void_not_allowed": "Seul le dentiste qui a émis l'ordonnance, ou un administrateur, peut l'annuler.",
+        "prescription_state_conflict": "Cette ordonnance a déjà été annulée.",
+        "void_reason_required": "Indiquez le motif de l'annulation.",
+        "prescription_not_found": "L'ordonnance n'existe plus ou n'est pas disponible.",
+        "request_validation": "Veuillez vérifier le motif de l'annulation.",
+        "generic": "L'ordonnance n'a pas pu être annulée. Veuillez réessayer."
       }
     }
   }

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- feat: **issue and void from the frontend (phase D).** "Nueva receta" in the Recetas tab and "Anular receta" in the detail; no backend change.
+  - Eligibility mirrors the backend and never reads the permission alone: issue needs `prescriptions.prescribe` + role `dentist` + a registered professional id; void needs `prescriptions.void` + an issued prescription + (role `admin` or the original prescriber). The role is `useAuth().currentRole` (`/auth/me` -> `clinics[0].role`); an admin's `*` wildcard no longer shows "Nueva receta".
+  - Form in a large modal: read-only header (patient, dentist, registration number, clinic), required `valid_until` with no default and no minimum, 1 to 50 medications in stacked cards with the backend's exact limits, a mandatory "cannot be edited once issued" confirmation before any request, and a draft that lives only in memory (discarded on close or patient change).
+  - POST carries exactly `patient_id`, `valid_until` and `items`. On success the response becomes the open detail and the history reloads from page 1; on failure the draft is kept and the backend code is mapped to a message.
+  - Void dialog with a required reason (1 to 2000), no suggestions, a conflict/not-allowed/not-found handled by reloading what is true now.
+  - Core frontend: `useAuth` gains `currentRole`; `useApi` gains the opt-in `silentForbidden`.
+  - Strings in es, en, fr, pt and ta. No edit, delete, duplicate, draft persistence, medication search or dose calculation.
+
 - feat: **read-only frontend (phase C)** - "Recetas" tab in the patient's Clinical tab (between Citas and Histórico, visible with `prescriptions.read`).
   - Manifest `frontend: {layer_path: "frontend", navigation: []}`; the layer registers the slot `patient.clinical.prescriptions` and `patients` never imports it.
   - History (10 per page, newest first, own Anterior / Página X de Y / Siguiente paginator), detail modal with the snapshots, and the authenticated PDF (popup opened inside the click, one refresh retry on 401, download fallback if the popup is blocked).
