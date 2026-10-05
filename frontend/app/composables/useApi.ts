@@ -18,6 +18,10 @@ interface UseApiOptions {
   // Optional AbortSignal so callers can cancel in-flight requests
   // (debounced lookups, component unmount, etc.).
   signal?: AbortSignal
+  // Opt-in: the caller explains a 403 itself, so skip the generic
+  // "access denied" toast (which would contradict the caller's own message).
+  // Off by default: no other caller changes.
+  silentForbidden?: boolean
 }
 
 function _withQuery(path: string, query?: UseApiOptions['query']): string {
@@ -46,7 +50,7 @@ export function useApi() {
     path: string,
     options: UseApiOptions = {}
   ): Promise<T> {
-    const { skipAuth, method, body, headers: optionHeaders, signal, query } = options
+    const { skipAuth, method, body, headers: optionHeaders, signal, query, silentForbidden } = options
 
     const headers: Record<string, string> = {
       ...(optionHeaders || {})
@@ -98,11 +102,13 @@ export function useApi() {
       }
 
       if (fetchError.statusCode === 403) {
-        toast.add({
-          title: t('common.error'),
-          description: t('common.forbidden', 'Acceso denegado'),
-          color: 'error'
-        })
+        if (!silentForbidden) {
+          toast.add({
+            title: t('common.error'),
+            description: t('common.forbidden', 'Acceso denegado'),
+            color: 'error'
+          })
+        }
         throw error
       }
 

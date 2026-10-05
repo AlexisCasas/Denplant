@@ -31,9 +31,22 @@ const route = useRoute()
 
 // Evolución is the notes history; without read access the mode does not exist.
 const canReadNotes = computed(() => can(PERMISSIONS.clinicalNotes.read))
-const modeAccess = computed(() => ({ evolution: canReadNotes.value }))
+// Recetas is the prescriptions history; without read access the mode does not exist.
+const canReadPrescriptions = computed(() => can(PERMISSIONS.prescriptions.read))
+const modeAccess = computed(() => ({
+  evolution: canReadNotes.value,
+  prescriptions: canReadPrescriptions.value
+}))
 
 const evolutionCtx = computed(() => ({
+  patientId: props.patientId,
+  readonly: props.readonly
+}))
+
+// ``readonly`` is passed for coherence with the other slots. It says nothing about
+// prescriptions: who may prescribe or void is decided by the prescriptions
+// module, never inferred from this flag.
+const prescriptionsCtx = computed(() => ({
   patientId: props.patientId,
   readonly: props.readonly
 }))
@@ -149,6 +162,7 @@ watch(currentMode, (newMode) => {
     <ClinicalModeToggle
       v-model="currentMode"
       :show-evolution="canReadNotes"
+      :show-prescriptions="canReadPrescriptions"
     />
 
     <!-- Mode Content -->
@@ -180,6 +194,12 @@ watch(currentMode, (newMode) => {
     <AppointmentsMode
       v-else-if="currentMode === 'appointments'"
       :patient-id="patientId"
+    />
+
+    <ModuleSlot
+      v-else-if="currentMode === 'prescriptions' && canReadPrescriptions"
+      name="patient.clinical.prescriptions"
+      :ctx="prescriptionsCtx"
     />
 
     <ModuleSlot

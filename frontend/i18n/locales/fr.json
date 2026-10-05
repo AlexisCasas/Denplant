@@ -990,6 +990,7 @@
       "diagnosis": "Diagnostic",
       "plans": "Plans de traitement",
       "appointments": "Rendez-vous",
+      "prescriptions": "Ordonnances",
       "evolution": "Évolution"
     },
     "history": {
