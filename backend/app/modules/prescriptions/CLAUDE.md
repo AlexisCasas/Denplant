@@ -1,9 +1,8 @@
 # Prescriptions module
 
 Issues, stores and lists medication prescriptions written by a dentist, for
-printing and handwritten signature. Backend (model, API, A4 PDF) plus a frontend (phases C and D):
-history, detail and PDF in the patient's Clinical tab, plus issuing and voiding
-(phase D). No events.
+printing and handwritten signature. Backend (model, API, A4 PDF) plus a frontend in
+the patient's Clinical tab: history, detail, PDF, issuing and voiding. No events.
 
 ## Public API
 
@@ -18,7 +17,7 @@ Routes mounted at `/api/v1/prescriptions` (no trailing slash).
 There is **no** `PUT`, `PATCH` or `DELETE`, and there never will be: an issued
 prescription is not edited or deleted. A mistake is voided and re-issued.
 
-## Frontend (phases C + D)
+## Frontend
 
 Layer `frontend/`, no navigation. It fills the slot
 `patient.clinical.prescriptions` (gated by `prescriptions.read`) of the patient's
@@ -71,7 +70,7 @@ inside the detail). There is no edit, no delete, no duplicate and no draft.
   no link to `patients_clinical.Medication`.
 - **Errors** are mapped by the backend's `code` (`utils/prescriptionForm.ts`),
   never by its text, and FastAPI's validation array becomes "review the fields".
-  Writes pass `silentForbidden: true` to `useApi` (an opt-in added in Phase D) so
+  Writes pass `silentForbidden: true` to `useApi` (an opt-in added for these writes) so
   a 403 is explained once, by the form, not also by the generic toast.
 - **Void races**: a conflict (`prescription_state_conflict`), `void_not_allowed`
   or `prescription_not_found` closes the void dialog, says what happened and

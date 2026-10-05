@@ -1,18 +1,41 @@
 ---
 module: prescriptions
-last_verified_commit: 9e40e4f1
+last_verified_commit: 588f47b
 ---
 
 # Prescriptions — technical overview
 
 Medication prescriptions written by a dentist, **for printing and handwritten
-signature**. So far this is the backend: model, migration, security, API and an
-A4 PDF rendered on demand. There is no frontend and no event yet.
+signature**. The module covers the whole flow:
 
-It is **not** an electronic prescription: nothing is digitally signed, and the
-module has no pharmacy or DIGEMID integration and no drug knowledge (no
-catalog, dose calculation or interaction checks). It is also unrelated to
-`patients_clinical.Medication`, which records what a patient *takes*.
+- **Issue**: a dentist with a registered professional id writes a prescription
+  with one or more medications for a patient.
+- **History and detail**: a patient's prescriptions, newest first, with every
+  snapshot, the medications and, for a voided one, why and when.
+- **PDF**: an A4 sheet rendered on demand, to be printed and signed by hand.
+- **Void**: an issued prescription can be voided, with a reason, by its
+  prescriber or an admin. It is never edited or deleted.
+
+It has a backend (model, migration, API, PDF) and a frontend layer that lives in
+the patient's Clinical tab. It publishes and consumes no events.
+
+It is **not** an electronic prescription and it is **not** digitally signed: the
+printed sheet leaves a line for the prescriber's handwritten signature and
+stamp, and says so. The module has no pharmacy or DIGEMID integration and no
+drug knowledge (no catalog, dose calculation or interaction checks). It is also
+unrelated to `patients_clinical.Medication`, which records what a patient
+*takes*.
+
+## Permissions at a glance
+
+| Action | Permission | Plus (enforced by the service, mirrored by the UI) |
+|---|---|---|
+| Read history, detail, PDF | `prescriptions.read` | access to the patient |
+| Issue | `prescriptions.prescribe` | role `dentist` and a registered professional id |
+| Void | `prescriptions.void` | role `admin`, or the `dentist` who issued it |
+
+The `admin` wildcard `*` matches all three permissions, so the permission alone
+never decides who may issue. See [permissions](./permissions.md).
 
 ## Lifecycle
 
@@ -154,5 +177,10 @@ the prescriber's signature and stamp.
 - An admin who is also a dentist cannot issue from an admin account.
 - `PatientAccessPolicy` excludes archived patients, so their prescriptions are
   not readable until a cross-cutting policy exists.
-- The logo, when a printout exists, will be the clinic's branding at the time of
-  printing, not a snapshot.
+- The logo is not a snapshot: a reprint carries the clinic's branding at the
+  time of printing.
+- The PDF has labels in Spanish and English only; any other communication
+  language prints in Spanish.
+- The UI reads the current role from `clinics[0].role` of `/auth/me`, which is
+  the membership the backend uses when no `clinic_id` is sent; a clinic selector
+  would need both sides to change together.
