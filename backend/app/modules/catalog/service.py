@@ -23,6 +23,10 @@ class SessionTemplateError(ValueError):
     """Raised when a session template fails validation (sum mismatch, etc.)."""
 
 
+class CommercialConfigurationError(ValueError):
+    """Raised when a system item's commercial configuration is invalid."""
+
+
 def validate_session_template(
     item_total: Decimal | None,
     sessions: list[dict] | None,
@@ -553,6 +557,35 @@ class CatalogService:
 
         await db.flush()
         return item
+
+    @staticmethod
+    async def update_system_item_commercial(
+        db: AsyncSession,
+        clinic_id: UUID,
+        item: TreatmentCatalogItem,
+        data: dict,
+    ) -> TreatmentCatalogItem:
+        """Update the clinic-owned commercial settings of a system item.
+
+        ``pricing_strategy`` is part of the protected clinical definition, so
+        the submitted settings must be compatible with the stored strategy.
+        VAT selection is tenant-scoped rather than relying solely on the FK.
+        """
+        if "vat_type_id" in data:
+            vat_type = await VatTypeService.get_vat_type(db, clinic_id, data["vat_type_id"])
+            if vat_type is None or not vat_type.is_active:
+                raise CommercialConfigurationError("VAT type is not selectable for this clinic")
+
+        if "surface_prices" in data and item.pricing_strategy != "per_surface":
+            raise CommercialConfigurationError(
+                "surface_prices can only be configured for per_surface pricing"
+            )
+        if "pricing_config" in data and item.pricing_strategy != "per_role":
+            raise CommercialConfigurationError(
+                "pricing_config can only be configured for per_role pricing"
+            )
+
+        return await CatalogService.update_item(db, clinic_id, item, data)
 
     @staticmethod
     async def delete_item(

@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -20,6 +21,7 @@ from .schemas import (
     CategoryResponse,
     CategoryUpdate,
     OdontogramTreatmentResponse,
+    SystemCatalogItemCommercialUpdate,
     VatTypeCreate,
     VatTypeResponse,
     VatTypeUpdate,
@@ -28,6 +30,7 @@ from .seed import seed_clinic_defaults
 from .service import (
     CatalogService,
     CategoryService,
+    CommercialConfigurationError,
     OdontogramCatalogService,
     SessionTemplateError,
     VatTypeService,
@@ -388,7 +391,7 @@ async def create_item(
 @router.put("/items/{item_id}", response_model=ApiResponse[CatalogItemResponse])
 async def update_item(
     item_id: UUID,
-    data: CatalogItemUpdate,
+    data: dict,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("catalog.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -399,14 +402,42 @@ async def update_item(
         raise HTTPException(status_code=404, detail="Catalog item not found")
 
     if item.is_system:
+        # A system item is a clinic-local copy of the stock clinical catalog.
+        # Only commercial choices may vary by clinic; Pydantic rejects every
+        # structural/clinical field before it can reach the service.
+        try:
+            commercial_data = SystemCatalogItemCommercialUpdate.model_validate(data)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+            ) from exc
+        try:
+            updated = await CatalogService.update_system_item_commercial(
+                # JSONB commercial settings cannot serialize Decimal instances.
+                # JSON mode preserves numeric values as strings, which the
+                # numeric/session services already normalize at their boundary.
+                db,
+                ctx.clinic_id,
+                item,
+                commercial_data.model_dump(exclude_unset=True, mode="json"),
+            )
+        except (SessionTemplateError, CommercialConfigurationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
+        updated = await CatalogService.get_item(db, ctx.clinic_id, updated.id)
+        return ApiResponse(data=CatalogItemResponse.model_validate(updated))
+
+    try:
+        normal_data = CatalogItemUpdate.model_validate(data)
+    except ValidationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot modify system catalog item",
-        )
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+        ) from exc
 
     # Verify category if changing
-    if data.category_id and data.category_id != item.category_id:
-        category = await CategoryService.get_category(db, ctx.clinic_id, data.category_id)
+    if normal_data.category_id and normal_data.category_id != item.category_id:
+        category = await CategoryService.get_category(db, ctx.clinic_id, normal_data.category_id)
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -414,8 +445,10 @@ async def update_item(
             )
 
     # Check code uniqueness if changing
-    if data.internal_code and data.internal_code != item.internal_code:
-        existing = await CatalogService.get_item_by_code(db, ctx.clinic_id, data.internal_code)
+    if normal_data.internal_code and normal_data.internal_code != item.internal_code:
+        existing = await CatalogService.get_item_by_code(
+            db, ctx.clinic_id, normal_data.internal_code
+        )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -424,7 +457,7 @@ async def update_item(
 
     try:
         updated = await CatalogService.update_item(
-            db, ctx.clinic_id, item, data.model_dump(exclude_unset=True)
+            db, ctx.clinic_id, item, normal_data.model_dump(exclude_unset=True)
         )
     except SessionTemplateError as exc:
         raise HTTPException(
