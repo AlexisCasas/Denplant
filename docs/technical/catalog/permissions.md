@@ -11,7 +11,7 @@ Returned by `CatalogModule.get_permissions()`
 | Permission | Allows | Required by |
 |------------|--------|-------------|
 | `catalog.read` | Browse categories, VAT types, treatments and odontogram mappings. Every role has it. | `GET /api/v1/catalog/categories`, `GET /api/v1/catalog/categories/{id}`, `GET /api/v1/catalog/vat-types`, `GET /api/v1/catalog/vat-types/default`, `GET /api/v1/catalog/vat-types/{id}`, `GET /api/v1/catalog/items`, `GET /api/v1/catalog/items/popular`, `GET /api/v1/catalog/items/search`, `GET /api/v1/catalog/items/{id}`, `GET /api/v1/catalog/odontogram-treatments`, `GET /api/v1/catalog/odontogram-treatments/by-category` |
-| `catalog.write` | Create, edit and (soft-)delete treatments. | `POST /api/v1/catalog/items`, `PUT /api/v1/catalog/items/{id}`, `DELETE /api/v1/catalog/items/{id}` |
+| `catalog.write` | Create, edit and (soft-)delete treatments. System treatments accept only their commercial allowlist on update and cannot be deleted. | `POST /api/v1/catalog/items`, `PUT /api/v1/catalog/items/{id}`, `DELETE /api/v1/catalog/items/{id}` |
 | `catalog.admin` | Manage categories and VAT types; load the stock catalog. System rows (`is_system`) reject edits/deletes with 403. | `POST /api/v1/catalog/categories`, `PUT /api/v1/catalog/categories/{id}`, `DELETE /api/v1/catalog/categories/{id}`, `POST /api/v1/catalog/vat-types`, `PUT /api/v1/catalog/vat-types/{id}`, `DELETE /api/v1/catalog/vat-types/{id}`, `POST /api/v1/catalog/seed` |
 
 ## Role assignment

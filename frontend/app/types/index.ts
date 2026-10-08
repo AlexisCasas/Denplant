@@ -801,6 +801,18 @@ export interface TreatmentCatalogItemUpdate {
   sessions?: CatalogItemSessionInput[]
 }
 
+/** Allowed payload when editing a clinic's copy of a system catalog item. */
+export interface SystemCatalogItemCommercialUpdate {
+  default_price?: number
+  cost_price?: number
+  vat_type_id?: string
+  surface_prices?: Record<string, number>
+  pricing_config?: Record<string, number>
+  sessions?: CatalogItemSessionInput[]
+  default_duration_minutes?: number
+  requires_appointment?: boolean
+}
+
 /** Layered visualization rule. Each layer renders on top of the previous. */
 export interface VisualizationRuleLayer {
   layer: VisualizationLayer

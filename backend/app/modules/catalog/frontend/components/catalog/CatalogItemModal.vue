@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buildSystemCommercialPayload } from '../../composables/useCatalog'
 import type {
   CatalogItemSessionInput,
   PricingStrategy,
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const catalog = useCatalog()
+const { symbol: currencySymbol } = useCurrency()
 
 // VAT Types
 const {
@@ -223,6 +225,8 @@ const strategyOptionsVisual = computed<{ value: PricingStrategy, label: string, 
 
 const SURFACE_TIERS = ['1', '2', '3', '4', '5'] as const
 const showSurfacePrices = computed(() => formData.value.pricing_strategy === 'per_surface')
+const ROLE_PRICES = ['pillar', 'pontic'] as const
+const showRolePrices = computed(() => formData.value.pricing_strategy === 'per_role')
 
 watch(
   () => formData.value.pricing_strategy,
@@ -251,6 +255,19 @@ function setTierPrice(tier: string, value: number | string | undefined) {
   }
   const n = value === undefined || value === '' ? 0 : Number(value)
   formData.value.surface_prices[tier] = Number.isFinite(n) ? n : 0
+}
+
+function getRolePrice(role: string): number | undefined {
+  const value = formData.value.pricing_config?.[role]
+  return typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : undefined
+}
+
+function setRolePrice(role: string, value: number | string | undefined) {
+  if (!formData.value.pricing_config) {
+    formData.value.pricing_config = {}
+  }
+  const amount = value === undefined || value === '' ? 0 : Number(value)
+  formData.value.pricing_config[role] = Number.isFinite(amount) ? amount : 0
 }
 
 // Duration presets
@@ -343,7 +360,11 @@ function handleSubmit() {
     if (!internal_code || !category_id || !names) return
     emit('create', { ...payload, internal_code, category_id, names })
   } else {
-    emit('save', payload)
+    if (isSystem.value) {
+      emit('save', buildSystemCommercialPayload(payload))
+    } else {
+      emit('save', payload)
+    }
   }
 }
 
@@ -488,6 +509,7 @@ function handleClose() {
               <UFormField :label="t('catalog.name')">
                 <UInput
                   v-model="itemName"
+                  :disabled="isSystem"
                   required
                 />
               </UFormField>
@@ -495,6 +517,7 @@ function handleClose() {
               <UFormField :label="t('catalog.materialNotes')">
                 <UTextarea
                   v-model="formData.material_notes"
+                  :disabled="isSystem"
                   :rows="2"
                   :placeholder="t('catalog.materialNotesPlaceholder')"
                 />
@@ -530,7 +553,7 @@ function handleClose() {
                     min="0"
                   >
                     <template #trailing>
-                      <span class="text-muted text-sm">€</span>
+                      <span class="text-muted text-sm">{{ currencySymbol() }}</span>
                     </template>
                   </UInput>
                 </UFormField>
@@ -543,7 +566,7 @@ function handleClose() {
                     min="0"
                   >
                     <template #trailing>
-                      <span class="text-muted text-sm">€</span>
+                      <span class="text-muted text-sm">{{ currencySymbol() }}</span>
                     </template>
                   </UInput>
                 </UFormField>
@@ -626,6 +649,41 @@ function handleClose() {
                 </div>
               </div>
 
+              <!-- Bridge role prices -->
+              <div
+                v-if="showRolePrices"
+                class="rounded-lg border border-default bg-surface-muted/30 p-4"
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <UIcon
+                    name="i-lucide-link-2"
+                    class="w-4 h-4 text-primary-accent"
+                  />
+                  <h5 class="font-medium text-sm text-default dark:text-white">
+                    {{ t('catalog.pricingStrategy.per_role') }}
+                  </h5>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                  <UFormField
+                    v-for="role in ROLE_PRICES"
+                    :key="role"
+                    :label="t(`catalog.pricingStrategy.${role}`, role)"
+                  >
+                    <UInput
+                      :model-value="getRolePrice(role)"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      @update:model-value="setRolePrice(role, $event)"
+                    >
+                      <template #trailing>
+                        <span class="text-muted text-sm">{{ currencySymbol() }}</span>
+                      </template>
+                    </UInput>
+                  </UFormField>
+                </div>
+              </div>
+
               <!-- Sessions -->
               <div class="rounded-lg border border-default overflow-hidden">
                 <div class="flex items-center justify-between p-3 bg-surface-muted/30">
@@ -670,7 +728,7 @@ function handleClose() {
                         class="w-28"
                       >
                         <template #trailing>
-                          <span class="text-muted text-xs">€</span>
+                          <span class="text-muted text-xs">{{ currencySymbol() }}</span>
                         </template>
                       </UInput>
                       <UButton
@@ -696,7 +754,7 @@ function handleClose() {
                   <div class="px-3 pb-3 pt-1 border-t border-subtle">
                     <div class="flex items-center justify-between text-xs mb-1.5">
                       <span class="text-muted">
-                        {{ sessionsSum.toFixed(2) }} € / {{ (Number(formData.default_price) || 0).toFixed(2) }} €
+                        {{ sessionsSum.toFixed(2) }} {{ currencySymbol() }} / {{ (Number(formData.default_price) || 0).toFixed(2) }} {{ currencySymbol() }}
                       </span>
                       <span
                         class="flex items-center gap-1 font-medium"
@@ -860,6 +918,7 @@ function handleClose() {
                         value-key="value"
                         label-key="label"
                         :placeholder="t('catalog.selectOdontogramType')"
+                        :disabled="isSystem"
                       />
                     </UFormField>
                     <UFormField
@@ -872,7 +931,7 @@ function handleClose() {
                         value-key="value"
                         label-key="label"
                         :placeholder="t('catalog.selectClinicalCategory')"
-                        :disabled="!odontogramType"
+                        :disabled="!odontogramType || isSystem"
                       />
                     </UFormField>
                   </div>

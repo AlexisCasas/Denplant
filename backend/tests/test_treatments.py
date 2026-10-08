@@ -1,6 +1,7 @@
 """Tests for the unified /treatments API (header + children model)."""
 
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -8,12 +9,14 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
+from app.modules.agenda.schemas import AppointmentTreatmentBrief
 from app.modules.catalog.models import (
     TreatmentCatalogItem,
     TreatmentCategory,
     TreatmentOdontogramMapping,
     VatType,
 )
+from app.modules.odontogram.models import Treatment
 
 
 async def _ensure_clinic_and_patient(
@@ -181,6 +184,59 @@ async def test_create_single_tooth_filling_with_surfaces(
     assert data["price_snapshot"] == "80.00"
     assert len(data["teeth"]) == 1
     assert data["teeth"][0]["surfaces"] == ["M", "O"]
+
+
+@pytest.mark.asyncio
+async def test_catalog_price_change_does_not_change_existing_treatment_snapshot(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, setup: dict
+) -> None:
+    """A S/180 catalog price is frozen on creation even after it becomes S/200."""
+    catalog_item = await db_session.get(TreatmentCatalogItem, UUID(setup["filling_id"]))
+    assert catalog_item is not None
+    catalog_item.default_price = Decimal("180.00")
+    await db_session.flush()
+
+    response = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={
+            "catalog_item_id": setup["filling_id"],
+            "tooth_numbers": [16],
+            "surfaces": ["O"],
+            "status": "planned",
+        },
+    )
+    assert response.status_code == 201, response.text
+    treatment_id = UUID(response.json()["data"]["id"])
+
+    catalog_item.default_price = Decimal("200.00")
+    await db_session.flush()
+    treatment = await db_session.get(Treatment, treatment_id)
+    assert treatment is not None
+    assert treatment.price_snapshot == Decimal("180.00")
+
+
+def test_agenda_price_fallback_uses_catalog_only_without_a_snapshot() -> None:
+    """Agenda must prefer history, but still render a catalog-only appointment."""
+    catalog_item = SimpleNamespace(
+        id=uuid4(),
+        internal_code="PREV-CHECKUP",
+        names={"es": "Revisión"},
+        default_price=Decimal("90.00"),
+        default_duration_minutes=30,
+    )
+    apt_treatment = SimpleNamespace(
+        id=uuid4(),
+        planned_item=None,
+        catalog_item=catalog_item,
+        # A detached relation is possible when rendering a historical
+        # appointment response; the FK remains present even though the
+        # relationship was not loaded.
+        planned_treatment_item_id=uuid4(),
+        completed_in_appointment=False,
+    )
+    brief = AppointmentTreatmentBrief.from_appointment_treatment(apt_treatment)
+    assert brief.default_price == 90.0
 
 
 # ----------------------------------------------------------------------------

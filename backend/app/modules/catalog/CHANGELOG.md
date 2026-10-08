@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- fix(HOTFIX-CATALOG-01): system-seeded treatments now permit only clinic-local
+  commercial configuration (prices, active clinic VAT, session template and
+  scheduling). Clinical identity remains immutable; protected payload fields
+  are rejected. The catalog modal sends the commercial allowlist only, uses the
+  clinic currency symbol, and suppresses the duplicate global 403 toast.
+
 - fix(HOTFIX-CATALOG-01): `CatalogItemModal` sent `odontogram_mapping.visualization_rules` as bare rule names (`["occlusal_surface"]`), which the API rejects with 422 (`list[dict]`); it now sends structured layers built by `getVisualizationRuleLayers`. The odontogram-type selector offers only `CATALOG_ODONTOGRAM_TREATMENT_TYPES` (the backend `TreatmentType` values, now including `bridge`/`splint`; no `filling`/`root_canal`/`bridge_pontic`/`pontic`/`bridge_abutment`). Stored legacy `filling`/`root_canal` load as `filling_composite`/`root_canal_full`; any other unsupported stored type (e.g. `bridge_pontic`) is shown as a warning and blocks saving until a valid type is chosen. A selected type now requires a clinical category before saving. Editing an item whose stored type is unchanged keeps its existing `visualization_rules`/`visualization_config` verbatim; only a changed (or legacy-upgraded) type gets the default rules.
 
 - fix(security): dentist catalog responses and catalog UI omit prices, costs, VAT and pricing configuration.
