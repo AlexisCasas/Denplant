@@ -1,11 +1,18 @@
 /** H1 — treatment plan projection shares the NTS structural geometry. */
 import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 
 import NtsPlanOdontogramChart from '../../../backend/app/modules/treatment_plan/frontend/components/clinical/NtsPlanOdontogramChart.vue'
 import { NTS_ROWS } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import { NTS_CHART_VIEWBOX, toothPlacement } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
+
+const chartSource = readFileSync(
+  resolve(process.cwd(), '../backend/app/modules/treatment_plan/frontend/components/clinical/NtsPlanOdontogramChart.vue'),
+  'utf8'
+)
 
 const item = (overrides: Record<string, unknown> = {}) => ({
   id: 'item-1',
@@ -79,5 +86,25 @@ describe('H1 — odontograma NTS del plan', () => {
     } })])
     expect(wrapper.findAll('line')).toHaveLength(2)
     expect(wrapper.find('[data-testid="nts-plan-odontogram-chart"]').text()).toContain('no son hallazgos MINSA')
+  })
+
+  it('keeps creation opt-in and connects the established clinical workflows', () => {
+    // A tooth click without an active catalog treatment remains a selection;
+    // the mutation path is entered only after TreatmentBar has chosen one.
+    expect(chartSource).toContain('if (props.readonly || !isClickToApplyMode.value) return')
+    expect(chartSource).toContain('selectedTooth.value = toothNumber')
+    expect(chartSource).toContain('<TreatmentBar')
+    expect(chartSource).toContain('<SurfaceSelectorPopup')
+    expect(chartSource).toContain('<MultiToothConfirmPopup')
+    expect(chartSource).toContain('<TreatmentEditModal')
+    expect(chartSource).toContain('<GlobalTreatmentsStrip')
+  })
+
+  it('attaches clinical mutations to the active plan and respects read-only mode', () => {
+    expect(chartSource).toContain('await treatmentPlansApi.addItem(props.planId, { treatment_id: treatment.id })')
+    expect(chartSource).toContain('v-if="!readonly && patientId"')
+    expect(chartSource).toContain(':disabled="readonly"')
+    expect(chartSource).toContain('@perform="handleTreatmentPerform"')
+    expect(chartSource).toContain('@delete="handleTreatmentDelete"')
   })
 })

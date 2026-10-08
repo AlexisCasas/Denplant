@@ -623,9 +623,18 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
 
         <NtsPlanOdontogramChart
           v-if="isOdontogramProfileLoaded && odontogramProfile === 'pe_nts_188_2022'"
+          ref="odontogramRef"
           :items="plan.items"
+          :patient-id="patientId"
+          :plan-id="plan.id"
+          :plan-title="plan.title || plan.plan_number"
+          :readonly="effectiveReadonly"
           :highlighted-teeth="highlightedTeeth"
+          :highlighted-global-ids="highlightedGlobalIds"
           @tooth-select="hoveredToothNumber = $event"
+          @tooth-hover="hoveredToothNumber = $event"
+          @global-hover="hoveredGlobalTreatmentId = $event"
+          @treatments-changed="emit('updated')"
         />
         <OdontogramChart
           v-else-if="isOdontogramProfileLoaded"
