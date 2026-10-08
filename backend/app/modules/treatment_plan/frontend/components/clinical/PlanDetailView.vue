@@ -17,6 +17,7 @@ import ReopenPlanModal from './modals/ReopenPlanModal.vue'
 import ClosePlanModal from './modals/ClosePlanModal.vue'
 import ReactivatePlanModal from './modals/ReactivatePlanModal.vue'
 import ContactLogModal from './modals/ContactLogModal.vue'
+import NtsPlanOdontogramChart from './NtsPlanOdontogramChart.vue'
 import { itemEffectivePrice } from '../../composables/useTreatmentPlans'
 
 const props = withDefaults(defineProps<{
@@ -38,6 +39,14 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const toast = useToast()
+// The plan follows the same clinic/user preference as diagnosis.  It waits
+// for the preference before choosing a renderer, so it never flashes the
+// legacy chart for a MINSA clinic.
+const { profile: odontogramProfile, isLoaded: isOdontogramProfileLoaded, ensureLoaded: ensureOdontogramProfileLoaded } = useOdontogramProfile()
+
+onMounted(() => {
+  void ensureOdontogramProfileLoaded()
+})
 
 const {
   completeItem,
@@ -612,7 +621,14 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           </div>
         </template>
 
+        <NtsPlanOdontogramChart
+          v-if="isOdontogramProfileLoaded && odontogramProfile === 'pe_nts_188_2022'"
+          :items="plan.items"
+          :highlighted-teeth="highlightedTeeth"
+          @tooth-select="hoveredToothNumber = $event"
+        />
         <OdontogramChart
+          v-else-if="isOdontogramProfileLoaded"
           ref="odontogramRef"
           :patient-id="patientId"
           :mode="effectiveReadonly ? 'view-only' : 'planning'"
@@ -624,6 +640,7 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           @global-hover="hoveredGlobalTreatmentId = $event"
           @treatments-changed="emit('updated')"
         />
+        <USkeleton v-else class="h-80" />
       </UCard>
 
       <!-- Right column: Treatment list + clinical notes, stacked and auto-height. -->
