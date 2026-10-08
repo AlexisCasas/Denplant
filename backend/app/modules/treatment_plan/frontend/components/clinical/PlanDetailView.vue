@@ -640,7 +640,10 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           @global-hover="hoveredGlobalTreatmentId = $event"
           @treatments-changed="emit('updated')"
         />
-        <USkeleton v-else class="h-80" />
+        <USkeleton
+          v-else
+          class="h-80"
+        />
       </UCard>
 
       <!-- Right column: Treatment list + clinical notes, stacked and auto-height. -->

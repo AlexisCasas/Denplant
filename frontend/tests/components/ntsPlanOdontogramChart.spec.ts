@@ -38,7 +38,7 @@ describe('H1 — odontograma NTS del plan', () => {
       .toEqual(NTS_ROWS.map(row => row.id))
   })
 
-  it.each([16, 55, 85, 46])('keeps tooth %i at its shared NTS placement', async fdi => {
+  it.each([16, 55, 85, 46])('keeps tooth %i at its shared NTS placement', async (fdi) => {
     const wrapper = await mountChart()
     const placement = toothPlacement(fdi)
     expect(placement).not.toBeNull()

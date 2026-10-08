@@ -68,11 +68,11 @@ function surfacePoint(marker: ToothMarker, surface: Surface) {
   const w = crown.width
   const h = crown.height
   const points: Record<Surface, { x: number, y: number }> = {
-    M: { x: x + w * .22, y: y + h * .5 },
-    D: { x: x + w * .78, y: y + h * .5 },
-    O: { x: x + w * .5, y: y + h * .5 },
-    V: { x: x + w * .5, y: y + h * .22 },
-    L: { x: x + w * .5, y: y + h * .78 }
+    M: { x: x + w * 0.22, y: y + h * 0.5 },
+    D: { x: x + w * 0.78, y: y + h * 0.5 },
+    O: { x: x + w * 0.5, y: y + h * 0.5 },
+    V: { x: x + w * 0.5, y: y + h * 0.22 },
+    L: { x: x + w * 0.5, y: y + h * 0.78 }
   }
   return points[surface]
 }
@@ -97,11 +97,17 @@ function markerTitle(marker: ToothMarker) {
     data-testid="nts-plan-odontogram-chart"
     aria-label="Odontograma del plan de tratamiento"
   >
-    <p class="text-caption text-subtle" data-testid="nts-plan-odontogram-description">
+    <p
+      class="text-caption text-subtle"
+      data-testid="nts-plan-odontogram-description"
+    >
       Tratamientos del plan sobre la geometría del odontograma clínico. Los indicadores no son hallazgos MINSA.
     </p>
 
-    <div class="overflow-x-auto" data-testid="nts-plan-chart-scroll">
+    <div
+      class="overflow-x-auto"
+      data-testid="nts-plan-chart-scroll"
+    >
       <div
         class="relative mx-auto py-2 space-y-1"
         :style="{ minWidth: `${NTS_CHART_WIDTH}px` }"
@@ -131,7 +137,10 @@ function markerTitle(marker: ToothMarker) {
         >
           <!-- A bridge is a relationship between persisted tooth members;
                the line is deliberately neutral and has no NTS meaning. -->
-          <template v-for="(bridge, index) in bridges" :key="index">
+          <template
+            v-for="(bridge, index) in bridges"
+            :key="index"
+          >
             <line
               v-for="(placement, placementIndex) in bridge.slice(1)"
               :key="`${placement.fdi}-${placementIndex}`"
@@ -145,7 +154,10 @@ function markerTitle(marker: ToothMarker) {
             />
           </template>
 
-          <template v-for="(toothMarkers, fdi) in markersByTooth" :key="fdi">
+          <template
+            v-for="(toothMarkers, fdi) in markersByTooth"
+            :key="fdi"
+          >
             <template v-if="toothPlacement(Number(fdi))">
               <rect
                 :x="toothPlacement(Number(fdi))!.crown.x"
@@ -167,7 +179,10 @@ function markerTitle(marker: ToothMarker) {
               >
                 <title>{{ markerTitle(marker) }}</title>
               </circle>
-              <template v-for="marker in toothMarkers" :key="`${marker.itemId}-surfaces`">
+              <template
+                v-for="marker in toothMarkers"
+                :key="`${marker.itemId}-surfaces`"
+              >
                 <circle
                   v-for="surface in marker.surfaces"
                   :key="surface"
@@ -183,7 +198,10 @@ function markerTitle(marker: ToothMarker) {
       </div>
     </div>
 
-    <p v-if="items.some(item => !item.treatment?.teeth?.length)" class="text-caption text-subtle">
+    <p
+      v-if="items.some(item => !item.treatment?.teeth?.length)"
+      class="text-caption text-subtle"
+    >
       Los tratamientos por arco, boca completa o sin una representación dental se mantienen en la lista del plan.
     </p>
   </section>
