@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- feat(odontogram): under the `pe_nts_188_2022` profile, the treatment plan
+  now uses the same 52-tooth, four-row NTS geometry as diagnosis.  The plan's
+  therapeutic overlay is a separate neutral projection of persisted plan
+  treatments; it does not reuse MINSA finding symbols or `NtsFindingLayer`.
+  Global/arch and unmapped treatments remain accessible in the plan list.
+
+- feat(odontogram): H1.2 restores the established planning workflow on the
+  NTS plan chart without changing the diagnosis renderer. It reuses
+  `TreatmentBar`, the surface selector, multi-tooth/bridge confirmation,
+  treatment editing and therapeutic state actions, global/arch treatments,
+  undo and the existing read-only guard. A plain tooth selection remains a
+  query/plan-list link; it never creates a treatment by itself. Plan
+  treatments remain therapeutic data, never NTS diagnostic findings, and the
+  chart does not reuse `NtsFindingLayer`.
+
 - feat: **`PlanDetailView` shows the diagnosis findings as a reference** (TASK-2026-00021). Mounts the odontogram layer's `NtsCurrentFindingsPanel` as the first element of the right column, above the treatment list. The panel is read-only, decides for itself whether to render (MINSA profile, `odontogram.read`) and keeps its failures to itself; nothing is persisted in this module, no `Treatment` is created or linked, and the plan model is unchanged.
 
 - security: scope treatment-plan patient, plan, item, session, and budget-link routes through the central patient access policy.

@@ -38,6 +38,12 @@ last_verified_commit: e1d6873
 
 # Detalle del plan de tratamiento
 
+> Con el perfil clínico `pe_nts_188_2022`, el odontograma del plan usa la
+> misma distribución de 52 piezas y cuatro filas que el diagnóstico MINSA.
+> Sus indicadores representan tratamientos del plan, no hallazgos MINSA; los
+> tratamientos de arco, boca completa o sin pieza siguen apareciendo en la
+> lista.
+
 Vista del plan: cabecera con paciente, profesional y estado;
 columna principal con los ítems (catálogo o tratamiento odontograma)
 y columna lateral con presupuesto enlazado, ejecuciones y contactos.
