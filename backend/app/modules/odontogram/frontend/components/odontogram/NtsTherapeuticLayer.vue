@@ -3,11 +3,15 @@
 import type { Surface } from '~~/app/types'
 import { getLateralIcon } from './LateralViewIcons'
 import { toothPlacement } from '../../utils/ntsChartGeometry'
-import { therapeuticInstructions } from '../../utils/therapeuticVisualization'
+import { therapeuticInstructions, type TherapeuticLayer } from '../../utils/therapeuticVisualization'
 
-const props = defineProps<{ fdi: number, snapshot: unknown, surfaces?: Surface[] | null, itemStatus: 'pending' | 'completed' | 'cancelled', treatmentStatus?: string, role?: 'pillar' | 'pontic' | null }>()
+const props = defineProps<{ fdi: number, snapshot: unknown, surfaces?: Surface[] | null, itemStatus: 'pending' | 'completed' | 'cancelled', treatmentStatus?: string, role?: 'pillar' | 'pontic' | null, layer?: TherapeuticLayer }>()
 const placement = computed(() => toothPlacement(props.fdi))
-const instructions = computed(() => props.itemStatus === 'cancelled' ? [] : therapeuticInstructions(props.snapshot))
+const instructions = computed(() => {
+  if (props.itemStatus === 'cancelled') return []
+  const all = therapeuticInstructions(props.snapshot)
+  return props.layer ? all.filter(instruction => instruction.layer === props.layer) : all
+})
 const opacity = computed(() => props.itemStatus === 'completed' || props.treatmentStatus === 'performed' ? 1 : 0.58)
 const id = computed(() => `therapy-pattern-${props.fdi}`)
 function surfacePoint(surface: Surface) {

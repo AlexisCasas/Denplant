@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- feat(H2.3): Plan therapeutic overlays now use a deterministic composition
+  order (surfaces, pulp, coverage, lateral icons, bridges, state decorators,
+  counters). Active overlapping treatments are preserved and expose a
+  per-tooth count; cancelled items remain available in history/detail but do
+  not contribute to that count. The contextual Plan-only legend lists only
+  symbols actually present.
+
 - feat(H2.2): Plan NTS chart now renders therapeutic snapshots through the
   reusable `NtsTherapeuticLayer`. It supports the four catalog layers
   (`pulp_fill`, `occlusal_surface`, `lateral_icon`, `cenital_pattern`), keeps

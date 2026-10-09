@@ -44,6 +44,12 @@ last_verified_commit: e1d6873
 > tratamientos de arco, boca completa o sin pieza siguen apareciendo en la
 > lista.
 
+> Cuando varias terapias vigentes coinciden en una pieza, el odontograma las
+> compone por capas y muestra un contador `+n`. Al seleccionar la pieza se
+> conservan todos sus tratamientos para consulta o edición según permisos. La
+> leyenda bajo el odontograma solo muestra los símbolos presentes en el plan;
+> los tratamientos cancelados se mantienen en el historial pero no cuentan.
+
 Vista del plan: cabecera con paciente, profesional y estado;
 columna principal con los ítems (catálogo o tratamiento odontograma)
 y columna lateral con presupuesto enlazado, ejecuciones y contactos.

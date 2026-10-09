@@ -43,6 +43,12 @@ last_verified_commit: e1d6873
 > plan treatments, not MINSA findings; arch, full-mouth, or toothless
 > treatments remain available in the plan list.
 
+> When multiple active therapies overlap on a tooth, the chart composes them
+> by layer and displays a `+n` count. Selecting the tooth preserves every
+> treatment for review or permitted editing. The legend below the chart lists
+> only symbols present in the plan; cancelled treatments remain in history but
+> are not counted.
+
 Plan view: header with patient, professional, and status; main
 column with the items (catalog or odontogram tooth treatment); and
 sidebar with the linked budget, executions, and contacts. This is

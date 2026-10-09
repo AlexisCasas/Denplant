@@ -16,6 +16,9 @@ import { NTS_ROWS } from '../../../../odontogram/frontend/utils/ntsDentition'
 import { NTS_CHART_HEIGHT, NTS_CHART_SCALE, NTS_CHART_VIEWBOX, NTS_CHART_WIDTH, toothPlacement } from '../../../../odontogram/frontend/utils/ntsChartGeometry'
 import NtsDentitionRow from '../../../../odontogram/frontend/components/odontogram/NtsDentitionRow.vue'
 import NtsTherapeuticLayer from '../../../../odontogram/frontend/components/odontogram/NtsTherapeuticLayer.vue'
+import TreatmentPlanVisualLegend from './TreatmentPlanVisualLegend.vue'
+import { activeTreatmentCount, isActivePlanMarker, orderedPlanMarkers, THERAPEUTIC_LAYER_ORDER } from '../../../../odontogram/frontend/utils/treatmentPlanComposition'
+import { therapeuticInstructions, type TherapeuticLayer } from '../../../../odontogram/frontend/utils/therapeuticVisualization'
 
 const props = withDefaults(defineProps<{
   items: PlannedTreatmentItem[]
@@ -53,6 +56,11 @@ type MarkerSurface = 'M' | 'D' | 'O' | 'V' | 'L'
 interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], treatmentStatus: string, snapshot: unknown, surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
 const markers = computed<ToothMarker[]>(() => props.items.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, treatmentStatus: item.treatment?.status ?? 'planned', snapshot: item.treatment?.visualization_snapshot ?? null, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
 const markersByTooth = computed(() => markers.value.reduce<Record<number, ToothMarker[]>>((byTooth, marker) => { ;(byTooth[marker.fdi] ??= []).push(marker); return byTooth }, {}))
+const orderedMarkersByTooth = computed(() => Object.fromEntries(Object.entries(markersByTooth.value).map(([fdi, toothMarkers]) => [fdi, orderedPlanMarkers(toothMarkers)])) as Record<number, ToothMarker[]>)
+const visibleTherapeuticLayers = computed<TherapeuticLayer[]>(() => THERAPEUTIC_LAYER_ORDER.filter(layer => markers.value.some(marker => isActivePlanMarker(marker) && therapeuticInstructions(marker.snapshot).some(instruction => instruction.layer === layer))))
+const hasMultipleTreatments = computed(() => Object.values(markersByTooth.value).some(toothMarkers => activeTreatmentCount(toothMarkers) > 1))
+const hasCompletedMarkers = computed(() => markers.value.some(marker => marker.status === 'completed' || marker.treatmentStatus === 'performed'))
+const hasPendingMarkers = computed(() => markers.value.some(marker => isActivePlanMarker(marker) && marker.status === 'pending' && marker.treatmentStatus !== 'performed'))
 const bridges = computed(() => props.items.filter(item => item.treatment?.clinical_type === 'bridge').map(item => (item.treatment?.teeth ?? []).map(tooth => tooth.tooth_number).map(toothPlacement).filter((placement): placement is NonNullable<typeof placement> => placement !== null)).filter(placements => placements.length > 1))
 const planTreatmentIds = computed(() => new Set(props.items.map(item => item.treatment_id)))
 const planTreatments = computed(() => treatments.value.filter(treatment => planTreatmentIds.value.has(treatment.id)))
@@ -174,60 +182,99 @@ defineExpose({ refetchTreatments })
           aria-hidden="true"
           focusable="false"
           data-testid="nts-plan-chart-overlay"
-        ><template
-          v-for="(bridge, index) in bridges"
-          :key="index"
-        ><line
-          v-for="(placement, placementIndex) in bridge.slice(1)"
-          :key="`${placement.fdi}-${placementIndex}`"
-          :x1="bridge[placementIndex]?.center.x"
-          :y1="bridge[placementIndex]?.center.y"
-          :x2="placement.center.x"
-          :y2="placement.center.y"
-          stroke="var(--color-primary-500)"
-          stroke-width="2"
-          stroke-dasharray="3 2"
-        /></template><template
-          v-for="(toothMarkers, fdi) in markersByTooth"
-          :key="fdi"
-        ><template v-if="toothPlacement(Number(fdi))"><NtsTherapeuticLayer
-          v-for="marker in toothMarkers"
-          :key="`therapy-${marker.itemId}`"
-          :fdi="marker.fdi"
-          :snapshot="marker.snapshot"
-          :surfaces="marker.surfaces"
-          :item-status="marker.status"
-          :treatment-status="marker.treatmentStatus"
-          :role="marker.role"
-        /><rect
-          :x="toothPlacement(Number(fdi))!.crown.x"
-          :y="toothPlacement(Number(fdi))!.crown.y"
-          :width="toothPlacement(Number(fdi))!.crown.width"
-          :height="toothPlacement(Number(fdi))!.crown.height"
-          rx="2"
-          fill="none"
-          :stroke="markerTone(toothMarkers[0]!)"
-          stroke-width="1.5"
-        /><circle
-          v-for="(marker, markerIndex) in toothMarkers"
-          :key="marker.itemId"
-          :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 5 - markerIndex * 6"
-          :cy="toothPlacement(Number(fdi))!.annotation.y + 6"
-          r="2.5"
-          :fill="markerTone(marker)"
-        ><title>{{ markerTitle(marker) }}</title></circle><template
-          v-for="marker in toothMarkers"
-          :key="`${marker.itemId}-surfaces`"
-        ><circle
-          v-for="surface in marker.surfaces"
-          :key="surface"
-          :cx="surfacePoint(marker, surface)?.x"
-          :cy="surfacePoint(marker, surface)?.y"
-          r="1.8"
-          :fill="markerTone(marker)"
-        /></template></template></template></svg>
+        >
+          <template
+            v-for="layer in THERAPEUTIC_LAYER_ORDER"
+            :key="layer"
+          >
+            <template
+              v-for="(toothMarkers, fdi) in orderedMarkersByTooth"
+              :key="fdi"
+            >
+              <NtsTherapeuticLayer
+                v-for="marker in toothMarkers"
+                :key="`therapy-${layer}-${marker.itemId}`"
+                :fdi="marker.fdi"
+                :snapshot="marker.snapshot"
+                :surfaces="marker.surfaces"
+                :item-status="marker.status"
+                :treatment-status="marker.treatmentStatus"
+                :role="marker.role"
+                :layer="layer"
+              />
+            </template>
+          </template>
+          <template
+            v-for="(bridge, index) in bridges"
+            :key="index"
+          >
+            <line
+              v-for="(placement, placementIndex) in bridge.slice(1)"
+              :key="`${placement.fdi}-${placementIndex}`"
+              :x1="bridge[placementIndex]?.center.x"
+              :y1="bridge[placementIndex]?.center.y"
+              :x2="placement.center.x"
+              :y2="placement.center.y"
+              stroke="var(--color-primary-500)"
+              stroke-width="2"
+              stroke-dasharray="3 2"
+            />
+          </template>
+          <template
+            v-for="(toothMarkers, fdi) in orderedMarkersByTooth"
+            :key="fdi"
+          ><template v-if="toothPlacement(Number(fdi))"><rect
+            :x="toothPlacement(Number(fdi))!.crown.x"
+            :y="toothPlacement(Number(fdi))!.crown.y"
+            :width="toothPlacement(Number(fdi))!.crown.width"
+            :height="toothPlacement(Number(fdi))!.crown.height"
+            rx="2"
+            fill="none"
+            :stroke="markerTone(toothMarkers[0]!)"
+            stroke-width="1.5"
+          /><circle
+            v-for="(marker, markerIndex) in toothMarkers"
+            :key="marker.itemId"
+            :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 5 - markerIndex * 6"
+            :cy="toothPlacement(Number(fdi))!.annotation.y + 6"
+            r="2.5"
+            :fill="markerTone(marker)"
+          ><title>{{ markerTitle(marker) }}</title></circle><template
+            v-for="marker in toothMarkers"
+            :key="`${marker.itemId}-surfaces`"
+          ><circle
+            v-for="surface in marker.surfaces"
+            :key="surface"
+            :cx="surfacePoint(marker, surface)?.x"
+            :cy="surfacePoint(marker, surface)?.y"
+            r="1.8"
+            :fill="markerTone(marker)"
+          /></template><g
+            v-if="activeTreatmentCount(toothMarkers) > 1"
+            data-testid="nts-plan-treatment-count"
+            :aria-label="`${activeTreatmentCount(toothMarkers)} tratamientos vigentes en la pieza ${fdi}`"
+          ><circle
+            :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
+            :cy="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 3"
+            r="5"
+            fill="var(--color-primary-700)"
+          /><text
+            :x="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
+            :y="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 1.5"
+            text-anchor="middle"
+            font-size="6"
+            fill="white"
+          >{{ activeTreatmentCount(toothMarkers) }}</text></g></template></template></svg>
       </div>
     </div>
+    <TreatmentPlanVisualLegend
+      :layers="visibleTherapeuticLayers"
+      :has-bridge="bridges.length > 0"
+      :has-global="items.some(item => !item.treatment?.teeth?.length)"
+      :has-multiple="hasMultipleTreatments"
+      :has-completed="hasCompletedMarkers"
+      :has-pending="hasPendingMarkers"
+    />
     <GlobalTreatmentsStrip
       v-if="patientId"
       :treatments="planTreatments"

@@ -67,7 +67,8 @@ describe('H1 — odontograma NTS del plan', () => {
         teeth: [{ tooth_number: 16, surfaces: [], role: null }]
       } })
     ])
-    expect(wrapper.findAll('circle')).toHaveLength(3)
+    expect(wrapper.findAll('circle')).toHaveLength(4)
+    expect(wrapper.find('[data-testid="nts-plan-treatment-count"]').text()).toBe('2')
   })
 
   it('renders the historical therapeutic snapshot layers without changing NTS geometry', async () => {

@@ -59,7 +59,12 @@ missing, partial or unsupported snapshot emits no therapeutic instructions, so
 the existing generic Plan marker remains visible. Cancelled plan items emit no
 therapeutic layer; pending is translucent and completed/performed is opaque.
 The base NTS geometry, MINSA findings, and clinical selection flows are not
-owned by this renderer. Advanced collision composition remains H2.3 work.
+owned by this renderer. H2.3 composes overlays independently of API arrival:
+surfaces, pulp, coverage, lateral icons, bridge connectors, state decorators,
+then an accessible active-treatment counter. `cancelled` plan items remain in
+detail/history but are excluded from the active counter. The contextual Plan
+legend is derived from the layers, bridges, global treatments and states that
+are actually visible; it never uses the diagnostic MINSA legend.
 
 ## Frontend
 
