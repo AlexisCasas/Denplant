@@ -5,8 +5,6 @@ last_verified_commit: 0000000
 
 # Odontogram — technical overview
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
-
 Auto-discovered facts about the `odontogram` module. See the module's
 own notes at `backend/app/modules/odontogram/CLAUDE.md` for context
 the scaffold could not infer.
@@ -29,6 +27,29 @@ the scaffold could not infer.
 - `POST /api/v1/odontogram/patients/{patient_id}/treatments`
 - `PUT /api/v1/odontogram/patients/{patient_id}/teeth/{tooth_number}`
 - `PUT /api/v1/odontogram/treatments/{treatment_id}`
+
+## Therapeutic visualization snapshots
+
+`TreatmentOdontogramMapping` remains clinic-local catalog configuration. When
+the odontogram creates a treatment from a mapped catalog item, it copies the
+effective therapeutic representation into `treatments.visualization_snapshot`:
+
+```json
+{
+  "schema_version": 1,
+  "odontogram_treatment_type": "crown",
+  "visualization_rules": [{"layer": "cenital_pattern", "pattern": "diagonal_stripes", "color": "#F59E0B"}],
+  "visualization_config": {"color": "#F59E0B"},
+  "clinical_category": "restauradora"
+}
+```
+
+The value is immutable after creation. Catalog price, mapping, status and
+session changes must not alter it. `TreatmentResponse` and the nested
+`treatment_plan.TreatmentBrief` expose it as `visualization_snapshot`.
+Treatments created before migration `odo_0005`, and valid treatments without a
+catalog mapping, expose `null`; clients must preserve their existing fallback
+instead of interpreting current catalog configuration as historical truth.
 
 ## Frontend
 

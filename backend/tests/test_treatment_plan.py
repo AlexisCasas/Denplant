@@ -136,6 +136,27 @@ async def _create_plan_with_items(
     return plan_id, item_ids
 
 
+@pytest.mark.asyncio
+async def test_plan_treatment_brief_exposes_visualization_snapshot(
+    client: AsyncClient, auth_headers: dict, setup: dict
+) -> None:
+    """Plan detail preserves the treatment's immutable visual API contract."""
+    plan_id, _ = await _create_plan_with_items(client, auth_headers, setup, [16])
+
+    response = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}", headers=auth_headers
+    )
+    assert response.status_code == 200, response.text
+    snapshot = response.json()["data"]["items"][0]["treatment"]["visualization_snapshot"]
+    assert snapshot == {
+        "schema_version": 1,
+        "odontogram_treatment_type": "crown",
+        "visualization_rules": [],
+        "visualization_config": {},
+        "clinical_category": "restauradora",
+    }
+
+
 async def _sync(db_session: AsyncSession) -> None:
     """Commit the test session and drop cached ORM state.
 
