@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- feat(H2.2): Plan NTS chart now renders therapeutic snapshots through the
+  reusable `NtsTherapeuticLayer`. It supports the four catalog layers
+  (`pulp_fill`, `occlusal_surface`, `lateral_icon`, `cenital_pattern`), keeps
+  historical `null`/unknown snapshots on the H1.2 generic fallback, and never
+  renders MINSA findings.
+
 - feat(H2.1): capture an immutable `visualization_snapshot` on each new
   catalog-backed treatment. The nullable JSONB records the mapping's schema
   version, clinical type, rules, configuration and category at creation time;

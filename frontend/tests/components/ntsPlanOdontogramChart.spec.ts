@@ -8,6 +8,7 @@ import { nextTick } from 'vue'
 import NtsPlanOdontogramChart from '../../../backend/app/modules/treatment_plan/frontend/components/clinical/NtsPlanOdontogramChart.vue'
 import { NTS_ROWS } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import { NTS_CHART_VIEWBOX, toothPlacement } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
+import { therapeuticInstructions } from '../../../backend/app/modules/odontogram/frontend/utils/therapeuticVisualization'
 
 const chartSource = readFileSync(
   resolve(process.cwd(), '../backend/app/modules/treatment_plan/frontend/components/clinical/NtsPlanOdontogramChart.vue'),
@@ -67,6 +68,36 @@ describe('H1 — odontograma NTS del plan', () => {
       } })
     ])
     expect(wrapper.findAll('circle')).toHaveLength(3)
+  })
+
+  it('renders the historical therapeutic snapshot layers without changing NTS geometry', async () => {
+    const wrapper = await mountChart([item({ treatment: {
+      id: 'therapy-1', clinical_type: 'crown', scope: 'tooth', status: 'performed',
+      visualization_snapshot: {
+        schema_version: 1,
+        odontogram_treatment_type: 'crown',
+        visualization_rules: [
+          { layer: 'pulp_fill', color: '#7C3AED', extent: 'full' },
+          { layer: 'occlusal_surface', color: '#3B82F6', kind: 'solid_fill' },
+          { layer: 'lateral_icon', icon: 'implant', color: '#22C55E' },
+          { layer: 'cenital_pattern', pattern: 'diagonal_stripes', color: '#F59E0B' }
+        ], visualization_config: {}, clinical_category: 'restauradora'
+      },
+      teeth: [{ tooth_number: 16, surfaces: ['M', 'D', 'O', 'V', 'L'], role: 'pillar' }]
+    } })])
+    expect(wrapper.findAll('[data-testid="nts-therapy-pulp"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-testid="nts-therapy-surface"]')).toHaveLength(5)
+    expect(wrapper.findAll('[data-testid="nts-therapy-icon"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-testid="nts-therapy-pattern"]')).toHaveLength(1)
+    expect(wrapper.find('[data-role="pillar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-plan-chart-overlay"]').attributes('viewBox')).toBe(NTS_CHART_VIEWBOX)
+  })
+
+  it('keeps generic H1.2 markers for null, partial, unknown and future snapshots', () => {
+    expect(therapeuticInstructions(null)).toEqual([])
+    expect(therapeuticInstructions({ schema_version: 2, visualization_rules: [] })).toEqual([])
+    expect(therapeuticInstructions({ schema_version: 1, visualization_rules: [{ layer: 'unknown' }] })).toEqual([])
+    expect(therapeuticInstructions({ schema_version: 1, visualization_rules: [{ layer: 'occlusal_surface' }] })).toEqual([{ layer: 'occlusal_surface', color: undefined, kind: undefined, extent: undefined, icon: undefined, pattern: undefined }])
   })
 
   it('emits a tooth selection for plan/list linking', async () => {

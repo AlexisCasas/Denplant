@@ -15,6 +15,7 @@ import { useTreatmentPlans } from '../../composables/useTreatmentPlans'
 import { NTS_ROWS } from '../../../../odontogram/frontend/utils/ntsDentition'
 import { NTS_CHART_HEIGHT, NTS_CHART_SCALE, NTS_CHART_VIEWBOX, NTS_CHART_WIDTH, toothPlacement } from '../../../../odontogram/frontend/utils/ntsChartGeometry'
 import NtsDentitionRow from '../../../../odontogram/frontend/components/odontogram/NtsDentitionRow.vue'
+import NtsTherapeuticLayer from '../../../../odontogram/frontend/components/odontogram/NtsTherapeuticLayer.vue'
 
 const props = withDefaults(defineProps<{
   items: PlannedTreatmentItem[]
@@ -49,8 +50,8 @@ const showTreatmentEditModal = ref(false)
 const undoStack = ref<string[]>([])
 
 type MarkerSurface = 'M' | 'D' | 'O' | 'V' | 'L'
-interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
-const markers = computed<ToothMarker[]>(() => props.items.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
+interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], treatmentStatus: string, snapshot: unknown, surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
+const markers = computed<ToothMarker[]>(() => props.items.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, treatmentStatus: item.treatment?.status ?? 'planned', snapshot: item.treatment?.visualization_snapshot ?? null, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
 const markersByTooth = computed(() => markers.value.reduce<Record<number, ToothMarker[]>>((byTooth, marker) => { ;(byTooth[marker.fdi] ??= []).push(marker); return byTooth }, {}))
 const bridges = computed(() => props.items.filter(item => item.treatment?.clinical_type === 'bridge').map(item => (item.treatment?.teeth ?? []).map(tooth => tooth.tooth_number).map(toothPlacement).filter((placement): placement is NonNullable<typeof placement> => placement !== null)).filter(placements => placements.length > 1))
 const planTreatmentIds = computed(() => new Set(props.items.map(item => item.treatment_id)))
@@ -189,7 +190,16 @@ defineExpose({ refetchTreatments })
         /></template><template
           v-for="(toothMarkers, fdi) in markersByTooth"
           :key="fdi"
-        ><template v-if="toothPlacement(Number(fdi))"><rect
+        ><template v-if="toothPlacement(Number(fdi))"><NtsTherapeuticLayer
+          v-for="marker in toothMarkers"
+          :key="`therapy-${marker.itemId}`"
+          :fdi="marker.fdi"
+          :snapshot="marker.snapshot"
+          :surfaces="marker.surfaces"
+          :item-status="marker.status"
+          :treatment-status="marker.treatmentStatus"
+          :role="marker.role"
+        /><rect
           :x="toothPlacement(Number(fdi))!.crown.x"
           :y="toothPlacement(Number(fdi))!.crown.y"
           :width="toothPlacement(Number(fdi))!.crown.width"
