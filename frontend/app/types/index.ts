@@ -493,6 +493,15 @@ export interface TreatmentCatalogItemBrief {
   default_price?: string | null
 }
 
+/** Historical therapeutic rendering captured with a treatment. */
+export interface TreatmentVisualizationSnapshot {
+  schema_version: 1
+  odontogram_treatment_type: string
+  visualization_rules: VisualizationRuleLayer[]
+  visualization_config: Record<string, unknown>
+  clinical_category: string
+}
+
 /** Treatment = one clinical act. Bridges, splints and multiple-veneers/crowns are
  *  a single Treatment with several TreatmentTooth entries. Globals have empty teeth. */
 export interface Treatment {
@@ -511,6 +520,7 @@ export interface Treatment {
   price_snapshot?: string | null
   duration_snapshot?: number | null
   vat_rate_snapshot?: string | null
+  visualization_snapshot?: TreatmentVisualizationSnapshot | null
   budget_item_id?: string | null
   notes?: string | null
   source_module: string
@@ -2119,6 +2129,7 @@ export interface TreatmentBrief {
   catalog_item_id?: string | null
   catalog_item?: TreatmentCatalogItemBrief | null
   price_snapshot?: string | null
+  visualization_snapshot?: TreatmentVisualizationSnapshot | null
   notes?: string | null
   teeth: Array<{
     tooth_number: number

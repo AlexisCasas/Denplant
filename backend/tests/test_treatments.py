@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
@@ -127,14 +128,19 @@ async def _seed_catalog_items(db_session: AsyncSession, clinic_id) -> dict:
         (cleaning, "caries"),  # arbitrary visual type; cleaning has no dedicated rule
         (splint, "splint"),
     ):
+        rules = (
+            [{"layer": "occlusal_surface", "color": "#3B82F6", "kind": "solid_fill"}]
+            if otype == "filling_composite"
+            else [{"layer": "cenital_pattern", "pattern": "diagonal_stripes", "color": "#F59E0B"}]
+        )
         db_session.add(
             TreatmentOdontogramMapping(
                 clinic_id=clinic_id,
                 catalog_item_id=item.id,
                 odontogram_treatment_type=otype,
                 clinical_category="restauradora",
-                visualization_rules=[],
-                visualization_config={},
+                visualization_rules=rules,
+                visualization_config={"color": rules[0]["color"]},
             )
         )
     await db_session.commit()
@@ -182,6 +188,15 @@ async def test_create_single_tooth_filling_with_surfaces(
     assert data["clinical_type"] == "filling_composite"
     assert data["status"] == "performed"
     assert data["price_snapshot"] == "80.00"
+    assert data["visualization_snapshot"] == {
+        "schema_version": 1,
+        "odontogram_treatment_type": "filling_composite",
+        "visualization_rules": [
+            {"layer": "occlusal_surface", "color": "#3B82F6", "kind": "solid_fill"}
+        ],
+        "visualization_config": {"color": "#3B82F6"},
+        "clinical_category": "restauradora",
+    }
     assert len(data["teeth"]) == 1
     assert data["teeth"][0]["surfaces"] == ["M", "O"]
 
@@ -214,6 +229,116 @@ async def test_catalog_price_change_does_not_change_existing_treatment_snapshot(
     treatment = await db_session.get(Treatment, treatment_id)
     assert treatment is not None
     assert treatment.price_snapshot == Decimal("180.00")
+
+
+@pytest.mark.asyncio
+async def test_visualization_snapshot_is_immutable_after_mapping_and_status_changes(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, setup: dict
+) -> None:
+    """Clinical history keeps its visual contract after catalog edits and performance."""
+    response = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"catalog_item_id": setup["filling_id"], "tooth_numbers": [16], "status": "planned"},
+    )
+    assert response.status_code == 201, response.text
+    treatment_id = response.json()["data"]["id"]
+    original_data = response.json()["data"]
+    original = original_data["visualization_snapshot"]
+    financial_snapshot = {
+        key: original_data[key]
+        for key in ("price_snapshot", "duration_snapshot", "vat_rate_snapshot")
+    }
+
+    mapping = (
+        await db_session.execute(
+            select(TreatmentOdontogramMapping).where(
+                TreatmentOdontogramMapping.catalog_item_id == UUID(setup["filling_id"])
+            )
+        )
+    ).scalar_one()
+    mapping.visualization_rules = [
+        {"layer": "cenital_pattern", "pattern": "dots", "color": "#000000"}
+    ]
+    mapping.visualization_config = {"color": "#000000"}
+    await db_session.flush()
+
+    updated = await client.put(
+        f"/api/v1/odontogram/treatments/{treatment_id}",
+        headers=auth_headers,
+        json={"status": "performed"},
+    )
+    assert updated.status_code == 200, updated.text
+    data = updated.json()["data"]
+    assert data["status"] == "performed"
+    assert data["visualization_snapshot"] == original
+    for key, value in financial_snapshot.items():
+        assert data[key] is None if value is None else Decimal(str(data[key])) == Decimal(str(value))
+
+
+@pytest.mark.asyncio
+async def test_treatment_without_catalog_mapping_returns_null_visualization_snapshot(
+    client: AsyncClient, auth_headers: dict, setup: dict
+) -> None:
+    """Legacy diagnostic-style creation remains valid without a catalog mapping."""
+    response = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"clinical_type": "caries", "tooth_numbers": [17], "status": "planned"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["data"]["visualization_snapshot"] is None
+
+
+@pytest.mark.asyncio
+async def test_foreign_clinic_catalog_mapping_is_rejected(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, setup: dict
+) -> None:
+    """A clinic cannot create a treatment from another clinic's mapped catalog item."""
+    other_clinic = Clinic(
+        id=uuid4(),
+        name="Other Clinic",
+        tax_id="B88888888",
+        address={"street": "y", "city": "z"},
+        settings={"slot_duration_min": 15},
+    )
+    db_session.add(other_clinic)
+    await db_session.flush()
+    category = TreatmentCategory(
+        clinic_id=other_clinic.id,
+        key="other-restauradora",
+        names={"es": "Restauradora"},
+        is_system=True,
+    )
+    db_session.add(category)
+    await db_session.flush()
+    item = TreatmentCatalogItem(
+        clinic_id=other_clinic.id,
+        category_id=category.id,
+        internal_code="OTHER-FILL",
+        names={"es": "Empaste ajeno"},
+        default_price=Decimal("90.00"),
+    )
+    db_session.add(item)
+    await db_session.flush()
+    db_session.add(
+        TreatmentOdontogramMapping(
+            clinic_id=other_clinic.id,
+            catalog_item_id=item.id,
+            odontogram_treatment_type="filling_composite",
+            clinical_category="restauradora",
+            visualization_rules=[],
+            visualization_config={},
+        )
+    )
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"catalog_item_id": str(item.id), "tooth_numbers": [16], "status": "planned"},
+    )
+    assert response.status_code == 400
 
 
 def test_agenda_price_fallback_uses_catalog_only_without_a_snapshot() -> None:

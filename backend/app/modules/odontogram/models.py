@@ -121,6 +121,12 @@ class Treatment(Base, TimestampMixin):
     duration_snapshot: Mapped[int | None] = mapped_column(Integer)
     vat_rate_snapshot: Mapped[float | None] = mapped_column(Numeric(5, 2))
 
+    # Visual snapshot (frozen at creation; decouples therapeutic rendering from
+    # later edits to the clinic's catalog mapping).  NULL is the compatible
+    # representation for treatments created before this field existed and for
+    # valid treatments that have no catalog odontogram mapping.
+    visualization_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     # Budget / invoicing integration
     budget_item_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True))
 

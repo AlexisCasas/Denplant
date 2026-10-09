@@ -1,5 +1,6 @@
 """Business logic service for odontogram module."""
 
+from copy import deepcopy
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -32,6 +33,9 @@ from .models import (
     Treatment,
     TreatmentTooth,
 )
+from .schemas import TreatmentVisualizationSnapshot
+
+VISUALIZATION_SNAPSHOT_SCHEMA_VERSION = 1
 
 
 def build_treatment_response(treatment: Treatment) -> dict:
@@ -79,6 +83,7 @@ def build_treatment_response(treatment: Treatment) -> dict:
         "price_snapshot": treatment.price_snapshot,
         "duration_snapshot": treatment.duration_snapshot,
         "vat_rate_snapshot": treatment.vat_rate_snapshot,
+        "visualization_snapshot": treatment.visualization_snapshot,
         "budget_item_id": treatment.budget_item_id,
         "notes": treatment.notes,
         "source_module": treatment.source_module,
@@ -594,6 +599,34 @@ class TreatmentService:
         return explicit
 
     @staticmethod
+    def _build_visualization_snapshot(
+        catalog_item: TreatmentCatalogItem | None,
+        clinic_id: UUID,
+    ) -> dict | None:
+        """Capture a self-contained mapping for one newly-created treatment.
+
+        A catalog mapping is clinic-owned configuration.  Its values are copied
+        into the treatment instead of referenced, so later catalog edits cannot
+        reinterpret clinical history.  Treatments without a mapping remain
+        valid and intentionally retain a ``NULL`` snapshot.
+        """
+        if catalog_item is None or catalog_item.odontogram_mapping is None:
+            return None
+
+        mapping: TreatmentOdontogramMapping = catalog_item.odontogram_mapping
+        if catalog_item.clinic_id != clinic_id or mapping.clinic_id != clinic_id:
+            raise ValueError("Catalog odontogram mapping does not belong to the clinic")
+
+        snapshot = TreatmentVisualizationSnapshot(
+            schema_version=VISUALIZATION_SNAPSHOT_SCHEMA_VERSION,
+            odontogram_treatment_type=mapping.odontogram_treatment_type,
+            visualization_rules=deepcopy(mapping.visualization_rules or []),
+            visualization_config=deepcopy(mapping.visualization_config or {}),
+            clinical_category=mapping.clinical_category,
+        )
+        return snapshot.model_dump(mode="json")
+
+    @staticmethod
     def _build_teeth_inputs(
         tooth_numbers: list[int],
         teeth: list | None,
@@ -668,6 +701,9 @@ class TreatmentService:
         resolved_clinical_type = TreatmentService._resolve_clinical_type(
             clinical_type, catalog_item
         )
+        visualization_snapshot = TreatmentService._build_visualization_snapshot(
+            catalog_item, clinic_id
+        )
 
         # 2. Normalize teeth input + assign roles for bridges.
         teeth_inputs = TreatmentService._build_teeth_inputs(tooth_numbers, teeth, common_surfaces)
@@ -708,6 +744,7 @@ class TreatmentService:
             price_snapshot=price_snapshot,
             duration_snapshot=duration_snapshot,
             vat_rate_snapshot=vat_rate_snapshot,
+            visualization_snapshot=visualization_snapshot,
             budget_item_id=budget_item_id,
             notes=notes,
             source_module=source_module,

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- feat(H2.3): Plan therapeutic overlays now use a deterministic composition
+  order (surfaces, pulp, coverage, lateral icons, bridges, state decorators,
+  counters). Active overlapping treatments are preserved and expose a
+  per-tooth count; cancelled items remain available in history/detail but do
+  not contribute to that count. The contextual Plan-only legend lists only
+  symbols actually present.
+
+- feat(H2.2): Plan NTS chart now renders therapeutic snapshots through the
+  reusable `NtsTherapeuticLayer`. It supports the four catalog layers
+  (`pulp_fill`, `occlusal_surface`, `lateral_icon`, `cenital_pattern`), keeps
+  historical `null`/unknown snapshots on the H1.2 generic fallback, and never
+  renders MINSA findings.
+
+- feat(H2.1): capture an immutable `visualization_snapshot` on each new
+  catalog-backed treatment. The nullable JSONB records the mapping's schema
+  version, clinical type, rules, configuration and category at creation time;
+  historical and unmapped treatments return `null` for backward compatibility.
+
 - feat(nts): **record a finding by clicking a tooth** (TASK-2026-00022). With a draft open for editing, the editor closed, nothing writing and `odontogram.write`, a click on a tooth opens a small dialog (`NtsToothFindingEntry`: "Registrar hallazgo — Pieza N", reusing `NtsFindingPicker`). Choosing a rule runs the existing editor calls — `startCreate()`, `selectRule()`, `pickTooth(fdi, rowOrder)` — so the tooth is already selected and the editor opens as usual; nothing is sent until the editor's own Save. `useNtsFindingEditor` is unchanged, and "+ Agregar hallazgo" is untouched and still offers the whole catalog.
   - **Which rules.** `isContextualRuleSupported` (`utils/ntsContextualRules.ts`): `usesToothSelection(rule)` (so no arch-scoped rule and no rule whose subject has no FDI number) and not a `multi_segment` range (`range_grouping`) — the editor builds one segment, so it cannot represent one. Metadata only; no rule id appears anywhere. A surface is still an attribute: the click selects the whole tooth and never infers a surface from the SVG region.
   - **Scroll.** Once the rule's targets are structurally complete (no `editor.problems`; a range additionally needs its span, since the editor builds it with a second click) the editor scrolls into view (`block: 'nearest'`, smooth unless the user prefers reduced motion). A pair or range that still needs the chart does not scroll.
