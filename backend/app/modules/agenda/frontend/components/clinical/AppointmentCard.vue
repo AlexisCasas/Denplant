@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
 import { parseWallClock } from '~~/app/utils/wallClock'
+import { labelTextColor } from '../../utils/appointmentLabels'
 
 interface Cabinet {
   id?: string
@@ -145,13 +146,6 @@ const cardStyle = computed(() => ({
   borderLeftWidth: '4px',
   borderLeftStyle: 'solid' as const
 }))
-
-function labelTextColor(hex: string): string {
-  const rgb = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255)
-  const luminance = rgb.map(value => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
-    .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0)
-  return luminance > 0.45 ? '#111827' : '#FFFFFF'
-}
 </script>
 
 <template>

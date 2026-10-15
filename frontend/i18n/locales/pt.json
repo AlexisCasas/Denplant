@@ -1219,7 +1219,7 @@
     "selectPendingTreatment": "Selecionar tratamento pendente",
     "emptyDay": "Sem consultas para este dia",
     "noPatient": "Sem paciente",
-    "labels": { "title": "Etiquetas", "field": "Etiqueta", "none": "Sem etiqueta", "new": "Nova etiqueta", "edit": "Editar etiqueta", "name": "Nome", "color": "Cor", "preview": "Pré-visualização", "saved": "Etiqueta guardada", "saveError": "Não foi possível guardar a etiqueta", "deactivated": "Etiqueta desativada", "deactivate": "Desativar etiqueta", "inactive": "Inativa", "empty": "Não há etiquetas" },
+    "labels": { "title": "Etiquetas", "field": "Etiqueta", "none": "Sem etiqueta", "new": "Nova etiqueta", "edit": "Editar etiqueta", "name": "Nome", "color": "Cor", "preview": "Pré-visualização", "saved": "Etiqueta guardada", "saveError": "Não foi possível guardar a etiqueta", "deactivated": "Etiqueta desativada", "deactivate": "Desativar etiqueta", "inactive": "Inativa", "empty": "Não há etiquetas", "loadSuggested": "Carregar etiquetas sugeridas", "suggestedConfirm": "Carregar as etiquetas sugeridas em falta? As existentes não serão alteradas.", "suggestedResult": "Criadas: {created}. Existentes: {existing}. Erros: {errors}." },
     "freeSlots": {
       "byProfessional": "Profissional",
       "byCabinet": "Gabinete",

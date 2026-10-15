@@ -1219,7 +1219,7 @@
     "selectPendingTreatment": "Select pending treatment",
     "emptyDay": "No appointments for this day",
     "noPatient": "No patient",
-    "labels": { "title": "Labels", "field": "Label", "none": "No label", "new": "New label", "edit": "Edit label", "name": "Name", "color": "Color", "preview": "Preview", "saved": "Label saved", "saveError": "Could not save label", "deactivated": "Label deactivated", "deactivate": "Deactivate label", "inactive": "Inactive", "empty": "No labels" },
+    "labels": { "title": "Labels", "field": "Label", "none": "No label", "new": "New label", "edit": "Edit label", "name": "Name", "color": "Color", "preview": "Preview", "saved": "Label saved", "saveError": "Could not save label", "deactivated": "Label deactivated", "deactivate": "Deactivate label", "inactive": "Inactive", "empty": "No labels", "loadSuggested": "Load suggested labels", "suggestedConfirm": "Load the missing suggested labels? Existing labels will not be changed.", "suggestedResult": "Created: {created}. Existing: {existing}. Errors: {errors}." },
     "freeSlots": {
       "byProfessional": "Professional",
       "byCabinet": "Cabinet",

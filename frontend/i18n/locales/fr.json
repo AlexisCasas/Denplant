@@ -1219,7 +1219,7 @@
     "selectPendingTreatment": "Sélectionner un traitement en attente",
     "emptyDay": "Aucun rendez-vous pour ce jour",
     "noPatient": "Aucun patient",
-    "labels": { "title": "Étiquettes", "field": "Étiquette", "none": "Sans étiquette", "new": "Nouvelle étiquette", "edit": "Modifier l’étiquette", "name": "Nom", "color": "Couleur", "preview": "Aperçu", "saved": "Étiquette enregistrée", "saveError": "Impossible d’enregistrer l’étiquette", "deactivated": "Étiquette désactivée", "deactivate": "Désactiver l’étiquette", "inactive": "Inactive", "empty": "Aucune étiquette" },
+    "labels": { "title": "Étiquettes", "field": "Étiquette", "none": "Sans étiquette", "new": "Nouvelle étiquette", "edit": "Modifier l’étiquette", "name": "Nom", "color": "Couleur", "preview": "Aperçu", "saved": "Étiquette enregistrée", "saveError": "Impossible d’enregistrer l’étiquette", "deactivated": "Étiquette désactivée", "deactivate": "Désactiver l’étiquette", "inactive": "Inactive", "empty": "Aucune étiquette", "loadSuggested": "Charger les étiquettes suggérées", "suggestedConfirm": "Charger les étiquettes suggérées manquantes ? Les étiquettes existantes ne seront pas modifiées.", "suggestedResult": "Créées : {created}. Existantes : {existing}. Erreurs : {errors}." },
     "freeSlots": {
       "byProfessional": "Professionnel",
       "byCabinet": "Cabinet",

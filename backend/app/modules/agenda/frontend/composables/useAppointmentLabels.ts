@@ -1,4 +1,5 @@
 import type { ApiResponse, Appointment, AppointmentLabel } from '~~/app/types'
+import { missingSuggestedLabels, SUGGESTED_APPOINTMENT_LABELS } from '../utils/appointmentLabels'
 
 export function useAppointmentLabels() {
   const api = useApi()
@@ -52,5 +53,25 @@ export function useAppointmentLabels() {
     return response.data
   }
 
-  return { labels: readonly(labels), fetchLabels, saveLabel, deactivateLabel }
+  async function loadSuggestedLabels(): Promise<{ created: number, existing: number, errors: number }> {
+    if (!labels.value.length) await fetchLabels()
+    const missing = missingSuggestedLabels(labels.value.map(label => label.name))
+    let created = 0
+    let existing = 0
+    let errors = 0
+    existing = SUGGESTED_APPOINTMENT_LABELS.length - missing.length
+    for (const suggestion of missing) {
+      try {
+        await saveLabel(suggestion)
+        created++
+      } catch {
+        // A parallel creation can race the pre-check. Treat it as an error
+        // in the summary rather than altering pre-existing clinic data.
+        errors++
+      }
+    }
+    return { created, existing, errors }
+  }
+
+  return { labels: readonly(labels), fetchLabels, saveLabel, deactivateLabel, loadSuggestedLabels }
 }

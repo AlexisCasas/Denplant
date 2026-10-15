@@ -2,13 +2,14 @@
 import type { AppointmentLabel } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
 import { errorMessage } from '~~/app/utils/error'
+import { labelTextColor } from '../../utils/appointmentLabels'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const { t } = useI18n()
 const toast = useToast()
 const { can } = usePermissions()
-const { labels, fetchLabels, saveLabel, deactivateLabel } = useAppointmentLabels()
+const { labels, fetchLabels, saveLabel, deactivateLabel, loadSuggestedLabels } = useAppointmentLabels()
 const editing = ref<AppointmentLabel | null>(null)
 const form = reactive({ name: '', color: '#3B82F6' })
 const saving = ref(false)
@@ -27,11 +28,6 @@ function begin(label?: AppointmentLabel) {
 }
 function reset() {
   begin()
-}
-function textColor(hex: string): string {
-  const rgb = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255)
-  const l = rgb.map(value => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0)
-  return l > 0.45 ? '#111827' : '#FFFFFF'
 }
 
 async function save() {
@@ -53,6 +49,14 @@ async function deactivate(label: AppointmentLabel) {
   } catch (error) {
     toast.add({ title: t('common.error'), description: errorMessage(error, t('appointments.labels.saveError')), color: 'error' })
   }
+}
+async function loadSuggested() {
+  if (!canWrite.value || !window.confirm(t('appointments.labels.suggestedConfirm'))) return
+  saving.value = true
+  try {
+    const result = await loadSuggestedLabels()
+    toast.add({ title: t('common.success'), description: t('appointments.labels.suggestedResult', result), color: result.errors ? 'warning' : 'success' })
+  } finally { saving.value = false }
 }
 </script>
 
@@ -97,7 +101,7 @@ async function deactivate(label: AppointmentLabel) {
             <div class="flex items-center justify-between gap-3">
               <UBadge
                 :label="form.name || t('appointments.labels.preview')"
-                :style="{ backgroundColor: form.color, color: textColor(form.color) }"
+                :style="{ backgroundColor: form.color, color: labelTextColor(form.color) }"
               /><div class="flex gap-2">
                 <UButton
                   v-if="editing"
@@ -114,6 +118,15 @@ async function deactivate(label: AppointmentLabel) {
               </div>
             </div>
           </div>
+          <UButton
+            v-if="canWrite"
+            variant="soft"
+            icon="i-lucide-sparkles"
+            :loading="saving"
+            @click="loadSuggested"
+          >
+            {{ t('appointments.labels.loadSuggested') }}
+          </UButton>
           <div class="space-y-2">
             <p
               v-if="!labels.length"
