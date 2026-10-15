@@ -148,9 +148,10 @@
     "archived": "Patient archived",
     "notFound": "Patient not found",
     "archiveConfirm": "Archive patient {name}?",
-    "archiveDescription": "This action will hide the patient from searches. Existing appointments will not be deleted.",
+    "archiveDescription": "The patient will be archived, not permanently deleted. Appointments and history will be preserved.",
     "cancel": "Cancel",
     "archive": "Archive",
+    "archiveFor": "Archive {name}",
     "dangerZone": {
       "title": "Danger zone",
       "archiveHelp": "Archive the patient to hide them from searches. Appointments and history are preserved."

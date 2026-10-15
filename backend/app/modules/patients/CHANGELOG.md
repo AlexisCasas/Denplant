@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- fix(DP-05): expose the existing soft-archive action from the patient list
+  for users with `patients.write`, guard it by patient status, and send
+  explicit `status` filters so active and archived lists remain distinct.
+  Archived list rows retain clinic/dentist scope but do not link to detail,
+  whose existing access policy intentionally remains active-only.
+
 - feat(QW4): the Clinical tab has a fifth mode, **Evolución** (Diagnóstico | Planes | Citas | Histórico | Evolución), rendered through the new `patient.clinical.evolution` slot — `patients` never imports the component that fills it. Hidden without `clinical_notes.notes.read`. `?clinicalMode=` is validated against one shared list (`~~/app/utils/clinicalModes`), and `DiagnosisModeContainer` forwards the new `add-note` event.
 
 - Add dentist patient visibility based on server-side creator ownership or a

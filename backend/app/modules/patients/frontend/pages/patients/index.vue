@@ -2,6 +2,7 @@
 import type { Patient, PatientCreate, PaginatedResponse, ApiResponse } from '~~/app/types'
 import { PATIENT_STATUS_ROLE, type PatientStatus } from '~~/app/config/severity'
 import { PERMISSIONS } from '~~/app/config/permissions'
+import { buildPatientListParams, canArchivePatient, canStartPatientArchive, requestPatientArchive } from '../../utils/patientList'
 
 /**
  * /patients — list page.
@@ -87,19 +88,14 @@ async function fetcher(q: {
   }
 
   // Step 2: query /patients with the optional intersect + native filters.
-  const params = new URLSearchParams()
-  params.set('page', String(q.page))
-  params.set('page_size', String(q.pageSize))
-  if (q.filters.q) params.set('search', q.filters.q)
-  if (q.filters.city) params.set('city', q.filters.city)
-  if (q.filters.do_not_contact !== null) {
-    params.set('do_not_contact', q.filters.do_not_contact ? 'true' : 'false')
-  }
-  if (q.filters.status.includes('archived')) params.set('include_archived', 'true')
-  if (patientIdsIntersect) {
-    for (const id of patientIdsIntersect) params.append('patient_ids', id)
-  }
-  if (q.sort) params.set('sort', q.sort)
+  const params = buildPatientListParams(
+    q.filters,
+    q.page,
+    q.pageSize,
+    q.sort,
+    patientIdsIntersect
+  )
+  if (!params) return { data: [], total: 0 }
 
   const response = await api.get<PaginatedResponse<Patient>>(`/api/v1/patients?${params.toString()}`)
 
@@ -144,6 +140,48 @@ const {
   searchKey: 'q',
   fetcher
 })
+
+const canWritePatients = computed(() => can(PERMISSIONS.patients.write))
+const isArchiveModalOpen = ref(false)
+const patientToArchive = ref<Patient | null>(null)
+const isArchiving = ref(false)
+
+function requestArchive(patient: Patient) {
+  if (!canArchivePatient(patient, canWritePatients.value)) return
+  patientToArchive.value = patient
+  isArchiveModalOpen.value = true
+}
+
+async function archivePatientFromList() {
+  const patient = patientToArchive.value
+  if (!canStartPatientArchive(patient, canWritePatients.value, isArchiving.value)) {
+    isArchiveModalOpen.value = false
+    patientToArchive.value = null
+    return
+  }
+
+  isArchiving.value = true
+  try {
+    await requestPatientArchive(api, patient.id)
+    toast.add({
+      title: t('common.success'),
+      description: t('patients.archived'),
+      color: 'success'
+    })
+    isArchiveModalOpen.value = false
+    patientToArchive.value = null
+    await refresh()
+  } catch (e: unknown) {
+    const fetchError = e as { data?: { message?: string } }
+    toast.add({
+      title: t('common.error'),
+      description: fetchError.data?.message || t('common.serverError'),
+      color: 'error'
+    })
+  } finally {
+    isArchiving.value = false
+  }
+}
 
 const statusItems = computed(() => [
   { label: t('patients.status.active'), value: 'active' },
@@ -337,7 +375,7 @@ function patientCity(p: Patient): string {
       <DataListItem
         v-for="patient in patients"
         :key="patient.id"
-        :to="`/patients/${patient.id}`"
+        :to="patient.status === 'active' ? `/patients/${patient.id}` : undefined"
       >
         <template #row>
           <UAvatar
@@ -409,9 +447,57 @@ function patientCity(p: Patient): string {
             />
           </div>
         </template>
+
+        <template
+          v-if="canArchivePatient(patient, canWritePatients)"
+          #actions
+        >
+          <UButton
+            variant="ghost"
+            color="error"
+            icon="i-lucide-archive"
+            size="sm"
+            :aria-label="t('patients.archiveFor', { name: `${patient.first_name} ${patient.last_name}` })"
+            @click.stop.prevent="requestArchive(patient)"
+          />
+        </template>
       </DataListItem>
     </template>
   </DataListLayout>
+
+  <UModal v-model:open="isArchiveModalOpen">
+    <template #content>
+      <UCard>
+        <template #header>
+          <h2 class="text-h1 text-default">
+            {{ t('patients.archiveConfirm', { name: patientToArchive ? `${patientToArchive.first_name} ${patientToArchive.last_name}` : '' }) }}
+          </h2>
+        </template>
+        <p class="text-body text-muted">
+          {{ t('patients.archiveDescription') }}
+        </p>
+        <template #footer>
+          <div class="flex justify-end gap-3">
+            <UButton
+              variant="outline"
+              color="neutral"
+              :disabled="isArchiving"
+              @click="isArchiveModalOpen = false"
+            >
+              {{ t('patients.cancel') }}
+            </UButton>
+            <UButton
+              color="error"
+              :loading="isArchiving"
+              @click="archivePatientFromList"
+            >
+              {{ t('patients.archive') }}
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </template>
+  </UModal>
 
   <UModal v-model:open="isCreateModalOpen">
     <template #content>

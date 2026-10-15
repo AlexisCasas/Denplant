@@ -8,7 +8,7 @@ never hard-deleted.
 
 Routes mounted at `/api/v1/patients/`.
 
-- `GET    /patients`        — list (paginated); `patients.read`
+- `GET    /patients`        — list (paginated; repeated `status=active|archived` filter; omitted status defaults to active); `patients.read`
 - `GET    /patients/{id}`   — detail; `patients.read`
 - `POST   /patients`        — create; `patients.write`
 - `PUT    /patients/{id}`   — update; `patients.write`
@@ -62,6 +62,12 @@ None.
 
 - **Soft delete only.** `DELETE /patients/{id}` flips `status` to
   archived; the row stays. Do not add a hard-delete endpoint.
+- **Archived list scope.** The list may explicitly request archived rows;
+  it uses a list-only access predicate. Detail and clinical-data endpoints
+  keep the regular active-only predicate, so archived list rows must not link
+  to those restricted detail routes. Use `status=archived` for archived rows
+  and repeat `status` for both states; the frontend canonicalizes a cleared
+  status filter to its active default.
 - **Multi-tenancy.** Every query MUST filter `Patient.clinic_id`.
   This includes future agent tools.
 - **No cross-module FKs into patients without `depends: ["patients"]`**

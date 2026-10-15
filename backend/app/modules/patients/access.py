@@ -48,6 +48,54 @@ class PatientAccessPolicy:
         )
 
     @staticmethod
+    def list_predicate_for(
+        role: str,
+        clinic_id: UUID,
+        user_id: UUID,
+        *,
+        include_archived: bool = False,
+    ) -> ColumnElement[bool]:
+        """Scope the patient list without widening detail access.
+
+        The regular predicate intentionally hides archived patients because it
+        is reused by patient detail and clinical-data endpoints. The list is
+        the one surface that may explicitly request archived rows. Dentists
+        keep their creator/appointment scope in either mode.
+        """
+        if role != "dentist":
+            conditions = [Patient.clinic_id == clinic_id]
+            if not include_archived:
+                conditions.append(Patient.status != "archived")
+            return and_(*conditions)
+
+        assigned = exists(
+            select(1).where(
+                _appointments.c.clinic_id == clinic_id,
+                _appointments.c.patient_id == Patient.id,
+                _appointments.c.professional_id == user_id,
+                _appointments.c.status != "cancelled",
+            )
+        )
+        conditions = [
+            Patient.clinic_id == clinic_id,
+            or_(Patient.created_by_user_id == user_id, assigned),
+        ]
+        if not include_archived:
+            conditions.append(Patient.status != "archived")
+        return and_(*conditions)
+
+    @classmethod
+    def list_predicate(
+        cls, ctx: ClinicContext, *, include_archived: bool = False
+    ) -> ColumnElement[bool]:
+        return cls.list_predicate_for(
+            ctx.role,
+            ctx.clinic_id,
+            ctx.user_id,
+            include_archived=include_archived,
+        )
+
+    @staticmethod
     def sql_predicate(role: str, *, patient_alias: str, user_id: UUID) -> tuple[str, dict]:
         """Return the central policy as a bound fragment for aggregate SQL queries."""
         if role != "dentist":
