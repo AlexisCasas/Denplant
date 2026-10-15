@@ -37,6 +37,7 @@ const api = useApi()
 const { can, canManageAllProfessionals } = usePermissions()
 const { isMobile } = useBreakpoint()
 const { createAppointment, updateAppointment, cancelAppointment } = useAppointments()
+const { labels, fetchLabels } = useAppointmentLabels()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
 const { fetchSettings, getAutoSendStatus } = useNotificationSettings()
 const { sendConfirmation, sendReminder, isSending: isSendingEmail } = useNotificationSend()
@@ -58,7 +59,8 @@ const formData = reactive({
   date: '',
   startTime: '09:00',
   duration: 30,
-  cabinet: UNASSIGNED_CABINET
+  cabinet: UNASSIGNED_CABINET,
+  appointmentLabelId: '__none__'
 })
 
 // Duration options (in minutes)
@@ -120,6 +122,13 @@ const professionalOptions = computed(() => {
     color: getProfessionalColor(prof.id)
   }))
 })
+const labelOptions = computed(() => [
+  { value: '__none__', label: t('appointments.labels.none') },
+  ...labels.value.filter(label => label.is_active || label.id === props.appointment?.appointment_label_id).map(label => ({
+    value: label.id, label: `● ${label.name}`
+  }))
+])
+const selectedLabel = computed(() => labels.value.find(label => label.id === formData.appointmentLabelId))
 
 // Computed
 const modalTitle = computed(() =>
@@ -292,7 +301,7 @@ watch(() => props.open, async (isOpen) => {
   // fetching produced "Access denied" / "Error loading settings" toasts
   // every time they opened the modal. When skipped, getAutoSendStatus
   // falls back to its sensible default (auto-send on).
-  const tasks: Array<Promise<unknown>> = [fetchProfessionals()]
+  const tasks: Array<Promise<unknown>> = [fetchProfessionals(), fetchLabels()]
   if (can(PERMISSIONS.notifications.settingsRead)) {
     tasks.push(fetchSettings())
   }
@@ -307,6 +316,7 @@ watch(() => props.open, async (isOpen) => {
     formData.startTime = apt.start_time.split('T')[1]?.substring(0, 5) ?? '09:00'
     // null cabinet (#51) maps to the "assign later" option.
     formData.cabinet = apt.cabinet ?? UNASSIGNED_CABINET
+    formData.appointmentLabelId = apt.appointment_label_id ?? '__none__'
 
     // Map each AppointmentTreatmentBrief into a PlannedTreatmentItem shape so the
     // shared selector can render it. The Treatment.id is not available in the
@@ -433,6 +443,7 @@ watch(() => props.open, async (isOpen) => {
       formData.cabinet = UNASSIGNED_CABINET
     }
     selectedTreatments.value = []
+    formData.appointmentLabelId = '__none__'
     // Reset email checkbox for create mode
     sendConfirmationEmail.value = true
   }
@@ -540,7 +551,8 @@ async function handleSave() {
       end_time: endTime,
       planned_item_ids: selectedTreatments.value.length > 0
         ? selectedTreatments.value.map(t => t.id)
-        : undefined
+        : undefined,
+      appointment_label_id: formData.appointmentLabelId === '__none__' ? null : formData.appointmentLabelId
     }
 
     let savedAppointment: Appointment
@@ -787,6 +799,25 @@ function openPatientFile() {
                   :placeholder="t('appointments.cabinet')"
                   icon="i-lucide-door-open"
                 />
+              </UFormField>
+              <UFormField :label="t('appointments.labels.field')">
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="selectedLabel"
+                    class="h-4 w-4 shrink-0 rounded-full"
+                    :style="{ backgroundColor: selectedLabel.color }"
+                    aria-hidden="true"
+                  />
+                  <USelect
+                    v-model="formData.appointmentLabelId"
+                    :items="labelOptions"
+                    value-key="value"
+                    label-key="label"
+                    :size="isMobile ? 'lg' : 'md'"
+                    icon="i-lucide-tag"
+                    class="flex-1"
+                  />
+                </div>
               </UFormField>
 
               <UFormField

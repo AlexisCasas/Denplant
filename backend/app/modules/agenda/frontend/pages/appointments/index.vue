@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
+import { PERMISSIONS } from '~~/app/config/permissions'
 import { defineAsyncComponent } from 'vue'
 import { formatLocalDate } from '../../utils/date'
 
@@ -18,9 +19,10 @@ const router = useRouter()
 const clinic = useClinic()
 const { appointments, isLoading, fetchAppointments, updateAppointment } = useAppointments()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
-const { canManageAllProfessionals } = usePermissions()
+const { canManageAllProfessionals, can } = usePermissions()
 const auth = useAuth()
 const { isMobile } = useBreakpoint()
+const labelsModalOpen = ref(false)
 
 // Query params for pre-selecting patient from treatment plan flow
 const initialPatientId = ref<string | undefined>(
@@ -624,6 +626,14 @@ watch(isMobile, async (mobile) => {
           @update:model-value="(v) => (viewMode = v as 'week' | 'day' | 'kanban')"
         />
         <UButton
+          v-if="can(PERMISSIONS.appointments.read)"
+          variant="soft"
+          icon="i-lucide-tags"
+          @click="labelsModalOpen = true"
+        >
+          {{ t('appointments.labels.title') }}
+        </UButton>
+        <UButton
           v-if="!isMobile"
           color="primary"
           variant="soft"
@@ -778,6 +788,7 @@ watch(isMobile, async (mobile) => {
       @saved="handleSaved"
       @cancelled="handleCancelled"
     />
+    <AppointmentLabelsModal v-model:open="labelsModalOpen" />
 
     <!-- "Which treatments were done" gate, shown before an appointment
          linked to treatment-plan items transitions to `completed`.

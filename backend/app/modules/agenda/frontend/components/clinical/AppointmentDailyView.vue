@@ -651,7 +651,7 @@ const appointmentsByProfIndex = computed(() => {
                   :style="{
                     ...getAppointmentStyle(appointment),
                     ...getOverlapStyle(appointment),
-                    ...getProfessionalFill(prof.color)
+                    ...getProfessionalFill(appointment.appointment_label?.color || prof.color)
                   }"
                   @click="handleAppointmentClick(appointment, $event)"
                   @mousedown="startDrag(appointment, $event, 'move')"
@@ -691,6 +691,11 @@ const appointmentsByProfIndex = computed(() => {
                     >
                       {{ appointment.treatment_type }}
                     </div>
+                    <span
+                      v-if="appointment.appointment_label"
+                      class="text-[10px] leading-none truncate"
+                      :title="appointment.appointment_label.name"
+                    >{{ appointment.appointment_label.name }}</span>
                   </div>
 
                   <!-- Resize handle -->

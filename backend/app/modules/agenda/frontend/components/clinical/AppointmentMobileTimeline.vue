@@ -11,6 +11,7 @@ import type { Appointment, Professional } from '~~/app/types'
 import type { TimelineEntry, FreeSlotEntry, BusyEntry, BlockedEntry } from '../../composables/useFreeSlots'
 import { formatDuration } from '../../composables/useFreeSlots'
 import { parseWallClock } from '~~/app/utils/wallClock'
+import { labelTextColor } from '../../utils/appointmentLabels'
 
 interface ProfessionalWithColor extends Professional {
   color: string
@@ -125,7 +126,7 @@ function entryKey(e: TimelineEntry, i: number): string {
         </div>
         <span
           class="w-1 self-stretch rounded-full shrink-0"
-          :style="{ backgroundColor: professionalFor(entry.appointment.professional_id)?.color || 'var(--color-primary)' }"
+          :style="{ backgroundColor: entry.appointment.appointment_label?.color || professionalFor(entry.appointment.professional_id)?.color || 'var(--color-primary)' }"
         />
         <div class="flex-1 min-w-0 flex flex-col gap-1">
           <div class="flex items-center gap-2 min-w-0">
@@ -140,6 +141,11 @@ function entryKey(e: TimelineEntry, i: number): string {
             />
           </div>
           <div class="flex items-center gap-2 flex-wrap text-caption text-subtle">
+            <span
+              v-if="entry.appointment.appointment_label"
+              class="inline-flex max-w-full truncate rounded px-1.5 py-0.5"
+              :style="{ backgroundColor: entry.appointment.appointment_label.color, color: labelTextColor(entry.appointment.appointment_label.color) }"
+            >{{ entry.appointment.appointment_label.name }}</span>
             <span
               v-if="professionalFor(entry.appointment.professional_id)"
               class="inline-flex items-center gap-1"

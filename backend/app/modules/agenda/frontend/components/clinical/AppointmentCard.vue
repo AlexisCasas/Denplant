@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
 import { parseWallClock } from '~~/app/utils/wallClock'
+import { labelTextColor } from '../../utils/appointmentLabels'
 
 interface Cabinet {
   id?: string
@@ -141,7 +142,7 @@ const timerClass = computed(() => {
 })
 
 const cardStyle = computed(() => ({
-  borderLeftColor: statusColour(props.appointment.status),
+  borderLeftColor: props.appointment.appointment_label?.color || statusColour(props.appointment.status),
   borderLeftWidth: '4px',
   borderLeftStyle: 'solid' as const
 }))
@@ -194,19 +195,29 @@ const cardStyle = computed(() => ({
       </div>
     </div>
     <div class="flex items-center justify-between gap-2 mt-1">
-      <UBadge
-        v-if="cabinet"
-        :label="cabinet.name"
-        :style="{ backgroundColor: cabinet.color, color: '#fff' }"
-        size="xs"
-      />
-      <UBadge
-        v-else
-        :label="t('appointments.cabinetAssignment.unassigned')"
-        color="warning"
-        variant="subtle"
-        size="xs"
-      />
+      <div class="flex min-w-0 items-center gap-1">
+        <UBadge
+          v-if="appointment.appointment_label"
+          :label="appointment.appointment_label.name"
+          :style="{ backgroundColor: appointment.appointment_label.color, color: labelTextColor(appointment.appointment_label.color) }"
+          size="xs"
+          class="max-w-24 truncate"
+        />
+        <UBadge
+          v-if="cabinet"
+          :label="cabinet.name"
+          :style="{ backgroundColor: cabinet.color, color: '#fff' }"
+          size="xs"
+          class="max-w-24 truncate"
+        />
+        <UBadge
+          v-else
+          :label="t('appointments.cabinetAssignment.unassigned')"
+          color="warning"
+          variant="subtle"
+          size="xs"
+        />
+      </div>
       <span
         class="text-xs"
         :class="timerClass"

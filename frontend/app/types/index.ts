@@ -298,6 +298,8 @@ export interface Appointment {
   status: AppointmentStatus
   current_status_since: string
   color?: string
+  appointment_label_id?: string | null
+  appointment_label?: AppointmentLabel | null
   created_at: string
   updated_at: string
   patient?: Patient
@@ -317,10 +319,21 @@ export interface AppointmentCreate {
   treatment_type?: string // Legacy field
   planned_item_ids?: string[] // List of PlannedTreatmentItem IDs
   color?: string
+  appointment_label_id?: string | null
 }
 
 export interface AppointmentUpdate extends Partial<AppointmentCreate> {
   status?: Appointment['status']
+}
+
+export interface AppointmentLabel {
+  id: string
+  clinic_id: string
+  name: string
+  color: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }
 
 // API and module-registry types live in their own files for clarity.

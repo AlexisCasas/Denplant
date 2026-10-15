@@ -28,6 +28,7 @@ from .models import (
     AppointmentStatusEvent,
     AppointmentTreatment,
     Cabinet,
+    AppointmentLabel,
 )
 from .tz import as_utc, get_clinic_tz
 
@@ -145,6 +146,50 @@ class CabinetService:
         await db.flush()
 
 
+class AppointmentLabelService:
+    """Tenant-safe catalog and assignment validation for appointment labels."""
+
+    @staticmethod
+    async def list_labels(db: AsyncSession, clinic_id: UUID, *, active_only: bool = False) -> list[AppointmentLabel]:
+        query = select(AppointmentLabel).where(AppointmentLabel.clinic_id == clinic_id)
+        if active_only:
+            query = query.where(AppointmentLabel.is_active.is_(True))
+        result = await db.execute(query.order_by(AppointmentLabel.name))
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_label(db: AsyncSession, clinic_id: UUID, label_id: UUID) -> AppointmentLabel | None:
+        result = await db.execute(select(AppointmentLabel).where(
+            AppointmentLabel.id == label_id, AppointmentLabel.clinic_id == clinic_id
+        ))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create_label(db: AsyncSession, clinic_id: UUID, data: dict) -> AppointmentLabel:
+        label = AppointmentLabel(clinic_id=clinic_id, **data)
+        db.add(label)
+        await db.flush()
+        return label
+
+    @staticmethod
+    async def update_label(db: AsyncSession, label: AppointmentLabel, data: dict) -> AppointmentLabel:
+        for key, value in data.items():
+            if value is not None:
+                setattr(label, key, value)
+        await db.flush()
+        return label
+
+    @staticmethod
+    async def validate_assignment(db: AsyncSession, clinic_id: UUID, label_id: UUID | None) -> None:
+        if label_id is None:
+            return
+        label = await AppointmentLabelService.get_label(db, clinic_id, label_id)
+        if label is None:
+            raise ValueError("Appointment label not found")
+        if not label.is_active:
+            raise ValueError("Appointment label is inactive")
+
+
 class AppointmentService:
     """Service for appointment operations."""
 
@@ -181,6 +226,7 @@ class AppointmentService:
         query = (
             select(Appointment)
             .options(
+                selectinload(Appointment.appointment_label),
                 selectinload(Appointment.patient),
                 selectinload(Appointment.professional),
                 selectinload(Appointment.treatments).options(
@@ -288,6 +334,7 @@ class AppointmentService:
         stmt = (
             select(Appointment)
             .options(
+                selectinload(Appointment.appointment_label),
                 selectinload(Appointment.patient),
                 selectinload(Appointment.professional),
                 selectinload(Appointment.treatments).options(
@@ -458,6 +505,10 @@ class AppointmentService:
         """
         planned_item_ids = data.pop("planned_item_ids", None)
 
+        await AppointmentLabelService.validate_assignment(
+            db, clinic_id, data.get("appointment_label_id")
+        )
+
         await AppointmentService._normalize_times(db, clinic_id, data)
 
         await AppointmentService._resolve_cabinet(db, clinic_id, data)
@@ -545,7 +596,7 @@ class AppointmentService:
             db=db,
         )
 
-        await db.refresh(appointment, ["patient", "professional", "treatments"])
+        await db.refresh(appointment, ["patient", "professional", "treatments", "appointment_label"])
         for treatment in appointment.treatments:
             await db.refresh(treatment, ["planned_item", "catalog_item"])
             if treatment.planned_item:
@@ -574,6 +625,17 @@ class AppointmentService:
         requested_status = data.pop("status", None)
 
         planned_item_ids = data.pop("planned_item_ids", None)
+
+        if "appointment_label_id" in data:
+            requested_label_id = data["appointment_label_id"]
+            # Historical labels may be deactivated after an appointment was
+            # booked. Keep that existing assignment valid for ordinary edits;
+            # only a new/replacement assignment must be active. Cross-clinic
+            # ids are still rejected, including if an attacker sends one.
+            if requested_label_id != appointment.appointment_label_id:
+                await AppointmentLabelService.validate_assignment(
+                    db, appointment.clinic_id, requested_label_id
+                )
 
         await AppointmentService._normalize_times(db, appointment.clinic_id, data)
 
@@ -616,7 +678,11 @@ class AppointmentService:
                 )
 
         for key, value in data.items():
-            if value is not None:
+            # ``appointment_label_id`` is intentionally nullable: an explicit
+            # null clears the label, whereas an omitted key leaves it intact.
+            # Other legacy nullable update fields retain their existing
+            # semantics for compatibility.
+            if value is not None or key == "appointment_label_id":
                 setattr(appointment, key, value)
 
         try:
@@ -677,6 +743,11 @@ class AppointmentService:
                     "patient_id": (str(appointment.patient_id) if appointment.patient_id else None),
                 },
             )
+
+        # Refresh the relation after a replacement/removal so the response
+        # cannot combine a new id with a stale label object from this session.
+        if "appointment_label_id" in data:
+            await db.refresh(appointment, ["appointment_label"])
 
         return appointment
 

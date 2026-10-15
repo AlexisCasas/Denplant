@@ -35,6 +35,9 @@ from .schemas import (
     AppointmentTreatmentNoteUpdate,
     AppointmentTreatmentResponse,
     AppointmentUpdate,
+    AppointmentLabelCreate,
+    AppointmentLabelResponse,
+    AppointmentLabelUpdate,
     CabinetCreate,
     CabinetResponse,
     CabinetUpdate,
@@ -45,11 +48,61 @@ from .service import (
     AppointmentService,
     CabinetRequiredError,
     CabinetService,
+    AppointmentLabelService,
     InvalidTransitionError,
 )
 from .tz import safe_zone
 
 router = APIRouter(dependencies=[Depends(mark_financial_response)])
+
+
+@router.get("/appointment-labels", response_model=ApiResponse[list[AppointmentLabelResponse]])
+async def list_appointment_labels(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    active_only: bool = False,
+) -> ApiResponse[list[AppointmentLabelResponse]]:
+    labels = await AppointmentLabelService.list_labels(db, ctx.clinic_id, active_only=active_only)
+    return ApiResponse(data=[AppointmentLabelResponse.model_validate(label) for label in labels])
+
+
+@router.post("/appointment-labels", response_model=ApiResponse[AppointmentLabelResponse], status_code=status.HTTP_201_CREATED)
+async def create_appointment_label(
+    data: AppointmentLabelCreate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AppointmentLabelResponse]:
+    try:
+        label = await AppointmentLabelService.create_label(db, ctx.clinic_id, data.model_dump())
+        await db.commit()
+        await db.refresh(label)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Label name already exists") from exc
+    return ApiResponse(data=AppointmentLabelResponse.model_validate(label))
+
+
+@router.put("/appointment-labels/{label_id}", response_model=ApiResponse[AppointmentLabelResponse])
+async def update_appointment_label(
+    label_id: UUID,
+    data: AppointmentLabelUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AppointmentLabelResponse]:
+    label = await AppointmentLabelService.get_label(db, ctx.clinic_id, label_id)
+    if label is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment label not found")
+    try:
+        label = await AppointmentLabelService.update_label(db, label, data.model_dump(exclude_unset=True))
+        await db.commit()
+        await db.refresh(label)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Label name already exists") from exc
+    return ApiResponse(data=AppointmentLabelResponse.model_validate(label))
 
 
 async def _get_accessible_appointment(db: AsyncSession, ctx: ClinicContext, appointment_id: UUID):
