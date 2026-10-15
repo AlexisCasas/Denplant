@@ -14,6 +14,7 @@
   },
   "nav": {
     "dashboard": "Inicio",
+    "panel": "Panel",
     "patients": "Pacientes",
     "appointments": "Agenda",
     "recalls": "Recordatorios",

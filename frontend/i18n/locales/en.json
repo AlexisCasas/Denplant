@@ -14,6 +14,7 @@
   },
   "nav": {
     "dashboard": "Home",
+    "panel": "Dashboard",
     "patients": "Patients",
     "appointments": "Schedule",
     "recalls": "Recalls",

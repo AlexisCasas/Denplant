@@ -1,82 +1,16 @@
 <script setup lang="ts">
-const { resolve } = useModuleSlots()
+import { resolveDefaultLanding } from '~/utils/defaultLanding'
 
-const heroEntries = computed(() => resolve('dashboard.hero', {}))
-const timelineEntries = computed(() => resolve('dashboard.timeline', {}))
-const attentionEntries = computed(() => resolve('dashboard.attention', {}))
-const activityEntries = computed(() => resolve('dashboard.activity', {}))
-const widgetEntries = computed(() => resolve('dashboard.widgets', {}))
+const { active, ensureLoaded } = useModules()
+const { permissions } = usePermissions()
 
-const hasAnyContent = computed(() =>
-  heroEntries.value.length
-  + timelineEntries.value.length
-  + attentionEntries.value.length
-  + activityEntries.value.length
-  + widgetEntries.value.length > 0
-)
+// The modules response is also awaited by the default layout during SSR.
+// Calling it here is idempotent and ensures direct requests to `/` use the
+// same availability data before selecting a destination.
+await ensureLoaded()
 
-const { t } = useI18n()
+await navigateTo(resolveDefaultLanding({
+  activeModules: active.value,
+  permissions: permissions.value
+}), { replace: true })
 </script>
-
-<template>
-  <div class="space-y-8">
-    <HomeGreeting />
-
-    <section
-      v-if="heroEntries.length > 0"
-      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-    >
-      <ModuleSlot
-        name="dashboard.hero"
-        :ctx="{}"
-      />
-    </section>
-
-    <section v-if="timelineEntries.length > 0">
-      <ModuleSlot
-        name="dashboard.timeline"
-        :ctx="{}"
-      />
-    </section>
-
-    <section
-      v-if="attentionEntries.length > 0 || activityEntries.length > 0"
-      class="grid grid-cols-1 lg:grid-cols-2 gap-6"
-    >
-      <div
-        v-if="attentionEntries.length > 0"
-        class="space-y-6"
-      >
-        <ModuleSlot
-          name="dashboard.attention"
-          :ctx="{}"
-        />
-      </div>
-      <div
-        v-if="activityEntries.length > 0"
-        class="space-y-6"
-        :class="{ 'lg:col-span-2': attentionEntries.length === 0 }"
-      >
-        <ModuleSlot
-          name="dashboard.activity"
-          :ctx="{}"
-        />
-      </div>
-    </section>
-
-    <section v-if="widgetEntries.length > 0">
-      <ModuleSlot
-        name="dashboard.widgets"
-        :ctx="{}"
-      />
-    </section>
-
-    <UCard v-if="!hasAnyContent">
-      <EmptyState
-        icon="i-lucide-smile"
-        :title="t('dashboard.welcome')"
-        :description="t('dashboard.welcomeMessage')"
-      />
-    </UCard>
-  </div>
-</template>
