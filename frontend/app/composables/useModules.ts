@@ -18,9 +18,9 @@ import type { ActiveModule, ApiResponse, NavigationItem } from '~/types'
 // any module. Always rendered, even when the modules endpoint fails.
 const HOST_NAV: NavigationItem[] = [
   {
-    label: 'nav.dashboard',
+    label: 'nav.panel',
     icon: 'i-lucide-home',
-    to: '/',
+    to: '/dashboard',
     order: 0
   },
   {
