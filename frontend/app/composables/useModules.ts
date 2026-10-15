@@ -31,6 +31,31 @@ const HOST_NAV: NavigationItem[] = [
   }
 ]
 
+interface InFlightModuleLoad {
+  token: string
+  promise: Promise<void>
+}
+
+interface ModuleLoadContext {
+  inFlight?: InFlightModuleLoad
+  loadedToken?: string
+}
+
+// Nuxt creates an app instance per SSR request, while the browser keeps one
+// instance for its session. A WeakMap therefore deduplicates callers within
+// one request/session without serializing a Promise into `useState` or
+// sharing module data across SSR requests.
+const moduleLoadContexts = new WeakMap<object, ModuleLoadContext>()
+
+function moduleLoadContextFor(nuxtApp: object): ModuleLoadContext {
+  let context = moduleLoadContexts.get(nuxtApp)
+  if (!context) {
+    context = {}
+    moduleLoadContexts.set(nuxtApp, context)
+  }
+  return context
+}
+
 /** Context-free read of the active-module list (only ``useState``). */
 export function useActiveModulesState() {
   return useState<ActiveModule[] | null>('modules:active', () => null)
@@ -48,28 +73,54 @@ export function useModules() {
   const lastLoadedAt = useState<number>('modules:active:at', () => 0)
 
   async function ensureLoaded(force = false): Promise<void> {
-    if (!auth.accessToken.value) return
-    if (loading.value) return
+    const token = auth.accessToken.value
+    if (!token) return
+
+    const context = moduleLoadContextFor(useNuxtApp())
+    if (context.inFlight?.token === token) {
+      return context.inFlight.promise
+    }
 
     const age = Date.now() - lastLoadedAt.value
     const FRESH_MS = 60_000 // 1 min — cheap enough to refetch often
-    if (!force && active.value !== null && age < FRESH_MS) return
-
-    loading.value = true
-    error.value = null
-    try {
-      const response = await api.get<ApiResponse<ActiveModule[]>>(
-        '/api/v1/modules/-/active'
-      )
-      active.value = response.data
-      lastLoadedAt.value = Date.now()
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load modules'
-      console.warn('useModules: backend fetch failed —', error.value)
-      active.value = null
-    } finally {
-      loading.value = false
+    if (!force && active.value !== null && age < FRESH_MS) {
+      // Hydrated SSR state has no client-side context yet. It belongs to the
+      // current token; later token changes are compared against this value.
+      context.loadedToken ??= token
+      if (context.loadedToken === token) return
     }
+
+    const run = (async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const response = await api.get<ApiResponse<ActiveModule[]>>(
+          '/api/v1/modules/-/active'
+        )
+
+        // A previous session's response must never replace data loaded for
+        // the current token after logout/login in the same browser app.
+        if (auth.accessToken.value === token) {
+          active.value = response.data
+          lastLoadedAt.value = Date.now()
+          context.loadedToken = token
+        }
+      } catch (err) {
+        if (auth.accessToken.value === token) {
+          error.value = err instanceof Error ? err.message : 'Failed to load modules'
+          console.warn('useModules: backend fetch failed —', error.value)
+          active.value = null
+        }
+      } finally {
+        if (context.inFlight?.promise === run) {
+          context.inFlight = undefined
+          loading.value = false
+        }
+      }
+    })()
+
+    context.inFlight = { token, promise: run }
+    return run
   }
 
   const modules = computed(() => {
