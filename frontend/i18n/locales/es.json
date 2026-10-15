@@ -1240,6 +1240,7 @@
     "selectPendingTreatment": "Seleccionar tratamiento pendiente",
     "emptyDay": "No hay citas este día",
     "noPatient": "Sin paciente",
+    "labels": { "title": "Etiquetas", "field": "Etiqueta", "none": "Sin etiqueta", "new": "Nueva etiqueta", "edit": "Editar etiqueta", "name": "Nombre", "color": "Color", "preview": "Vista previa", "saved": "Etiqueta guardada", "saveError": "No se pudo guardar la etiqueta", "deactivated": "Etiqueta desactivada", "deactivate": "Desactivar etiqueta", "inactive": "Inactiva", "empty": "No hay etiquetas" },
     "freeSlots": {
       "byProfessional": "Profesional",
       "byCabinet": "Gabinete",

@@ -145,6 +145,13 @@ const cardStyle = computed(() => ({
   borderLeftWidth: '4px',
   borderLeftStyle: 'solid' as const
 }))
+
+function labelTextColor(hex: string): string {
+  const rgb = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255)
+  const luminance = rgb.map(value => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0)
+  return luminance > 0.45 ? '#111827' : '#FFFFFF'
+}
 </script>
 
 <template>
@@ -194,25 +201,29 @@ const cardStyle = computed(() => ({
       </div>
     </div>
     <div class="flex items-center justify-between gap-2 mt-1">
-      <UBadge
-        v-if="appointment.appointment_label"
-        :label="appointment.appointment_label.name"
-        :style="{ backgroundColor: appointment.appointment_label.color, color: '#fff' }"
-        size="xs"
-      />
-      <UBadge
-        v-else-if="cabinet"
-        :label="cabinet.name"
-        :style="{ backgroundColor: cabinet.color, color: '#fff' }"
-        size="xs"
-      />
-      <UBadge
-        v-else
-        :label="t('appointments.cabinetAssignment.unassigned')"
-        color="warning"
-        variant="subtle"
-        size="xs"
-      />
+      <div class="flex min-w-0 items-center gap-1">
+        <UBadge
+          v-if="appointment.appointment_label"
+          :label="appointment.appointment_label.name"
+          :style="{ backgroundColor: appointment.appointment_label.color, color: labelTextColor(appointment.appointment_label.color) }"
+          size="xs"
+          class="max-w-24 truncate"
+        />
+        <UBadge
+          v-if="cabinet"
+          :label="cabinet.name"
+          :style="{ backgroundColor: cabinet.color, color: '#fff' }"
+          size="xs"
+          class="max-w-24 truncate"
+        />
+        <UBadge
+          v-else
+          :label="t('appointments.cabinetAssignment.unassigned')"
+          color="warning"
+          variant="subtle"
+          size="xs"
+        />
+      </div>
       <span
         class="text-xs"
         :class="timerClass"

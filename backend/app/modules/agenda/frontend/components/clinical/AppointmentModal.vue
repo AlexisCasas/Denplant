@@ -123,11 +123,12 @@ const professionalOptions = computed(() => {
   }))
 })
 const labelOptions = computed(() => [
-  { value: '__none__', label: 'Sin etiqueta' },
+  { value: '__none__', label: t('appointments.labels.none') },
   ...labels.value.filter(label => label.is_active || label.id === props.appointment?.appointment_label_id).map(label => ({
-    value: label.id, label: label.name
+    value: label.id, label: `● ${label.name}`
   }))
 ])
+const selectedLabel = computed(() => labels.value.find(label => label.id === formData.appointmentLabelId))
 
 // Computed
 const modalTitle = computed(() =>
@@ -799,15 +800,24 @@ function openPatientFile() {
                   icon="i-lucide-door-open"
                 />
               </UFormField>
-              <UFormField label="Etiqueta">
-                <USelect
-                  v-model="formData.appointmentLabelId"
-                  :items="labelOptions"
-                  value-key="value"
-                  label-key="label"
-                  :size="isMobile ? 'lg' : 'md'"
-                  icon="i-lucide-tag"
-                />
+              <UFormField :label="t('appointments.labels.field')">
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="selectedLabel"
+                    class="h-4 w-4 shrink-0 rounded-full"
+                    :style="{ backgroundColor: selectedLabel.color }"
+                    aria-hidden="true"
+                  />
+                  <USelect
+                    v-model="formData.appointmentLabelId"
+                    :items="labelOptions"
+                    value-key="value"
+                    label-key="label"
+                    :size="isMobile ? 'lg' : 'md'"
+                    icon="i-lucide-tag"
+                    class="flex-1"
+                  />
+                </div>
               </UFormField>
 
               <UFormField

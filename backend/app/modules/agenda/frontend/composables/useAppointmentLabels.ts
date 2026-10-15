@@ -1,14 +1,27 @@
-import type { ApiResponse, AppointmentLabel } from '~~/app/types'
+import type { ApiResponse, Appointment, AppointmentLabel } from '~~/app/types'
 
 export function useAppointmentLabels() {
   const api = useApi()
   const labels = useState<AppointmentLabel[]>('agenda:appointment-labels', () => [])
+  const appointments = useState<Appointment[]>('appointments:list', () => [])
+  const { currentClinic } = useClinicState()
+  const loadedClinicId = useState<string | null>('agenda:appointment-labels:clinic', () => null)
 
   async function fetchLabels() {
     const response = await api.get<ApiResponse<AppointmentLabel[]>>('/api/v1/agenda/appointment-labels')
     labels.value = response.data
+    loadedClinicId.value = currentClinic.value?.id ?? null
     return response.data
   }
+
+  // Do not expose a previous clinic's cached labels while the next clinic
+  // session is loading. Backend tenancy remains authoritative.
+  watch(currentClinic, (clinic) => {
+    if (loadedClinicId.value !== null && loadedClinicId.value !== clinic?.id) {
+      labels.value = []
+      loadedClinicId.value = null
+    }
+  })
 
   async function saveLabel(data: Pick<AppointmentLabel, 'name' | 'color'>, id?: string) {
     const response = id
@@ -17,12 +30,25 @@ export function useAppointmentLabels() {
     labels.value = id
       ? labels.value.map(label => label.id === id ? response.data : label)
       : [...labels.value, response.data].sort((a, b) => a.name.localeCompare(b.name))
+    // List responses embed label snapshots. Keep currently visible cards in
+    // sync immediately after catalog edits without a duplicate source of
+    // truth or requiring a session refresh.
+    appointments.value = appointments.value.map(appointment =>
+      appointment.appointment_label_id === response.data.id
+        ? { ...appointment, appointment_label: response.data }
+        : appointment
+    )
     return response.data
   }
 
   async function deactivateLabel(id: string) {
     const response = await api.put<ApiResponse<AppointmentLabel>>(`/api/v1/agenda/appointment-labels/${id}`, { is_active: false })
     labels.value = labels.value.map(label => label.id === id ? response.data : label)
+    appointments.value = appointments.value.map(appointment =>
+      appointment.appointment_label_id === id
+        ? { ...appointment, appointment_label: response.data }
+        : appointment
+    )
     return response.data
   }
 

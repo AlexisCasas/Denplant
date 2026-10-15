@@ -627,9 +627,15 @@ class AppointmentService:
         planned_item_ids = data.pop("planned_item_ids", None)
 
         if "appointment_label_id" in data:
-            await AppointmentLabelService.validate_assignment(
-                db, appointment.clinic_id, data["appointment_label_id"]
-            )
+            requested_label_id = data["appointment_label_id"]
+            # Historical labels may be deactivated after an appointment was
+            # booked. Keep that existing assignment valid for ordinary edits;
+            # only a new/replacement assignment must be active. Cross-clinic
+            # ids are still rejected, including if an attacker sends one.
+            if requested_label_id != appointment.appointment_label_id:
+                await AppointmentLabelService.validate_assignment(
+                    db, appointment.clinic_id, requested_label_id
+                )
 
         await AppointmentService._normalize_times(db, appointment.clinic_id, data)
 
@@ -672,7 +678,11 @@ class AppointmentService:
                 )
 
         for key, value in data.items():
-            if value is not None:
+            # ``appointment_label_id`` is intentionally nullable: an explicit
+            # null clears the label, whereas an omitted key leaves it intact.
+            # Other legacy nullable update fields retain their existing
+            # semantics for compatibility.
+            if value is not None or key == "appointment_label_id":
                 setattr(appointment, key, value)
 
         try:
@@ -733,6 +743,11 @@ class AppointmentService:
                     "patient_id": (str(appointment.patient_id) if appointment.patient_id else None),
                 },
             )
+
+        # Refresh the relation after a replacement/removal so the response
+        # cannot combine a new id with a stale label object from this session.
+        if "appointment_label_id" in data:
+            await db.refresh(appointment, ["appointment_label"])
 
         return appointment
 
