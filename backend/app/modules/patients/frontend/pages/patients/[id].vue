@@ -17,7 +17,7 @@
  */
 import type { PatientExtended, ApiResponse } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
-import { canArchivePatient, requestPatientArchive } from '../../utils/patientList'
+import { canArchivePatient, canStartPatientArchive, requestPatientArchive } from '../../utils/patientList'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -213,7 +213,7 @@ const summaryCards = computed(() =>
 const isArchiveModalOpen = ref(false)
 
 async function archivePatient() {
-  if (!canArchive.value) return
+  if (!canStartPatientArchive(patient.value, can(PERMISSIONS.patients.write), isSubmitting.value)) return
   isSubmitting.value = true
 
   try {

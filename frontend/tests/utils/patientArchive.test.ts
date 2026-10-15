@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   buildPatientListParams,
   canArchivePatient,
+  canStartPatientArchive,
   requestPatientArchive
 } from '../../../backend/app/modules/patients/frontend/utils/patientList'
 
@@ -25,6 +26,11 @@ describe('patient archive UX policy', () => {
     expect(canArchivePatient({ status: 'active' }, false)).toBe(false)
     expect(canArchivePatient({ status: 'archived' }, true)).toBe(false)
     expect(canArchivePatient(null, true)).toBe(false)
+  })
+
+  it('does not start a second archive request while one is in flight', () => {
+    expect(canStartPatientArchive({ status: 'active' }, true, false)).toBe(true)
+    expect(canStartPatientArchive({ status: 'active' }, true, true)).toBe(false)
   })
 })
 

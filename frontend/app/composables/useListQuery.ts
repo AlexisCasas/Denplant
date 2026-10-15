@@ -73,7 +73,7 @@ export interface UseListQueryReturn<F extends FiltersBag, R> {
   refresh: () => Promise<void>
 }
 
-function serialize(value: FilterPrimitive): string | null {
+export function serializeListFilter(value: FilterPrimitive): string | null {
   if (value === null || value === undefined) return null
   if (typeof value === 'boolean') return value ? '1' : null
   if (Array.isArray(value)) return value.length ? value.join(',') : null
@@ -82,7 +82,7 @@ function serialize(value: FilterPrimitive): string | null {
   return s ? s : null
 }
 
-function parseInto<F extends FiltersBag>(
+export function parseListFilters<F extends FiltersBag>(
   defaults: F,
   query: Record<string, string | string[] | null | undefined>
 ): F {
@@ -94,7 +94,7 @@ function parseInto<F extends FiltersBag>(
     const raw = query[key]
     if (raw === undefined || raw === null) continue
     const value = Array.isArray(raw) ? raw[raw.length - 1] : raw
-    if (value === undefined || value === null) continue
+    if (value === undefined || value === null || value === '') continue
     const def = defaultsDict[key]
     if (typeof def === 'boolean') {
       out[key] = value === '1' || value === 'true'
@@ -121,7 +121,7 @@ export function useListQuery<F extends FiltersBag, R>(
   const debounceMs = cfg.searchDebounce ?? 300
 
   // ---- State -----------------------------------------------------------
-  const filters = ref<F>(parseInto(cfg.defaults, route.query as Record<string, string | string[]>))
+  const filters = ref<F>(parseListFilters(cfg.defaults, route.query as Record<string, string | string[]>))
   const page = ref<number>(Number(route.query.page) > 0 ? Number(route.query.page) : 1)
   const pageSize = ref<number>(pageSizeVal)
   const sort = ref<string>(
@@ -140,7 +140,7 @@ export function useListQuery<F extends FiltersBag, R>(
   function pushUrl() {
     const next: Record<string, string> = {}
     for (const [k, v] of Object.entries(filters.value)) {
-      const s = serialize(v as FilterPrimitive)
+      const s = serializeListFilter(v as FilterPrimitive)
       if (s !== null) next[k] = s
     }
     if (page.value > 1) next.page = String(page.value)
@@ -243,7 +243,7 @@ export function useListQuery<F extends FiltersBag, R>(
   watch(
     () => route.query,
     (q) => {
-      const parsed = parseInto(cfg.defaults, q as Record<string, string | string[]>)
+      const parsed = parseListFilters(cfg.defaults, q as Record<string, string | string[]>)
       if (!shallowEqualFilters(parsed, filters.value)) filters.value = parsed
       const nextPage = Number(q.page) > 0 ? Number(q.page) : 1
       if (nextPage !== page.value) page.value = nextPage

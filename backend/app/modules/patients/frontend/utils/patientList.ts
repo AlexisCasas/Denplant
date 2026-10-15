@@ -17,6 +17,14 @@ export function canArchivePatient(
   return canWrite && patient?.status === 'active'
 }
 
+export function canStartPatientArchive(
+  patient: Pick<Patient, 'status'> | null | undefined,
+  canWrite: boolean,
+  isSubmitting: boolean
+): boolean {
+  return !isSubmitting && canArchivePatient(patient, canWrite)
+}
+
 export function buildPatientListParams(
   filters: {
     q: string

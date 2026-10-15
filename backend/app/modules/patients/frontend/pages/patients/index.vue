@@ -2,7 +2,7 @@
 import type { Patient, PatientCreate, PaginatedResponse, ApiResponse } from '~~/app/types'
 import { PATIENT_STATUS_ROLE, type PatientStatus } from '~~/app/config/severity'
 import { PERMISSIONS } from '~~/app/config/permissions'
-import { buildPatientListParams, canArchivePatient, requestPatientArchive } from '../../utils/patientList'
+import { buildPatientListParams, canArchivePatient, canStartPatientArchive, requestPatientArchive } from '../../utils/patientList'
 
 /**
  * /patients — list page.
@@ -154,7 +154,7 @@ function requestArchive(patient: Patient) {
 
 async function archivePatientFromList() {
   const patient = patientToArchive.value
-  if (!canArchivePatient(patient, canWritePatients.value)) {
+  if (!canStartPatientArchive(patient, canWritePatients.value, isArchiving.value)) {
     isArchiveModalOpen.value = false
     patientToArchive.value = null
     return
