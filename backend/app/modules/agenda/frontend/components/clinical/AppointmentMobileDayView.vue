@@ -324,6 +324,7 @@ const hasAnyEntry = computed(() => entries.value.length > 0)
           @click="shiftDay(1)"
         />
       </div>
+      <slot name="legend" />
 
       <!-- 7-day strip -->
       <div class="grid grid-cols-7 gap-1 px-2 pb-2">

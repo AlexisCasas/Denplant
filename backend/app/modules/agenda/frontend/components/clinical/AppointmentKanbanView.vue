@@ -480,6 +480,7 @@ function isInvalidHint(col: ColumnDef): boolean {
         {{ formattedDate() }}
       </h2>
     </div>
+    <slot name="legend" />
 
     <!-- Professionals strip (#51): one pill per working pro today, live
          state derived from appointments + schedules. -->
