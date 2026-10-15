@@ -75,6 +75,13 @@ export function useModules() {
   async function ensureLoaded(force = false): Promise<void> {
     const token = auth.accessToken.value
     if (!token) return
+    const sessionGeneration = auth.sessionGeneration.value
+
+    // `useApi` may replace an expired access token after a 401 and retry the
+    // same request. The generation changes for logout/login (including the
+    // same account) but not for an in-session refresh.
+    const belongsToCurrentSession = () =>
+      auth.sessionGeneration.value === sessionGeneration
 
     const context = moduleLoadContextFor(useNuxtApp())
     if (context.inFlight?.token === token) {
@@ -98,15 +105,15 @@ export function useModules() {
           '/api/v1/modules/-/active'
         )
 
-        // A previous session's response must never replace data loaded for
-        // the current token after logout/login in the same browser app.
-        if (auth.accessToken.value === token) {
+        // Accept a token refresh for the same user, but never let a previous
+        // user's response replace data after logout/login in this browser.
+        if (belongsToCurrentSession()) {
           active.value = response.data
           lastLoadedAt.value = Date.now()
           context.loadedToken = token
         }
       } catch (err) {
-        if (auth.accessToken.value === token) {
+        if (belongsToCurrentSession()) {
           error.value = err instanceof Error ? err.message : 'Failed to load modules'
           console.warn('useModules: backend fetch failed —', error.value)
           active.value = null

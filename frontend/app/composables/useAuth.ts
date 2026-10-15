@@ -28,6 +28,9 @@ export function useAuth() {
   // State
   const user = useState<User | null>('auth:user', () => null)
   const permissions = useState<string[]>('auth:permissions', () => [])
+  // Advances only when a session ends or a new login starts. Unlike the
+  // access token, it deliberately does not change during a token refresh.
+  const sessionGeneration = useState<number>('auth:session-generation', () => 0)
   // The role of the *current clinic membership*, straight from `/auth/me`
   // (`clinics[0].role`: the membership the backend itself uses when no
   // clinic_id is sent). `User.role` is not it: the API never sends one.
@@ -71,12 +74,14 @@ export function useAuth() {
 
   /** Store a token pair obtained out-of-band (e.g. invite set-password) and load the user. */
   async function applyTokens(access: string, refresh: string): Promise<void> {
+    sessionGeneration.value += 1
     accessToken.value = access
     refreshToken.value = refresh
     await fetchUser()
   }
 
   async function logout(): Promise<void> {
+    sessionGeneration.value += 1
     accessToken.value = null
     refreshToken.value = null
     user.value = null
@@ -193,6 +198,7 @@ export function useAuth() {
         await refresh()
       }
     } catch {
+      sessionGeneration.value += 1
       accessToken.value = null
       refreshToken.value = null
       user.value = null
@@ -204,6 +210,7 @@ export function useAuth() {
   return {
     user: readonly(user),
     permissions: readonly(permissions),
+    sessionGeneration: readonly(sessionGeneration),
     currentRole: readonly(currentRole),
     accessToken: readonly(accessToken),
     isAuthenticated,
