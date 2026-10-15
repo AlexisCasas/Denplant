@@ -8,7 +8,7 @@ from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.patients.schemas import PatientBrief
 
@@ -21,6 +21,59 @@ AppointmentStatus = Literal[
     "cancelled",
     "no_show",
 ]
+
+
+class AppointmentLabelBase(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    color: str = Field(min_length=7, max_length=7, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Label name is required")
+        return value
+
+    @field_validator("color")
+    @classmethod
+    def normalize_color(cls, value: str) -> str:
+        return value.upper()
+
+
+class AppointmentLabelCreate(AppointmentLabelBase):
+    pass
+
+
+class AppointmentLabelUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=40)
+    color: str | None = Field(default=None, min_length=7, max_length=7, pattern=r"^#[0-9A-Fa-f]{6}$")
+    is_active: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Label name is required")
+        return value
+
+    @field_validator("color")
+    @classmethod
+    def normalize_color(cls, value: str | None) -> str | None:
+        return value.upper() if value is not None else value
+
+
+class AppointmentLabelResponse(AppointmentLabelBase):
+    id: UUID
+    clinic_id: UUID
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Professional brief -------------------------------------------------
 
@@ -178,6 +231,7 @@ class AppointmentCreate(BaseModel):
     treatment_type: str | None = Field(default=None, max_length=100)  # Legacy field
     planned_item_ids: list[UUID] | None = None
     color: str | None = Field(default=None, max_length=7)
+    appointment_label_id: UUID | None = None
 
 
 class AppointmentUpdate(BaseModel):
@@ -191,6 +245,7 @@ class AppointmentUpdate(BaseModel):
     planned_item_ids: list[UUID] | None = None
     status: str | None = None
     color: str | None = Field(default=None, max_length=7)
+    appointment_label_id: UUID | None = None
 
 
 class AppointmentStatusTransition(BaseModel):
@@ -299,6 +354,8 @@ class AppointmentResponse(BaseModel):
     status: str
     current_status_since: datetime
     color: str | None
+    appointment_label_id: UUID | None = None
+    appointment_label: AppointmentLabelResponse | None = None
     created_at: datetime
     updated_at: datetime
     patient: PatientBrief | None = None
@@ -337,6 +394,8 @@ class AppointmentResponse(BaseModel):
                 "status": data.status,
                 "current_status_since": data.current_status_since,
                 "color": data.color,
+                "appointment_label_id": data.appointment_label_id,
+                "appointment_label": data.appointment_label,
                 "created_at": data.created_at,
                 "updated_at": data.updated_at,
                 "patient": data.patient,

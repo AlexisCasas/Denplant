@@ -141,7 +141,7 @@ const timerClass = computed(() => {
 })
 
 const cardStyle = computed(() => ({
-  borderLeftColor: statusColour(props.appointment.status),
+  borderLeftColor: props.appointment.appointment_label?.color || statusColour(props.appointment.status),
   borderLeftWidth: '4px',
   borderLeftStyle: 'solid' as const
 }))
@@ -195,7 +195,13 @@ const cardStyle = computed(() => ({
     </div>
     <div class="flex items-center justify-between gap-2 mt-1">
       <UBadge
-        v-if="cabinet"
+        v-if="appointment.appointment_label"
+        :label="appointment.appointment_label.name"
+        :style="{ backgroundColor: appointment.appointment_label.color, color: '#fff' }"
+        size="xs"
+      />
+      <UBadge
+        v-else-if="cabinet"
         :label="cabinet.name"
         :style="{ backgroundColor: cabinet.color, color: '#fff' }"
         size="xs"

@@ -270,7 +270,7 @@ function getProfessionalFullName(professionalId: string): string {
 // Get appointment style with cabinet color
 // Per DESIGN §7.3: fill at alpha 0.12 in cabinet colour, 3 px left border in full colour.
 function getAppointmentColorStyle(appointment: Appointment): Record<string, string> {
-  const color = getCabinetColor(appointment.cabinet)
+  const color = appointment.appointment_label?.color || getCabinetColor(appointment.cabinet)
   // Convert hex to rgba with alpha for fill tint
   const r = parseInt(color.slice(1, 3), 16)
   const g = parseInt(color.slice(3, 5), 16)
@@ -842,6 +842,11 @@ const allAppointmentsWithDayIndex = computed(() => {
                     >
                       {{ appointment.cabinet }}{{ appointment.treatment_type ? ` · ${appointment.treatment_type}` : '' }}
                     </div>
+                    <span
+                      v-if="appointment.appointment_label"
+                      class="text-[10px] leading-none truncate"
+                      :title="appointment.appointment_label.name"
+                    >{{ appointment.appointment_label.name }}</span>
                   </div>
 
                   <!-- Resize handle -->
