@@ -148,9 +148,10 @@
     "archived": "Patient archivé",
     "notFound": "Patient introuvable",
     "archiveConfirm": "Archiver le patient {name} ?",
-    "archiveDescription": "Cette action masquera le patient des recherches. Les rendez-vous existants ne seront pas supprimés.",
+    "archiveDescription": "Le patient sera archivé et non supprimé définitivement. Les rendez-vous et l'historique seront conservés.",
     "cancel": "Annuler",
     "archive": "Archiver",
+    "archiveFor": "Archiver {name}",
     "dangerZone": {
       "title": "Zone de danger",
       "archiveHelp": "Archiver le patient pour le masquer des recherches. Les rendez-vous et l'historique sont conservés."

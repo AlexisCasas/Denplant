@@ -148,9 +148,10 @@
     "archived": "Paciente arquivado",
     "notFound": "Paciente não encontrado",
     "archiveConfirm": "Arquivar o paciente {name}?",
-    "archiveDescription": "Esta ação irá ocultar o paciente das pesquisas. As consultas existentes não serão eliminadas.",
+    "archiveDescription": "O paciente será arquivado, não eliminado definitivamente. As consultas e o histórico serão preservados.",
     "cancel": "Cancelar",
     "archive": "Arquivar",
+    "archiveFor": "Arquivar {name}",
     "dangerZone": {
       "title": "Zona de perigo",
       "archiveHelp": "Arquive o paciente para o ocultar das pesquisas. As consultas e o histórico são preservados."

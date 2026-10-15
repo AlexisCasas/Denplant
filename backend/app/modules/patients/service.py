@@ -163,6 +163,7 @@ class PatientService:
         patient_ids: list[UUID] | None = None,
         city: str | None = None,
         do_not_contact: bool | None = None,
+        statuses: list[str] | None = None,
         include_archived: bool = False,
         sort: str | None = None,
         access_predicate: ColumnElement[bool] | None = None,
@@ -185,7 +186,18 @@ class PatientService:
         conditions = [Patient.clinic_id == clinic_id]
         if access_predicate is not None:
             conditions.append(access_predicate)
-        if not include_archived:
+        if statuses is not None:
+            allowed_statuses = {"active", "archived"}
+            invalid_statuses = set(statuses) - allowed_statuses
+            if invalid_statuses:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid patient status filter.",
+                )
+            if not statuses:
+                return [], 0
+            conditions.append(Patient.status.in_(statuses))
+        elif not include_archived:
             conditions.append(Patient.status != "archived")
 
         if patient_ids:
