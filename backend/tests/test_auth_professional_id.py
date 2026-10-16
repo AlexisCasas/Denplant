@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.models import Clinic, ClinicMembership, User
 from app.core.auth.service import create_access_token, hash_password
 
-
 USERS = "/api/v1/auth/users"
 
 
@@ -60,7 +59,9 @@ async def test_update_registration_distinguishes_omitted_value_and_explicit_clea
 ) -> None:
     user = await _create(client, auth_headers, professional_id="COL-100")
 
-    omitted = await client.put(f"{USERS}/{user['id']}", json={"first_name": "Grace"}, headers=auth_headers)
+    omitted = await client.put(
+        f"{USERS}/{user['id']}", json={"first_name": "Grace"}, headers=auth_headers
+    )
     assert omitted.status_code == 200
     assert omitted.json()["data"]["professional_id"] == "COL-100"
 
@@ -92,7 +93,9 @@ async def test_registration_rejects_values_longer_than_fifty_characters(
     assert create.status_code == 422
 
     user = await _create(client, auth_headers)
-    update = await client.put(f"{USERS}/{user['id']}", json={"professional_id": too_long}, headers=auth_headers)
+    update = await client.put(
+        f"{USERS}/{user['id']}", json={"professional_id": too_long}, headers=auth_headers
+    )
     assert update.status_code == 422
 
 
@@ -112,7 +115,9 @@ async def test_registration_update_requires_admin_permission_and_current_clinic_
     )
     db_session.add(staff)
     await db_session.flush()
-    db_session.add(ClinicMembership(user_id=staff.id, clinic_id=test_clinic.id, role="receptionist"))
+    db_session.add(
+        ClinicMembership(user_id=staff.id, clinic_id=test_clinic.id, role="receptionist")
+    )
     outsider = User(
         email=f"outside-{uuid4().hex[:10]}@example.com",
         password_hash=hash_password("TestPass1234"),
@@ -122,7 +127,9 @@ async def test_registration_update_requires_admin_permission_and_current_clinic_
     db_session.add(outsider)
     await db_session.commit()
 
-    staff_headers = {"Authorization": f"Bearer {create_access_token(staff.id, token_version=staff.token_version)}"}
+    staff_headers = {
+        "Authorization": f"Bearer {create_access_token(staff.id, token_version=staff.token_version)}"
+    }
     forbidden = await client.put(
         f"{USERS}/{target['id']}", json={"professional_id": "COL-300"}, headers=staff_headers
     )
