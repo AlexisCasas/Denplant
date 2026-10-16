@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- fix(DP-08.A): Plan therapeutic overlay is anchored with the diagnostic NTS
+  geometry through the new `ntsTherapeuticGeometry.ts`. M/D/V/L follow tooth
+  side and arch in both dentitions (previously fixed positions), catalog
+  `cenital_pattern` values and `occlusal_surface` kinds are honoured, apex and
+  beyond-apex icons use the tooth's apex (mirrored in the upper arch), the
+  pulp fill grows from the crown in either arch, and icons without a symbol
+  (e.g. `splint`) get a generic indicator. Frontend only: stored snapshots,
+  API and diagnostic rendering are unchanged.
+
 - feat(H2.3): Plan therapeutic overlays now use a deterministic composition
   order (surfaces, pulp, coverage, lateral icons, bridges, state decorators,
   counters). Active overlapping treatments are preserved and expose a

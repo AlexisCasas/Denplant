@@ -33,7 +33,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/treatment_plan/frontend/pages/treatment-plans/[id].vue
   - backend/app/modules/treatment_plan/router.py
-last_verified_commit: e1d6873
+last_verified_commit: ecb4a01
 ---
 
 # Treatment plan detail
@@ -44,10 +44,15 @@ last_verified_commit: e1d6873
 > treatments remain available in the plan list.
 
 > When multiple active therapies overlap on a tooth, the chart composes them
-> by layer and displays a `+n` count. Selecting the tooth preserves every
-> treatment for review or permitted editing. The legend below the chart lists
-> only symbols present in the plan; cancelled treatments remain in history but
-> are not counted.
+> by layer and displays the number of active treatments inside a circle (also
+> exposed to screen readers). Selecting the tooth preserves every active
+> treatment for review or permitted editing. Surfaces M, D, V and L are placed
+> from the tooth's side and arch, as in the diagnosis. The legend below the
+> chart explains only the symbols that are visible, including the generic
+> indicators when a treatment has no stored therapeutic representation.
+> Cancelled treatments remain in the plan list and history but are not drawn
+> on the chart (no layers, dots, bridges, global treatments, counter or
+> legend entry).
 
 Plan view: header with patient, professional, and status; main
 column with the items (catalog or odontogram tooth treatment); and
