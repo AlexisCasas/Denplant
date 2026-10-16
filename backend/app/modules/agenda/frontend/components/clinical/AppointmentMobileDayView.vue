@@ -297,6 +297,7 @@ function createNow() {
 }
 
 const hasAnyEntry = computed(() => entries.value.length > 0)
+const visibleAppointmentIds = computed(() => props.appointments.map(appointment => appointment.id))
 </script>
 
 <template>
@@ -426,6 +427,7 @@ const hasAnyEntry = computed(() => entries.value.length > 0)
       <AppointmentMobileTimeline
         v-else
         :entries="entries"
+        :visible-appointment-ids="visibleAppointmentIds"
         :professionals="professionals"
         :highlighted-appointment-id="highlightedAppointmentId"
         @appointment-click="emit('appointment-click', $event)"
