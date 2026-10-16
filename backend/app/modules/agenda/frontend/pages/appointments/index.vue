@@ -641,7 +641,7 @@ watch(isMobile, async (mobile) => {
 </script>
 
 <template>
-  <div class="h-full lg:h-[calc(100dvh-6.5rem)] flex flex-col w-full min-w-0 overflow-hidden">
+  <div class="h-full flex flex-col w-full min-w-0 overflow-hidden">
     <PageHeader
       :title="t('appointments.title')"
       class="agenda-page-header shrink-0"
