@@ -33,7 +33,6 @@ from app.modules.prescriptions.models import Prescription
 from app.modules.prescriptions.pdf import (
     PrescriptionPDFService,
     build_pdf_context,
-    data_only_url_fetcher,
     pdf_filename,
     render_html,
     resolve_locale,
@@ -959,9 +958,10 @@ async def test_printing_creates_no_files_in_storage(api, env, inspect):
 # ===========================================================================
 
 
-# The plain-callable fetcher is only used on WeasyPrint < 68, where it is not deprecated.
-@pytest.mark.filterwarnings("ignore:default_url_fetcher is deprecated:DeprecationWarning")
 def test_only_data_urls_may_be_loaded_while_rendering():
+    import weasyprint
+
+    fetcher = pdf_module._url_fetcher(weasyprint)
     for forbidden in (
         "http://example.com/x.png",
         "https://example.com/x.png",
@@ -970,22 +970,36 @@ def test_only_data_urls_may_be_loaded_while_rendering():
         "//example.com/x",
     ):
         with pytest.raises(ValueError):
-            data_only_url_fetcher(forbidden)
+            fetcher.fetch(forbidden) if hasattr(fetcher, "fetch") else fetcher(forbidden)
 
-    allowed = data_only_url_fetcher("data:text/plain;base64,aGk=")
+    allowed = (
+        fetcher.fetch("data:text/plain;base64,aGk=")
+        if hasattr(fetcher, "fetch")
+        else fetcher("data:text/plain;base64,aGk=")
+    )
     assert allowed is not None
 
 
 def test_the_renderer_is_configured_with_a_restrictive_fetcher():
     import weasyprint
+    from weasyprint.urls import URLFetcher
 
     fetcher = pdf_module._url_fetcher(weasyprint)
-    if hasattr(weasyprint, "URLFetcher"):
-        assert isinstance(fetcher, weasyprint.URLFetcher)
-        with pytest.raises(Exception):  # noqa: B017
-            fetcher.fetch("http://127.0.0.1:9/x.png")
-    else:
-        assert fetcher is data_only_url_fetcher
+    assert isinstance(fetcher, URLFetcher)
+    with pytest.raises(ValueError):
+        fetcher.fetch("http://127.0.0.1:9/x.png")
+
+
+def test_a_data_url_image_is_embedded_by_the_restrictive_fetcher():
+    from base64 import b64encode
+
+    data_url = b64encode(png(2, 2)).decode("ascii")
+    pdf_bytes = pdf_module._html_to_pdf(
+        f'<html><body><img src="data:image/png;base64,{data_url}"></body></html>', uuid4()
+    )
+
+    assert pdf_bytes.startswith(b"%PDF")
+    assert has_image(pdf_bytes)
 
 
 def test_an_external_resource_is_never_requested(monkeypatch):
