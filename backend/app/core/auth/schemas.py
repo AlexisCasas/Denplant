@@ -22,6 +22,18 @@ def _validate_iana_timezone(value: str | None) -> str | None:
     return value
 
 
+def _normalize_professional_id(value: str | None) -> str | None:
+    """Normalize an optional professional registration without imposing a format."""
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if len(normalized) > 50:
+        raise ValueError("Professional registration number must be at most 50 characters")
+    return normalized
+
+
 class UserLogin(BaseModel):
     """Schema for user login."""
 
@@ -178,6 +190,7 @@ class UserCreate(BaseModel):
     password: str | None = Field(default=None, min_length=8)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
+    professional_id: str | None = None
     role: str = Field(description="Role: admin, dentist, hygienist, assistant, receptionist")
     clinic_id: UUID | None = Field(
         default=None, description="Clinic ID. If not provided, uses admin's current clinic"
@@ -187,6 +200,8 @@ class UserCreate(BaseModel):
         description="Appears in the agenda / can be assigned treatments. "
         "Defaults to true for dentist/hygienist, false otherwise.",
     )
+
+    _normalize_professional_id = field_validator("professional_id")(_normalize_professional_id)
 
 
 class InviteLinkResponse(BaseModel):
@@ -210,6 +225,7 @@ class UserWithRoleResponse(BaseModel):
     email: str
     first_name: str
     last_name: str
+    professional_id: str | None = None
     is_active: bool
     role: str
     is_professional: bool = False
@@ -224,6 +240,7 @@ class UserUpdate(BaseModel):
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
     email: EmailStr | None = None
+    professional_id: str | None = None
     role: str | None = Field(
         default=None, description="Role: admin, dentist, hygienist, assistant, receptionist"
     )
@@ -233,6 +250,8 @@ class UserUpdate(BaseModel):
         description="Appears in the agenda / can be assigned treatments. "
         "When only `role` changes, the flag is re-derived from the new role.",
     )
+
+    _normalize_professional_id = field_validator("professional_id")(_normalize_professional_id)
 
 
 class ProfessionalResponse(BaseModel):

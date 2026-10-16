@@ -1436,6 +1436,8 @@
     "youTag": "(tú)",
     "userActive": "Usuario activo",
     "isProfessional": "Ejerce como profesional",
+    "professionalRegistration": "Número de colegiatura",
+    "professionalRegistrationHelp": "Número de registro profesional del odontólogo.",
     "isProfessionalHelp": "Aparece en la agenda, tiene horario y se le pueden asignar tratamientos. Un administrador también puede ejercer.",
     "userInactiveNote": "(No podrá iniciar sesión)",
     "saveChanges": "Guardar Cambios",

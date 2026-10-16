@@ -6,7 +6,7 @@ export interface User {
   email: string
   first_name: string
   last_name: string
-  professional_id?: string
+  professional_id?: string | null
   role?: 'admin' | 'dentist' | 'hygienist' | 'assistant' | 'receptionist'
   is_active: boolean
   created_at: string
@@ -142,6 +142,7 @@ export interface UserCreate {
   password?: string
   first_name: string
   last_name: string
+  professional_id?: string | null
   role: UserRole
   clinic_id?: string
   // Omitted → backend derives from role (true for dentist/hygienist)
@@ -152,6 +153,7 @@ export interface UserUpdate {
   first_name?: string
   last_name?: string
   email?: string
+  professional_id?: string | null
   role?: UserRole
   is_active?: boolean
   is_professional?: boolean

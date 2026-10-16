@@ -59,7 +59,7 @@ async function copyInvite() {
 const showEdit = ref(false)
 const isUpdating = ref(false)
 const editing = ref<ClinicUser | null>(null)
-const editData = ref({ email: '', first_name: '', last_name: '', is_active: true })
+const editData = ref({ email: '', first_name: '', last_name: '', professional_id: '', is_active: true })
 const editSelectedRole = ref<UserRole>('receptionist')
 const editIsProfessional = ref(false)
 
@@ -118,6 +118,7 @@ function openEdit(user: ClinicUser) {
     email: user.email,
     first_name: user.first_name,
     last_name: user.last_name,
+    professional_id: user.professional_id ?? '',
     is_active: user.is_active
   }
   editSelectedRole.value = user.role
@@ -132,6 +133,7 @@ async function handleUpdate() {
     first_name: editData.value.first_name,
     last_name: editData.value.last_name,
     email: editData.value.email,
+    professional_id: editData.value.professional_id,
     role: editSelectedRole.value,
     is_active: editData.value.is_active,
     is_professional: editIsProfessional.value
@@ -382,6 +384,16 @@ async function handleDelete() {
                 v-model="editData.email"
                 type="email"
                 required
+              />
+            </UFormField>
+
+            <UFormField
+              :label="t('settings.professionalRegistration')"
+              :help="t('settings.professionalRegistrationHelp')"
+            >
+              <UInput
+                v-model="editData.professional_id"
+                maxlength="50"
               />
             </UFormField>
 
