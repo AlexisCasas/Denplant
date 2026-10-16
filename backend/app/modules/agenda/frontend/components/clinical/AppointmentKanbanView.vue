@@ -17,7 +17,10 @@ interface ProfessionalWithColor {
 }
 
 const props = defineProps<{
+  /** Cards currently visible after display filters are applied. */
   appointments: Appointment[]
+  /** Complete agenda data for occupancy, next-visit and DnD validation. */
+  allAppointments?: Appointment[]
   cabinets: Cabinet[]
   professionals: ProfessionalWithColor[]
   currentDate: Date
@@ -132,6 +135,11 @@ const dayAppointments = computed(() =>
   props.appointments.filter(apt => isSameDay(apt.start_time, props.currentDate))
 )
 
+const operationalAppointments = computed(() => props.allAppointments ?? props.appointments)
+const operationalDayAppointments = computed(() =>
+  operationalAppointments.value.filter(apt => isSameDay(apt.start_time, props.currentDate))
+)
+
 function appointmentsForColumn(col: ColumnDef): Appointment[] {
   const list = dayAppointments.value.filter(a => col.statuses.includes(a.status))
   if (col.id === 'waiting') {
@@ -164,7 +172,7 @@ const inChairByCabinet = computed(() => {
   for (const c of props.cabinets) {
     grouped.set(c.name, null)
   }
-  for (const apt of dayAppointments.value) {
+  for (const apt of operationalDayAppointments.value) {
     if (apt.status === 'in_treatment' && apt.cabinet) {
       grouped.set(apt.cabinet, apt)
     }
@@ -175,12 +183,15 @@ const inChairByCabinet = computed(() => {
       color: '#6B7280'
     }
     const isActive = (cabinet as { is_active?: boolean }).is_active !== false
+    const visibleAppointment = apt && dayAppointments.value.some(candidate => candidate.id === apt.id)
+      ? apt
+      : null
     const state: CabinetState = !isActive
       ? 'inactive'
       : apt !== null
         ? 'in_use'
         : 'free'
-    return { cabinet, appointment: apt, state }
+    return { cabinet, appointment: visibleAppointment, isOccupied: apt !== null, state }
   })
 })
 
@@ -192,7 +203,7 @@ const CABINET_STATE_ACCENT: Record<CabinetState, string> = {
 
 // Next upcoming appointment per cabinet (to show when the cabinet is free).
 function nextForCabinet(cabinetName: string): Appointment | null {
-  const later = dayAppointments.value
+  const later = operationalDayAppointments.value
     .filter(a => a.cabinet === cabinetName && ['scheduled', 'confirmed'].includes(a.status))
     .sort((a, b) =>
       new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
@@ -230,7 +241,7 @@ function onDragEnd() {
 
 function onDragOverColumn(col: ColumnDef, e: DragEvent, cabinetName?: string) {
   if (!drag.value) return
-  const apt = props.appointments.find(a => a.id === drag.value!.appointmentId)
+  const apt = operationalAppointments.value.find(a => a.id === drag.value!.appointmentId)
   if (!apt) return
   if (!canDropOn(apt, col)) return
   e.preventDefault()
@@ -266,7 +277,7 @@ async function onDrop(col: ColumnDef, e: DragEvent, cabinetName?: string) {
   e.preventDefault()
   if (!drag.value) return
   const aptId = drag.value.appointmentId
-  const apt = props.appointments.find(a => a.id === aptId)
+  const apt = operationalAppointments.value.find(a => a.id === aptId)
   drag.value = null
   if (!apt) return
 
@@ -386,11 +397,11 @@ function avgWaitMinutes(): number | null {
 }
 
 function cabinetsFreeCount(): number {
-  return inChairByCabinet.value.filter(x => x.appointment === null).length
+  return inChairByCabinet.value.filter(x => !x.isOccupied).length
 }
 
 function cabinetsBusyCount(): number {
-  return inChairByCabinet.value.filter(x => x.appointment !== null).length
+  return inChairByCabinet.value.filter(x => x.isOccupied).length
 }
 
 function headerSubtitle(col: ColumnDef): string {
@@ -445,7 +456,7 @@ function isDropHint(col: ColumnDef, cabinetName?: string): boolean {
 
 function isInvalidHint(col: ColumnDef): boolean {
   if (!drag.value) return false
-  const apt = props.appointments.find(a => a.id === drag.value!.appointmentId)
+  const apt = operationalAppointments.value.find(a => a.id === drag.value!.appointmentId)
   if (!apt) return false
   return !canDropOn(apt, col)
 }
@@ -578,7 +589,7 @@ function isInvalidHint(col: ColumnDef): boolean {
                   />
                   <span class="text-ui text-default truncate">{{ entry.cabinet.name }}</span>
                   <span
-                    v-if="!entry.appointment"
+                    v-if="!entry.isOccupied"
                     class="ml-auto text-caption text-subtle italic"
                   >{{ entry.state === 'inactive' ? t('appointments.kanban.inactive') : t('appointments.kanban.free') }}</span>
                 </div>
@@ -592,6 +603,13 @@ function isInvalidHint(col: ColumnDef): boolean {
                   @dragstart="onDragStart(entry.appointment as Appointment, $event)"
                   @dragend="onDragEnd"
                 />
+                <div
+                  v-else-if="entry.isOccupied"
+                  class="text-caption text-subtle italic px-1"
+                  aria-label="Occupied cabinet"
+                >
+                  {{ t('appointments.kanban.inChair') }}
+                </div>
                 <div
                   v-else-if="nextForCabinet(entry.cabinet.name)"
                   class="text-caption text-subtle italic px-1"

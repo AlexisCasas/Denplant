@@ -27,6 +27,8 @@ interface ProfessionalWithColor extends Professional {
 
 const props = defineProps<{
   appointments: readonly Appointment[]
+  /** Full period data, kept separate from display-only label filtering. */
+  allAppointments?: readonly Appointment[]
   professionals: ProfessionalWithColor[]
   cabinets: Cabinet[]
   currentDate: Date
@@ -212,7 +214,9 @@ const bounds = computed<DayBounds>(() => {
 
 // ---- Free-slot engine -------------------------------------------
 
-const appointmentsRef = computed(() => props.appointments)
+// Availability must always subtract every existing reservation, even if a
+// label filter hides its card from the timeline.
+const appointmentsRef = computed(() => props.allAppointments ?? props.appointments)
 
 const { entries, summary } = useFreeSlots({
   appointments: appointmentsRef,

@@ -19,6 +19,7 @@ const router = useRouter()
 const clinic = useClinic()
 const { appointments, isLoading, fetchAppointments, updateAppointment } = useAppointments()
 const { labels, fetchLabels } = useAppointmentLabels()
+const { currentClinic } = useClinicState()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
 const { canManageAllProfessionals, can } = usePermissions()
 const auth = useAuth()
@@ -26,7 +27,21 @@ const { isMobile } = useBreakpoint()
 const labelsModalOpen = ref(false)
 const selectedLabelId = ref<string | null>(null)
 
-onMounted(() => { void fetchLabels() })
+async function loadLabelsSafely() {
+  try {
+    await fetchLabels()
+  } catch {
+    // Labels are an optional display filter; the agenda must remain usable
+    // when the catalogue is temporarily unavailable.
+    toast.add({ title: t('appointments.labels.title'), description: t('common.error'), color: 'warning' })
+  }
+}
+
+onMounted(() => { void loadLabelsSafely() })
+
+watch(currentClinic, (clinic, previousClinic) => {
+  if (clinic?.id !== previousClinic?.id) void loadLabelsSafely()
+})
 
 watch(labels, (catalogue) => {
   if (selectedLabelId.value && !catalogue.some(label => label.id === selectedLabelId.value && label.is_active)) {
@@ -727,6 +742,7 @@ watch(isMobile, async (mobile) => {
       <AppointmentMobileDayView
         v-if="isMobile"
         :appointments="filteredAppointments"
+        :all-appointments="appointments"
         :professionals="professionalsWithColors"
         :cabinets="clinic.cabinets.value"
         :current-date="currentDate"
@@ -784,6 +800,7 @@ watch(isMobile, async (mobile) => {
       <AppointmentKanbanView
         v-else
         :appointments="filteredAppointments"
+        :all-appointments="appointments"
         :cabinets="clinic.cabinets.value"
         :professionals="professionalsWithColors"
         :current-date="currentDate"
