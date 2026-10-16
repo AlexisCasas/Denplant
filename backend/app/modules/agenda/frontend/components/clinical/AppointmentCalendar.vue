@@ -672,6 +672,7 @@ const allAppointmentsWithDayIndex = computed(() => {
         {{ weekRangeText }}
       </h2>
     </div>
+    <slot name="legend" />
 
     <!-- Loading overlay -->
     <div

@@ -1255,7 +1255,8 @@
       "noFreeSlots": "No hay huecos disponibles este día",
       "clinicClosed": "Clínica cerrada",
       "professionalOff": "No disponible",
-      "onBreak": "Pausa"
+      "onBreak": "Pausa",
+      "occupied": "Ocupado"
     }
   },
   "dashboard": {

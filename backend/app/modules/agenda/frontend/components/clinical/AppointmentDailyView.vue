@@ -513,6 +513,7 @@ const appointmentsByProfIndex = computed(() => {
         {{ formattedDate }}
       </h2>
     </div>
+    <slot name="legend" />
 
     <!-- Loading -->
     <div

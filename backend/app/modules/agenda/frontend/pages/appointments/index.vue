@@ -18,11 +18,36 @@ const route = useRoute()
 const router = useRouter()
 const clinic = useClinic()
 const { appointments, isLoading, fetchAppointments, updateAppointment } = useAppointments()
+const { labels, fetchLabels } = useAppointmentLabels()
+const { currentClinic } = useClinicState()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
 const { canManageAllProfessionals, can } = usePermissions()
 const auth = useAuth()
 const { isMobile } = useBreakpoint()
 const labelsModalOpen = ref(false)
+const selectedLabelId = ref<string | null>(null)
+
+async function loadLabelsSafely() {
+  try {
+    await fetchLabels()
+  } catch {
+    // Labels are an optional display filter; the agenda must remain usable
+    // when the catalogue is temporarily unavailable.
+    toast.add({ title: t('appointments.labels.title'), description: t('common.error'), color: 'warning' })
+  }
+}
+
+onMounted(() => { void loadLabelsSafely() })
+
+watch(currentClinic, (clinic, previousClinic) => {
+  if (clinic?.id !== previousClinic?.id) void loadLabelsSafely()
+})
+
+watch(labels, (catalogue) => {
+  if (selectedLabelId.value && !catalogue.some(label => label.id === selectedLabelId.value && label.is_active)) {
+    selectedLabelId.value = null
+  }
+})
 
 // Query params for pre-selecting patient from treatment plan flow
 const initialPatientId = ref<string | undefined>(
@@ -96,6 +121,10 @@ const filteredAppointments = computed(() => {
   // Filter by professional
   if (selectedProfessionals.value.length > 0) {
     result = result.filter(apt => selectedProfessionals.value.includes(apt.professional_id))
+  }
+
+  if (selectedLabelId.value) {
+    result = result.filter(apt => apt.appointment_label_id === selectedLabelId.value)
   }
 
   return result
@@ -713,6 +742,7 @@ watch(isMobile, async (mobile) => {
       <AppointmentMobileDayView
         v-if="isMobile"
         :appointments="filteredAppointments"
+        :all-appointments="appointments"
         :professionals="professionalsWithColors"
         :cabinets="clinic.cabinets.value"
         :current-date="currentDate"
@@ -723,7 +753,9 @@ watch(isMobile, async (mobile) => {
         @create-at="(d) => { currentDate = d; openCreateModal() }"
         @free-slot-tap="handleFreeSlotTap"
         @highlight-cleared="clearHighlight"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentMobileDayView>
 
       <!-- Weekly view -->
       <AppointmentCalendar
@@ -741,7 +773,9 @@ watch(isMobile, async (mobile) => {
         @appointment-move="handleAppointmentMove"
         @appointment-resize="handleAppointmentResize"
         @highlight-cleared="clearHighlight"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentCalendar>
 
       <!-- Daily view -->
       <AppointmentDailyView
@@ -758,12 +792,15 @@ watch(isMobile, async (mobile) => {
         @appointment-move="handleDailyAppointmentMove"
         @appointment-resize="handleDailyAppointmentResize"
         @highlight-cleared="clearHighlight"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentDailyView>
 
       <!-- Kanban view -->
       <AppointmentKanbanView
         v-else
         :appointments="filteredAppointments"
+        :all-appointments="appointments"
         :cabinets="clinic.cabinets.value"
         :professionals="professionalsWithColors"
         :current-date="currentDate"
@@ -771,7 +808,9 @@ watch(isMobile, async (mobile) => {
         @appointment-click="handleAppointmentClick"
         @date-change="handleDateChange"
         @professional-filter="handleProfessionalFilter"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentKanbanView>
     </div>
 
     <!-- Appointment Modal -->

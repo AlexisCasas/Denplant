@@ -9,9 +9,13 @@ export function useAppointmentLabels() {
   const loadedClinicId = useState<string | null>('agenda:appointment-labels:clinic', () => null)
 
   async function fetchLabels() {
+    const requestedClinicId = currentClinic.value?.id ?? null
     const response = await api.get<ApiResponse<AppointmentLabel[]>>('/api/v1/agenda/appointment-labels')
+    // A clinic/session switch can complete while an earlier request is in
+    // flight. Never publish a catalogue that belongs to that old clinic.
+    if (requestedClinicId !== (currentClinic.value?.id ?? null)) return labels.value
     labels.value = response.data
-    loadedClinicId.value = currentClinic.value?.id ?? null
+    loadedClinicId.value = requestedClinicId
     return response.data
   }
 
