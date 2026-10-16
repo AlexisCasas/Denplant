@@ -642,7 +642,10 @@ watch(isMobile, async (mobile) => {
 
 <template>
   <div class="h-full flex flex-col w-full min-w-0 overflow-hidden">
-    <PageHeader :title="t('appointments.title')">
+    <PageHeader
+      :title="t('appointments.title')"
+      class="agenda-page-header shrink-0"
+    >
       <template #actions>
         <SegmentedControl
           v-if="!isMobile"
@@ -677,11 +680,11 @@ watch(isMobile, async (mobile) => {
     <!-- Filters (hidden on mobile to save space; mobile uses simple day view) -->
     <div
       v-if="!isMobile"
-      class="flex flex-wrap items-center gap-x-6 gap-y-[var(--density-gap,0.75rem)] mb-[var(--density-gap,1rem)] shrink-0"
+      class="grid grid-cols-1 xl:grid-cols-[auto_minmax(0,1fr)] items-start gap-x-5 gap-y-2 mb-3 shrink-0 rounded-token-lg border border-subtle bg-surface-muted/40 px-3 py-2"
     >
       <div
         v-if="cabinetFilterOptions.length > 0"
-        class="flex items-center gap-2 flex-wrap"
+        class="flex items-center gap-2 flex-wrap min-w-0"
       >
         <span class="text-caption text-subtle">
           {{ t('appointments.cabinet') }}
@@ -707,12 +710,12 @@ watch(isMobile, async (mobile) => {
 
       <div
         v-if="canManageAllProfessionals && professionalFilterOptions.length > 0"
-        class="flex items-center gap-2 min-w-0 flex-1"
+        class="flex items-center gap-2 min-w-0"
       >
         <span class="text-caption text-subtle shrink-0">
           {{ t('appointments.professional') }}
         </span>
-        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0 [&>*]:shrink-0">
+        <div class="flex flex-1 items-center gap-2 overflow-x-auto no-scrollbar min-w-0 [&>*]:shrink-0">
           <FilterChip
             v-for="prof in professionalFilterOptions"
             :key="prof.value"
@@ -846,4 +849,25 @@ watch(isMobile, async (mobile) => {
 <style scoped>
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* PageHeader is shared globally; keep its responsive treatment local to Agenda. */
+:deep(.agenda-page-header) {
+  margin-bottom: 0.75rem;
+}
+
+:deep(.agenda-page-header > div:first-child) {
+  align-items: center;
+}
+
+@media (max-width: 1279px) {
+  :deep(.agenda-page-header > div:first-child) {
+    flex-wrap: wrap;
+  }
+
+  :deep(.agenda-page-header > div:first-child > div:last-child) {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
 </style>
