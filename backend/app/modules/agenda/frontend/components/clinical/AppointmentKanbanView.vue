@@ -465,8 +465,8 @@ function isInvalidHint(col: ColumnDef): boolean {
 <template>
   <div class="flex flex-col h-full w-full min-w-0">
     <!-- Date nav -->
-    <div class="flex items-center justify-between mb-4 flex-shrink-0 min-w-0">
-      <div class="flex items-center gap-2">
+    <div class="flex items-center justify-between gap-3 mb-2 flex-shrink-0 min-w-0">
+      <div class="flex items-center gap-2 shrink-0">
         <UButton
           variant="outline"
           color="neutral"

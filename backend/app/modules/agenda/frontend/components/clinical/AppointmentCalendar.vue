@@ -645,8 +645,8 @@ const allAppointmentsWithDayIndex = computed(() => {
 <template>
   <div class="flex flex-col h-full">
     <!-- Calendar header -->
-    <div class="flex items-center justify-between mb-4 flex-shrink-0">
-      <div class="flex items-center gap-2">
+    <div class="flex items-center justify-between gap-3 mb-2 flex-shrink-0 min-w-0">
+      <div class="flex items-center gap-2 shrink-0">
         <UButton
           variant="outline"
           color="neutral"
@@ -668,7 +668,7 @@ const allAppointmentsWithDayIndex = computed(() => {
         />
       </div>
 
-      <h2 class="text-h2 text-default">
+      <h2 class="text-h2 text-default truncate text-right">
         {{ weekRangeText }}
       </h2>
     </div>

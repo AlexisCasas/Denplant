@@ -114,7 +114,7 @@ function onPillClick(pill: StripPill) {
 <template>
   <div
     v-if="pills.length > 0 || isLoading"
-    class="flex flex-wrap items-center gap-2 px-1 py-2 mb-3 border-b border-subtle"
+    class="flex flex-wrap items-center gap-2 px-1 py-1.5 mb-2 border-b border-subtle"
   >
     <span class="text-caption text-subtle mr-2 shrink-0">
       {{ t('appointments.professionals.strip') }}

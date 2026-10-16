@@ -22,7 +22,7 @@ function toggle(labelId: string) {
 <template>
   <div
     v-if="activeLabels.length"
-    class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3 min-w-0"
+    class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 min-w-0"
     role="group"
     :aria-label="t('appointments.labels.title')"
   >

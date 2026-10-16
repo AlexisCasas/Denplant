@@ -483,8 +483,8 @@ const appointmentsByProfIndex = computed(() => {
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4 flex-shrink-0">
-      <div class="flex items-center gap-2">
+    <div class="flex items-center justify-between gap-3 mb-2 flex-shrink-0 min-w-0">
+      <div class="flex items-center gap-2 shrink-0">
         <UButton
           variant="outline"
           color="neutral"
@@ -507,7 +507,7 @@ const appointmentsByProfIndex = computed(() => {
       </div>
 
       <h2
-        class="text-h2 capitalize"
+        class="text-h2 capitalize truncate text-right"
         :class="isToday ? 'text-[var(--color-primary-soft-text)]' : 'text-default'"
       >
         {{ formattedDate }}
