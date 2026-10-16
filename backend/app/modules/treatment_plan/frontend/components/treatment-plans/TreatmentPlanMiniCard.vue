@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TreatmentPlan, TreatmentPlanStatus } from '~~/app/types'
 import type { UiColor } from '~~/app/config/severity'
+import { PERMISSIONS } from '~~/app/config/permissions'
 
 const props = defineProps<{
   plan: TreatmentPlan
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { can } = usePermissions()
 
 // Progress calculations
 const totalCount = computed(() => props.plan.item_count || 0)
@@ -104,23 +106,37 @@ const { format: formatCurrency } = useCurrency()
 
     <!-- Budget link (if exists) -->
     <div
-      v-if="plan.budget"
+      v-if="plan.budget_id && can(PERMISSIONS.budget.read)"
       class="flex items-center gap-2 text-xs mb-3 p-2 bg-surface-muted rounded"
     >
       <UIcon
         name="i-lucide-file-text"
         class="w-3.5 h-3.5 text-subtle"
       />
-      <span class="text-muted">
+      <span
+        v-if="plan.budget?.budget_number"
+        class="text-muted"
+      >
         {{ plan.budget.budget_number }}
       </span>
       <UBadge
+        v-if="plan.budget?.status"
         :color="plan.budget.status === 'accepted' ? 'success' : 'warning'"
         size="xs"
         variant="subtle"
       >
         {{ t(`budget.status.${plan.budget.status}`) }}
       </UBadge>
+      <UButton
+        :to="`/budgets/${plan.budget_id}`"
+        size="xs"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-external-link"
+        class="ml-auto"
+      >
+        {{ t('clinical.plans.locked.viewBudget') }}
+      </UButton>
     </div>
 
     <!-- Actions -->
