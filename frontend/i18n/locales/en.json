@@ -1234,7 +1234,8 @@
       "noFreeSlots": "No free slots today",
       "clinicClosed": "Clinic closed",
       "professionalOff": "Off-duty",
-      "onBreak": "On break"
+      "onBreak": "On break",
+      "occupied": "Occupied"
     }
   },
   "dashboard": {

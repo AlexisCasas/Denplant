@@ -194,14 +194,14 @@ function entryKey(e: TimelineEntry, i: number): string {
         v-else-if="isBusy(entry)"
         class="w-full flex items-start gap-3 px-3 py-3 text-left bg-surface-muted/40 min-h-[60px]"
         role="status"
-        :aria-label="`${formatTime(entry.start)}–${formatTime(entry.end)} ${t('appointments.kanban.inChair')}`"
+        :aria-label="`${formatTime(entry.start)}–${formatTime(entry.end)} ${t('appointments.freeSlots.occupied')}`"
       >
         <div class="flex flex-col items-end shrink-0 w-14 pt-0.5">
           <span class="text-ui font-medium text-default tnum">{{ formatTime(entry.start) }}</span>
           <span class="text-caption text-subtle tnum">{{ formatTime(entry.end) }}</span>
         </div>
         <span class="w-1 self-stretch rounded-full shrink-0 bg-neutral-400" aria-hidden="true" />
-        <span class="text-ui text-muted">{{ t('appointments.kanban.inChair') }}</span>
+        <span class="text-ui text-muted">{{ t('appointments.freeSlots.occupied') }}</span>
       </div>
 
       <!-- Free slot — qualifying (prominent, tappable) -->
