@@ -5,6 +5,7 @@ export interface ClinicUser {
   email: string
   first_name: string
   last_name: string
+  professional_id: string | null
   is_active: boolean
   role: UserRole
   is_professional: boolean
