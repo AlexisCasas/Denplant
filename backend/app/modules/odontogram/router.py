@@ -38,6 +38,8 @@ from .service import (
     TreatmentDeleteGuardUnavailableError,
     TreatmentDeletionBlockedError,
     TreatmentService,
+    TreatmentSurfacesEditBlockedError,
+    TreatmentSurfacesGuardUnavailableError,
     build_treatment_response,
 )
 
@@ -405,15 +407,27 @@ async def update_treatment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentResponse]:
     await _get_accessible_treatment(db, ctx, treatment_id)
-    treatment = await TreatmentService.update(
-        db=db,
-        clinic_id=ctx.clinic_id,
-        treatment_id=treatment_id,
-        user_id=ctx.user_id,
-        status=data.status,
-        notes=data.notes,
-        surfaces=data.surfaces,
-    )
+    try:
+        treatment = await TreatmentService.update(
+            db=db,
+            clinic_id=ctx.clinic_id,
+            treatment_id=treatment_id,
+            user_id=ctx.user_id,
+            status=data.status,
+            notes=data.notes,
+            surfaces=data.surfaces,
+        )
+    except TreatmentSurfacesEditBlockedError as e:
+        # Raised before any write; get_db rolls the request back.
+        raise HTTPException(
+            status_code=409,
+            detail={"code": e.code, "message": str(e), "errors": [str(e)]},
+        )
+    except TreatmentSurfacesGuardUnavailableError as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": e.code, "message": str(e), "errors": [str(e)]},
+        )
     if not treatment:
         raise HTTPException(status_code=404, detail="Treatment not found")
     return ApiResponse(data=TreatmentResponse.model_validate(build_treatment_response(treatment)))

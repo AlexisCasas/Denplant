@@ -21,6 +21,7 @@ the legacy surface/tooth update path).
 | `odontogram.treatment.added` | Treatment added to a tooth | — |
 | `odontogram.treatment.status_changed` | Treatment status transition | — |
 | `odontogram.treatment.delete_requested` | **Vetoable**, published with `db` before the soft delete (ADR 0023). Payload `{clinic_id, treatment_id, requested_by, cleared_by: []}`. A subscriber raises `TreatmentDeletionBlockedError` to refuse (HTTP 409 `treatment_linked_to_plan`) or appends its module to `cleared_by`; empty `cleared_by` → refused (503 `delete_guard_unavailable`). | treatment_plan |
+| `odontogram.treatment.surfaces_update_requested` | **Vetoable**, published with `db` before a surfaces change is written (ADR 0023, DP-08.B2). Payload `{clinic_id, treatment_id, requested_by, old_surfaces, new_surfaces, cleared_by: []}`. A subscriber raises `TreatmentSurfacesEditBlockedError` to refuse (HTTP 409 `surfaces_locked_<reason>`) or appends its module to `cleared_by`; both `treatment_plan` and `budget` must clear it, otherwise 503 `surfaces_guard_unavailable`. | treatment_plan, budget |
 | `odontogram.treatment.deleted` | Treatment removed (only after clearance) | — |
 | `odontogram.surface.updated` | A tooth surface condition changes | — |
 | `odontogram.tooth.updated` | A whole-tooth condition changes | — |

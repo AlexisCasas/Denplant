@@ -43,6 +43,7 @@ the publisher's session, so plan and budget move together or not at all
 | `budget.renegotiated` | `events.py::on_budget_renegotiated` | pending → draft via `reopen_from_budget` (never writes the budget row — the publisher is already cancelling it, and an echoed `budget.cancelled` would loop back here). |
 | `budget.cancelled` | `events.py::on_budget_cancelled` | pending → draft via `reopen_from_budget` (issue #162). No-op without `plan_id` (standalone budget). |
 | `budget.superseded` | `events.py::on_budget_superseded` | Repoint `plan.budget_id` to the resent version — only while the plan still points at the superseded budget (idempotent). Status untouched. |
+| `odontogram.treatment.surfaces_update_requested` | `events.py::on_treatment_surfaces_update_requested` | **Vetoable** (ADR 0023, DP-08.B2). Read-only: raises `TreatmentSurfacesEditBlockedError(linked_to_plan)` when ANY `PlannedTreatmentItem` references the treatment (any plan, any status — closed/archived plans keep their items), else appends `treatment_plan` to `cleared_by`. Required: without it the edit is refused (503). |
 | `odontogram.treatment.performed` | `events.py::on_treatment_performed` | Mark the matching pending item completed **and cancel its pending sessions** (no session events) — the performed event already carried the full price to payments; a later session completion would book the same money twice. |
 
 ## Adding a new event

@@ -21,6 +21,7 @@ from app.modules.catalog.pricing import (
 from .constants import (
     ATOMIC_MULTI_TOOTH_TYPES,
     DEFAULT_ODONTOGRAM_PROFILE,
+    SURFACE_TREATMENTS,
     ToothCondition,
     TreatmentStatus,
     get_tooth_type,
@@ -41,6 +42,13 @@ from .schemas import TreatmentVisualizationSnapshot
 # added to ``cleared_by`` but never replace these.
 REQUIRED_DELETE_GUARDS: frozenset[str] = frozenset({"treatment_plan"})
 
+SURFACES_LOCKED_CODE_PREFIX = "surfaces_locked_"
+
+# Modules that must acknowledge a surfaces edit before it is applied (ADR 0023).
+# Both own a link to the treatment (``PlannedTreatmentItem`` / ``BudgetItem``);
+# neither can be imported from here (ADR 0003), hence the event.
+REQUIRED_SURFACE_EDIT_GUARDS: frozenset[str] = frozenset({"treatment_plan", "budget"})
+
 
 class TreatmentDeletionBlockedError(ValueError):
     """A module that owns a link to the treatment refused its deletion.
@@ -56,6 +64,32 @@ class TreatmentDeleteGuardUnavailableError(RuntimeError):
     """Nobody acknowledged the delete request: fail closed, never delete silently."""
 
     code = "delete_guard_unavailable"
+
+
+class TreatmentSurfacesEditBlockedError(ValueError):
+    """The surfaces of this treatment cannot be edited safely (409).
+
+    ``reason`` is one of ``not_planned``, ``not_single_tooth``,
+    ``type_without_surfaces``, ``no_surfaces``, ``linked_to_plan``,
+    ``linked_to_budget`` or ``price_snapshot_drift``; the stable machine-readable ``code`` is
+    ``surfaces_locked_<reason>`` (clients match the ``surfaces_locked_``
+    prefix). Raised by this module or by a transactional subscriber of
+    ``odontogram.treatment.surfaces_update_requested`` (ADR 0023).
+    """
+
+    def __init__(self, message: str, reason: str = "locked") -> None:
+        super().__init__(message)
+        self.reason = reason
+
+    @property
+    def code(self) -> str:
+        return f"{SURFACES_LOCKED_CODE_PREFIX}{self.reason}"
+
+
+class TreatmentSurfacesGuardUnavailableError(RuntimeError):
+    """A required module did not acknowledge the edit: fail closed (503)."""
+
+    code = "surfaces_guard_unavailable"
 
 
 VISUALIZATION_SNAPSHOT_SCHEMA_VERSION = 1
@@ -825,11 +859,30 @@ class TreatmentService:
         notes: str | None = None,
         surfaces: list[str] | None = None,
     ) -> Treatment | None:
-        treatment = await TreatmentService.get_treatment(db, clinic_id, treatment_id)
+        if surfaces is None:
+            treatment = await TreatmentService.get_treatment(db, clinic_id, treatment_id)
+        else:
+            # Row lock first (same order as ``add_item``/delete): a concurrent
+            # plan association or budget line (its FK check takes KEY SHARE on
+            # this row) cannot slip in between the checks below and the write.
+            treatment = await TreatmentService._lock_and_reload(db, clinic_id, treatment_id)
         if not treatment:
             return None
         old_status = treatment.status
         now = datetime.now(UTC)
+
+        # Veto BEFORE any mutation (notes, status, surfaces, price): a combined
+        # request that includes a forbidden surfaces change changes nothing.
+        surfaces_changed = surfaces is not None and TreatmentService._surfaces_changed(
+            treatment, surfaces
+        )
+        new_price: Decimal | None = None
+        if surfaces_changed:
+            assert surfaces is not None
+            await TreatmentService._authorize_surfaces_edit(
+                db, clinic_id, treatment, user_id, surfaces, status
+            )
+            new_price = TreatmentService._price_for_new_surfaces(treatment, surfaces)
 
         if status is not None and status != old_status:
             treatment.status = status
@@ -855,19 +908,15 @@ class TreatmentService:
         if notes is not None:
             treatment.notes = notes
 
-        if surfaces is not None:
+        if surfaces_changed:
+            assert surfaces is not None
             for tooth in treatment.teeth:
-                tooth.surfaces = list(surfaces)
-            if treatment.catalog_item is not None:
-                pricing_teeth = [
-                    PricingTooth(role=t.role, surfaces=t.surfaces) for t in treatment.teeth
-                ]
-                treatment.price_snapshot = compute_price_snapshot(
-                    treatment.catalog_item, pricing_teeth
-                )
-                treatment.duration_snapshot = compute_duration_snapshot(
-                    treatment.catalog_item, len(treatment.teeth)
-                )
+                tooth.surfaces = list(dict.fromkeys(surfaces))  # as sent, deduplicated
+            # Only a ``per_surface`` catalog price depends on surfaces; every
+            # other snapshot (duration, VAT, visualization, other strategies)
+            # is left exactly as it was frozen.
+            if new_price is not None:
+                treatment.price_snapshot = new_price
 
         await db.flush()
         return treatment
@@ -968,6 +1017,119 @@ class TreatmentService:
         if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
             return False
         return await TreatmentService._soft_delete(db, clinic_id, treatment_id, user_id)
+
+    @staticmethod
+    async def _lock_and_reload(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID
+    ) -> Treatment | None:
+        """``SELECT … FOR UPDATE`` the live treatment, then re-read it fresh.
+
+        ``populate_existing`` matters: the identity map may hold a state read
+        before the lock was granted (e.g. by the router's access check).
+        """
+        if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
+            return None
+        result = await db.execute(
+            TreatmentService._select_with_relations()
+            .where(
+                Treatment.clinic_id == clinic_id,
+                Treatment.id == treatment_id,
+                Treatment.deleted_at.is_(None),
+            )
+            .execution_options(populate_existing=True)
+        )
+        return result.scalars().unique().one_or_none()
+
+    @staticmethod
+    def _surfaces_changed(treatment: Treatment, surfaces: list[str]) -> bool:
+        """True when the requested set differs from what a tooth stores today.
+
+        Compared as sets: ``["O", "M"]`` is ``["M", "O"]``. A treatment with no
+        teeth (global scope) has no surfaces, so only a non-empty request is a change.
+        """
+        wanted = set(surfaces)
+        if not treatment.teeth:
+            return bool(wanted)
+        return any(set(t.surfaces or []) != wanted for t in treatment.teeth)
+
+    @staticmethod
+    async def _authorize_surfaces_edit(
+        db: AsyncSession,
+        clinic_id: UUID,
+        treatment: Treatment,
+        user_id: UUID,
+        surfaces: list[str],
+        requested_status: str | None,
+    ) -> None:
+        """Own rules first, then the owners of the links (ADR 0023). Read-only."""
+        blocked = TreatmentSurfacesEditBlockedError
+        # A combined request must also END planned: otherwise it would be a way
+        # to edit the surfaces of a treatment that is performed by the same call.
+        if treatment.status != "planned" or requested_status not in (None, "planned"):
+            raise blocked("Only planned treatments can change surfaces", "not_planned")
+        if treatment.scope != "tooth" or len(treatment.teeth) != 1:
+            raise blocked(
+                "Surfaces can only be edited on a single-tooth treatment", "not_single_tooth"
+            )
+        if treatment.clinical_type not in SURFACE_TREATMENTS:
+            raise blocked("This treatment type does not use surfaces", "type_without_surfaces")
+        # A surface treatment without a selected surface has no anatomical
+        # location.  Keep historical empty rows compatible when the caller is
+        # not changing their set (``_authorize_surfaces_edit`` is then never
+        # reached), but do not let an effective edit erase the location.
+        if not set(surfaces):
+            raise blocked("Select at least one surface for this treatment", "no_surfaces")
+        if treatment.budget_item_id is not None:
+            raise blocked("Treatment is linked to a budget line", "linked_to_budget")
+
+        payload: dict = {
+            "clinic_id": str(clinic_id),
+            "treatment_id": str(treatment.id),
+            "requested_by": str(user_id),
+            "old_surfaces": sorted(set(treatment.teeth[0].surfaces or [])),
+            "new_surfaces": sorted(set(surfaces)),
+            # Guards append their module name when they ran and agreed.
+            "cleared_by": [],
+        }
+        await event_bus.publish(
+            EventType.ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED, payload, db=db
+        )
+        missing = REQUIRED_SURFACE_EDIT_GUARDS - set(payload["cleared_by"])
+        if missing:
+            raise TreatmentSurfacesGuardUnavailableError(
+                "Required surfaces guard did not clear the request: " + ", ".join(sorted(missing))
+            )
+
+    @staticmethod
+    def _price_for_new_surfaces(treatment: Treatment, surfaces: list[str]) -> Decimal | None:
+        """New ``price_snapshot`` or ``None`` to keep the frozen one.
+
+        Surfaces only move the price under the ``per_surface`` strategy. There
+        the catalog tiers are *current*, the snapshot is *frozen*: if the
+        current catalog does not reproduce the frozen price for the OLD
+        surfaces, the catalog drifted since creation and recomputing would
+        silently re-price the treatment, so the edit is refused instead.
+        """
+        item = treatment.catalog_item
+        if item is None or (item.pricing_strategy or "flat") != "per_surface":
+            return None
+        old = [PricingTooth(role=t.role, surfaces=t.surfaces) for t in treatment.teeth]
+        deduped = list(dict.fromkeys(surfaces))
+        new = [PricingTooth(role=t.role, surfaces=deduped) for t in treatment.teeth]
+        frozen = treatment.price_snapshot
+        reproduced = compute_price_snapshot(item, old)
+        if (frozen is None) != (reproduced is None) or (
+            frozen is not None
+            and reproduced is not None
+            and Decimal(frozen).quantize(Decimal("0.01")) != reproduced.quantize(Decimal("0.01"))
+        ):
+            raise TreatmentSurfacesEditBlockedError(
+                "The catalog price changed since this treatment was priced; "
+                "recreate the treatment instead of editing its surfaces",
+                "price_snapshot_drift",
+            )
+        result = compute_price_snapshot(item, new)
+        return result.quantize(Decimal("0.01")) if result is not None else None
 
     @staticmethod
     async def _lock_for_delete(db: AsyncSession, clinic_id: UUID, treatment_id: UUID) -> bool:

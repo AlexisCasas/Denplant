@@ -77,6 +77,7 @@ const {
   performTreatment,
   deleteTreatment,
   updateTreatment,
+  updateError,
   getToothTreatments,
   timelineDates,
   viewingDate,
@@ -659,15 +660,20 @@ async function handleGlobalTreatmentApplied(treatment: Treatment) {
 // ============================================================================
 
 function handleEditTreatment(treatment: ToothTreatmentView) {
+  updateError.value = null
   editingTreatment.value = treatment
   showTreatmentEditModal.value = true
 }
 
 async function handleTreatmentUpdate(
   treatmentId: string,
-  data: { status?: TreatmentStatus, notes?: string }
+  data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] }
 ) {
-  await updateTreatment(treatmentId, data)
+  // Close only once the API confirmed the save. A refusal (409 surfaces lock,
+  // network, ...) leaves the modal open with the user's selection and, for a
+  // lock, the explanation inline; nothing is emitted.
+  const updated = await updateTreatment(treatmentId, data)
+  if (!updated) return
   emit('treatmentsChanged')
   showTreatmentEditModal.value = false
   editingTreatment.value = null
@@ -1003,6 +1009,8 @@ defineExpose({
     <TreatmentEditModal
       v-model:open="showTreatmentEditModal"
       :treatment="editingTreatment"
+      :plan-context="isPlanningMode"
+      :error-message="updateError"
       @update="handleTreatmentUpdate"
       @delete="handleTreatmentDelete"
       @perform="handleTreatmentPerform"

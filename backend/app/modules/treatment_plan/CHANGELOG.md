@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- feat(DP-08.B2): subscribes (transactionally) to
+  `odontogram.treatment.surfaces_update_requested` and vetoes a surfaces edit on
+  any treatment referenced by a `PlannedTreatmentItem` (any plan/status). It is a
+  required guard (ADR 0023).
+
 - test(DP-08.B1, B1-06): deterministic two-session PostgreSQL race of
   `remove_item` vs `add_item`; verified serializable (B→R or R→B), no
   duplicates, no deadlock. `remove_item` unchanged. See ADR 0023.

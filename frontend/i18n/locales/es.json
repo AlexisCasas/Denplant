@@ -927,6 +927,18 @@
     "selectSurfaces": "Seleccionar Superficies",
     "selectedSurfaces": "Superficies seleccionadas",
     "surfacesSelected": "superficie(s) seleccionada(s)",
+    "surfacesLockedInPlan": "Las superficies no se pueden editar en el contexto del Plan.",
+    "surfacesLockedPrefix": "No se pudo guardar. Las superficies no se pueden cambiar:",
+    "surfacesLocked": {
+      "not_planned": "el tratamiento ya no está planificado.",
+      "not_single_tooth": "solo se editan en tratamientos de una sola pieza.",
+      "type_without_surfaces": "este tipo de tratamiento no usa superficies.",
+      "no_surfaces": "selecciona al menos una superficie antes de guardar.",
+      "linked_to_plan": "pertenece a un Plan de tratamiento; quítalo del Plan y vuelve a crearlo.",
+      "linked_to_budget": "está vinculado a un presupuesto.",
+      "price_snapshot_drift": "el precio del catálogo cambió desde que se creó; crea el tratamiento de nuevo.",
+      "locked": "la edición no es segura."
+    },
     "instructions": {
       "selectTreatment": "Selecciona un tratamiento para aplicar",
       "clickTooth": "Haz clic en el diente para aplicar"

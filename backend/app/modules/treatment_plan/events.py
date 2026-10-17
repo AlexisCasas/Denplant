@@ -365,3 +365,34 @@ async def on_treatment_delete_requested(data: dict[str, Any], *, db: AsyncSessio
             "Treatment belongs to a treatment plan; remove it from the plan instead"
         )
     data.setdefault("cleared_by", []).append("treatment_plan")
+
+
+async def on_treatment_surfaces_update_requested(data: dict[str, Any], *, db: AsyncSession) -> None:
+    """Veto a surfaces edit on a treatment a Plan owns (ADR 0023).
+
+    Same contract as ``on_treatment_delete_requested``: transactional, read-only,
+    raises to refuse, appends ``treatment_plan`` to ``cleared_by`` only when the
+    treatment has no ``PlannedTreatmentItem`` in ANY plan or status (closed and
+    archived plans keep their items as history, and their sessions and budget
+    line were priced from the surfaces at association time).
+    """
+    from app.modules.odontogram.service import TreatmentSurfacesEditBlockedError
+
+    clinic_id = UUID(str(data["clinic_id"]))
+    treatment_id = UUID(str(data["treatment_id"]))
+    item_id = (
+        await db.execute(
+            select(PlannedTreatmentItem.id)
+            .where(
+                PlannedTreatmentItem.treatment_id == treatment_id,
+                PlannedTreatmentItem.clinic_id == clinic_id,
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if item_id is not None:
+        raise TreatmentSurfacesEditBlockedError(
+            "Treatment belongs to a treatment plan; its surfaces can no longer be edited",
+            "linked_to_plan",
+        )
+    data.setdefault("cleared_by", []).append("treatment_plan")

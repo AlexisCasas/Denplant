@@ -2,7 +2,7 @@
 
 - **Status:** accepted
 - **Date:** 2026-10-17
-- **Tags:** modules, events, integrity (DP-08.B1)
+- **Tags:** modules, events, integrity (DP-08.B1, DP-08.B2)
 
 ## Context
 
@@ -75,6 +75,62 @@ correctness, so `remove_item` is unchanged.
 
 Result of the race: associate wins → delete is refused (409); delete wins →
 associate sees `deleted_at` and answers 400 "Invalid treatment".
+
+## Amendment — surfaces edit (DP-08.B2, F5)
+
+The same mechanism guards `PUT /odontogram/treatments/{id}` when it changes
+`surfaces`. Surfaces feed the price (`per_surface`), the Plan sessions, the
+budget line and the earned ledger, so they must not move once another module
+has built on them.
+
+**Policy.** Surfaces are editable only if the treatment is `planned`, `scope =
+tooth` with exactly one tooth, a surface-capable clinical type
+(`SURFACE_TREATMENTS`), not deleted, has no `budget_item_id`, no
+`PlannedTreatmentItem` (any plan, any status) and no `BudgetItem.treatment_id`
+(any budget, any status or version). A combined request must also *end*
+planned. Anything else → **409 `surfaces_locked_<reason>`**, reasons:
+`not_planned`, `not_single_tooth`, `type_without_surfaces`, `linked_to_plan`,
+`no_surfaces`, `linked_to_budget`, `price_snapshot_drift`. An effective edit
+of a surface-capable treatment may not leave it with zero surfaces; unchanged
+historical empty rows remain compatible. Fail-closed: a missing validator →
+**503 `surfaces_guard_unavailable`**.
+
+**Order in `TreatmentService.update`** (only when `surfaces` is sent):
+
+1. `SELECT … FOR UPDATE` the live Treatment and re-read it (`populate_existing`).
+2. Effective change? Compared as *sets* (`["O","M"]` = `["M","O"]`). No change →
+   no event, no recompute, no write to surfaces.
+3. Own rules (status, scope, tooth count, type, `budget_item_id`).
+4. Publish `odontogram.treatment.surfaces_update_requested` with `db`. The
+   owners check their own links and append their module to `cleared_by`:
+   `treatment_plan` (items) and `budget` (lines). `REQUIRED_SURFACE_EDIT_GUARDS
+   = {"treatment_plan", "budget"}`; another subscriber can never stand in for one.
+5. Only now: status/notes, surfaces, price. Nothing is written before step 4, so
+   a refusal leaves notes, status, surfaces and prices untouched.
+
+`odontogram` imports neither `treatment_plan` nor `budget` (ADR 0003).
+
+**Concurrency.** The edit holds the Treatment row lock from step 1 to commit.
+- vs `add_item`: `add_item` locks the same row first, so they serialize. Edit
+  first → the association sees the new surfaces; association first → the edit
+  waits, then its validator sees the item (409).
+- vs a budget line: `BudgetItem.treatment_id` has an FK to `treatments.id`, and
+  inserting such a row takes `FOR KEY SHARE` on the referenced Treatment, which
+  conflicts with `FOR UPDATE`. A line created through any path (plan sync or
+  `POST /budgets/{id}/items`) therefore waits for the edit or is seen by it.
+  No budget/financial contract had to change. Both orders are tested.
+- `Treatment.budget_item_id` has no FK, but it lives on the locked row itself.
+
+**Price and snapshots.** Only the `per_surface` strategy depends on surfaces.
+For every other strategy `price_snapshot` is left exactly as frozen
+(`duration_snapshot`, `vat_rate_snapshot` and `visualization_snapshot` are
+never touched). For `per_surface` the catalog tiers are *current* while the
+snapshot is *frozen*: the edit first proves the current catalog reproduces the
+frozen price for the OLD surfaces; if it does not (the catalog moved since
+creation) the edit is refused with `price_snapshot_drift` rather than silently
+re-pricing. **This refusal is a decision for the maintainers** (alternative:
+keep the frozen price and only change surfaces, accepting a price that no
+longer matches them).
 
 ## Consequences
 
