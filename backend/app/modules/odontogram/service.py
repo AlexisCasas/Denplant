@@ -35,6 +35,12 @@ from .models import (
 )
 from .schemas import TreatmentVisualizationSnapshot
 
+# Modules whose acknowledgement is mandatory before a treatment is soft-deleted
+# (ADR 0023). A plain string, not an import: ``treatment_plan`` owns the link to
+# treatments and is ``auto_install`` / ``removable=False``. Other guards may be
+# added to ``cleared_by`` but never replace these.
+REQUIRED_DELETE_GUARDS: frozenset[str] = frozenset({"treatment_plan"})
+
 
 class TreatmentDeletionBlockedError(ValueError):
     """A module that owns a link to the treatment refused its deletion.
@@ -988,10 +994,13 @@ class TreatmentService:
             "cleared_by": [],
         }
         await event_bus.publish(EventType.ODONTOGRAM_TREATMENT_DELETE_REQUESTED, payload, db=db)
-        if not payload["cleared_by"]:
-            # No guard answered: do not guess that the treatment is unlinked.
+        missing = REQUIRED_DELETE_GUARDS - set(payload["cleared_by"])
+        if missing:
+            # A required guard did not run (absent or silent): do not guess that
+            # the treatment is unlinked. Other modules' acknowledgements are
+            # welcome but can never stand in for a required one.
             raise TreatmentDeleteGuardUnavailableError(
-                "No delete guard is registered; refusing to delete the treatment"
+                "Required delete guard did not clear the request: " + ", ".join(sorted(missing))
             )
 
     @staticmethod

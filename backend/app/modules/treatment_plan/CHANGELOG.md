@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- test(DP-08.B1, B1-06): deterministic two-session PostgreSQL race of
+  `remove_item` vs `add_item`; verified serializable (B→R or R→B), no
+  duplicates, no deadlock. `remove_item` unchanged. See ADR 0023.
+
 - fix(DP-08.B1, server guard): `treatment_plan` subscribes (transactionally) to
   `odontogram.treatment.delete_requested` and refuses the deletion of any
   treatment referenced by a `PlannedTreatmentItem` (any plan/status, so closed

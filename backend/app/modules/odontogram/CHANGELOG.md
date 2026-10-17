@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- fix(DP-08.B1, B1-05): `TreatmentService.delete` now requires the
+  `treatment_plan` acknowledgement explicitly (`REQUIRED_DELETE_GUARDS`);
+  another subscriber's `cleared_by` entry cannot stand in for it (503
+  `delete_guard_unavailable`). Further validators remain allowed.
+
 - fix(DP-08.B1): `DELETE /odontogram/treatments/{id}` is now guarded
   (ADR 0023). `TreatmentService.delete` locks the row, publishes the vetoable
   `odontogram.treatment.delete_requested` (with `db`) and fails closed when no
