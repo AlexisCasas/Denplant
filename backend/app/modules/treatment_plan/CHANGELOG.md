@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- fix(DP-08.A): cancelled items no longer appear as active on the Plan NTS
+  chart (layers, outline, dots, bridge connectors, global strip, counter and
+  legend) while remaining in the Plan list and history. The legend now
+  matches what is drawn (circle counter instead of "+n", generic indicators,
+  surface dots, bridge roles) and tooth treatment counts are exposed outside
+  the `aria-hidden` SVG. Bridge role squares are drawn once per member.
+  Frontend only.
+
 - feat(odontogram): under the `pe_nts_188_2022` profile, the treatment plan
   now uses the same 52-tooth, four-row NTS geometry as diagnosis.  The plan's
   therapeutic overlay is a separate neutral projection of persisted plan

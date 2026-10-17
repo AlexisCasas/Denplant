@@ -18,7 +18,9 @@ import NtsDentitionRow from '../../../../odontogram/frontend/components/odontogr
 import NtsTherapeuticLayer from '../../../../odontogram/frontend/components/odontogram/NtsTherapeuticLayer.vue'
 import TreatmentPlanVisualLegend from './TreatmentPlanVisualLegend.vue'
 import { activeTreatmentCount, isActivePlanMarker, orderedPlanMarkers, THERAPEUTIC_LAYER_ORDER } from '../../../../odontogram/frontend/utils/treatmentPlanComposition'
-import { therapeuticInstructions, type TherapeuticLayer } from '../../../../odontogram/frontend/utils/therapeuticVisualization'
+import { getLateralIcon } from '../../../../odontogram/frontend/components/odontogram/LateralViewIcons'
+import { isTherapeuticSurface, therapeuticSurfaceAnchor } from '../../../../odontogram/frontend/utils/ntsTherapeuticGeometry'
+import { renderableTherapeuticInstructions, type TherapeuticLayer } from '../../../../odontogram/frontend/utils/therapeuticVisualization'
 
 const props = withDefaults(defineProps<{
   items: PlannedTreatmentItem[]
@@ -54,27 +56,33 @@ const undoStack = ref<string[]>([])
 
 type MarkerSurface = 'M' | 'D' | 'O' | 'V' | 'L'
 interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], treatmentStatus: string, snapshot: unknown, surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
-const markers = computed<ToothMarker[]>(() => props.items.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, treatmentStatus: item.treatment?.status ?? 'planned', snapshot: item.treatment?.visualization_snapshot ?? null, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
+/** Cancelled items stay in the Plan detail; the chart only draws what is still in force. */
+const activeItems = computed(() => props.items.filter(item => isActivePlanMarker({ itemId: item.id, treatmentId: item.treatment_id, status: item.status, treatmentStatus: item.treatment?.status })))
+const markers = computed<ToothMarker[]>(() => activeItems.value.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, treatmentStatus: item.treatment?.status ?? 'planned', snapshot: item.treatment?.visualization_snapshot ?? null, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
 const markersByTooth = computed(() => markers.value.reduce<Record<number, ToothMarker[]>>((byTooth, marker) => { ;(byTooth[marker.fdi] ??= []).push(marker); return byTooth }, {}))
 const orderedMarkersByTooth = computed(() => Object.fromEntries(Object.entries(markersByTooth.value).map(([fdi, toothMarkers]) => [fdi, orderedPlanMarkers(toothMarkers)])) as Record<number, ToothMarker[]>)
-const visibleTherapeuticLayers = computed<TherapeuticLayer[]>(() => THERAPEUTIC_LAYER_ORDER.filter(layer => markers.value.some(marker => isActivePlanMarker(marker) && therapeuticInstructions(marker.snapshot).some(instruction => instruction.layer === layer))))
+const visibleTherapeuticLayers = computed<TherapeuticLayer[]>(() => THERAPEUTIC_LAYER_ORDER.filter(layer => markers.value.some(marker => isActivePlanMarker(marker) && renderableTherapeuticInstructions(marker.snapshot, marker.surfaces).some(instruction => instruction.layer === layer))))
 const hasMultipleTreatments = computed(() => Object.values(markersByTooth.value).some(toothMarkers => activeTreatmentCount(toothMarkers) > 1))
+const hasMarkers = computed(() => markers.value.length > 0)
+const hasFallbackMarkers = computed(() => markers.value.some(marker => renderableTherapeuticInstructions(marker.snapshot, marker.surfaces).length === 0))
+const hasGenericIcons = computed(() => markers.value.some(marker => renderableTherapeuticInstructions(marker.snapshot, marker.surfaces).some(instruction => instruction.layer === 'lateral_icon' && instruction.icon !== 'implant' && !getLateralIcon(instruction.icon || ''))))
+const hasSurfaceMarkers = computed(() => markers.value.some(marker => marker.surfaces.some(isTherapeuticSurface)))
+const hasRoles = computed(() => markers.value.some(marker => marker.role !== null))
 const hasCompletedMarkers = computed(() => markers.value.some(marker => marker.status === 'completed' || marker.treatmentStatus === 'performed'))
 const hasPendingMarkers = computed(() => markers.value.some(marker => isActivePlanMarker(marker) && marker.status === 'pending' && marker.treatmentStatus !== 'performed'))
-const bridges = computed(() => props.items.filter(item => item.treatment?.clinical_type === 'bridge').map(item => (item.treatment?.teeth ?? []).map(tooth => tooth.tooth_number).map(toothPlacement).filter((placement): placement is NonNullable<typeof placement> => placement !== null)).filter(placements => placements.length > 1))
+const bridges = computed(() => activeItems.value.filter(item => item.treatment?.clinical_type === 'bridge').map(item => (item.treatment?.teeth ?? []).map(tooth => tooth.tooth_number).map(toothPlacement).filter((placement): placement is NonNullable<typeof placement> => placement !== null)).filter(placements => placements.length > 1))
 const planTreatmentIds = computed(() => new Set(props.items.map(item => item.treatment_id)))
+const activeTreatmentIds = computed(() => new Set(activeItems.value.map(item => item.treatment_id)))
+const hasActiveGlobals = computed(() => activeItems.value.some(item => item.treatment?.scope === 'global_mouth' || item.treatment?.scope === 'global_arch'))
+const hasActiveToothless = computed(() => activeItems.value.some(item => !item.treatment?.teeth?.length))
 const planTreatments = computed(() => treatments.value.filter(treatment => planTreatmentIds.value.has(treatment.id)))
-const selectedToothTreatments = computed(() => !selectedTooth.value ? [] : planTreatments.value.map(treatment => viewForTooth(treatment, selectedTooth.value!)).filter((treatment): treatment is ToothTreatmentView => treatment !== null))
+const activePlanTreatments = computed(() => planTreatments.value.filter(treatment => activeTreatmentIds.value.has(treatment.id)))
+const multipleTreatmentDescriptions = computed(() => Object.entries(markersByTooth.value).filter(([, toothMarkers]) => activeTreatmentCount(toothMarkers) > 1).map(([fdi, toothMarkers]) => `${activeTreatmentCount(toothMarkers)} tratamientos vigentes en la pieza ${fdi}`))
+const selectedToothTreatments = computed(() => !selectedTooth.value ? [] : activePlanTreatments.value.map(treatment => viewForTooth(treatment, selectedTooth.value!)).filter((treatment): treatment is ToothTreatmentView => treatment !== null))
 const selectedTeeth = computed(() => [...new Set([...props.highlightedTeeth, ...multiToothSelection.value.teeth, ...(selectedTooth.value ? [selectedTooth.value] : [])])])
 const isClickToApplyMode = computed(() => selectedTreatmentType.value !== null || selectedCatalogItemId.value !== null)
 const multiToothConfig = computed<MultiToothTreatmentConfig | null>(() => selectedTreatmentType.value ? getMultiToothConfig(selectedTreatmentType.value) : null)
 
-function surfacePoint(marker: ToothMarker, surface: MarkerSurface) {
-  const crown = toothPlacement(marker.fdi)?.crown
-  if (!crown) return null
-  const { x, y, width: w, height: h } = crown
-  return { M: { x: x + w * 0.22, y: y + h * 0.5 }, D: { x: x + w * 0.78, y: y + h * 0.5 }, O: { x: x + w * 0.5, y: y + h * 0.5 }, V: { x: x + w * 0.5, y: y + h * 0.22 }, L: { x: x + w * 0.5, y: y + h * 0.78 } }[surface]
-}
 function markerTone(marker: ToothMarker) { return marker.status === 'completed' ? 'var(--color-success-500)' : marker.status === 'cancelled' ? 'var(--color-text-dimmed)' : 'var(--color-primary-500)' }
 function markerTitle(marker: ToothMarker) { return `${marker.type}${marker.role ? ` (${marker.role})` : ''}` }
 function treatmentLabel(treatment: ToothTreatmentView) { return treatment.catalog_item?.names?.[locale.value] || treatment.catalog_item?.names?.es || t(`odontogram.treatments.types.${treatment.clinical_type}`, treatment.clinical_type) }
@@ -199,7 +207,6 @@ defineExpose({ refetchTreatments })
                 :surfaces="marker.surfaces"
                 :item-status="marker.status"
                 :treatment-status="marker.treatmentStatus"
-                :role="marker.role"
                 :layer="layer"
               />
             </template>
@@ -243,16 +250,27 @@ defineExpose({ refetchTreatments })
             v-for="marker in toothMarkers"
             :key="`${marker.itemId}-surfaces`"
           ><circle
-            v-for="surface in marker.surfaces"
+            v-for="surface in marker.surfaces.filter(isTherapeuticSurface)"
             :key="surface"
-            :cx="surfacePoint(marker, surface)?.x"
-            :cy="surfacePoint(marker, surface)?.y"
+            :cx="therapeuticSurfaceAnchor(marker.fdi, surface)?.x"
+            :cy="therapeuticSurfaceAnchor(marker.fdi, surface)?.y"
             r="1.8"
             :fill="markerTone(marker)"
+          /></template><template
+            v-for="(marker, markerIndex) in toothMarkers"
+            :key="`${marker.itemId}-role`"
+          ><rect
+            v-if="marker.role"
+            :x="toothPlacement(Number(fdi))!.annotation.x + 2 + markerIndex * 6"
+            :y="toothPlacement(Number(fdi))!.annotation.y + 2"
+            width="4"
+            height="4"
+            :fill="marker.role === 'pillar' ? 'currentColor' : 'none'"
+            stroke="currentColor"
+            :data-role="marker.role"
           /></template><g
             v-if="activeTreatmentCount(toothMarkers) > 1"
             data-testid="nts-plan-treatment-count"
-            :aria-label="`${activeTreatmentCount(toothMarkers)} tratamientos vigentes en la pieza ${fdi}`"
           ><circle
             :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
             :cy="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 3"
@@ -267,17 +285,34 @@ defineExpose({ refetchTreatments })
           >{{ activeTreatmentCount(toothMarkers) }}</text></g></template></template></svg>
       </div>
     </div>
+    <ul
+      v-if="multipleTreatmentDescriptions.length"
+      class="sr-only"
+      data-testid="nts-plan-treatment-descriptions"
+    >
+      <li
+        v-for="description in multipleTreatmentDescriptions"
+        :key="description"
+      >
+        {{ description }}
+      </li>
+    </ul>
     <TreatmentPlanVisualLegend
       :layers="visibleTherapeuticLayers"
+      :has-markers="hasMarkers"
+      :has-fallback="hasFallbackMarkers"
+      :has-generic-icon="hasGenericIcons"
+      :has-surfaces="hasSurfaceMarkers"
+      :has-roles="hasRoles"
       :has-bridge="bridges.length > 0"
-      :has-global="items.some(item => !item.treatment?.teeth?.length)"
+      :has-global="hasActiveGlobals"
       :has-multiple="hasMultipleTreatments"
       :has-completed="hasCompletedMarkers"
       :has-pending="hasPendingMarkers"
     />
     <GlobalTreatmentsStrip
       v-if="patientId"
-      :treatments="planTreatments"
+      :treatments="activePlanTreatments"
       :highlighted-ids="highlightedGlobalIds"
       @treatment-hover="emit('globalHover', $event)"
       @arch-hover="emit('archHover', $event)"
@@ -316,7 +351,7 @@ defineExpose({ refetchTreatments })
       @cancel="cancelClickToApplyMode"
     />
     <p
-      v-if="items.some(item => !item.treatment?.teeth?.length)"
+      v-if="hasActiveToothless"
       class="text-caption text-subtle"
     >
       Los tratamientos por arco, boca completa o sin una representación dental se mantienen en la lista del plan.

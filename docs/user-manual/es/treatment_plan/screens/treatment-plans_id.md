@@ -33,7 +33,7 @@ related_permissions:
 related_paths:
   - backend/app/modules/treatment_plan/frontend/pages/treatment-plans/[id].vue
   - backend/app/modules/treatment_plan/router.py
-last_verified_commit: e1d6873
+last_verified_commit: ecb4a01
 ---
 
 # Detalle del plan de tratamiento
@@ -45,10 +45,17 @@ last_verified_commit: e1d6873
 > lista.
 
 > Cuando varias terapias vigentes coinciden en una pieza, el odontograma las
-> compone por capas y muestra un contador `+n`. Al seleccionar la pieza se
-> conservan todos sus tratamientos para consulta o edición según permisos. La
-> leyenda bajo el odontograma solo muestra los símbolos presentes en el plan;
-> los tratamientos cancelados se mantienen en el historial pero no cuentan.
+> compone por capas y muestra un número dentro de un círculo con la cantidad
+> de tratamientos vigentes (también disponible para lectores de pantalla). Al
+> seleccionar la pieza se conservan todos sus tratamientos vigentes para
+> consulta o edición según permisos. Las superficies M, D, V y L se ubican
+> según el lado y la arcada de la pieza, igual que en el diagnóstico. La
+> leyenda bajo el odontograma solo explica los símbolos visibles en el plan,
+> incluidos los indicadores genéricos cuando un tratamiento no tiene
+> representación terapéutica guardada. Los tratamientos cancelados se
+> mantienen en la lista y el historial del plan, pero no se dibujan en el
+> odontograma (ni capas, puntos, puentes, tratamientos globales, contador ni
+> leyenda).
 
 Vista del plan: cabecera con paciente, profesional y estado;
 columna principal con los ítems (catálogo o tratamiento odontograma)
