@@ -27,7 +27,7 @@ the scaffold could not infer.
 - `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/confirm`
 - `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/contact-log`
 - `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/generate-budget`
-- `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/items`
+- `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/items` (idempotent per `treatment_id`: 201 first time, 200 repeat, 409 other Plan / locked Plan)
 - `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/link-budget`
 - `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/reactivate`
 - `POST /api/v1/treatment_plan/treatment-plans/{plan_id}/reopen`

@@ -33,7 +33,10 @@ Routes mounted at `/api/v1/treatment-plans/`.
 - `POST  /treatment-plans`              — create; `treatment_plan.plans.write`
 - `GET   /treatment-plans/{id}`         — detail
 - `PUT   /treatment-plans/{id}`         — update; status transitions
-- `POST  /treatment-plans/{id}/items`   — add item from catalog or odontogram tooth treatment
+- `POST  /treatment-plans/{id}/items`   — add item from catalog or odontogram tooth treatment.
+  **Idempotent per `treatment_id`** (DP-08.B1): 201 first time, 200 + same item
+  on a repeat in the same editable Plan; 409 `treatment_already_planned`
+  (treatment in another Plan) or 409 `plan_locked`; closed/terminal Plan → 400.
 - `PUT   /treatment-plans/{id}/items/reorder`
 - `POST  /treatment-plans/{id}/items/{item_id}/complete`
 - `POST  /treatment-plans/{id}/confirm`     — `plans.confirm`; draft → pending
@@ -81,6 +84,13 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
 > All events above are declared in `EventType` and published via the
 > constants. ``items_reordered`` used to be a string-only literal —
 > it now lives at `EventType.TREATMENT_PLAN_ITEMS_REORDERED`.
+
+## Events consumed (vetoable)
+
+`odontogram.treatment.delete_requested` → `on_treatment_delete_requested`:
+raises `TreatmentDeletionBlockedError` when any `PlannedTreatmentItem`
+references the treatment, otherwise appends `treatment_plan` to `cleared_by`.
+The plan lifecycle bypasses it via `TreatmentService.delete_after_plan_release`.
 
 ## Events consumed
 
@@ -133,6 +143,25 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
   `treatment_plan.treatment_added` with a denormalized snapshot
   (catalog_item_id, tooth, surfaces, unit_price, budget_id); the
   budget module's handler creates the matching budget line.
+- **`add_item` is idempotent and locks the Treatment row.** It returns
+  `(item, created)`; the router maps `created=False` to 200. The repeat path
+  must stay side-effect free (no event, sessions, budget lines or rewrites).
+  `UNIQUE(treatment_id)` is the final barrier; the `IntegrityError` is
+  recovered inside a SAVEPOINT (`begin_nested`) — never query an aborted
+  transaction. Frontend callers must read `statusCode`/`data.code`, not assume
+  201, and must use `usePlanTreatmentLink` (never a bare `addItem`) for
+  create→associate, retrying with the SAME `treatment_id`.
+- **The recovery handle is in memory only.** Closing the "Tratamiento creado,
+  pero no agregado al Plan." notice or reloading the page loses the retry for
+  that treatment; it is never auto-deleted. Unlinked treatments stay visible
+  and can be added from the Plan list. Persistent recovery is deliberately out
+  of scope.
+- **Plan context never falls back to the odontogram DELETE**
+  (`releaseTreatment`): an item missing from *this* Plan does not prove the
+  treatment is standalone. The server now enforces it too (ADR 0023).
+- **Plan-linked treatments are removed through the Plan** (`removeItem`), not
+  `DELETE /odontogram/treatments/{id}`: only the former applies the orphan,
+  session and budget rules and the lock check.
 - **Item completion has two paths**: the user marks an item complete
   here, or the odontogram fires `odontogram.treatment.performed`. Both
   must converge to the same state — keep them idempotent.

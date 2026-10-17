@@ -1935,6 +1935,23 @@
     "deleteError": "Erro ao eliminar o tipo de IVA"
   },
   "treatmentPlans": {
+    "linkRecovery": {
+      "title": "Tratamento criado, mas não adicionado ao Plano.",
+      "blockedTitle": "Não foi possível adicionar ao Plano",
+      "undoBlockedTitle": "Não é possível desfazer",
+      "unknownAssociation": "Não é possível confirmar que o tratamento pertence a este Plano, por isso não foi eliminado. Pode estar noutro Plano.",
+      "added": "Tratamento adicionado ao Plano",
+      "recovered": "Tratamento adicionado ao Plano após nova tentativa",
+      "reason": {
+        "locked": "O Plano está bloqueado por um orçamento enviado ou aceito. Reabra ou renegocie o orçamento para alterá-lo.",
+        "closed": "O Plano está encerrado ou concluído e não aceita tratamentos.",
+        "other_plan": "Este tratamento já pertence a outro Plano.",
+        "plan_missing": "O Plano já não está disponível.",
+        "unverified": "Não foi possível verificar o estado do Plano. Nenhum tratamento foi criado; tente novamente.",
+        "invalid": "O tratamento não é válido para este Plano.",
+        "error": "Não foi possível confirmar a associação. Pode tentar novamente; nenhum tratamento novo será criado."
+      }
+    },
     "title": "Planos de tratamento",
     "description": "Faça a gestão dos planos de tratamento dos pacientes",
     "new": "Novo plano",

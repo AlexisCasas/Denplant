@@ -1935,6 +1935,23 @@
     "deleteError": "Erreur lors de la suppression du type de TVA"
   },
   "treatmentPlans": {
+    "linkRecovery": {
+      "title": "Traitement créé, mais non ajouté au Plan.",
+      "blockedTitle": "Impossible d'ajouter au Plan",
+      "undoBlockedTitle": "Annulation impossible",
+      "unknownAssociation": "Impossible de confirmer que le traitement appartient à ce Plan ; il n'a donc pas été supprimé. Il peut être dans un autre Plan.",
+      "added": "Traitement ajouté au Plan",
+      "recovered": "Traitement ajouté au Plan après une nouvelle tentative",
+      "reason": {
+        "locked": "Le Plan est verrouillé par un devis envoyé ou accepté. Rouvrez ou renégociez le devis pour le modifier.",
+        "closed": "Le Plan est clôturé ou terminé et n'accepte plus de traitements.",
+        "other_plan": "Ce traitement appartient déjà à un autre Plan.",
+        "plan_missing": "Le Plan n'est plus disponible.",
+        "unverified": "L'état du Plan n'a pas pu être vérifié. Aucun traitement n'a été créé ; réessayez.",
+        "invalid": "Le traitement n'est pas valide pour ce Plan.",
+        "error": "L'association n'a pas pu être confirmée. Vous pouvez réessayer ; aucun nouveau traitement ne sera créé."
+      }
+    },
     "title": "Plans de traitement",
     "description": "Gérer les plans de traitement des patients",
     "new": "Nouveau plan",

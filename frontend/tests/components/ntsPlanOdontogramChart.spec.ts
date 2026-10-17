@@ -133,7 +133,8 @@ describe('H1 — odontograma NTS del plan', () => {
   })
 
   it('attaches clinical mutations to the active plan and respects read-only mode', () => {
-    expect(chartSource).toContain('await treatmentPlansApi.addItem(props.planId, { treatment_id: treatment.id })')
+    // DP-08.B1: association goes through the shared, idempotent-aware flow
+    expect(chartSource).toContain('planLink.createAndLink(props.planId, create)')
     expect(chartSource).toContain('v-if="!readonly && patientId"')
     expect(chartSource).toContain(':disabled="readonly"')
     expect(chartSource).toContain('@perform="handleTreatmentPerform"')

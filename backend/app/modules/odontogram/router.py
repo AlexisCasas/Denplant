@@ -35,6 +35,8 @@ from .schemas import (
 from .service import (
     OdontogramPreferenceService,
     OdontogramService,
+    TreatmentDeleteGuardUnavailableError,
+    TreatmentDeletionBlockedError,
     TreatmentService,
     build_treatment_response,
 )
@@ -425,7 +427,19 @@ async def delete_treatment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     await _get_accessible_treatment(db, ctx, treatment_id)
-    deleted = await TreatmentService.delete(db, ctx.clinic_id, treatment_id, ctx.user_id)
+    try:
+        deleted = await TreatmentService.delete(db, ctx.clinic_id, treatment_id, ctx.user_id)
+    except TreatmentDeletionBlockedError as e:
+        # Raised before any write; get_db rolls the request back.
+        raise HTTPException(
+            status_code=409,
+            detail={"code": e.code, "message": str(e), "errors": [str(e)]},
+        )
+    except TreatmentDeleteGuardUnavailableError as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": e.code, "message": str(e), "errors": [str(e)]},
+        )
     if not deleted:
         raise HTTPException(status_code=404, detail="Treatment not found")
 

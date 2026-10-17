@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- fix(DP-08.B1, B1-05): `TreatmentService.delete` now requires the
+  `treatment_plan` acknowledgement explicitly (`REQUIRED_DELETE_GUARDS`);
+  another subscriber's `cleared_by` entry cannot stand in for it (503
+  `delete_guard_unavailable`). Further validators remain allowed.
+
+- fix(DP-08.B1): `DELETE /odontogram/treatments/{id}` is now guarded
+  (ADR 0023). `TreatmentService.delete` locks the row, publishes the vetoable
+  `odontogram.treatment.delete_requested` (with `db`) and fails closed when no
+  guard answers: 409 `treatment_linked_to_plan` for plan-linked treatments, 503
+  `delete_guard_unavailable` if nobody cleared the request. New
+  `delete_after_plan_release` (Python-only) serves the Plan lifecycle. No
+  migration.
+
+- fix(DP-08.B1): `OdontogramChart.vue` and `TreatmentBar.vue` (planning mode)
+  associate new treatments to the Plan through the shared, idempotent
+  `usePlanTreatmentLink` flow. A failed association shows the recovery notice
+  instead of a success message and is never pushed to the undo stack; undo of a
+  Plan-linked treatment uses the Plan's item removal rather than
+  `DELETE /odontogram/treatments/{id}`. Standalone (no Plan) behaviour is
+  unchanged. Frontend only.
+
 - fix(DP-08.A): Plan therapeutic overlay is anchored with the diagnostic NTS
   geometry through the new `ntsTherapeuticGeometry.ts`. M/D/V/L follow tooth
   side and arch in both dentitions (previously fixed positions), catalog

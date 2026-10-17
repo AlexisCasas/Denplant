@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- test(DP-08.B1, B1-06): deterministic two-session PostgreSQL race of
+  `remove_item` vs `add_item`; verified serializable (B→R or R→B), no
+  duplicates, no deadlock. `remove_item` unchanged. See ADR 0023.
+
+- fix(DP-08.B1, server guard): `treatment_plan` subscribes (transactionally) to
+  `odontogram.treatment.delete_requested` and refuses the deletion of any
+  treatment referenced by a `PlannedTreatmentItem` (any plan/status, so closed
+  plans keep their history protected). Closing/archiving a plan keeps working:
+  the cleanup uses `TreatmentService.delete_after_plan_release`. `remove_item`
+  is unchanged. See ADR 0023.
+
+- fix(DP-08.B1, audit): Plan context never falls back to
+  `DELETE /odontogram/treatments/{id}`: if the item is not found in the Plan
+  the outcome is `unknown_association` and nothing is deleted (it may belong to
+  another Plan). The creation preflight is fail-closed (`unverified` when the
+  Plan cannot be read; nothing is created). A refused delete keeps the modal
+  open and emits nothing; a refused undo leaves local state untouched.
+  Known limitation: closing the recovery notice or reloading the page loses the
+  in-memory handle to retry a partially created treatment (no persistent
+  storage added); the treatment is never deleted automatically and stays
+  visible in the odontogram/list. The server-side delete guard is implemented (ADR 0023).
+
+- fix(DP-08.B1): safe, idempotent association of treatments to a Plan (F6).
+  `POST /treatment-plans/{id}/items` answers 201 on the first association and
+  **200 with the same item** when the same `treatment_id` is repeated in the
+  same editable Plan (no new item, sessions, `treatment_added` event or budget
+  lines). A treatment linked to another Plan, or a locked Plan, answers 409
+  with a structured `code` (`treatment_already_planned` / `plan_locked`);
+  closed or terminal Plans keep their 400 with no idempotent success.
+  The Treatment row is locked (`SELECT ... FOR UPDATE`) before the check and
+  insert, `UNIQUE(treatment_id)` stays the final barrier, and an
+  `IntegrityError` is recovered inside a SAVEPOINT. `add_item` now returns
+  `(item, created)`. No migration. Frontend: one shared flow
+  (`usePlanTreatmentLink`) for single, multi-tooth, whole-mouth and per-arch
+  creation — preflight, create once, associate, recover with the same
+  `treatment_id`; the "Tratamiento creado, pero no agregado al Plan." notice
+  (retry / close, never auto-delete); undo and delete of Plan-linked
+  treatments go through the Plan's item removal and are blocked with a reason
+  when the Plan is locked.
+
 - fix(DP-08.A): cancelled items no longer appear as active on the Plan NTS
   chart (layers, outline, dots, bridge connectors, global strip, counter and
   legend) while remaining in the Plan list and history. The legend now
