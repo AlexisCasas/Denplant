@@ -416,3 +416,211 @@ async def test_delete_first_then_associate_is_refused(
     async with session_factory() as check:
         assert await _count(check, PlannedTreatmentItem) == 0
         assert (await check.get(Treatment, tid)).deleted_at is not None
+
+
+# ---------------------------------------------------------------------------
+# B1-05: the treatment_plan acknowledgement is REQUIRED, not "any" acknowledgement
+# ---------------------------------------------------------------------------
+
+
+async def test_other_subscriber_cannot_stand_in_for_missing_plan_guard(
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+    db_session: AsyncSession,
+    spy,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = await _create_treatment(client, auth_headers, setup)
+    before = await _snapshot(db_session)
+
+    async def other_guard(data: dict, *, db: AsyncSession) -> None:
+        data["cleared_by"].append("some_other_module")  # acknowledges, but is not treatment_plan
+
+    # treatment_plan's validator absent; a different subscriber acknowledges.
+    monkeypatch.setitem(event_bus._handlers, REQUESTED, [other_guard])
+
+    r = await client.delete(f"{TREATMENTS}/{tid}", headers=auth_headers)
+
+    assert r.status_code == 503, r.text
+    assert r.json()["code"] == "delete_guard_unavailable"
+    assert await _alive(db_session, tid)
+    assert await _snapshot(db_session) == before
+    assert spy.n(DELETED) == 0
+
+
+async def test_additional_guards_are_still_allowed_next_to_the_plan_guard(
+    client: AsyncClient,
+    auth_headers: dict,
+    setup: dict,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = await _create_treatment(client, auth_headers, setup)
+
+    async def extra_guard(data: dict, *, db: AsyncSession) -> None:
+        data["cleared_by"].append("future_module")
+
+    monkeypatch.setitem(
+        event_bus._handlers, REQUESTED, [on_treatment_delete_requested, extra_guard]
+    )
+
+    r = await client.delete(f"{TREATMENTS}/{tid}", headers=auth_headers)
+
+    assert r.status_code == 204, r.text
+    assert not await _alive(db_session, tid)
+
+
+# ---------------------------------------------------------------------------
+# B1-06: remove_item (A) racing add_item (B) on the same treatment
+# ---------------------------------------------------------------------------
+#
+# A deletes the item and flushes, then (orphan rule) locks the Treatment; B
+# locks the Treatment first and then looks for the item. Question: can B answer
+# "already linked" (200) from an item whose removal A has not committed, and is
+# that outcome consistent? A is paused at a deterministic point inside its
+# transaction, B runs meanwhile, then both finish.
+
+
+async def _race_remove_vs_add(
+    client, auth_headers, setup, db_session, session_factory, monkeypatch, *, pause_at, performed
+):
+    plan_id = await _plan(client, auth_headers, setup)
+    tid = await _create_treatment(client, auth_headers, setup)
+    r = await client.post(
+        f"{PLANS}/{plan_id}/items", headers=auth_headers, json={"treatment_id": tid}
+    )
+    assert r.status_code == 201, r.text
+    item_id = UUID(r.json()["data"]["id"])
+    if performed:
+        # perform() would book prices through sessions; flip the status directly so the
+        # orphan rule (planned-only) is skipped without touching any financial flow.
+        await db_session.execute(
+            text("update treatments set status = 'performed' where id = :i"), {"i": tid}
+        )
+    await db_session.commit()
+    clinic_id, plan_uuid, treatment_id = UUID(setup["clinic_id"]), UUID(plan_id), UUID(tid)
+
+    window, proceed = asyncio.Event(), asyncio.Event()
+
+    async def pause() -> None:
+        window.set()
+        await asyncio.wait_for(proceed.wait(), timeout=20)
+
+    if pause_at == "before_orphan_delete":
+        real_delete = TreatmentService.delete
+
+        async def paused_delete(*a: Any, **kw: Any):
+            await pause()
+            return await real_delete(*a, **kw)
+
+        monkeypatch.setattr(TreatmentService, "delete", staticmethod(paused_delete))
+    else:  # "after_item_removed": between the removal work and the commit
+        real_publish = event_bus.publish
+
+        async def paused_publish(event_type: str, data: dict, **kw: Any) -> None:
+            if event_type == "treatment_plan.treatment_removed":
+                await pause()
+            await real_publish(event_type, data, **kw)
+
+        monkeypatch.setattr(event_bus, "publish", paused_publish)
+
+    async with session_factory() as s_rm, session_factory() as s_add:
+        t_rm = asyncio.create_task(
+            TreatmentPlanService.remove_item(s_rm, clinic_id, plan_uuid, item_id, uuid4())
+        )
+
+        async def request_b():
+            # B behaves like a whole HTTP request: it commits (or rolls back) by itself,
+            # releasing the Treatment lock exactly as `get_db` would.
+            try:
+                result = await TreatmentPlanService.add_item(
+                    s_add, clinic_id, plan_uuid, {"treatment_id": tid}
+                )
+                await s_add.commit()
+                return result
+            except BaseException:
+                await s_add.rollback()
+                raise
+
+        t_add = None
+        try:
+            await asyncio.wait(
+                {asyncio.ensure_future(window.wait()), t_rm},
+                timeout=15,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if not window.is_set():
+                raise AssertionError(f"A never reached the pause point: {t_rm!r}")
+            t_add = asyncio.create_task(request_b())
+            await asyncio.sleep(0.8)
+            b_finished_while_a_open = t_add.done()
+            proceed.set()
+            removed = await asyncio.wait_for(t_rm, timeout=20)
+            await s_rm.commit()
+            b = (await asyncio.wait_for(asyncio.gather(t_add, return_exceptions=True), timeout=20))[
+                0
+            ]
+        finally:
+            proceed.set()
+            await s_rm.rollback()
+            await asyncio.gather(*(t for t in (t_rm, t_add) if t), return_exceptions=True)
+    async with session_factory() as check:
+        items = await _count(
+            check, PlannedTreatmentItem, PlannedTreatmentItem.treatment_id == treatment_id
+        )
+        sessions = await _count(check, PlannedTreatmentItemSession)
+        alive = (await check.get(Treatment, treatment_id)).deleted_at is None
+    return removed, b, b_finished_while_a_open, items, sessions, alive
+
+
+@pytest.mark.parametrize(
+    ("pause_at", "performed"),
+    [
+        ("before_orphan_delete", False),
+        ("after_item_removed", False),
+        ("after_item_removed", True),
+    ],
+)
+async def test_remove_item_vs_add_item_is_serializable_and_deadlock_free(
+    client, auth_headers, setup, db_session, session_factory, monkeypatch, spy, pause_at, performed
+) -> None:
+    removed, b, b_early, items, sessions, alive = await _race_remove_vs_add(
+        client,
+        auth_headers,
+        setup,
+        db_session,
+        session_factory,
+        monkeypatch,
+        pause_at=pause_at,
+        performed=performed,
+    )
+    assert removed is True
+    # Never a deadlock / driver error: B either answers or is refused cleanly.
+    assert not isinstance(b, BaseException) or isinstance(b, ValueError), repr(b)
+    # No duplicates and no orphan sessions, whatever the order.
+    assert items in (0, 1)
+    assert sessions == items
+    if isinstance(b, BaseException):
+        # R → B: B saw the removal (and, for a planned treatment, its deletion).
+        assert items == 0 and (performed or not alive)
+    else:
+        item, created = b
+        if created:
+            # R → B: the item was gone when B looked, so B created a fresh one.
+            assert items == 1 and alive
+        else:
+            # B → R: B read the committed state (item still there) and A then
+            # removed it. A valid serial order; B's 200 reflects what existed
+            # when it ran and created nothing.
+            assert items == 0
+    # Observed serial orders (documented in ADR 0023, "Lock order"):
+    if pause_at == "before_orphan_delete" or performed:
+        # A holds no Treatment lock yet: B reads the committed state (item present),
+        # answers 200 without creating anything -> order B -> R.
+        assert b_early and not isinstance(b, BaseException) and b[1] is False
+    else:
+        # A already holds the Treatment lock: B waits for A's commit -> order R -> B.
+        assert not b_early and isinstance(b, ValueError)
+    # B never produced a second `treatment_added` for the original link.
+    assert spy.n("treatment_plan.treatment_added") <= 1

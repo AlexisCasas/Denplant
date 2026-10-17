@@ -29,9 +29,12 @@ exceptions already propagate to the publisher:
    `treatment_linked_to_plan`**; the request rolls back with nothing written
    and `odontogram.treatment.deleted` is never published.
 4. A subscriber that ran and agrees appends its module name to `cleared_by`.
-   **If `cleared_by` is empty the delete is refused** (`503
-   delete_guard_unavailable`): an absent or silent guard never causes a silent
-   delete. `treatment_plan` is `auto_install` and `removable=False`, so the
+   `odontogram` requires the acknowledgement of every module in
+   `REQUIRED_DELETE_GUARDS` (today `{"treatment_plan"}`, a string, not an
+   import). **If a required guard is missing from `cleared_by` the delete is
+   refused** (`503 delete_guard_unavailable`) even if other subscribers
+   acknowledged: an absent or silent `treatment_plan` guard never causes a
+   silent delete, while additional guards remain possible. `treatment_plan` is `auto_install` and `removable=False`, so the
    guard is always mounted; `tests/test_treatment_delete_guard.py` asserts the
    registration and the fail-closed path.
 
@@ -49,6 +52,27 @@ lifecycle and, while linked, are refused by the guard.
 `delete_after_plan_release`). The guard only *reads* `planned_treatment_items`.
 `remove_item` takes the item row then the Treatment row (pre-existing); an
 `add_item` holding the Treatment lock only reads the item, so no cycle exists.
+#### `remove_item` vs `add_item` (B1-06, verified, no code change)
+
+`tests/test_treatment_delete_guard.py::test_remove_item_vs_add_item_is_serializable_and_deadlock_free`
+holds `remove_item` (session A) uncommitted at two points and runs `add_item`
+(session B) on the same treatment from an independent PostgreSQL session:
+
+| A paused at | B | Final state | Serial order |
+|-------------|---|-------------|--------------|
+| after item delete, before orphan delete (A holds only the item row) | answers **200, `created=False`** immediately (reads the *committed* item) | item gone, treatment soft-deleted | B → R |
+| after orphan delete (A holds the Treatment lock) | blocks until A commits, then `ValueError` ("Invalid treatment") | item gone, treatment soft-deleted | R → B |
+| performed treatment (A never takes the Treatment lock) | answers 200, `created=False` | item gone, treatment alive | B → R |
+
+B's idempotent 200 is never based on an *unconfirmed removal*: under READ
+COMMITTED B only sees committed rows, so the item it returns existed when B ran
+and R is ordered after it. There are never duplicate items or sessions, no
+second `treatment_added`, and no deadlock: B holds the Treatment lock only
+while reading, and A never waits on anything B holds while B waits on A. A's
+`FOR UPDATE` waits for B's short commit, then proceeds. Locking the Treatment
+first in `remove_item` would only turn B → R into R → B; it is not needed for
+correctness, so `remove_item` is unchanged.
+
 Result of the race: associate wins → delete is refused (409); delete wins →
 associate sees `deleted_at` and answers 400 "Invalid treatment".
 
