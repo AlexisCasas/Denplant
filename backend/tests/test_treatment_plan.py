@@ -235,9 +235,15 @@ async def test_add_treatment_item_to_plan(
 
 
 @pytest.mark.asyncio
-async def test_duplicate_treatment_id_rejected(
+async def test_duplicate_treatment_id_in_same_plan_is_idempotent(
     client: AsyncClient, auth_headers: dict, setup: dict
 ) -> None:
+    """Re-linking the same treatment to the same plan answers 200 + same item.
+
+    (Before DP-08.B1 this surfaced ``uq_planned_item_treatment`` as a 5xx.
+    The full contract — 409 for another plan, locked/closed plans, races —
+    lives in ``test_treatment_plan_add_item_idempotency.py``.)
+    """
     plan_resp = await client.post(
         "/api/v1/treatment_plan/treatment-plans",
         headers=auth_headers,
@@ -253,20 +259,13 @@ async def test_duplicate_treatment_id_rejected(
     )
     assert first.status_code == 201
 
-    # Unique constraint on treatment_id — second add raises IntegrityError
-    # which the handler surfaces as a 5xx. Capture the exception to keep the
-    # assertion focused on "the duplicate was blocked".
-    from sqlalchemy.exc import IntegrityError
-
-    try:
-        second = await client.post(
-            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
-            headers=auth_headers,
-            json={"treatment_id": treatment_id},
-        )
-        assert second.status_code in (400, 409, 500)
-    except IntegrityError:
-        pass
+    second = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["data"]["id"] == first.json()["data"]["id"]
 
 
 # ---------------------------------------------------------------------------
