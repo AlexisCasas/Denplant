@@ -80,6 +80,7 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 | `odontogram.treatment.deleted` | `EventType.ODONTOGRAM_TREATMENT_DELETED` | `odontogram` | — |
 | `odontogram.treatment.performed` | `EventType.ODONTOGRAM_TREATMENT_PERFORMED` | `odontogram` | `patient_timeline`, `payments`, `periodontogram`, `treatment_plan` |
 | `odontogram.treatment.status_changed` | `EventType.ODONTOGRAM_TREATMENT_STATUS_CHANGED` | `odontogram` | — |
+| `odontogram.treatment.surfaces_update_requested` | `EventType.ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED` | `odontogram` | `budget`, `treatment_plan` |
 | `patient.archived` | `EventType.PATIENT_ARCHIVED` | `patients` | `media`, `periodontogram`, `recalls` |
 | `patient.created` | `EventType.PATIENT_CREATED` | `patients` | `notifications` |
 | `patient.medical_updated` | `EventType.PATIENT_MEDICAL_UPDATED` | `patients_clinical` | `patient_timeline` |
@@ -592,35 +593,35 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.ODONTOGRAM_CONDITION_CHANGED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:203`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:243`
 - **Subscribers:** —
 
 ### `odontogram.surface.updated`
 
 - **Constant:** `EventType.ODONTOGRAM_SURFACE_UPDATED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:237`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:277`
 - **Subscribers:** —
 
 ### `odontogram.tooth.updated`
 
 - **Constant:** `EventType.ODONTOGRAM_TOOTH_UPDATED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:305`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:345`
 - **Subscribers:** —
 
 ### `odontogram.treatment.added`
 
 - **Constant:** `EventType.ODONTOGRAM_TREATMENT_ADDED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:789`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:829`
 - **Subscribers:** —
 
 ### `odontogram.treatment.delete_requested`
 
 - **Constant:** `EventType.ODONTOGRAM_TREATMENT_DELETE_REQUESTED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:990`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:1152`
 - **Subscribers:**
   - `treatment_plan`
 
@@ -628,14 +629,14 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.ODONTOGRAM_TREATMENT_DELETED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:1018`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:1183`
 - **Subscribers:** —
 
 ### `odontogram.treatment.performed`
 
 - **Constant:** `EventType.ODONTOGRAM_TREATMENT_PERFORMED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:890`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:945`
 - **Subscribers:**
   - `patient_timeline`
   - `payments`
@@ -646,8 +647,17 @@ Maintained by `backend/scripts/generate_catalogs.py`.
 
 - **Constant:** `EventType.ODONTOGRAM_TREATMENT_STATUS_CHANGED`
 - **Publishers:**
-  - `odontogram` — `backend/app/modules/odontogram/service.py:833`
+  - `odontogram` — `backend/app/modules/odontogram/service.py:892`
 - **Subscribers:** —
+
+### `odontogram.treatment.surfaces_update_requested`
+
+- **Constant:** `EventType.ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED`
+- **Publishers:**
+  - `odontogram` — `backend/app/modules/odontogram/service.py:1088`
+- **Subscribers:**
+  - `budget`
+  - `treatment_plan`
 
 ### `patient.archived`
 

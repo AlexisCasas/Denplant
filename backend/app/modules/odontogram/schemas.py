@@ -392,8 +392,11 @@ class TreatmentUpdate(BaseModel):
     """Update a Treatment header.
 
     `surfaces` replaces the surfaces on every TreatmentTooth of this treatment
-    (useful for single-tooth surface treatments like fillings) and triggers a
-    recompute of price_snapshot/duration_snapshot from the catalog item.
+    only when its set effectively changes. The service authorizes that change
+    only for eligible planned single-tooth surface treatments; Plan/Budget
+    links, a performed status and price-snapshot drift can refuse it. Only a
+    ``per_surface`` catalog item can update ``price_snapshot``. Duration, VAT
+    and visualization snapshots remain frozen.
     """
 
     status: Literal["planned", "performed"] | None = None

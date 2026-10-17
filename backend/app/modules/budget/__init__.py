@@ -130,7 +130,42 @@ class BudgetModule(BaseModule):
             EventType.TREATMENT_PLAN_TREATMENT_ADDED: self._on_treatment_added_to_plan,
             EventType.TREATMENT_PLAN_TREATMENT_REMOVED: self._on_treatment_removed_from_plan,
             EventType.TREATMENT_PLAN_BUDGET_SYNC_REQUESTED: self._on_sync_requested,
+            EventType.ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED: (
+                self._on_surfaces_update_requested
+            ),
         }
+
+    async def _on_surfaces_update_requested(
+        self, data: dict[str, Any], *, db: AsyncSession
+    ) -> None:
+        """Veto a surfaces edit on a treatment a quote line points at (ADR 0023).
+
+        Transactional and read-only. ANY ``BudgetItem`` for the treatment blocks it,
+        whatever the budget's status or version: old versions and terminal quotes
+        are history (and may already feed invoices), and the line stores the
+        surfaces, price and tax computed from the treatment as it was. Appends
+        ``budget`` to ``cleared_by`` only when nothing links to it.
+        """
+        from app.modules.odontogram.service import TreatmentSurfacesEditBlockedError
+
+        clinic_id = UUID(str(data["clinic_id"]))
+        treatment_id = UUID(str(data["treatment_id"]))
+        item_id = (
+            await db.execute(
+                select(BudgetItem.id)
+                .where(
+                    BudgetItem.treatment_id == treatment_id,
+                    BudgetItem.clinic_id == clinic_id,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if item_id is not None:
+            raise TreatmentSurfacesEditBlockedError(
+                "Treatment is linked to a budget line; its surfaces can no longer be edited",
+                "linked_to_budget",
+            )
+        data.setdefault("cleared_by", []).append("budget")
 
     async def _on_treatment_added_to_plan(self, data: dict[str, Any], *, db: AsyncSession) -> None:
         """Create BudgetItem when a treatment is added to a plan.
