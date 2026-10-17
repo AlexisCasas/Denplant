@@ -1936,6 +1936,22 @@
     "deleteError": "Error deleting VAT type"
   },
   "treatmentPlans": {
+    "linkRecovery": {
+      "title": "Treatment created, but not added to the Plan.",
+      "blockedTitle": "Could not add to the Plan",
+      "undoBlockedTitle": "Cannot undo",
+      "alreadyRemoved": "The treatment is no longer in the Plan.",
+      "added": "Treatment added to the Plan",
+      "recovered": "Treatment added to the Plan after retrying",
+      "reason": {
+        "locked": "The Plan is locked by a sent or accepted budget. Reopen or renegotiate the budget to change it.",
+        "closed": "The Plan is closed or completed and cannot take treatments.",
+        "other_plan": "This treatment already belongs to another Plan.",
+        "plan_missing": "The Plan is no longer available.",
+        "invalid": "The treatment is not valid for this Plan.",
+        "error": "The association could not be confirmed. You can retry; no new treatment will be created."
+      }
+    },
     "title": "Treatment Plans",
     "description": "Manage treatment plans for patients",
     "new": "New plan",

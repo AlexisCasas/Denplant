@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- fix(DP-08.B1): `OdontogramChart.vue` and `TreatmentBar.vue` (planning mode)
+  associate new treatments to the Plan through the shared, idempotent
+  `usePlanTreatmentLink` flow. A failed association shows the recovery notice
+  instead of a success message and is never pushed to the undo stack; undo of a
+  Plan-linked treatment uses the Plan's item removal rather than
+  `DELETE /odontogram/treatments/{id}`. Standalone (no Plan) behaviour is
+  unchanged. Frontend only.
+
 - fix(DP-08.A): Plan therapeutic overlay is anchored with the diagnostic NTS
   geometry through the new `ntsTherapeuticGeometry.ts`. M/D/V/L follow tooth
   side and arch in both dentitions (previously fixed positions), catalog

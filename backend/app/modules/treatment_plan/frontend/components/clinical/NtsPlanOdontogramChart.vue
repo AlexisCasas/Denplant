@@ -11,7 +11,9 @@ import SurfaceSelectorPopup from '../../../../odontogram/frontend/components/odo
 import TreatmentBar from '../../../../odontogram/frontend/components/odontogram/TreatmentBar.vue'
 import TreatmentEditModal from '../../../../odontogram/frontend/components/odontogram/TreatmentEditModal.vue'
 import { useTreatments } from '../../../../odontogram/frontend/composables/useTreatments'
-import { useTreatmentPlans } from '../../composables/useTreatmentPlans'
+import { usePlanTreatmentLink, type PlanCreateLinkResult } from '../../composables/usePlanTreatmentLink'
+import type { PlanLinkFailureReason } from '../../utils/planTreatmentLink'
+import PlanLinkRecoveryNotice from './PlanLinkRecoveryNotice.vue'
 import { NTS_ROWS } from '../../../../odontogram/frontend/utils/ntsDentition'
 import { NTS_CHART_HEIGHT, NTS_CHART_SCALE, NTS_CHART_VIEWBOX, NTS_CHART_WIDTH, toothPlacement } from '../../../../odontogram/frontend/utils/ntsChartGeometry'
 import NtsDentitionRow from '../../../../odontogram/frontend/components/odontogram/NtsDentitionRow.vue'
@@ -42,7 +44,7 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 const toast = useToast()
 const { treatments, fetchTreatments, createTreatment, updateTreatment, deleteTreatment, performTreatment } = useTreatments()
-const treatmentPlansApi = useTreatmentPlans()
+const planLink = usePlanTreatmentLink()
 const selectedTooth = ref<number | null>(null)
 const selectedTreatmentType = ref<string | null>(null)
 const selectedCatalogItemId = ref<string | null>(null)
@@ -52,7 +54,8 @@ const multiToothSelection = ref<{ teeth: number[], anchor: number | null }>({ te
 const showMultiToothConfirm = ref(false)
 const editingTreatment = ref<ToothTreatmentView | null>(null)
 const showTreatmentEditModal = ref(false)
-const undoStack = ref<string[]>([])
+// Entries carry the Plan they were associated with so undo can go through the Plan's removeItem.
+const undoStack = ref<Array<{ treatmentId: string, planId: string }>>([])
 
 type MarkerSurface = 'M' | 'D' | 'O' | 'V' | 'L'
 interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], treatmentStatus: string, snapshot: unknown, surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
@@ -114,16 +117,39 @@ function handleMultiToothClick(toothNumber: number) {
   multiToothSelection.value = { ...multiToothSelection.value, teeth: candidate }
 }
 function canConfirmFreeSelection() { return multiToothConfig.value?.selectionMode === 'free' && multiToothSelection.value.teeth.length >= multiToothConfig.value.minTeeth }
-async function attachToPlan(treatment: Treatment) { if (props.planId) await treatmentPlansApi.addItem(props.planId, { treatment_id: treatment.id }) }
+/** Plan context: preflight → create once → associate. Standalone: create only. */
+async function createInContext(create: () => Promise<Treatment | null>): Promise<PlanCreateLinkResult | { status: 'standalone', treatmentId: string } | null> {
+  if (props.planId) return planLink.createAndLink(props.planId, create)
+  const created = await create()
+  return created ? { status: 'standalone', treatmentId: created.id } : null
+}
+async function finishCreate(result: Awaited<ReturnType<typeof createInContext>>) {
+  if (!result || result.status === 'create_failed') return
+  if (result.status === 'blocked') { planLink.explain(result.reason); return }
+  if (result.status === 'unlinked') {
+    // Treatment exists but is NOT in the Plan: no success toast, no undo entry.
+    // The recovery notice (planLink.pending) offers a retry with the same id.
+    await refetchTreatments(); emit('treatmentsChanged'); cancelClickToApplyMode(); return
+  }
+  undoStack.value.push({ treatmentId: result.treatmentId, planId: props.planId })
+  if (result.status === 'linked') planLink.notifyLinked(result.recovered)
+  emit('treatmentsChanged'); cancelClickToApplyMode()
+}
+async function retryPlanLink() {
+  const pending = planLink.pending.value
+  const result = await planLink.retry()
+  if (result?.ok && pending) {
+    undoStack.value.push({ treatmentId: pending.treatmentId, planId: pending.planId })
+    planLink.notifyLinked(true); await refetchTreatments(); emit('treatmentsChanged')
+  }
+}
 async function applyTreatment(toothNumber: number, surfaces?: Surface[]) {
   if (!props.patientId || !isClickToApplyMode.value) return
   const payload: TreatmentCreate = { tooth_numbers: [toothNumber], status: 'planned', scope: 'tooth' }
   if (selectedCatalogItemId.value) payload.catalog_item_id = selectedCatalogItemId.value
   if (selectedTreatmentType.value) payload.clinical_type = selectedTreatmentType.value as ClinicalType
   if (surfaces?.length) payload.surfaces = surfaces
-  const created = await createTreatment(props.patientId, payload)
-  if (!created) return
-  await attachToPlan(created); undoStack.value.push(created.id); emit('treatmentsChanged'); cancelClickToApplyMode()
+  await finishCreate(await createInContext(() => createTreatment(props.patientId, payload)))
 }
 function handleSurfaceConfirm(surfaces: Surface[]) { if (selectedTooth.value && surfaces.length) void applyTreatment(selectedTooth.value, surfaces); selectedTooth.value = null }
 async function confirmMultiToothSelection(roles: Array<{ tooth_number: number, role: 'pillar' | 'pontic' }> | null) {
@@ -133,16 +159,45 @@ async function confirmMultiToothSelection(roles: Array<{ tooth_number: number, r
   if (cfg.mode === 'bridge' && roles?.length) payload.teeth = roles
   else payload.tooth_numbers = [...multiToothSelection.value.teeth].sort((a, b) => a - b)
   if (selectedCatalogItemId.value) payload.catalog_item_id = selectedCatalogItemId.value
-  const created = await createTreatment(props.patientId, payload)
-  if (!created) return
-  await attachToPlan(created); undoStack.value.push(created.id); emit('treatmentsChanged'); cancelClickToApplyMode()
+  await finishCreate(await createInContext(() => createTreatment(props.patientId, payload)))
 }
-async function handleUndo() { const treatmentId = undoStack.value.pop(); if (!treatmentId) return; await deleteTreatment(treatmentId); emit('treatmentsChanged') }
+/** Removes a treatment honouring Plan links; false = nothing was removed. */
+async function removeTreatmentSafely(treatmentId: string, planId: string, allowStandaloneFallback: boolean): Promise<boolean> {
+  if (!planId) return deleteTreatment(treatmentId)
+  // Plan-linked treatments are released through the Plan's item DELETE (orphan,
+  // session and budget rules). The odontogram DELETE is never used on them.
+  const result = await planLink.removeFromPlan(planId, treatmentId)
+  if (result.outcome === 'removed') return true
+  if (result.outcome === 'not_linked' && allowStandaloneFallback) return deleteTreatment(treatmentId)
+  planLink.explainRemove(result)
+  return false
+}
+async function handleUndo() {
+  const entry = undoStack.value.pop()
+  if (!entry) return
+  const removed = await removeTreatmentSafely(entry.treatmentId, entry.planId, false)
+  if (!removed) undoStack.value.push(entry) // keep it so the user can retry once the Plan allows it
+  else await refetchTreatments()
+  emit('treatmentsChanged')
+}
 async function refetchTreatments() { if (props.patientId) await fetchTreatments(props.patientId) }
-async function handleGlobalTreatmentApplied(_treatment: Treatment) { await refetchTreatments(); emit('treatmentsChanged') }
+async function handleGlobalTreatmentApplied(treatment: Treatment) {
+  // TreatmentBar only emits this once the Plan item is confirmed.
+  if (props.planId) undoStack.value.push({ treatmentId: treatment.id, planId: props.planId })
+  await refetchTreatments(); emit('treatmentsChanged')
+}
+async function handlePlanLinkFailed(payload: { planId: string, treatmentId: string, reason: PlanLinkFailureReason, label?: string }) {
+  planLink.setPending(payload)
+  await refetchTreatments(); emit('treatmentsChanged')
+}
 function editTreatment(treatment: ToothTreatmentView) { editingTreatment.value = treatment; showTreatmentEditModal.value = true }
 async function handleTreatmentUpdate(treatmentId: string, data: { status?: TreatmentStatus, notes?: string }) { await updateTreatment(treatmentId, data); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
-async function handleTreatmentDelete(treatmentId: string) { await deleteTreatment(treatmentId); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
+async function handleTreatmentDelete(treatmentId: string) {
+  // Explicit manual deletion; Plan-linked treatments still go through the Plan.
+  const removed = await removeTreatmentSafely(treatmentId, props.planId, true)
+  if (removed) undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
+  await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged')
+}
 async function handleTreatmentPerform(treatmentId: string) { await performTreatment(treatmentId); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
 onMounted(() => refetchTreatments())
 watch(() => props.patientId, () => refetchTreatments())
@@ -348,7 +403,15 @@ defineExpose({ refetchTreatments })
       @update:selected-status="selectedTreatmentStatus = $event"
       @treatment-select="selectedTreatmentType = $event"
       @treatment-applied="handleGlobalTreatmentApplied"
+      @plan-link-failed="handlePlanLinkFailed"
       @cancel="cancelClickToApplyMode"
+    />
+    <PlanLinkRecoveryNotice
+      v-if="planLink.pending.value"
+      :pending="planLink.pending.value"
+      :busy="planLink.busy.value"
+      @retry="retryPlanLink"
+      @dismiss="planLink.dismiss()"
     />
     <p
       v-if="hasActiveToothless"

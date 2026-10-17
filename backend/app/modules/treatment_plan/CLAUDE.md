@@ -33,7 +33,10 @@ Routes mounted at `/api/v1/treatment-plans/`.
 - `POST  /treatment-plans`              — create; `treatment_plan.plans.write`
 - `GET   /treatment-plans/{id}`         — detail
 - `PUT   /treatment-plans/{id}`         — update; status transitions
-- `POST  /treatment-plans/{id}/items`   — add item from catalog or odontogram tooth treatment
+- `POST  /treatment-plans/{id}/items`   — add item from catalog or odontogram tooth treatment.
+  **Idempotent per `treatment_id`** (DP-08.B1): 201 first time, 200 + same item
+  on a repeat in the same editable Plan; 409 `treatment_already_planned`
+  (treatment in another Plan) or 409 `plan_locked`; closed/terminal Plan → 400.
 - `PUT   /treatment-plans/{id}/items/reorder`
 - `POST  /treatment-plans/{id}/items/{item_id}/complete`
 - `POST  /treatment-plans/{id}/confirm`     — `plans.confirm`; draft → pending
@@ -133,6 +136,17 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
   `treatment_plan.treatment_added` with a denormalized snapshot
   (catalog_item_id, tooth, surfaces, unit_price, budget_id); the
   budget module's handler creates the matching budget line.
+- **`add_item` is idempotent and locks the Treatment row.** It returns
+  `(item, created)`; the router maps `created=False` to 200. The repeat path
+  must stay side-effect free (no event, sessions, budget lines or rewrites).
+  `UNIQUE(treatment_id)` is the final barrier; the `IntegrityError` is
+  recovered inside a SAVEPOINT (`begin_nested`) — never query an aborted
+  transaction. Frontend callers must read `statusCode`/`data.code`, not assume
+  201, and must use `usePlanTreatmentLink` (never a bare `addItem`) for
+  create→associate, retrying with the SAME `treatment_id`.
+- **Plan-linked treatments are removed through the Plan** (`removeItem`), not
+  `DELETE /odontogram/treatments/{id}`: only the former applies the orphan,
+  session and budget rules and the lock check.
 - **Item completion has two paths**: the user marks an item complete
   here, or the odontogram fires `odontogram.treatment.performed`. Both
   must converge to the same state — keep them idempotent.

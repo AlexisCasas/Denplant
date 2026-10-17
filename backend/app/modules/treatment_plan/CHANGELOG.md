@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- fix(DP-08.B1): safe, idempotent association of treatments to a Plan (F6).
+  `POST /treatment-plans/{id}/items` answers 201 on the first association and
+  **200 with the same item** when the same `treatment_id` is repeated in the
+  same editable Plan (no new item, sessions, `treatment_added` event or budget
+  lines). A treatment linked to another Plan, or a locked Plan, answers 409
+  with a structured `code` (`treatment_already_planned` / `plan_locked`);
+  closed or terminal Plans keep their 400 with no idempotent success.
+  The Treatment row is locked (`SELECT ... FOR UPDATE`) before the check and
+  insert, `UNIQUE(treatment_id)` stays the final barrier, and an
+  `IntegrityError` is recovered inside a SAVEPOINT. `add_item` now returns
+  `(item, created)`. No migration. Frontend: one shared flow
+  (`usePlanTreatmentLink`) for single, multi-tooth, whole-mouth and per-arch
+  creation — preflight, create once, associate, recover with the same
+  `treatment_id`; the "Tratamiento creado, pero no agregado al Plan." notice
+  (retry / close, never auto-delete); undo and delete of Plan-linked
+  treatments go through the Plan's item removal and are blocked with a reason
+  when the Plan is locked.
+
 - fix(DP-08.A): cancelled items no longer appear as active on the Plan NTS
   chart (layers, outline, dots, bridge connectors, global strip, counter and
   legend) while remaining in the Plan list and history. The legend now

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Arch, OdontogramTreatment, Treatment, TreatmentStatus, TreatmentPlan } from '~~/app/types'
+import type { PlanLinkFailureReason } from '../../../../treatment_plan/frontend/utils/planTreatmentLink'
 import { TREATMENT_ICONS, isSurfaceTreatment, resolveTreatmentIconKey } from './TreatmentIcons'
 import {
   ATOMIC_MULTI_TOOTH_TYPES,
@@ -46,6 +47,8 @@ const emit = defineEmits<{
   'treatmentSelect': [treatment: string]
   /** Fired after a global treatment is created and (optionally) added to the plan. */
   'treatmentApplied': [treatment: Treatment]
+  /** DP-08.B1: created but NOT associated to the Plan; parent shows the recovery notice. */
+  'planLinkFailed': [payload: { planId: string, treatmentId: string, reason: PlanLinkFailureReason, label?: string, treatment: Treatment }]
   'createPlan': []
   'cancel': []
 }>()
@@ -283,7 +286,7 @@ const currentTreatments = computed<TreatmentBarItem[]>(() => {
 
 const toast = useToast()
 const { createGlobalTreatment } = useTreatments()
-const treatmentPlansApi = useTreatmentPlans()
+const planLink = usePlanTreatmentLink()
 
 // Arch picker state: non-null while user must choose upper/lower for a global_arch.
 const archPickerItem = ref<OdontogramTreatment | null>(null)
@@ -310,30 +313,54 @@ async function applyGlobalTreatment(
     console.error('TreatmentBar: patientId is required to apply a global treatment')
     return
   }
+  const patientId = props.patientId
   applyingGlobal.value = true
   try {
-    const created = await createGlobalTreatment(props.patientId, {
+    const globalName = (c: Treatment) => c.catalog_item?.names?.[locale.value]
+      || c.catalog_item?.names?.es
+      || c.clinical_type
+    const make = () => createGlobalTreatment(patientId, {
       catalogItemId,
       scope,
       arch,
       status: 'planned'
     })
-    if (!created) return
 
-    // Link to the currently selected plan (if any).
-    if (props.selectedPlanId) {
-      await treatmentPlansApi.addItem(props.selectedPlanId, { treatment_id: created.id })
+    // No Plan selected: standalone odontogram behaviour, unchanged.
+    if (!props.selectedPlanId) {
+      const created = await make()
+      if (!created) return
+      toast.add({ title: t('odontogram.globals.applied', { name: globalName(created) }), color: 'success' })
+      emit('treatmentApplied', created)
+      return
     }
 
-    toast.add({
-      title: t('odontogram.globals.applied', {
-        name: created.catalog_item?.names?.[locale.value]
-          || created.catalog_item?.names?.es
-          || created.clinical_type
-      }),
-      color: 'success'
+    // Plan context (DP-08.B1): preflight → create once → associate. The
+    // success toast and `treatmentApplied` only fire once the item is confirmed.
+    let created: Treatment | null = null
+    const result = await planLink.createAndLink(props.selectedPlanId, async () => {
+      created = await make()
+      return created
     })
-    emit('treatmentApplied', created)
+    if (result.status === 'blocked') {
+      planLink.explain(result.reason)
+      return
+    }
+    if (result.status === 'create_failed' || !created) return
+    const treatment: Treatment = created
+    if (result.status === 'unlinked') {
+      // Keep treatment_id + context for recovery; no success message.
+      emit('planLinkFailed', {
+        planId: props.selectedPlanId,
+        treatmentId: result.treatmentId,
+        reason: result.reason,
+        label: String(globalName(treatment) ?? ''),
+        treatment
+      })
+      return
+    }
+    toast.add({ title: t('odontogram.globals.applied', { name: globalName(treatment) }), color: 'success' })
+    emit('treatmentApplied', treatment)
   } finally {
     applyingGlobal.value = false
   }
