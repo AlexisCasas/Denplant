@@ -912,6 +912,7 @@
       "not_planned": "the treatment is no longer planned.",
       "not_single_tooth": "they are only editable on single-tooth treatments.",
       "type_without_surfaces": "this treatment type does not use surfaces.",
+      "no_surfaces": "select at least one surface before saving.",
       "linked_to_plan": "it belongs to a treatment Plan; remove it from the Plan and create it again.",
       "linked_to_budget": "it is linked to a budget.",
       "price_snapshot_drift": "the catalog price changed since it was created; create the treatment again.",

@@ -912,6 +912,7 @@
       "not_planned": "le traitement n'est plus planifié.",
       "not_single_tooth": "elles ne sont modifiables que sur un traitement d'une seule dent.",
       "type_without_surfaces": "ce type de traitement n'utilise pas de surfaces.",
+      "no_surfaces": "sélectionnez au moins une surface avant d'enregistrer.",
       "linked_to_plan": "il appartient à un Plan de traitement ; retirez-le du Plan puis recréez-le.",
       "linked_to_budget": "il est lié à un devis.",
       "price_snapshot_drift": "le prix du catalogue a changé depuis sa création ; recréez le traitement.",

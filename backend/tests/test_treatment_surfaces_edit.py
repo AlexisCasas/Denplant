@@ -338,6 +338,49 @@ async def test_per_surface_catalog_drift_refuses_instead_of_repricing(
     )
 
 
+async def test_effective_empty_surfaces_are_refused_without_events_or_repricing(
+    client: AsyncClient, auth_headers: dict, setup: dict, db_session: AsyncSession, spy
+) -> None:
+    tid = await _filling(client, auth_headers, setup, surfaces=["O"])
+    before = await _state(db_session, tid)
+
+    await _assert_refused(client, auth_headers, db_session, tid, "no_surfaces", surfaces=[])
+
+    assert spy.n(REQUESTED) == 0
+    assert spy.n(STATUS_CHANGED) == 0
+    assert (await _state(db_session, tid))["price_snapshot"] == before["price_snapshot"]
+
+
+async def test_combined_empty_surfaces_request_changes_nothing(
+    client: AsyncClient, auth_headers: dict, setup: dict, db_session: AsyncSession, spy
+) -> None:
+    tid = await _filling(client, auth_headers, setup, surfaces=["O"])
+    before = await _state(db_session, tid)
+
+    await _assert_refused(
+        client, auth_headers, db_session, tid, "no_surfaces", notes="no guardar", surfaces=[]
+    )
+
+    assert await _state(db_session, tid) == before
+    assert spy.n(REQUESTED) == 0
+    assert spy.n(STATUS_CHANGED) == 0
+
+
+async def test_historical_empty_surfaces_remain_compatible_for_notes_only_update(
+    client: AsyncClient, auth_headers: dict, setup: dict, db_session: AsyncSession
+) -> None:
+    tid = await _filling(client, auth_headers, setup, surfaces=[])
+    before = await _state(db_session, tid)
+
+    r = await _put(client, auth_headers, tid, notes="nota histórica")
+
+    assert r.status_code == 200, r.text
+    after = await _state(db_session, tid)
+    assert _surfaces(after) == set()
+    assert after["notes"] == "nota histórica"
+    assert after["price_snapshot"] == before["price_snapshot"]
+
+
 # ---------------------------------------------------------------------------
 # Refused: links
 # ---------------------------------------------------------------------------
@@ -668,7 +711,7 @@ class _Pause:
 
         async def publish(et: str, data: dict, **kw: Any) -> None:
             await real(et, data, **kw)
-            if str(et) == str(event_type):
+            if str(et) == str(event_type) and not self.reached.is_set():
                 self.reached.set()
                 await asyncio.wait_for(self.proceed.wait(), timeout=20)
 
@@ -863,3 +906,39 @@ async def test_budget_line_then_edit_is_refused(
     assert exc.value.reason == "linked_to_budget"
     state = await _committed(db_session, tid)
     assert _surfaces(state) == {"O"} and state["price_snapshot"] == Decimal("50.00")
+
+
+async def test_two_surface_edits_serialize_with_last_committed_writer_winning(
+    client, auth_headers, setup, db_session, session_factory, monkeypatch
+) -> None:
+    """Both edits serialize on Treatment; B reads A's committed state then writes last."""
+    tid = await _filling(client, auth_headers, setup, surfaces=["O"])
+    await db_session.commit()
+    clinic_id = UUID(setup["clinic_id"])
+    pause = _Pause(monkeypatch, REQUESTED)
+
+    async with session_factory() as s_a, session_factory() as s_b:
+        t_a = asyncio.create_task(
+            _in_request(
+                s_a,
+                lambda: TreatmentService.update(
+                    s_a, clinic_id, UUID(tid), uuid4(), surfaces=["M", "O"]
+                ),
+            )
+        )
+        await pause.wait_reached()
+        t_b = asyncio.create_task(
+            _in_request(
+                s_b,
+                lambda: TreatmentService.update(s_b, clinic_id, UUID(tid), uuid4(), surfaces=["D"]),
+            )
+        )
+        await asyncio.sleep(0.8)
+        assert not t_b.done(), "the second edit must wait for the Treatment row lock"
+        pause.proceed.set()
+        await asyncio.wait_for(t_a, timeout=20)
+        await asyncio.wait_for(t_b, timeout=20)
+
+    state = await _committed(db_session, tid)
+    assert _surfaces(state) == {"D"}
+    assert state["price_snapshot"] == Decimal("50.00")

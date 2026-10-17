@@ -14,6 +14,7 @@ export const SURFACES_LOCKED_REASONS = [
   'not_planned',
   'not_single_tooth',
   'type_without_surfaces',
+  'no_surfaces',
   'linked_to_plan',
   'linked_to_budget',
   'price_snapshot_drift'

@@ -31,6 +31,7 @@ const { t, locale } = useI18n()
 const status = ref<TreatmentStatus>('existing')
 const selectedSurfaces = ref<Surface[]>([])
 const notes = ref('')
+const surfaceSelectionError = ref<string | null>(null)
 
 // All surfaces
 const allSurfaces: Surface[] = ['M', 'D', 'O', 'V', 'L']
@@ -47,6 +48,7 @@ watch(() => props.treatment, (treatment) => {
     status.value = treatment.status
     selectedSurfaces.value = [...(treatment.surfaces || [])]
     notes.value = treatment.notes || ''
+    surfaceSelectionError.value = null
   }
 }, { immediate: true })
 
@@ -86,6 +88,7 @@ function toggleSurface(surface: Surface) {
   } else {
     selectedSurfaces.value.splice(index, 1)
   }
+  if (selectedSurfaces.value.length > 0) surfaceSelectionError.value = null
 }
 
 function handleSave() {
@@ -103,11 +106,16 @@ function handleSave() {
 
   // Sent only when the SET really changed ('O','M' is 'M','O'), and never from a
   // Plan: the server would refuse it and the user could not have meant it.
-  if (
+  const changedSurfaces = (
     isSurfaceType.value
     && !props.planContext
     && surfacesChanged(props.treatment.surfaces, selectedSurfaces.value)
-  ) {
+  )
+  if (changedSurfaces && selectedSurfaces.value.length === 0) {
+    surfaceSelectionError.value = t('odontogram.surfacesLocked.no_surfaces')
+    return
+  }
+  if (changedSurfaces) {
     data.surfaces = [...selectedSurfaces.value]
   }
 
@@ -253,12 +261,12 @@ function handleClose() {
         </div>
 
         <UAlert
-          v-if="errorMessage"
+          v-if="errorMessage || surfaceSelectionError"
           data-testid="treatment-edit-error"
           color="error"
           variant="subtle"
           icon="i-lucide-circle-alert"
-          :description="errorMessage"
+          :description="surfaceSelectionError || errorMessage"
           class="mt-4"
         />
 

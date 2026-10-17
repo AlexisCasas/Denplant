@@ -90,7 +90,9 @@ tooth` with exactly one tooth, a surface-capable clinical type
 (any budget, any status or version). A combined request must also *end*
 planned. Anything else → **409 `surfaces_locked_<reason>`**, reasons:
 `not_planned`, `not_single_tooth`, `type_without_surfaces`, `linked_to_plan`,
-`linked_to_budget`, `price_snapshot_drift`. Fail-closed: a missing validator →
+`no_surfaces`, `linked_to_budget`, `price_snapshot_drift`. An effective edit
+of a surface-capable treatment may not leave it with zero surfaces; unchanged
+historical empty rows remain compatible. Fail-closed: a missing validator →
 **503 `surfaces_guard_unavailable`**.
 
 **Order in `TreatmentService.update`** (only when `surfaces` is sent):
