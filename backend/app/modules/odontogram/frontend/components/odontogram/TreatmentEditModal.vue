@@ -3,16 +3,24 @@ import type { Surface, ToothTreatmentView, TreatmentStatus } from '~~/app/types'
 import { getTreatmentColor, isSurfaceTreatment, getAllowedStatusesForTreatment } from '~~/app/config/odontogramConstants'
 import type { UiColor } from '~~/app/config/severity'
 import { getTreatmentDisplayName } from '~~/app/utils/treatmentView'
+import { surfacesChanged } from '~~/app/utils/treatmentSurfaces'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** Per-tooth view over a Treatment (see utils/treatmentView.ts). */
   treatment: ToothTreatmentView | null
   open: boolean
-}>()
+  /**
+   * Expressly inside a treatment Plan: surfaces are read-only here (the Plan
+   * already priced and quoted them). Unknown context = false: the API decides.
+   */
+  planContext?: boolean
+  /** Why the last save was refused; shown inline while the modal stays open. */
+  errorMessage?: string | null
+}>(), { planContext: false, errorMessage: null })
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'update': [treatmentId: string, data: { status?: TreatmentStatus, notes?: string }]
+  'update': [treatmentId: string, data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] }]
   'delete': [treatmentId: string]
   'perform': [treatmentId: string]
 }>()
@@ -71,6 +79,7 @@ const statusOptions = computed(() => {
 })
 
 function toggleSurface(surface: Surface) {
+  if (props.planContext) return
   const index = selectedSurfaces.value.indexOf(surface)
   if (index === -1) {
     selectedSurfaces.value.push(surface)
@@ -82,7 +91,7 @@ function toggleSurface(surface: Surface) {
 function handleSave() {
   if (!props.treatment) return
 
-  const data: { status?: TreatmentStatus, notes?: string } = {}
+  const data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] } = {}
 
   if (status.value !== props.treatment.status) {
     data.status = status.value
@@ -90,6 +99,16 @@ function handleSave() {
 
   if (notes.value !== (props.treatment.notes || '')) {
     data.notes = notes.value
+  }
+
+  // Sent only when the SET really changed ('O','M' is 'M','O'), and never from a
+  // Plan: the server would refuse it and the user could not have meant it.
+  if (
+    isSurfaceType.value
+    && !props.planContext
+    && surfacesChanged(props.treatment.surfaces, selectedSurfaces.value)
+  ) {
+    data.surfaces = [...selectedSurfaces.value]
   }
 
   if (Object.keys(data).length > 0) {
@@ -182,6 +201,7 @@ function handleClose() {
                 :key="surface"
                 :color="selectedSurfaces.includes(surface) ? 'primary' : 'neutral'"
                 :variant="selectedSurfaces.includes(surface) ? 'solid' : 'outline'"
+                :disabled="planContext"
                 size="sm"
                 @click="toggleSurface(surface)"
               >
@@ -193,6 +213,13 @@ function handleClose() {
               class="text-caption text-subtle mt-2"
             >
               {{ selectedSurfaces.length }} {{ t('odontogram.surfacesSelected') }}
+            </p>
+            <p
+              v-if="planContext"
+              data-testid="surfaces-locked-in-plan"
+              class="text-caption text-subtle mt-2"
+            >
+              {{ t('odontogram.surfacesLockedInPlan') }}
             </p>
           </div>
 
@@ -224,6 +251,16 @@ function handleClose() {
             </UButton>
           </div>
         </div>
+
+        <UAlert
+          v-if="errorMessage"
+          data-testid="treatment-edit-error"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :description="errorMessage"
+          class="mt-4"
+        />
 
         <template #footer>
           <div class="flex justify-between w-full">

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- feat(DP-08.B2): subscribes (transactionally) to
+  `odontogram.treatment.surfaces_update_requested` and vetoes a surfaces edit on
+  any treatment a `BudgetItem` points at (any budget/status/version). No budget
+  model, price or workflow changes. Required guard (ADR 0023).
+
 - feat(QW-BUDGET): **printable budget: figures, clinic identity, logo, immutable signed PDF.**
   - `pdf.py` is split into `build_pdf_context` (every figure and string, derived and formatted — the rules live here), `render_html` (presentation only, the part a client template replaces) and WeasyPrint. All database text is HTML-escaped.
   - The table has a VAT column per line; the totals block is derived for display (`Subtotal − line discounts − global discount = Taxable base`, `+ VAT = Total`). The global discount is spread by `pricing.allocate_global_discount` only, VAT is the remainder to `budget.total`, so the shown total is exactly `budget.total`. Persisted formulas are unchanged.

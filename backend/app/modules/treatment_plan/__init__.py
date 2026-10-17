@@ -126,6 +126,7 @@ class TreatmentPlanModule(BaseModule):
             on_budget_superseded,
             on_treatment_delete_requested,
             on_treatment_performed,
+            on_treatment_surfaces_update_requested,
         )
 
         return {
@@ -137,4 +138,7 @@ class TreatmentPlanModule(BaseModule):
             EventType.BUDGET_SUPERSEDED: on_budget_superseded,
             EventType.ODONTOGRAM_TREATMENT_DELETE_REQUESTED: on_treatment_delete_requested,
             EventType.ODONTOGRAM_TREATMENT_PERFORMED: on_treatment_performed,
+            EventType.ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED: (
+                on_treatment_surfaces_update_requested
+            ),
         }

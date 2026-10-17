@@ -906,6 +906,17 @@
     "selectSurfaces": "Sélectionner les surfaces",
     "selectedSurfaces": "Surfaces sélectionnées",
     "surfacesSelected": "surface(s) sélectionnée(s)",
+    "surfacesLockedInPlan": "Les surfaces ne peuvent pas être modifiées dans le contexte du Plan.",
+    "surfacesLockedPrefix": "Enregistrement impossible. Les surfaces ne peuvent pas être modifiées :",
+    "surfacesLocked": {
+      "not_planned": "le traitement n'est plus planifié.",
+      "not_single_tooth": "elles ne sont modifiables que sur un traitement d'une seule dent.",
+      "type_without_surfaces": "ce type de traitement n'utilise pas de surfaces.",
+      "linked_to_plan": "il appartient à un Plan de traitement ; retirez-le du Plan puis recréez-le.",
+      "linked_to_budget": "il est lié à un devis.",
+      "price_snapshot_drift": "le prix du catalogue a changé depuis sa création ; recréez le traitement.",
+      "locked": "la modification n'est pas sûre."
+    },
     "instructions": {
       "selectTreatment": "Sélectionnez un traitement à appliquer",
       "clickTooth": "Cliquez sur la dent pour appliquer"

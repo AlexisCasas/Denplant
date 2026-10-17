@@ -26,6 +26,13 @@ Routes mounted at `/api/v1/odontogram/`.
   `TreatmentDeletionBlockedError` to refuse, else append their module to
   `cleared_by`; nobody cleared → `TreatmentDeleteGuardUnavailableError` (fail
   closed). Router: 409 `treatment_linked_to_plan` / 503 `delete_guard_unavailable`.
+- `odontogram.treatment.surfaces_update_requested` — **vetoable** (ADR 0023,
+  DP-08.B2): published with `db` before surfaces are rewritten. Payload
+  `{clinic_id, treatment_id, requested_by, old_surfaces, new_surfaces,
+  cleared_by}`. `treatment_plan` AND `budget` must append themselves to
+  `cleared_by` (`REQUIRED_SURFACE_EDIT_GUARDS`); a subscriber raises
+  `TreatmentSurfacesEditBlockedError` to refuse. Router: 409
+  `surfaces_locked_<reason>` / 503 `surfaces_guard_unavailable`.
 - `odontogram.treatment.deleted` (only after clearance)
 
 (Surface/tooth update events `odontogram.surface.updated`,
@@ -101,6 +108,14 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
   Treatment row, asks for clearance (`delete_requested`) and only then writes
   `deleted_at`. `delete_after_plan_release` is the Python-only escape hatch for
   the Plan lifecycle (close/archive); never call it from a router.
+
+- **`TreatmentService.update` edits surfaces only when safe (F5).** With
+  `surfaces` in the request it locks the Treatment row, decides on the SET of
+  surfaces (equivalent → nothing happens), checks its own rules, asks the
+  owners via `surfaces_update_requested` and only then writes anything. Never
+  write notes/status before that veto. Only `per_surface` prices move; other
+  snapshots stay frozen, and a drifted catalog refuses the edit
+  (`price_snapshot_drift`). Don't import `treatment_plan`/`budget` here.
 
 - **FDI numbering is strict** (11–48 permanent, 51–85 deciduous).
   Validate at the boundary; don't trust caller-supplied tooth ids.
