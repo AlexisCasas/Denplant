@@ -144,6 +144,12 @@ class EventType:
     # transactional subscriber may raise to refuse it.
     ODONTOGRAM_TREATMENT_DELETE_REQUESTED = "odontogram.treatment.delete_requested"
 
+    # Vetoable (ADR 0023): published with ``db`` BEFORE the surfaces of a
+    # treatment are rewritten; owners of a link (plan, budget) may raise to refuse.
+    ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED = (
+        "odontogram.treatment.surfaces_update_requested"
+    )
+
     # Document / media events
     DOCUMENT_UPLOADED = "document.uploaded"
     DOCUMENT_DELETED = "document.deleted"

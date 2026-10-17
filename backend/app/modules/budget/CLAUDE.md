@@ -77,6 +77,10 @@ only — never combined with payments data.
   via **snapshot payloads only** (no cross-module ORM imports).
 - `odontogram.treatment.performed` — mark line items done when the
   underlying tooth treatment is performed.
+- `odontogram.treatment.surfaces_update_requested` — **vetoable** (ADR 0023,
+  DP-08.B2): refuses (`linked_to_budget`) when any `BudgetItem` points at the
+  treatment, any budget/status/version; otherwise appends `budget` to
+  `cleared_by`. Read-only, transactional, and a REQUIRED guard of the edit.
 
 ## Frontend slots exposed
 

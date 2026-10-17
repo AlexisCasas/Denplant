@@ -574,6 +574,8 @@ export interface TreatmentCreate {
 export interface TreatmentUpdate {
   status?: TreatmentStatus
   notes?: string
+  /** Sent only when the set of surfaces really changed (DP-08.B2). */
+  surfaces?: Surface[]
 }
 
 /** UI config for the multi-tooth picker (bridges, splints, multiple veneers/crowns). */

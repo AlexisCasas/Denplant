@@ -85,6 +85,7 @@ export function useOdontogram() {
     fetchTreatments: treatmentsApi.fetchTreatments,
     createTreatment: treatmentsApi.createTreatment,
     updateTreatment: treatmentsApi.updateTreatment,
+    updateError: treatmentsApi.updateError,
     deleteTreatment: treatmentsApi.deleteTreatment,
     performTreatment: treatmentsApi.performTreatment,
     fetchToothWithTreatments: treatmentsApi.fetchToothWithTreatments,

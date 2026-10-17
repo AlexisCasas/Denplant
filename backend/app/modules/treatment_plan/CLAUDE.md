@@ -92,6 +92,12 @@ raises `TreatmentDeletionBlockedError` when any `PlannedTreatmentItem`
 references the treatment, otherwise appends `treatment_plan` to `cleared_by`.
 The plan lifecycle bypasses it via `TreatmentService.delete_after_plan_release`.
 
+`odontogram.treatment.surfaces_update_requested` →
+`on_treatment_surfaces_update_requested` (DP-08.B2): raises
+`TreatmentSurfacesEditBlockedError(linked_to_plan)` when any
+`PlannedTreatmentItem` references the treatment (any plan/status), otherwise
+appends `treatment_plan` to `cleared_by`. It is a REQUIRED guard of the edit.
+
 ## Events consumed
 
 | Event | Handler | Effect |

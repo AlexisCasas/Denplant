@@ -38,6 +38,8 @@ request instead of quietly dropping a line (issue #183).
 | `treatment_plan.treatment_added` | `__init__.py::_on_treatment_added_to_plan` | Add matching line to the linked draft budget (no-op on non-draft). |
 | `treatment_plan.treatment_removed` | `__init__.py::_on_treatment_removed_from_plan` | Remove matching line from the linked draft budget. |
 
+| `odontogram.treatment.surfaces_update_requested` | `__init__.py::_on_surfaces_update_requested` | **Vetoable** (ADR 0023, DP-08.B2). Read-only: raises `TreatmentSurfacesEditBlockedError(linked_to_budget)` when ANY `BudgetItem` points at the treatment (any budget, status or version), else appends `budget` to `cleared_by`. Required: without it the edit is refused (503). |
+
 `odontogram.treatment.performed` used to appear here; the handler was a
 `pass` placeholder and was removed in #183.
 

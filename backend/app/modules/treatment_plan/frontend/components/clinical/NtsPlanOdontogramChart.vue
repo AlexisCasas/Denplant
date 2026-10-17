@@ -43,7 +43,7 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const toast = useToast()
-const { treatments, fetchTreatments, createTreatment, updateTreatment, deleteTreatment, performTreatment } = useTreatments()
+const { treatments, fetchTreatments, createTreatment, updateTreatment, updateError, deleteTreatment, performTreatment } = useTreatments()
 const planLink = usePlanTreatmentLink()
 const selectedTooth = ref<number | null>(null)
 const selectedTreatmentType = ref<string | null>(null)
@@ -183,8 +183,14 @@ async function handlePlanLinkFailed(payload: { planId: string, treatmentId: stri
   planLink.setPending(payload)
   await refetchTreatments(); emit('treatmentsChanged')
 }
-function editTreatment(treatment: ToothTreatmentView) { editingTreatment.value = treatment; showTreatmentEditModal.value = true }
-async function handleTreatmentUpdate(treatmentId: string, data: { status?: TreatmentStatus, notes?: string }) { await updateTreatment(treatmentId, data); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
+function editTreatment(treatment: ToothTreatmentView) { updateError.value = null; editingTreatment.value = treatment; showTreatmentEditModal.value = true }
+async function handleTreatmentUpdate(treatmentId: string, data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] }) {
+  // Close only once the API confirmed the save; a refusal keeps the modal open
+  // (selection intact, reason shown inline) and emits nothing.
+  const updated = await updateTreatment(treatmentId, data)
+  if (!updated) return
+  await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged')
+}
 async function handleTreatmentDelete(treatmentId: string) {
   // Explicit manual deletion. In Plan context it only ever goes through the
   // Plan; if that is refused or unverifiable the modal stays open with the
@@ -428,6 +434,8 @@ defineExpose({ refetchTreatments })
       v-if="patientId"
       v-model:open="showTreatmentEditModal"
       :treatment="editingTreatment"
+      :plan-context="!!planId"
+      :error-message="updateError"
       @update="handleTreatmentUpdate"
       @delete="handleTreatmentDelete"
       @perform="handleTreatmentPerform"

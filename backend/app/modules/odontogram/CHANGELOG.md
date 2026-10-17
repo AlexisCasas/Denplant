@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- fix(DP-08.B2, F5): `PUT /treatments/{id}` now really edits surfaces, and only
+  when safe. Planned, single-tooth, surface-capable treatments with no Plan item
+  and no budget line may change them; everything else answers 409
+  `surfaces_locked_<reason>` (`not_planned`, `not_single_tooth`,
+  `type_without_surfaces`, `linked_to_plan`, `linked_to_budget`,
+  `price_snapshot_drift`) and 503 `surfaces_guard_unavailable` if a required
+  validator is missing. New vetoable event
+  `odontogram.treatment.surfaces_update_requested` (ADR 0023). The Treatment row
+  is locked first, the veto runs before any write (no partial changes on a
+  combined request), equivalent surface sets are a no-op, and only `per_surface`
+  prices are recomputed (other snapshots stay frozen; a drifted catalog refuses
+  the edit). Frontend: `TreatmentEditModal` sends `surfaces` only when the set
+  changed, is read-only in Plan context, stays open on refusal/failure.
+
 - fix(DP-08.B1, B1-05): `TreatmentService.delete` now requires the
   `treatment_plan` acknowledgement explicitly (`REQUIRED_DELETE_GUARDS`);
   another subscriber's `cleared_by` entry cannot stand in for it (503
