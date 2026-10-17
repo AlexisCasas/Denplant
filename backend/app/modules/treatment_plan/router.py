@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -32,7 +32,7 @@ from .schemas import (
     TreatmentPlanUpdate,
     UpdateSessionRequest,
 )
-from .service import PlanLockedError, TreatmentPlanService
+from .service import PlanLockedError, TreatmentAlreadyPlannedError, TreatmentPlanService
 
 router = APIRouter(dependencies=[Depends(mark_financial_response)])
 
@@ -412,23 +412,57 @@ async def delete_treatment_plan(
     "/treatment-plans/{plan_id}/items",
     response_model=ApiResponse[PlannedTreatmentItemResponse],
     status_code=status.HTTP_201_CREATED,
+    responses={
+        200: {
+            "model": ApiResponse[PlannedTreatmentItemResponse],
+            "description": (
+                "The treatment was already an item of this plan: the existing "
+                "item is returned unchanged (idempotent repeat)."
+            ),
+        },
+        409: {
+            "description": (
+                "Plan locked by a sent/accepted budget, or the treatment is "
+                "already linked to a different plan."
+            ),
+        },
+    },
 )
 async def add_plan_item(
     plan_id: UUID,
     data: PlannedTreatmentItemCreate,
+    response: Response,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
-    """Add a treatment item to the plan."""
+    """Link a treatment to the plan (idempotent per plan).
+
+    201 on first link; 200 with the same item when the treatment is already
+    an item of this plan (no new sessions, event or budget line).
+    """
     await _get_accessible_plan(db, ctx, plan_id)
     try:
-        item = await TreatmentPlanService.add_item(db, ctx.clinic_id, plan_id, data.model_dump())
-        return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
+        item, created = await TreatmentPlanService.add_item(
+            db, ctx.clinic_id, plan_id, data.model_dump()
+        )
     except PlanLockedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        # ``code`` is machine-readable so the client can tell the two 409s
+        # apart without parsing prose (standard ``ErrorResponse.code``).
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "plan_locked", "message": str(e), "errors": [str(e)]},
+        )
+    except TreatmentAlreadyPlannedError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "treatment_already_planned", "message": str(e), "errors": [str(e)]},
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
 
 
 @router.put(
