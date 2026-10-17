@@ -1,28 +1,42 @@
-import { shallowMount } from '@vue/test-utils'
+import { flushPromises, shallowMount } from '@vue/test-utils'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { createI18n } from 'vue-i18n'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
 import type { TreatmentPlanDetail } from '../../app/types'
-import PlanDetailView from '../../../backend/app/modules/treatment_plan/frontend/components/clinical/PlanDetailView.vue'
 import TreatmentPlanMiniCard from '../../../backend/app/modules/treatment_plan/frontend/components/treatment-plans/TreatmentPlanMiniCard.vue'
 
 let canReadBudget = true
+let PlanDetailView: typeof import('../../../backend/app/modules/treatment_plan/frontend/components/clinical/PlanDetailView.vue')['default']
+const wrappers: ReturnType<typeof shallowMount>[] = []
 
 vi.stubGlobal('useToast', () => ({ add: vi.fn() }))
 mockNuxtImport('usePermissions', () => () => ({ can: () => canReadBudget }))
 vi.stubGlobal('useCurrency', () => ({ format: (amount: number) => String(amount) }))
-vi.stubGlobal('useOdontogramProfile', () => ({
-  profile: ref(''),
-  isLoaded: ref(true),
-  ensureLoaded: vi.fn()
-}))
 vi.stubGlobal('useClinicalNotes', () => ({ createNote: vi.fn() }))
 vi.stubGlobal('useTreatmentPlans', () => ({
   completeItem: vi.fn(), completeSession: vi.fn(), cancelSession: vi.fn(),
   removeItem: vi.fn(), reorderItems: vi.fn(), changeItemDoctor: vi.fn(),
   fetchPlan: vi.fn(), loading: ref(false), confirmPlan: vi.fn(), reopenPlan: vi.fn(),
   closePlan: vi.fn(), reactivatePlan: vi.fn(), logContact: vi.fn()
+}))
+
+const { ensureOdontogramProfileLoaded } = vi.hoisted(() => ({
+  ensureOdontogramProfileLoaded: vi.fn()
+}))
+
+mockNuxtImport('useOdontogramProfile', () => () => ({
+  profile: ref(''),
+  isLoaded: ref(true),
+  ensureLoaded: ensureOdontogramProfileLoaded
+}))
+
+vi.mock('../../../backend/app/modules/odontogram/frontend/composables/useOdontogramProfile', () => ({
+  useOdontogramProfile: () => ({
+    profile: ref(''),
+    isLoaded: ref(true),
+    ensureLoaded: ensureOdontogramProfileLoaded
+  })
 }))
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: {} }, missingWarn: false, fallbackWarn: false })
@@ -48,11 +62,16 @@ function plan(overrides: Record<string, unknown> = {}) {
   } as unknown as TreatmentPlanDetail
 }
 
-function detailWrapper(currentPlan: ReturnType<typeof plan>) {
-  return shallowMount(PlanDetailView, {
+async function detailWrapper(currentPlan: ReturnType<typeof plan>) {
+  const previousCalls = ensureOdontogramProfileLoaded.mock.calls.length
+  const wrapper = shallowMount(PlanDetailView, {
     props: { plan: currentPlan, patientId: 'patient-1', readonly: true },
     global: { plugins: [i18n], stubs }
   })
+  wrappers.push(wrapper)
+  await nextTick()
+  expect(ensureOdontogramProfileLoaded).toHaveBeenCalledTimes(previousCalls + 1)
+  return wrapper
 }
 
 function hasBudgetDestination(wrapper: ReturnType<typeof shallowMount>, budgetId: string) {
@@ -60,34 +79,44 @@ function hasBudgetDestination(wrapper: ReturnType<typeof shallowMount>, budgetId
 }
 
 describe('treatment plan budget navigation', () => {
-  beforeEach(() => {
-    canReadBudget = true
+  beforeAll(async () => {
+    PlanDetailView = (await import('../../../backend/app/modules/treatment_plan/frontend/components/clinical/PlanDetailView.vue')).default
   })
 
-  it('shows the linked draft budget for a pending plan and uses its current id', () => {
-    const wrapper = detailWrapper(plan())
+  beforeEach(() => {
+    canReadBudget = true
+    ensureOdontogramProfileLoaded.mockClear()
+  })
+
+  afterEach(async () => {
+    wrappers.splice(0).forEach(wrapper => wrapper.unmount())
+    await flushPromises()
+  })
+
+  it('shows the linked draft budget for a pending plan and uses its current id', async () => {
+    const wrapper = await detailWrapper(plan())
 
     expect(wrapper.findAll('a[href="/budgets/budget-1"]')).toHaveLength(1)
     expect(wrapper.text()).toContain('B-001')
     expect(wrapper.text()).toContain('budget.status.draft')
   })
 
-  it('keeps a sent budget in the lock banner without duplicating the action', () => {
-    const wrapper = detailWrapper(plan({ budget: { id: 'budget-2', budget_number: 'B-002', status: 'sent' }, budget_id: 'budget-2' }))
+  it('keeps a sent budget in the lock banner without duplicating the action', async () => {
+    const wrapper = await detailWrapper(plan({ budget: { id: 'budget-2', budget_number: 'B-002', status: 'sent' }, budget_id: 'budget-2' }))
 
     expect(wrapper.findAll('a[href="/budgets/budget-2"]')).toHaveLength(1)
     expect(wrapper.text()).toContain('clinical.plans.locked.title')
   })
 
-  it('does not offer a budget destination without a link or budget.read', () => {
-    expect(hasBudgetDestination(detailWrapper(plan({ budget_id: undefined, budget: undefined })), 'budget-1')).toBe(false)
+  it('does not offer a budget destination without a link or budget.read', async () => {
+    expect(hasBudgetDestination(await detailWrapper(plan({ budget_id: undefined, budget: undefined })), 'budget-1')).toBe(false)
 
     canReadBudget = false
-    expect(hasBudgetDestination(detailWrapper(plan()), 'budget-1')).toBe(false)
+    expect(hasBudgetDestination(await detailWrapper(plan()), 'budget-1')).toBe(false)
   })
 
   it('shows the link as soon as the refreshed confirmed plan includes its draft budget', async () => {
-    const wrapper = detailWrapper(plan({ budget_id: undefined, budget: undefined }))
+    const wrapper = await detailWrapper(plan({ budget_id: undefined, budget: undefined }))
 
     expect(hasBudgetDestination(wrapper, 'budget-after-confirmation')).toBe(false)
 
@@ -106,11 +135,14 @@ describe('treatment plan budget navigation', () => {
       props: { plan: plan({ budget_id: 'budget-history', budget: { id: 'budget-history', budget_number: 'B-003', status: 'expired' } }) },
       global: { plugins: [i18n], stubs }
     })
+    wrappers.push(wrapper)
 
     expect(hasBudgetDestination(wrapper, 'budget-history')).toBe(true)
     expect(wrapper.text()).toContain('B-003')
 
     canReadBudget = false
-    expect(hasBudgetDestination(shallowMount(TreatmentPlanMiniCard, { props: { plan: plan() }, global: { plugins: [i18n], stubs } }), 'budget-1')).toBe(false)
+    const restrictedWrapper = shallowMount(TreatmentPlanMiniCard, { props: { plan: plan() }, global: { plugins: [i18n], stubs } })
+    wrappers.push(restrictedWrapper)
+    expect(hasBudgetDestination(restrictedWrapper, 'budget-1')).toBe(false)
   })
 })
