@@ -140,6 +140,9 @@ class EventType:
     ODONTOGRAM_TREATMENT_STATUS_CHANGED = "odontogram.treatment.status_changed"
     ODONTOGRAM_TREATMENT_PERFORMED = "odontogram.treatment.performed"
     ODONTOGRAM_TREATMENT_DELETED = "odontogram.treatment.deleted"
+    # Vetoable (ADR 0023): published with ``db`` BEFORE the soft delete; a
+    # transactional subscriber may raise to refuse it.
+    ODONTOGRAM_TREATMENT_DELETE_REQUESTED = "odontogram.treatment.delete_requested"
 
     # Document / media events
     DOCUMENT_UPLOADED = "document.uploaded"

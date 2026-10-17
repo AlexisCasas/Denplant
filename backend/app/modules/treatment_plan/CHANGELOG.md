@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- fix(DP-08.B1, server guard): `treatment_plan` subscribes (transactionally) to
+  `odontogram.treatment.delete_requested` and refuses the deletion of any
+  treatment referenced by a `PlannedTreatmentItem` (any plan/status, so closed
+  plans keep their history protected). Closing/archiving a plan keeps working:
+  the cleanup uses `TreatmentService.delete_after_plan_release`. `remove_item`
+  is unchanged. See ADR 0023.
+
 - fix(DP-08.B1, audit): Plan context never falls back to
   `DELETE /odontogram/treatments/{id}`: if the item is not found in the Plan
   the outcome is `unknown_association` and nothing is deleted (it may belong to
@@ -11,8 +18,7 @@
   Known limitation: closing the recovery notice or reloading the page loses the
   in-memory handle to retry a partially created treatment (no persistent
   storage added); the treatment is never deleted automatically and stays
-  visible in the odontogram/list. The server-side delete guard is a proposal:
-  `docs/technical/treatment_plan/treatment-delete-guard-proposal.md`.
+  visible in the odontogram/list. The server-side delete guard is implemented (ADR 0023).
 
 - fix(DP-08.B1): safe, idempotent association of treatments to a Plan (F6).
   `POST /treatment-plans/{id}/items` answers 201 on the first association and

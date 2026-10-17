@@ -21,7 +21,12 @@ Routes mounted at `/api/v1/odontogram/`.
 - `odontogram.treatment.added`
 - `odontogram.treatment.status_changed`
 - `odontogram.treatment.performed`
-- `odontogram.treatment.deleted`
+- `odontogram.treatment.delete_requested` — **vetoable** (ADR 0023): published
+  with `db` before `deleted_at` is set. Subscribers raise
+  `TreatmentDeletionBlockedError` to refuse, else append their module to
+  `cleared_by`; nobody cleared → `TreatmentDeleteGuardUnavailableError` (fail
+  closed). Router: 409 `treatment_linked_to_plan` / 503 `delete_guard_unavailable`.
+- `odontogram.treatment.deleted` (only after clearance)
 
 (Surface/tooth update events `odontogram.surface.updated`,
 `odontogram.tooth.updated`, `odontogram.condition.changed` are declared
@@ -91,6 +96,11 @@ See [`nts-record-model.md`](../../../../docs/technical/odontogram/nts-record-mod
 [ADR 0022](../../../../docs/adr/0022-nts-lifecycle-auditability-concurrency.md).
 
 ## Gotchas
+
+- **`TreatmentService.delete` is guarded; keep it that way.** It locks the
+  Treatment row, asks for clearance (`delete_requested`) and only then writes
+  `deleted_at`. `delete_after_plan_release` is the Python-only escape hatch for
+  the Plan lifecycle (close/archive); never call it from a router.
 
 - **FDI numbering is strict** (11–48 permanent, 51–85 deciduous).
   Validate at the boundary; don't trust caller-supplied tooth ids.

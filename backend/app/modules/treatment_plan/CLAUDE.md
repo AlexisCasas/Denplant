@@ -85,6 +85,13 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
 > constants. ``items_reordered`` used to be a string-only literal —
 > it now lives at `EventType.TREATMENT_PLAN_ITEMS_REORDERED`.
 
+## Events consumed (vetoable)
+
+`odontogram.treatment.delete_requested` → `on_treatment_delete_requested`:
+raises `TreatmentDeletionBlockedError` when any `PlannedTreatmentItem`
+references the treatment, otherwise appends `treatment_plan` to `cleared_by`.
+The plan lifecycle bypasses it via `TreatmentService.delete_after_plan_release`.
+
 ## Events consumed
 
 | Event | Handler | Effect |
@@ -151,8 +158,7 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
   of scope.
 - **Plan context never falls back to the odontogram DELETE**
   (`releaseTreatment`): an item missing from *this* Plan does not prove the
-  treatment is standalone. The server has no guard yet — see
-  `docs/technical/treatment_plan/treatment-delete-guard-proposal.md`.
+  treatment is standalone. The server now enforces it too (ADR 0023).
 - **Plan-linked treatments are removed through the Plan** (`removeItem`), not
   `DELETE /odontogram/treatments/{id}`: only the former applies the orphan,
   session and budget rules and the lock check.

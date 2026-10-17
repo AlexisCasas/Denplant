@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- fix(DP-08.B1): `DELETE /odontogram/treatments/{id}` is now guarded
+  (ADR 0023). `TreatmentService.delete` locks the row, publishes the vetoable
+  `odontogram.treatment.delete_requested` (with `db`) and fails closed when no
+  guard answers: 409 `treatment_linked_to_plan` for plan-linked treatments, 503
+  `delete_guard_unavailable` if nobody cleared the request. New
+  `delete_after_plan_release` (Python-only) serves the Plan lifecycle. No
+  migration.
+
 - fix(DP-08.B1): `OdontogramChart.vue` and `TreatmentBar.vue` (planning mode)
   associate new treatments to the Plan through the shared, idempotent
   `usePlanTreatmentLink` flow. A failed association shows the recovery notice

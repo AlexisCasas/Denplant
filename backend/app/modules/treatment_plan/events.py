@@ -329,3 +329,39 @@ async def on_treatment_performed(data: dict[str, Any], *, db: AsyncSession) -> N
 
     await TreatmentPlanService._check_and_complete_plan(db, UUID(clinic_id), item.treatment_plan_id)
     logger.info("Marked planned item %s as completed from odontogram", item.id)
+
+
+async def on_treatment_delete_requested(data: dict[str, Any], *, db: AsyncSession) -> None:
+    """Veto the soft delete of a treatment that a Plan still owns (ADR 0023).
+
+    Runs inside the odontogram request's transaction, before ``deleted_at`` is
+    written. Any ``PlannedTreatmentItem`` (any plan, any status — closed plans
+    keep their items as history) protects the treatment. The plan lifecycle
+    itself releases treatments through
+    ``TreatmentService.delete_after_plan_release`` and never reaches this
+    handler; ``remove_item`` deletes the item first, so it passes.
+
+    Raising is the contract: the exception propagates to the publisher and
+    rolls the request back. The module name is appended to ``cleared_by`` only
+    when the treatment is NOT linked, which is how the publisher knows a guard
+    actually ran.
+    """
+    from app.modules.odontogram.service import TreatmentDeletionBlockedError
+
+    clinic_id = UUID(str(data["clinic_id"]))
+    treatment_id = UUID(str(data["treatment_id"]))
+    item = (
+        await db.execute(
+            select(PlannedTreatmentItem.id, PlannedTreatmentItem.treatment_plan_id)
+            .where(
+                PlannedTreatmentItem.treatment_id == treatment_id,
+                PlannedTreatmentItem.clinic_id == clinic_id,
+            )
+            .limit(1)
+        )
+    ).first()
+    if item is not None:
+        raise TreatmentDeletionBlockedError(
+            "Treatment belongs to a treatment plan; remove it from the plan instead"
+        )
+    data.setdefault("cleared_by", []).append("treatment_plan")
