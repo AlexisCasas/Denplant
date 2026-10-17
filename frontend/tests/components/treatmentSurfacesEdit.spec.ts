@@ -84,6 +84,7 @@ describe('DP-08.B2 — reglas puras', () => {
 
   it('reads the lock reason from status + structured code only', () => {
     expect(surfacesLockedReason(httpError(409, 'surfaces_locked_linked_to_plan'))).toBe('linked_to_plan')
+    expect(surfacesLockedReason(httpError(409, 'surfaces_locked_no_surfaces'))).toBe('no_surfaces')
     expect(surfacesLockedReason(httpError(409, 'surfaces_locked_price_snapshot_drift'))).toBe('price_snapshot_drift')
     expect(surfacesLockedReason(httpError(409, 'surfaces_locked_brand_new'))).toBe('locked')
     expect(surfacesLockedReason(httpError(409, 'plan_locked'))).toBeNull()
@@ -92,7 +93,7 @@ describe('DP-08.B2 — reglas puras', () => {
   })
 
   it('every backend reason has text in all five locales', () => {
-    const reasons = ['not_planned', 'not_single_tooth', 'type_without_surfaces', 'linked_to_plan', 'linked_to_budget', 'price_snapshot_drift', 'locked']
+    const reasons = ['not_planned', 'not_single_tooth', 'type_without_surfaces', 'no_surfaces', 'linked_to_plan', 'linked_to_budget', 'price_snapshot_drift', 'locked']
     for (const code of ['es', 'en', 'fr', 'pt', 'ta']) {
       const o = locale(code).odontogram
       expect(o.surfacesLockedInPlan, code).toBeTruthy()
@@ -180,6 +181,23 @@ describe('DP-08.B2 — TreatmentEditModal', () => {
     await new Promise(r => setTimeout(r, 0))
     buttonByText('Guardar').click()
     expect(w.emitted('update')).toBeUndefined()
+  })
+
+  it('prevents saving an effective change that removes every surface, then allows correction', async () => {
+    const w = await mountModal({ treatment: view({ surfaces: ['O'] }) })
+    buttonByText('O - ').click()
+    await new Promise(r => setTimeout(r, 0))
+    buttonByText('Guardar').click()
+    await new Promise(r => setTimeout(r, 0))
+    expect(w.emitted('update')).toBeUndefined()
+    expect(body().querySelector('[data-testid="treatment-edit-error"]')?.textContent)
+      .toContain('al menos una superficie')
+    expect(w.emitted('update:open')).toBeUndefined()
+
+    buttonByText('M - ').click()
+    await new Promise(r => setTimeout(r, 0))
+    buttonByText('Guardar').click()
+    expect(w.emitted('update')![0][1]).toEqual({ surfaces: ['M'] })
   })
 
   it('shows the refusal inline and keeps the user selection while open', async () => {

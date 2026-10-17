@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- fix(DP-08.B2): reject an effective edit that would leave a surface treatment
+  with no surfaces (`409 surfaces_locked_no_surfaces`) before any event or
+  write. Existing historical empty-surface rows remain readable and notes-only
+  updates remain compatible. The edit dialog keeps the selection open with a
+  corrective message; `TreatmentUpdate` now documents the frozen snapshot
+  policy. Two simultaneous edits serialize on the Treatment row; the later
+  committed request is the current last-writer policy.
+
 - fix(DP-08.B2, F5): `PUT /treatments/{id}` now really edits surfaces, and only
   when safe. Planned, single-tooth, surface-capable treatments with no Plan item
   and no budget line may change them; everything else answers 409

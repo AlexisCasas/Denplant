@@ -70,8 +70,8 @@ class TreatmentSurfacesEditBlockedError(ValueError):
     """The surfaces of this treatment cannot be edited safely (409).
 
     ``reason`` is one of ``not_planned``, ``not_single_tooth``,
-    ``type_without_surfaces``, ``linked_to_plan``, ``linked_to_budget`` or
-    ``price_snapshot_drift``; the stable machine-readable ``code`` is
+    ``type_without_surfaces``, ``no_surfaces``, ``linked_to_plan``,
+    ``linked_to_budget`` or ``price_snapshot_drift``; the stable machine-readable ``code`` is
     ``surfaces_locked_<reason>`` (clients match the ``surfaces_locked_``
     prefix). Raised by this module or by a transactional subscriber of
     ``odontogram.treatment.surfaces_update_requested`` (ADR 0023).
@@ -1073,6 +1073,12 @@ class TreatmentService:
             )
         if treatment.clinical_type not in SURFACE_TREATMENTS:
             raise blocked("This treatment type does not use surfaces", "type_without_surfaces")
+        # A surface treatment without a selected surface has no anatomical
+        # location.  Keep historical empty rows compatible when the caller is
+        # not changing their set (``_authorize_surfaces_edit`` is then never
+        # reached), but do not let an effective edit erase the location.
+        if not set(surfaces):
+            raise blocked("Select at least one surface for this treatment", "no_surfaces")
         if treatment.budget_item_id is not None:
             raise blocked("Treatment is linked to a budget line", "linked_to_budget")
 
