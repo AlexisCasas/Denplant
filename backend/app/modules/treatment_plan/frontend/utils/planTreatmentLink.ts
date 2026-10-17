@@ -9,6 +9,7 @@ export type PlanLinkFailureReason
     | 'other_plan' // treatment already belongs to a different plan
     | 'plan_missing' // plan no longer exists / not visible
     | 'invalid' // backend rejected the treatment (wrong clinic/patient/...)
+    | 'unverified' // the Plan state could not be read (403 / 5xx / timeout / network): fail-closed
     | 'error' // transient: network / 5xx, outcome unknown
 
 /** Reasons for which retrying can never succeed without user action elsewhere. */

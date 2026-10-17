@@ -33,6 +33,8 @@ const fake = vi.hoisted(() => {
       items: Array<{ id: string, treatment_id: string }>
     },
     getFails: false,
+    // when set, GET plan fails with this HTTP status (0 = network/timeout)
+    getErrorStatus: null as number | null,
     // 'ok' | 'lost' (server commits, response lost) | 409 codes | 'network'
     postMode: 'ok' as string,
     deleteMode: 'ok' as string,
@@ -49,6 +51,9 @@ mockNuxtImport('useApi', () => () => ({
   get: async (path: string) => {
     fake.calls.push(`GET ${path}`)
     if (fake.getFails) throw Object.assign(new Error('network'), {})
+    if (fake.getErrorStatus !== null) {
+      throw fake.getErrorStatus === 0 ? Object.assign(new Error('timeout'), {}) : httpError(fake.getErrorStatus)
+    }
     if (!fake.plan) throw httpError(404)
     return { data: JSON.parse(JSON.stringify(fake.plan)) }
   },
@@ -95,6 +100,7 @@ const dels = () => fake.calls.filter(c => c.startsWith('DELETE'))
 beforeEach(() => {
   fake.plan = { id: PLAN, status: 'draft', budget_id: null, budget: null, items: [] }
   fake.getFails = false
+  fake.getErrorStatus = null
   fake.postMode = 'ok'
   fake.deleteMode = 'ok'
   fake.calls = []
@@ -280,9 +286,9 @@ describe('DP-08.B1 — deshacer / eliminar con Plan (removeFromPlan)', () => {
     expect(dels()).toHaveLength(0)
   })
 
-  it('no PlannedTreatmentItem: reports not_linked and issues no DELETE itself', async () => {
+  it('no item in THIS plan: unknown association, issues no DELETE itself', async () => {
     const link = usePlanTreatmentLink()
-    expect(await link.removeFromPlan(PLAN, 't1')).toEqual({ outcome: 'not_linked' })
+    expect(await link.removeFromPlan(PLAN, 't1')).toEqual({ outcome: 'unknown_association' })
     expect(dels()).toHaveLength(0)
   })
 
@@ -299,7 +305,7 @@ describe('DP-08.B1 — deshacer / eliminar con Plan (removeFromPlan)', () => {
     const link = usePlanTreatmentLink()
     link.explainRemove({ outcome: 'blocked', reason: 'locked' })
     link.explainRemove({ outcome: 'failed' })
-    link.explainRemove({ outcome: 'not_linked' })
+    link.explainRemove({ outcome: 'unknown_association' })
     expect(fake.toasts.map(t => t.color)).not.toContain('success')
   })
 })
@@ -326,8 +332,8 @@ describe('DP-08.B1 — aviso de recuperación', () => {
   })
 
   it('has the keys in every supported locale', () => {
-    const keys = ['title', 'blockedTitle', 'undoBlockedTitle', 'alreadyRemoved', 'added', 'recovered']
-    const reasons = ['locked', 'closed', 'other_plan', 'plan_missing', 'invalid', 'error']
+    const keys = ['title', 'blockedTitle', 'undoBlockedTitle', 'unknownAssociation', 'added', 'recovered']
+    const reasons = ['locked', 'closed', 'other_plan', 'plan_missing', 'unverified', 'invalid', 'error']
     for (const code of ['en', 'es', 'fr', 'pt', 'ta']) {
       const block = locale(code).treatmentPlans.linkRecovery
       for (const k of keys) expect(block[k], `${code}.${k}`).toBeTruthy()
@@ -349,16 +355,33 @@ describe('DP-08.B1 — los tres componentes usan el mecanismo compartido', () =>
     }
   })
 
-  it('undo / delete use removeFromPlan and never the odontogram DELETE for linked treatments', () => {
+  it('undo / delete go through releaseTreatment; no direct odontogram delete remains', () => {
     for (const src of [nts, chart]) {
-      expect(src).toContain('removeFromPlan')
-      expect(src).toContain('planLink.explainRemove')
+      expect(src).toContain('planLink.releaseTreatment(')
+      expect(src).not.toContain('removeTreatmentSafely')
+      expect(src).not.toContain('\'not_linked\'')
+      // deleteTreatment is only handed over as the no-Plan callback, never called here
+      expect(src).not.toMatch(/\bdeleteTreatment\(/)
     }
-    // the only direct deleteTreatment calls are the no-Plan and not_linked fallbacks
+  })
+
+  it('a refused delete keeps the modal open and emits nothing', () => {
     for (const src of [nts, chart]) {
-      const calls = src.match(/deleteTreatment\(/g) ?? []
-      expect(calls.length).toBe(2)
-      expect(src).toContain('if (!planId) return deleteTreatment(treatmentId)')
+      const fn = src.slice(src.indexOf('async function handleTreatmentDelete'))
+      const guard = fn.indexOf('if (!removed) return')
+      expect(guard).toBeGreaterThan(-1)
+      expect(guard).toBeLessThan(fn.indexOf('showTreatmentEditModal.value = false'))
+      expect(guard).toBeLessThan(fn.indexOf('emit(\'treatmentsChanged\')'))
+      expect(guard).toBeLessThan(fn.indexOf('undoStack.value'))
+    }
+  })
+
+  it('a refused undo re-pushes the entry and emits nothing', () => {
+    for (const src of [nts, chart]) {
+      const fn = src.slice(src.indexOf('async function handleUndo'))
+      const push = fn.indexOf('undoStack.value.push(')
+      expect(push).toBeGreaterThan(-1)
+      expect(push).toBeLessThan(fn.indexOf('emit(\'treatmentsChanged\')'))
     }
   })
 
@@ -377,5 +400,111 @@ describe('DP-08.B1 — los tres componentes usan el mecanismo compartido', () =>
       expect(src).toContain('@dismiss="planLink.dismiss()"')
       expect(src).not.toContain('Descartar')
     }
+  })
+})
+
+describe('DP-08.B1 (auditoría) — B1-01 sin borrado indebido', () => {
+  const del = () => vi.fn(async () => true)
+
+  it('treatment of Plan A is never deleted from Plan B', async () => {
+    // Plan B has no item for t1 (t1 belongs to Plan A, which this view cannot see)
+    fake.plan = { id: 'plan-B', status: 'draft', budget_id: null, budget: null, items: [] }
+    const standalone = del()
+    const link = usePlanTreatmentLink()
+    expect(await link.releaseTreatment('plan-B', 't1', standalone)).toBe(false)
+    expect(standalone).not.toHaveBeenCalled()
+    expect(dels()).toHaveLength(0)
+    expect(fake.toasts.at(-1)?.color).toBe('warning')
+  })
+
+  it('treatment without confirmed association is not deleted either', async () => {
+    const standalone = del()
+    const link = usePlanTreatmentLink()
+    expect(await link.releaseTreatment(PLAN, 'orphan', standalone)).toBe(false)
+    expect(standalone).not.toHaveBeenCalled()
+  })
+
+  it('unreadable Plan (403/500/network) never falls back to the odontogram DELETE', async () => {
+    for (const status of [403, 500, 0]) {
+      fake.getErrorStatus = status
+      const standalone = del()
+      const link = usePlanTreatmentLink()
+      expect(await link.releaseTreatment(PLAN, 't1', standalone)).toBe(false)
+      expect(standalone).not.toHaveBeenCalled()
+    }
+    expect(dels()).toHaveLength(0)
+  })
+
+  it('linked treatment is released through the Plan item DELETE only', async () => {
+    fake.plan!.items.push({ id: 'item-1', treatment_id: 't1' })
+    const standalone = del()
+    const link = usePlanTreatmentLink()
+    expect(await link.releaseTreatment(PLAN, 't1', standalone)).toBe(true)
+    expect(standalone).not.toHaveBeenCalled()
+    expect(dels()).toEqual([`DELETE /api/v1/treatment_plan/treatment-plans/${PLAN}/items/item-1`])
+  })
+
+  it('failed Plan delete is a refusal (false), not a success', async () => {
+    fake.plan!.items.push({ id: 'item-1', treatment_id: 't1' })
+    fake.deleteMode = 'fail'
+    const link = usePlanTreatmentLink()
+    expect(await link.releaseTreatment(PLAN, 't1', del())).toBe(false)
+    expect(fake.toasts.map(t => t.color)).not.toContain('success')
+  })
+
+  it('locked Plan refuses the undo and nothing is deleted', async () => {
+    fake.plan!.items.push({ id: 'item-1', treatment_id: 't1' })
+    fake.plan!.status = 'active'
+    fake.plan!.budget_id = 'b'
+    fake.plan!.budget = { status: 'accepted' }
+    const standalone = del()
+    const link = usePlanTreatmentLink()
+    expect(await link.releaseTreatment(PLAN, 't1', standalone)).toBe(false)
+    expect(standalone).not.toHaveBeenCalled()
+    expect(dels()).toHaveLength(0)
+  })
+
+  it('without a Plan the standalone odontogram behaviour is kept (and a failure is a failure)', async () => {
+    const link = usePlanTreatmentLink()
+    const ok = vi.fn(async () => true)
+    expect(await link.releaseTreatment(undefined, 't1', ok)).toBe(true)
+    expect(ok).toHaveBeenCalledWith('t1')
+    expect(await link.releaseTreatment(undefined, 't1', async () => false)).toBe(false)
+    expect(fake.calls).toHaveLength(0)
+  })
+})
+
+describe('DP-08.B1 (auditoría) — B1-02 preflight fail-closed', () => {
+  it.each([403, 500, 0])('Plan unreadable (%i): nothing is created and the reason is "unverified"', async (status) => {
+    fake.getErrorStatus = status
+    const link = usePlanTreatmentLink()
+    const create = vi.fn(async () => ({ id: 't1' }))
+    expect(await link.createAndLink(PLAN, create)).toEqual({ status: 'blocked', reason: 'unverified' })
+    expect(create).not.toHaveBeenCalled()
+    expect(posts()).toHaveLength(0)
+  })
+
+  it('"unverified" is distinguishable from locked/closed, and the user can simply try again', async () => {
+    fake.getErrorStatus = 500
+    const link = usePlanTreatmentLink()
+    const create = vi.fn(async () => ({ id: 't1' }))
+    const first = await link.createAndLink(PLAN, create)
+    expect(first).toEqual({ status: 'blocked', reason: 'unverified' })
+    link.explain('unverified')
+    expect(String(fake.toasts.at(-1)?.description)).toContain('No se pudo comprobar')
+    fake.getErrorStatus = null // connectivity back: the same action now proceeds once
+    expect(await link.createAndLink(PLAN, create)).toMatchObject({ status: 'linked' })
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  it('retry after an association error never creates a second treatment', async () => {
+    fake.postMode = 'network'
+    const link = usePlanTreatmentLink()
+    const create = vi.fn(async () => ({ id: 't1' }))
+    await link.createAndLink(PLAN, create)
+    fake.postMode = 'ok'
+    await link.retry()
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(fake.plan!.items).toHaveLength(1)
   })
 })

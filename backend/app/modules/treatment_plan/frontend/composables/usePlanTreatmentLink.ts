@@ -37,13 +37,15 @@ export type PlanLinkResult
 
 export type PlanRemoveResult
   = | { outcome: 'removed' }
-    | { outcome: 'not_linked' } // no PlannedTreatmentItem: caller may use the standalone flow
+    // The item was not found in THIS Plan. That does not prove the treatment is
+  // standalone (it may belong to another Plan), so callers must NOT delete it.
+    | { outcome: 'unknown_association' }
     | { outcome: 'blocked', reason: 'locked' | 'closed' | 'plan_missing' }
     | { outcome: 'failed' }
 
 export type PlanCreateLinkResult
   = | { status: 'linked', treatmentId: string, recovered: boolean }
-    | { status: 'blocked', reason: 'locked' | 'closed' | 'plan_missing' } // nothing was created
+    | { status: 'blocked', reason: 'locked' | 'closed' | 'plan_missing' | 'unverified' } // nothing was created
     | { status: 'create_failed' } // createTreatment already reported its own error
     | { status: 'unlinked', treatmentId: string, reason: PlanLinkFailureReason } // created, NOT in the Plan
 
@@ -67,10 +69,12 @@ export function usePlanTreatmentLink() {
   }
 
   /** Preflight before creating a Treatment. Backend stays the authority. */
-  async function checkPlanEditable(planId: string): Promise<{ ok: true } | { ok: false, reason: 'locked' | 'closed' | 'plan_missing' }> {
+  async function checkPlanEditable(planId: string): Promise<{ ok: true } | { ok: false, reason: 'locked' | 'closed' | 'plan_missing' | 'unverified' }> {
     const plan = await fetchPlan(planId)
     if (plan === 'missing') return { ok: false, reason: 'plan_missing' }
-    if (plan === null) return { ok: true } // unknown: let the server decide
+    // Fail-closed: a 403, 5xx, timeout or network failure is NOT an implicit
+    // authorisation to create. Nothing is created until the Plan can be read.
+    if (plan === null) return { ok: false, reason: 'unverified' }
     const block = planBlockReason(plan)
     return block ? { ok: false, reason: block } : { ok: true }
   }
@@ -196,7 +200,7 @@ export function usePlanTreatmentLink() {
     if (plan === 'missing') return { outcome: 'blocked', reason: 'plan_missing' }
     if (plan === null) return { outcome: 'failed' }
     const item = findPlanItemByTreatment(plan, treatmentId)
-    if (!item) return { outcome: 'not_linked' }
+    if (!item) return { outcome: 'unknown_association' }
     const block = planBlockReason(plan)
     if (block) return { outcome: 'blocked', reason: block }
     try {
@@ -213,7 +217,7 @@ export function usePlanTreatmentLink() {
   }
 
   /** Explains why the Plan cannot take / release a treatment (never a success tone). */
-  function explain(reason: PlanLinkFailureReason | 'plan_missing') {
+  function explain(reason: PlanLinkFailureReason) {
     toast.add({
       title: t('treatmentPlans.linkRecovery.blockedTitle'),
       description: t(`treatmentPlans.linkRecovery.reason.${reason}`),
@@ -236,12 +240,35 @@ export function usePlanTreatmentLink() {
         description: t(`treatmentPlans.linkRecovery.reason.${result.reason}`),
         color: 'warning'
       })
-    } else if (result.outcome === 'not_linked') {
-      toast.add({ title: t('treatmentPlans.linkRecovery.alreadyRemoved'), color: 'neutral' })
+    } else if (result.outcome === 'unknown_association') {
+      toast.add({
+        title: t('treatmentPlans.linkRecovery.undoBlockedTitle'),
+        description: t('treatmentPlans.linkRecovery.unknownAssociation'),
+        color: 'warning'
+      })
     } else if (result.outcome === 'failed') {
       toast.add({ title: t('errors.deleteFailed'), color: 'error' })
     }
   }
 
-  return { pending, busy, explain, notifyLinked, explainRemove, checkPlanEditable, attach, createAndLink, linkCreated, retry, dismiss, setPending, removeFromPlan }
+  /**
+   * Single entry point for undo / manual delete. In Plan context the
+   * odontogram DELETE is NEVER used: the treatment is released through the
+   * Plan's item DELETE, and any other outcome (blocked, unknown association,
+   * failure) leaves everything untouched and explains why. Without a Plan the
+   * standalone odontogram behaviour is kept. Returns true only when removed.
+   */
+  async function releaseTreatment(
+    planId: string | undefined,
+    treatmentId: string,
+    deleteStandalone: (treatmentId: string) => Promise<boolean>
+  ): Promise<boolean> {
+    if (!planId) return deleteStandalone(treatmentId)
+    const result = await removeFromPlan(planId, treatmentId)
+    if (result.outcome === 'removed') return true
+    explainRemove(result)
+    return false
+  }
+
+  return { pending, busy, releaseTreatment, explain, notifyLinked, explainRemove, checkPlanEditable, attach, createAndLink, linkCreated, retry, dismiss, setPending, removeFromPlan }
 }

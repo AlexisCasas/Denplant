@@ -144,6 +144,15 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
   transaction. Frontend callers must read `statusCode`/`data.code`, not assume
   201, and must use `usePlanTreatmentLink` (never a bare `addItem`) for
   create→associate, retrying with the SAME `treatment_id`.
+- **The recovery handle is in memory only.** Closing the "Tratamiento creado,
+  pero no agregado al Plan." notice or reloading the page loses the retry for
+  that treatment; it is never auto-deleted. Unlinked treatments stay visible
+  and can be added from the Plan list. Persistent recovery is deliberately out
+  of scope.
+- **Plan context never falls back to the odontogram DELETE**
+  (`releaseTreatment`): an item missing from *this* Plan does not prove the
+  treatment is standalone. The server has no guard yet — see
+  `docs/technical/treatment_plan/treatment-delete-guard-proposal.md`.
 - **Plan-linked treatments are removed through the Plan** (`removeItem`), not
   `DELETE /odontogram/treatments/{id}`: only the former applies the orphan,
   session and budget rules and the lock check.

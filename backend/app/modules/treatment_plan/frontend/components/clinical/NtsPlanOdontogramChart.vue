@@ -161,23 +161,16 @@ async function confirmMultiToothSelection(roles: Array<{ tooth_number: number, r
   if (selectedCatalogItemId.value) payload.catalog_item_id = selectedCatalogItemId.value
   await finishCreate(await createInContext(() => createTreatment(props.patientId, payload)))
 }
-/** Removes a treatment honouring Plan links; false = nothing was removed. */
-async function removeTreatmentSafely(treatmentId: string, planId: string, allowStandaloneFallback: boolean): Promise<boolean> {
-  if (!planId) return deleteTreatment(treatmentId)
-  // Plan-linked treatments are released through the Plan's item DELETE (orphan,
-  // session and budget rules). The odontogram DELETE is never used on them.
-  const result = await planLink.removeFromPlan(planId, treatmentId)
-  if (result.outcome === 'removed') return true
-  if (result.outcome === 'not_linked' && allowStandaloneFallback) return deleteTreatment(treatmentId)
-  planLink.explainRemove(result)
-  return false
-}
 async function handleUndo() {
   const entry = undoStack.value.pop()
   if (!entry) return
-  const removed = await removeTreatmentSafely(entry.treatmentId, entry.planId, false)
-  if (!removed) undoStack.value.push(entry) // keep it so the user can retry once the Plan allows it
-  else await refetchTreatments()
+  // Plan context never falls back to the odontogram DELETE (see releaseTreatment).
+  const removed = await planLink.releaseTreatment(entry.planId, entry.treatmentId, deleteTreatment)
+  if (!removed) {
+    undoStack.value.push(entry) // local state untouched: undo can be retried later
+    return
+  }
+  await refetchTreatments()
   emit('treatmentsChanged')
 }
 async function refetchTreatments() { if (props.patientId) await fetchTreatments(props.patientId) }
@@ -193,9 +186,12 @@ async function handlePlanLinkFailed(payload: { planId: string, treatmentId: stri
 function editTreatment(treatment: ToothTreatmentView) { editingTreatment.value = treatment; showTreatmentEditModal.value = true }
 async function handleTreatmentUpdate(treatmentId: string, data: { status?: TreatmentStatus, notes?: string }) { await updateTreatment(treatmentId, data); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
 async function handleTreatmentDelete(treatmentId: string) {
-  // Explicit manual deletion; Plan-linked treatments still go through the Plan.
-  const removed = await removeTreatmentSafely(treatmentId, props.planId, true)
-  if (removed) undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
+  // Explicit manual deletion. In Plan context it only ever goes through the
+  // Plan; if that is refused or unverifiable the modal stays open with the
+  // error toast, nothing is emitted and the undo stack is left alone.
+  const removed = await planLink.releaseTreatment(props.planId || undefined, treatmentId, deleteTreatment)
+  if (!removed) return
+  undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
   await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged')
 }
 async function handleTreatmentPerform(treatmentId: string) { await performTreatment(treatmentId); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }

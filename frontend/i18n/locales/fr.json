@@ -1939,7 +1939,7 @@
       "title": "Traitement créé, mais non ajouté au Plan.",
       "blockedTitle": "Impossible d'ajouter au Plan",
       "undoBlockedTitle": "Annulation impossible",
-      "alreadyRemoved": "Le traitement n'est plus dans le Plan.",
+      "unknownAssociation": "Impossible de confirmer que le traitement appartient à ce Plan ; il n'a donc pas été supprimé. Il peut être dans un autre Plan.",
       "added": "Traitement ajouté au Plan",
       "recovered": "Traitement ajouté au Plan après une nouvelle tentative",
       "reason": {
@@ -1947,6 +1947,7 @@
         "closed": "Le Plan est clôturé ou terminé et n'accepte plus de traitements.",
         "other_plan": "Ce traitement appartient déjà à un autre Plan.",
         "plan_missing": "Le Plan n'est plus disponible.",
+        "unverified": "L'état du Plan n'a pas pu être vérifié. Aucun traitement n'a été créé ; réessayez.",
         "invalid": "Le traitement n'est pas valide pour ce Plan.",
         "error": "L'association n'a pas pu être confirmée. Vous pouvez réessayer ; aucun nouveau traitement ne sera créé."
       }

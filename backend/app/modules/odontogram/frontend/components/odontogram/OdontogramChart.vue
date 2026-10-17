@@ -491,7 +491,8 @@ async function confirmMultiToothSelection(
   const planId = isPlanningMode.value && props.planId ? props.planId : ''
   const outcome = await createInContext(planId, () => createTreatment(props.patientId, payload))
   if (outcome.kind === 'blocked' || outcome.kind === 'none') {
-    showMultiToothConfirm.value = false
+    // Plan unverifiable: keep the selection so the user can simply try again.
+    if (outcome.kind !== 'blocked' || outcome.reason !== 'unverified') showMultiToothConfirm.value = false
     return
   }
   const created = outcome.treatment
@@ -582,7 +583,7 @@ function handleSurfaceConfirm(surfaces: Surface[]) {
 
 type CreateOutcome
   = | { kind: 'none' }
-    | { kind: 'blocked' }
+    | { kind: 'blocked', reason: string }
     | { kind: 'linked' | 'standalone', treatment: Treatment }
     | { kind: 'unlinked', treatment: Treatment }
 
@@ -599,28 +600,17 @@ async function createInContext(planId: string, create: () => Promise<Treatment |
   })
   if (result.status === 'blocked') {
     planLink.explain(result.reason)
-    return { kind: 'blocked' }
+    return { kind: 'blocked', reason: result.reason }
   }
   if (result.status === 'create_failed' || !treatment) return { kind: 'none' }
   return { kind: result.status === 'unlinked' ? 'unlinked' : 'linked', treatment }
 }
 
-/** Removes a treatment honouring Plan links. false = nothing was removed. */
-async function removeTreatmentSafely(treatmentId: string, planId: string | undefined, allowStandaloneFallback: boolean): Promise<boolean> {
-  if (!planId) return deleteTreatment(treatmentId)
-  // Never DELETE /odontogram/treatments/{id} on a Plan-linked treatment: the
-  // Plan's item DELETE applies orphan / session / budget rules.
-  const result = await planLink.removeFromPlan(planId, treatmentId)
-  if (result.outcome === 'removed') return true
-  if (result.outcome === 'not_linked' && allowStandaloneFallback) return deleteTreatment(treatmentId)
-  planLink.explainRemove(result)
-  return false
-}
-
 async function handleUndo() {
   const lastAction = undoStack.value.pop()
   if (!lastAction) return
-  const removed = await removeTreatmentSafely(lastAction.treatmentId, lastAction.planId, false)
+  // Plan context never falls back to the odontogram DELETE (see releaseTreatment).
+  const removed = await planLink.releaseTreatment(lastAction.planId, lastAction.treatmentId, deleteTreatment)
   if (!removed) {
     undoStack.value.push(lastAction) // keep it: undo can be retried once the Plan allows it
     return
@@ -684,10 +674,13 @@ async function handleTreatmentUpdate(
 }
 
 async function handleTreatmentDelete(treatmentId: string) {
-  // Explicit manual deletion; a Plan-linked treatment is released via the Plan.
+  // Explicit manual deletion. In planning mode it only ever goes through the
+  // Plan; if that is refused or unverifiable the modal stays open with the
+  // error toast, no event is emitted and the undo stack is left alone.
   const planId = isPlanningMode.value && props.planId ? props.planId : undefined
-  const removed = await removeTreatmentSafely(treatmentId, planId, true)
-  if (removed) undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
+  const removed = await planLink.releaseTreatment(planId, treatmentId, deleteTreatment)
+  if (!removed) return
+  undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
   emit('treatmentsChanged')
   showTreatmentEditModal.value = false
   editingTreatment.value = null
