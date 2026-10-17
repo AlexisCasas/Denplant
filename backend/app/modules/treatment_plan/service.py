@@ -574,7 +574,12 @@ class TreatmentPlanService:
 
             treatment = await db.get(Treatment, treatment_id)
             if treatment and treatment.deleted_at is None and treatment.status == "planned":
-                await TreatmentService.delete(db, clinic_id, treatment_id, user_id)
+                # Plan items stay as history here, so the delete-clearance guard
+                # (which protects linked treatments) must not apply: this IS the
+                # plan releasing its own hold.
+                await TreatmentService.delete_after_plan_release(
+                    db, clinic_id, treatment_id, user_id
+                )
 
     # -------------------------------------------------------------------------
     # Item Operations

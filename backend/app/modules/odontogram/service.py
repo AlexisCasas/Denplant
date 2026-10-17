@@ -35,6 +35,23 @@ from .models import (
 )
 from .schemas import TreatmentVisualizationSnapshot
 
+
+class TreatmentDeletionBlockedError(ValueError):
+    """A module that owns a link to the treatment refused its deletion.
+
+    Raised by a transactional ``odontogram.treatment.delete_requested``
+    subscriber (ADR 0023). ``code`` is the stable machine-readable reason.
+    """
+
+    code = "treatment_linked_to_plan"
+
+
+class TreatmentDeleteGuardUnavailableError(RuntimeError):
+    """Nobody acknowledged the delete request: fail closed, never delete silently."""
+
+    code = "delete_guard_unavailable"
+
+
 VISUALIZATION_SNAPSHOT_SCHEMA_VERSION = 1
 
 
@@ -913,6 +930,74 @@ class TreatmentService:
 
     @staticmethod
     async def delete(db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID) -> bool:
+        """Soft-delete a treatment, **guarded** (ADR 0023).
+
+        Default entry point (HTTP and any new caller). Order of operations:
+
+        1. lock the Treatment row (``FOR UPDATE``) — the same first lock that
+           ``TreatmentPlanService.add_item`` takes, so a concurrent
+           associate/delete serialises on this row and never deadlocks;
+        2. publish ``odontogram.treatment.delete_requested`` with ``db``; a
+           transactional subscriber that owns a link to the treatment raises
+           ``TreatmentDeletionBlockedError`` (nothing has been written yet);
+        3. fail closed if no subscriber acknowledged the request;
+        4. only then set ``deleted_at`` and publish ``treatment.deleted``.
+        """
+        if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
+            return False
+        await TreatmentService._request_delete_clearance(db, clinic_id, treatment_id, user_id)
+        return await TreatmentService._soft_delete(db, clinic_id, treatment_id, user_id)
+
+    @staticmethod
+    async def delete_after_plan_release(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID
+    ) -> bool:
+        """Soft-delete WITHOUT the clearance request.
+
+        Reserved for the plan lifecycle (closing / archiving a plan keeps its
+        items as history while dropping the hold on `planned` treatments).
+        Python-only: no router exposes it and it takes no client input. Do not
+        use it from a request handler.
+        """
+        if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
+            return False
+        return await TreatmentService._soft_delete(db, clinic_id, treatment_id, user_id)
+
+    @staticmethod
+    async def _lock_for_delete(db: AsyncSession, clinic_id: UUID, treatment_id: UUID) -> bool:
+        locked = await db.execute(
+            select(Treatment.id)
+            .where(
+                Treatment.id == treatment_id,
+                Treatment.clinic_id == clinic_id,
+                Treatment.deleted_at.is_(None),
+            )
+            .with_for_update()
+        )
+        return locked.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def _request_delete_clearance(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID
+    ) -> None:
+        payload: dict = {
+            "clinic_id": str(clinic_id),
+            "treatment_id": str(treatment_id),
+            "requested_by": str(user_id),
+            # Guards append their module name here when they ran and agreed.
+            "cleared_by": [],
+        }
+        await event_bus.publish(EventType.ODONTOGRAM_TREATMENT_DELETE_REQUESTED, payload, db=db)
+        if not payload["cleared_by"]:
+            # No guard answered: do not guess that the treatment is unlinked.
+            raise TreatmentDeleteGuardUnavailableError(
+                "No delete guard is registered; refusing to delete the treatment"
+            )
+
+    @staticmethod
+    async def _soft_delete(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID
+    ) -> bool:
         treatment = await TreatmentService.get_treatment(db, clinic_id, treatment_id)
         if not treatment:
             return False
@@ -961,18 +1046,14 @@ class OdontogramPreferenceService:
         return row.profile if row is not None else DEFAULT_ODONTOGRAM_PROFILE
 
     @staticmethod
-    async def set_profile(
-        db: AsyncSession, clinic_id: UUID, user_id: UUID, profile: str
-    ) -> str:
+    async def set_profile(db: AsyncSession, clinic_id: UUID, user_id: UUID, profile: str) -> str:
         """Upsert the caller's own preference. Raises ValueError if unsupported."""
         if not is_valid_odontogram_profile(profile):
             raise ValueError(f"Unsupported odontogram profile: {profile}")
 
         row = await OdontogramPreferenceService._get_row(db, clinic_id, user_id)
         if row is None:
-            row = OdontogramUserPreference(
-                clinic_id=clinic_id, user_id=user_id, profile=profile
-            )
+            row = OdontogramUserPreference(clinic_id=clinic_id, user_id=user_id, profile=profile)
             db.add(row)
         else:
             row.profile = profile

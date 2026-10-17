@@ -124,6 +124,7 @@ class TreatmentPlanModule(BaseModule):
             on_budget_rejected,
             on_budget_renegotiated,
             on_budget_superseded,
+            on_treatment_delete_requested,
             on_treatment_performed,
         )
 
@@ -134,5 +135,6 @@ class TreatmentPlanModule(BaseModule):
             EventType.BUDGET_REJECTED: on_budget_rejected,
             EventType.BUDGET_RENEGOTIATED: on_budget_renegotiated,
             EventType.BUDGET_SUPERSEDED: on_budget_superseded,
+            EventType.ODONTOGRAM_TREATMENT_DELETE_REQUESTED: on_treatment_delete_requested,
             EventType.ODONTOGRAM_TREATMENT_PERFORMED: on_treatment_performed,
         }
