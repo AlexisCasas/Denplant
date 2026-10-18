@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '~/constants/storage'
 import type { CodeLang } from '~/types'
+import { LOCALE_COOKIE_KEY, isSupportedLocale } from '~/utils/localePersistence'
 
 export function useLocale() {
   const { locale, setLocale, locales } = useI18n()
@@ -12,6 +13,14 @@ export function useLocale() {
   )
 
   async function changeLocale(code: CodeLang): Promise<void> {
+    if (!isSupportedLocale(code)) return
+
+    const localeCookie = useCookie<CodeLang | null>(LOCALE_COOKIE_KEY, {
+      path: '/',
+      sameSite: 'lax'
+    })
+    localeCookie.value = code
+
     if (import.meta.client) {
       localStorage.setItem(STORAGE_KEYS.LOCALE, code)
     }
