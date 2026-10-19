@@ -11,8 +11,10 @@ import { defineComponent, isReactive, markRaw, h } from 'vue'
 
 describe('useModuleSlots', () => {
   beforeEach(async () => {
-    const { clearSlots } = await import('~/composables/useModuleSlots')
+    const { clearSlots, useSlotsReady } = await import('~/composables/useModuleSlots')
     clearSlots()
+    // These cases exercise registry semantics, i.e. post-mount behaviour.
+    useSlotsReady().value = true
   })
 
   it('marks the registered component raw so the slot map can\'t make it reactive', async () => {

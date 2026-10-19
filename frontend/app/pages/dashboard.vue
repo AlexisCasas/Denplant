@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { resolve } = useModuleSlots()
+const { resolve, ready } = useModuleSlots()
 
 const heroEntries = computed(() => resolve('dashboard.hero', {}))
 const timelineEntries = computed(() => resolve('dashboard.timeline', {}))
@@ -71,7 +71,9 @@ const { t } = useI18n()
       />
     </section>
 
-    <UCard v-if="!hasAnyContent">
+    <!-- Only after slots activate: before that, "no content" is just the
+         hydration barrier, not "no modules installed". -->
+    <UCard v-if="ready && !hasAnyContent">
       <EmptyState
         icon="i-lucide-smile"
         :title="t('dashboard.welcome')"

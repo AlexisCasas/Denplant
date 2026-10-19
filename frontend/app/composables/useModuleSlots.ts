@@ -16,6 +16,15 @@
  * Registrations are stored in :func:`useState` so SSR + HMR preserve
  * them across reloads and every consumer (across layers) sees the
  * same map.
+ *
+ * Hydration barrier: slot plugins are ``*.client.ts`` (components can't
+ * be serialized into the SSR payload), so the server always renders
+ * with an empty registry while the browser registers entries before
+ * hydrating. To keep both trees identical, :func:`resolveSlot` returns
+ * ``[]`` until ``modules:slots:ready`` is flipped by
+ * ``plugins/slots-ready.client.ts`` on ``app:suspense:resolve``. The flag lives
+ * in per-request ``useState`` (false in the SSR payload), so nothing is
+ * shared across requests.
  */
 
 import { markRaw } from 'vue'
@@ -66,6 +75,14 @@ function useSlotState() {
   return useState<SlotMap>('modules:slots', () => ({}))
 }
 
+/**
+ * ``false`` during SSR and the first client render; ``true`` once Nuxt
+ * has mounted. Reactive, so slot consumers re-render on activation.
+ */
+export function useSlotsReady() {
+  return useState<boolean>('modules:slots:ready', () => false)
+}
+
 export function registerSlot(name: string, entry: SlotEntry): void {
   const state = useSlotState()
   const current = state.value[name] || []
@@ -103,6 +120,9 @@ export function resolveSlot<Ctx = unknown>(
   ctx: Ctx,
   opts: { can: (p: string) => boolean }
 ): SlotEntry<Ctx>[] {
+  // Hydration barrier — see file header. Reading the flag (and the map)
+  // here keeps every caller reactive to the post-mount activation.
+  if (!useSlotsReady().value) return []
   const state = useSlotState()
   const entries = (state.value[name] || []) as SlotEntry<Ctx>[]
   return [...entries]
@@ -129,6 +149,7 @@ export function useModuleSlots() {
     register: registerSlot,
     unregister: unregisterSlot,
     clear: clearSlots,
-    resolve
+    resolve,
+    ready: useSlotsReady()
   }
 }
