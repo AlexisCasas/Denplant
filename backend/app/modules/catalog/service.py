@@ -19,6 +19,24 @@ from .models import (
 SESSION_SUM_TOLERANCE = Decimal("0.01")
 
 
+def _jsonb_decimal_safe(value: object) -> object:
+    """Convert Decimal values in catalog JSONB payloads without losing precision."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _jsonb_decimal_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_jsonb_decimal_safe(item) for item in value]
+    return value
+
+
+def _normalize_catalog_jsonb_prices(data: dict) -> None:
+    """Prepare price configuration fields for PostgreSQL JSONB persistence."""
+    for field in ("surface_prices", "pricing_config"):
+        if field in data and data[field] is not None:
+            data[field] = _jsonb_decimal_safe(data[field])
+
+
 class SessionTemplateError(ValueError):
     """Raised when a session template fails validation (sum mismatch, etc.)."""
 
@@ -464,6 +482,8 @@ class CatalogService:
         data: dict,
     ) -> TreatmentCatalogItem:
         """Create a new catalog item."""
+        _normalize_catalog_jsonb_prices(data)
+
         # Extract relations to handle separately
         odontogram_data = data.pop("odontogram_mapping", None)
         sessions_data = data.pop("sessions", None)
@@ -515,6 +535,8 @@ class CatalogService:
         ``sessions`` semantics: omitted key = leave template untouched;
         present key (list or empty list) = replace template atomically.
         """
+        _normalize_catalog_jsonb_prices(data)
+
         odontogram_data = data.pop("odontogram_mapping", None)
         sessions_data = data.pop("sessions", "__not_provided__")
 
