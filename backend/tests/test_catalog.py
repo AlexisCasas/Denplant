@@ -1,5 +1,7 @@
 """Tests for the catalog module."""
 
+from decimal import Decimal
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -9,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
 from app.modules.catalog.models import TreatmentCatalogItem, TreatmentCategory, VatType
+from app.modules.catalog.pricing import compute_price_snapshot
+from app.modules.catalog.service import _normalize_catalog_jsonb_prices
 
 
 @pytest.fixture
@@ -398,6 +402,93 @@ async def test_update_catalog_item(
     data = response.json()["data"]
     assert data["names"]["es"] == "Actualizado"
     assert float(data["default_price"]) == 75.00
+
+
+@pytest.mark.asyncio
+async def test_catalog_item_per_surface_prices_are_jsonb_safe_on_create_and_read(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict, db_session: AsyncSession
+):
+    """Per-surface Decimal prices persist through JSONB and remain priceable."""
+    category_id = await _create_catalog_category(client, auth_headers, "surface_jsonb_create")
+
+    response = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "SURFACE-JSONB-CREATE",
+            "names": {"es": "Composite"},
+            "default_price": 50.00,
+            "pricing_strategy": "per_surface",
+            "surface_prices": {"1": 50.00, "2": 80.00},
+            "treatment_scope": "tooth",
+            "requires_surfaces": True,
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    item_id = response.json()["data"]["id"]
+    assert Decimal(str(response.json()["data"]["surface_prices"]["1"])) == Decimal("50.00")
+    assert Decimal(str(response.json()["data"]["surface_prices"]["2"])) == Decimal("80.00")
+
+    persisted = await db_session.get(TreatmentCatalogItem, item_id)
+    assert persisted is not None
+    assert Decimal(str(persisted.surface_prices["1"])) == Decimal("50.00")
+    assert Decimal(str(persisted.surface_prices["2"])) == Decimal("80.00")
+    assert compute_price_snapshot(
+        persisted, [SimpleNamespace(surfaces=["M", "O"], role=None)]
+    ) == Decimal("80.00")
+
+
+@pytest.mark.asyncio
+async def test_catalog_item_per_surface_prices_are_jsonb_safe_on_update(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict, db_session: AsyncSession
+):
+    """Updating a normal item keeps precise per-surface prices JSONB-safe."""
+    category_id = await _create_catalog_category(client, auth_headers, "surface_jsonb_update")
+    create = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "SURFACE-JSONB-UPDATE",
+            "names": {"es": "Composite"},
+            "default_price": 50.00,
+            "pricing_strategy": "per_surface",
+            "surface_prices": {"1": 50.00},
+            "treatment_scope": "tooth",
+        },
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    item_id = create.json()["data"]["id"]
+
+    update = await client.put(
+        f"/api/v1/catalog/items/{item_id}",
+        json={"surface_prices": {"1": 50.005, "2": 80.125}},
+        headers=auth_headers,
+    )
+
+    assert update.status_code == 200
+    assert Decimal(str(update.json()["data"]["surface_prices"]["1"])) == Decimal("50.005")
+    assert Decimal(str(update.json()["data"]["surface_prices"]["2"])) == Decimal("80.125")
+    persisted = await db_session.get(TreatmentCatalogItem, item_id)
+    assert Decimal(str(persisted.surface_prices["1"])) == Decimal("50.005")
+    assert Decimal(str(persisted.surface_prices["2"])) == Decimal("80.125")
+
+
+def test_catalog_jsonb_price_normalization_preserves_decimal_precision():
+    """Nested Decimal prices become exact JSON-compatible values only in JSONB fields."""
+    data = {
+        "surface_prices": {"1": Decimal("50.005")},
+        "pricing_config": {"abutment": {"amount": Decimal("80.125")}},
+        "default_price": Decimal("99.99"),
+    }
+
+    _normalize_catalog_jsonb_prices(data)
+
+    assert data["surface_prices"] == {"1": "50.005"}
+    assert data["pricing_config"] == {"abutment": {"amount": "80.125"}}
+    assert data["default_price"] == Decimal("99.99")
 
 
 async def _system_item(
