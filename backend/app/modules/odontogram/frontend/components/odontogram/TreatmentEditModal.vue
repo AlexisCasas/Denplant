@@ -3,16 +3,24 @@ import type { Surface, ToothTreatmentView, TreatmentStatus } from '~~/app/types'
 import { getTreatmentColor, isSurfaceTreatment, getAllowedStatusesForTreatment } from '~~/app/config/odontogramConstants'
 import type { UiColor } from '~~/app/config/severity'
 import { getTreatmentDisplayName } from '~~/app/utils/treatmentView'
+import { surfacesChanged } from '~~/app/utils/treatmentSurfaces'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** Per-tooth view over a Treatment (see utils/treatmentView.ts). */
   treatment: ToothTreatmentView | null
   open: boolean
-}>()
+  /**
+   * Expressly inside a treatment Plan: surfaces are read-only here (the Plan
+   * already priced and quoted them). Unknown context = false: the API decides.
+   */
+  planContext?: boolean
+  /** Why the last save was refused; shown inline while the modal stays open. */
+  errorMessage?: string | null
+}>(), { planContext: false, errorMessage: null })
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'update': [treatmentId: string, data: { status?: TreatmentStatus, notes?: string }]
+  'update': [treatmentId: string, data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] }]
   'delete': [treatmentId: string]
   'perform': [treatmentId: string]
 }>()
@@ -23,6 +31,7 @@ const { t, locale } = useI18n()
 const status = ref<TreatmentStatus>('existing')
 const selectedSurfaces = ref<Surface[]>([])
 const notes = ref('')
+const surfaceSelectionError = ref<string | null>(null)
 
 // All surfaces
 const allSurfaces: Surface[] = ['M', 'D', 'O', 'V', 'L']
@@ -39,6 +48,7 @@ watch(() => props.treatment, (treatment) => {
     status.value = treatment.status
     selectedSurfaces.value = [...(treatment.surfaces || [])]
     notes.value = treatment.notes || ''
+    surfaceSelectionError.value = null
   }
 }, { immediate: true })
 
@@ -71,18 +81,20 @@ const statusOptions = computed(() => {
 })
 
 function toggleSurface(surface: Surface) {
+  if (props.planContext) return
   const index = selectedSurfaces.value.indexOf(surface)
   if (index === -1) {
     selectedSurfaces.value.push(surface)
   } else {
     selectedSurfaces.value.splice(index, 1)
   }
+  if (selectedSurfaces.value.length > 0) surfaceSelectionError.value = null
 }
 
 function handleSave() {
   if (!props.treatment) return
 
-  const data: { status?: TreatmentStatus, notes?: string } = {}
+  const data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] } = {}
 
   if (status.value !== props.treatment.status) {
     data.status = status.value
@@ -90,6 +102,21 @@ function handleSave() {
 
   if (notes.value !== (props.treatment.notes || '')) {
     data.notes = notes.value
+  }
+
+  // Sent only when the SET really changed ('O','M' is 'M','O'), and never from a
+  // Plan: the server would refuse it and the user could not have meant it.
+  const changedSurfaces = (
+    isSurfaceType.value
+    && !props.planContext
+    && surfacesChanged(props.treatment.surfaces, selectedSurfaces.value)
+  )
+  if (changedSurfaces && selectedSurfaces.value.length === 0) {
+    surfaceSelectionError.value = t('odontogram.surfacesLocked.no_surfaces')
+    return
+  }
+  if (changedSurfaces) {
+    data.surfaces = [...selectedSurfaces.value]
   }
 
   if (Object.keys(data).length > 0) {
@@ -182,6 +209,7 @@ function handleClose() {
                 :key="surface"
                 :color="selectedSurfaces.includes(surface) ? 'primary' : 'neutral'"
                 :variant="selectedSurfaces.includes(surface) ? 'solid' : 'outline'"
+                :disabled="planContext"
                 size="sm"
                 @click="toggleSurface(surface)"
               >
@@ -193,6 +221,13 @@ function handleClose() {
               class="text-caption text-subtle mt-2"
             >
               {{ selectedSurfaces.length }} {{ t('odontogram.surfacesSelected') }}
+            </p>
+            <p
+              v-if="planContext"
+              data-testid="surfaces-locked-in-plan"
+              class="text-caption text-subtle mt-2"
+            >
+              {{ t('odontogram.surfacesLockedInPlan') }}
             </p>
           </div>
 
@@ -224,6 +259,16 @@ function handleClose() {
             </UButton>
           </div>
         </div>
+
+        <UAlert
+          v-if="errorMessage || surfaceSelectionError"
+          data-testid="treatment-edit-error"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :description="surfaceSelectionError || errorMessage"
+          class="mt-4"
+        />
 
         <template #footer>
           <div class="flex justify-between w-full">

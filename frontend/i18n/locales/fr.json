@@ -906,6 +906,18 @@
     "selectSurfaces": "Sélectionner les surfaces",
     "selectedSurfaces": "Surfaces sélectionnées",
     "surfacesSelected": "surface(s) sélectionnée(s)",
+    "surfacesLockedInPlan": "Les surfaces ne peuvent pas être modifiées dans le contexte du Plan.",
+    "surfacesLockedPrefix": "Enregistrement impossible. Les surfaces ne peuvent pas être modifiées :",
+    "surfacesLocked": {
+      "not_planned": "le traitement n'est plus planifié.",
+      "not_single_tooth": "elles ne sont modifiables que sur un traitement d'une seule dent.",
+      "type_without_surfaces": "ce type de traitement n'utilise pas de surfaces.",
+      "no_surfaces": "sélectionnez au moins une surface avant d'enregistrer.",
+      "linked_to_plan": "il appartient à un Plan de traitement ; retirez-le du Plan puis recréez-le.",
+      "linked_to_budget": "il est lié à un devis.",
+      "price_snapshot_drift": "le prix du catalogue a changé depuis sa création ; recréez le traitement.",
+      "locked": "la modification n'est pas sûre."
+    },
     "instructions": {
       "selectTreatment": "Sélectionnez un traitement à appliquer",
       "clickTooth": "Cliquez sur la dent pour appliquer"
@@ -1416,6 +1428,8 @@
     "youTag": "(vous)",
     "userActive": "Utilisateur actif",
     "isProfessional": "Exerce comme professionnel",
+    "professionalRegistration": "Numéro d'inscription professionnelle",
+    "professionalRegistrationHelp": "Le numéro d'inscription professionnelle du dentiste.",
     "isProfessionalHelp": "Apparaît dans l'agenda, a des horaires et peut se voir attribuer des traitements. Un administrateur peut aussi exercer.",
     "userInactiveNote": "(Ne peut pas se connecter)",
     "saveChanges": "Enregistrer les modifications",
@@ -1933,6 +1947,23 @@
     "deleteError": "Erreur lors de la suppression du type de TVA"
   },
   "treatmentPlans": {
+    "linkRecovery": {
+      "title": "Traitement créé, mais non ajouté au Plan.",
+      "blockedTitle": "Impossible d'ajouter au Plan",
+      "undoBlockedTitle": "Annulation impossible",
+      "unknownAssociation": "Impossible de confirmer que le traitement appartient à ce Plan ; il n'a donc pas été supprimé. Il peut être dans un autre Plan.",
+      "added": "Traitement ajouté au Plan",
+      "recovered": "Traitement ajouté au Plan après une nouvelle tentative",
+      "reason": {
+        "locked": "Le Plan est verrouillé par un devis envoyé ou accepté. Rouvrez ou renégociez le devis pour le modifier.",
+        "closed": "Le Plan est clôturé ou terminé et n'accepte plus de traitements.",
+        "other_plan": "Ce traitement appartient déjà à un autre Plan.",
+        "plan_missing": "Le Plan n'est plus disponible.",
+        "unverified": "L'état du Plan n'a pas pu être vérifié. Aucun traitement n'a été créé ; réessayez.",
+        "invalid": "Le traitement n'est pas valide pour ce Plan.",
+        "error": "L'association n'a pas pu être confirmée. Vous pouvez réessayer ; aucun nouveau traitement ne sera créé."
+      }
+    },
     "title": "Plans de traitement",
     "description": "Gérer les plans de traitement des patients",
     "new": "Nouveau plan",

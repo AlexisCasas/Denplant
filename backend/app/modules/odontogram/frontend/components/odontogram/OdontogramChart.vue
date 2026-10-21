@@ -9,6 +9,7 @@
  * - Treatment management (add, edit, delete, perform)
  */
 
+import type { PlanLinkFailureReason } from '../../../../treatment_plan/frontend/utils/planTreatmentLink'
 import type {
   ClinicalType,
   OdontogramHistoryEntry,
@@ -76,6 +77,7 @@ const {
   performTreatment,
   deleteTreatment,
   updateTreatment,
+  updateError,
   getToothTreatments,
   timelineDates,
   viewingDate,
@@ -87,7 +89,7 @@ const {
   returnToCurrentView
 } = useOdontogram()
 
-const treatmentPlansApi = useTreatmentPlans()
+const planLink = usePlanTreatmentLink()
 
 // ============================================================================
 // State
@@ -128,7 +130,9 @@ const multiToothSelection = ref<{ teeth: number[], anchor: number | null }>({ te
 const showMultiToothConfirm = ref(false)
 
 // Undo stack (single entry per Treatment, whether single- or multi-tooth).
-const undoStack = ref<Array<{ treatmentId: string, type: string }>>([])
+// `planId` is set only for treatments confirmed as Plan items, so undo goes
+// through the Plan's removeItem instead of the odontogram DELETE (DP-08.B1).
+const undoStack = ref<Array<{ treatmentId: string, type: string, planId?: string }>>([])
 
 // History section
 const historyData = ref<OdontogramHistoryEntry[]>([])
@@ -485,17 +489,25 @@ async function confirmMultiToothSelection(
     payload.catalog_item_id = selectedCatalogItemId.value
   }
 
-  const created = await createTreatment(props.patientId, payload)
-  if (!created) {
-    showMultiToothConfirm.value = false
+  const planId = isPlanningMode.value && props.planId ? props.planId : ''
+  const outcome = await createInContext(planId, () => createTreatment(props.patientId, payload))
+  if (outcome.kind === 'blocked' || outcome.kind === 'none') {
+    // Plan unverifiable: keep the selection so the user can simply try again.
+    if (outcome.kind !== 'blocked' || outcome.reason !== 'unverified') showMultiToothConfirm.value = false
+    return
+  }
+  const created = outcome.treatment
+  if (outcome.kind === 'unlinked') {
+    // Created but NOT in the Plan: no success, no undo entry; recovery notice is shown.
+    resetMultiToothSelection()
+    emit('treatmentAdd', created)
+    emit('treatmentsChanged')
+    selectedTreatmentType.value = null
+    selectedCatalogItemId.value = null
     return
   }
 
-  if (isPlanningMode.value && props.planId) {
-    await treatmentPlansApi.addItem(props.planId, { treatment_id: created.id })
-  }
-
-  undoStack.value.push({ treatmentId: created.id, type: cfg.key })
+  undoStack.value.push({ treatmentId: created.id, type: cfg.key, planId: planId || undefined })
   resetMultiToothSelection()
   emit('treatmentAdd', created)
   emit('treatmentsChanged')
@@ -534,16 +546,21 @@ async function applyTreatment(toothNumber: number, surfaces?: Surface[]) {
   }
   if (surfaces?.length) payload.surfaces = surfaces
 
-  const treatment = await createTreatment(props.patientId, payload)
-  if (!treatment) return
-
-  // In planning mode linked to a specific plan, attach the new Treatment as a
-  // PlannedTreatmentItem so it shows up in the plan's list.
-  if (isPlanningMode.value && props.planId) {
-    await treatmentPlansApi.addItem(props.planId, { treatment_id: treatment.id })
+  // In planning mode linked to a specific plan: preflight → create once →
+  // attach as a PlannedTreatmentItem (DP-08.B1). Success only when confirmed.
+  const planId = isPlanningMode.value && props.planId ? props.planId : ''
+  const outcome = await createInContext(planId, () => createTreatment(props.patientId, payload))
+  if (outcome.kind === 'blocked' || outcome.kind === 'none') return
+  const treatment = outcome.treatment
+  if (outcome.kind === 'unlinked') {
+    emit('treatmentAdd', treatment)
+    emit('treatmentsChanged')
+    selectedTreatmentType.value = null
+    selectedCatalogItemId.value = null
+    return
   }
 
-  undoStack.value.push({ treatmentId: treatment.id, type: treatment.clinical_type })
+  undoStack.value.push({ treatmentId: treatment.id, type: treatment.clinical_type, planId: planId || undefined })
 
   toast.add({
     title: `${t(`odontogram.treatments.types.${treatment.clinical_type}`, treatment.clinical_type)} - ${t('odontogram.tooth')} ${toothNumber}`,
@@ -565,12 +582,61 @@ function handleSurfaceConfirm(surfaces: Surface[]) {
   selectedTooth.value = null
 }
 
+type CreateOutcome
+  = | { kind: 'none' }
+    | { kind: 'blocked', reason: string }
+    | { kind: 'linked' | 'standalone', treatment: Treatment }
+    | { kind: 'unlinked', treatment: Treatment }
+
+/** Plan context: preflight → create once → associate. No Plan: create only. */
+async function createInContext(planId: string, create: () => Promise<Treatment | null>): Promise<CreateOutcome> {
+  if (!planId) {
+    const created = await create()
+    return created ? { kind: 'standalone', treatment: created } : { kind: 'none' }
+  }
+  let treatment: Treatment | null = null
+  const result = await planLink.createAndLink(planId, async () => {
+    treatment = await create()
+    return treatment
+  })
+  if (result.status === 'blocked') {
+    planLink.explain(result.reason)
+    return { kind: 'blocked', reason: result.reason }
+  }
+  if (result.status === 'create_failed' || !treatment) return { kind: 'none' }
+  return { kind: result.status === 'unlinked' ? 'unlinked' : 'linked', treatment }
+}
+
 async function handleUndo() {
   const lastAction = undoStack.value.pop()
   if (!lastAction) return
-  await deleteTreatment(lastAction.treatmentId)
+  // Plan context never falls back to the odontogram DELETE (see releaseTreatment).
+  const removed = await planLink.releaseTreatment(lastAction.planId, lastAction.treatmentId, deleteTreatment)
+  if (!removed) {
+    undoStack.value.push(lastAction) // keep it: undo can be retried once the Plan allows it
+    return
+  }
   emit('treatmentsChanged')
   toast.add({ title: t('common.undone'), color: 'neutral' })
+}
+
+async function retryPlanLink() {
+  const pending = planLink.pending.value
+  const result = await planLink.retry()
+  if (result?.ok && pending) {
+    undoStack.value.push({ treatmentId: pending.treatmentId, type: 'planned', planId: pending.planId })
+    planLink.notifyLinked(true)
+    await fetchTreatments(props.patientId)
+    emit('treatmentsChanged')
+  }
+}
+
+// Global treatment created but not associated (reported by TreatmentBar).
+async function handlePlanLinkFailed(payload: { planId: string, treatmentId: string, reason: PlanLinkFailureReason, label?: string, treatment: Treatment }) {
+  planLink.setPending(payload)
+  await fetchTreatments(props.patientId)
+  emit('treatmentAdd', payload.treatment)
+  emit('treatmentsChanged')
 }
 
 function cancelClickToApplyMode() {
@@ -594,22 +660,33 @@ async function handleGlobalTreatmentApplied(treatment: Treatment) {
 // ============================================================================
 
 function handleEditTreatment(treatment: ToothTreatmentView) {
+  updateError.value = null
   editingTreatment.value = treatment
   showTreatmentEditModal.value = true
 }
 
 async function handleTreatmentUpdate(
   treatmentId: string,
-  data: { status?: TreatmentStatus, notes?: string }
+  data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] }
 ) {
-  await updateTreatment(treatmentId, data)
+  // Close only once the API confirmed the save. A refusal (409 surfaces lock,
+  // network, ...) leaves the modal open with the user's selection and, for a
+  // lock, the explanation inline; nothing is emitted.
+  const updated = await updateTreatment(treatmentId, data)
+  if (!updated) return
   emit('treatmentsChanged')
   showTreatmentEditModal.value = false
   editingTreatment.value = null
 }
 
 async function handleTreatmentDelete(treatmentId: string) {
-  await deleteTreatment(treatmentId)
+  // Explicit manual deletion. In planning mode it only ever goes through the
+  // Plan; if that is refused or unverifiable the modal stays open with the
+  // error toast, no event is emitted and the undo stack is left alone.
+  const planId = isPlanningMode.value && props.planId ? props.planId : undefined
+  const removed = await planLink.releaseTreatment(planId, treatmentId, deleteTreatment)
+  if (!removed) return
+  undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
   emit('treatmentsChanged')
   showTreatmentEditModal.value = false
   editingTreatment.value = null
@@ -886,7 +963,17 @@ defineExpose({
         @update:selected-status="selectedTreatmentStatus = $event"
         @treatment-select="selectedTreatmentType = $event"
         @treatment-applied="handleGlobalTreatmentApplied"
+        @plan-link-failed="handlePlanLinkFailed"
         @cancel="cancelClickToApplyMode"
+      />
+
+      <!-- DP-08.B1: treatment created but not added to the Plan -->
+      <PlanLinkRecoveryNotice
+        v-if="planLink.pending.value"
+        :pending="planLink.pending.value"
+        :busy="planLink.busy.value"
+        @retry="retryPlanLink"
+        @dismiss="planLink.dismiss()"
       />
 
       <!-- Legend -->
@@ -922,6 +1009,8 @@ defineExpose({
     <TreatmentEditModal
       v-model:open="showTreatmentEditModal"
       :treatment="editingTreatment"
+      :plan-context="isPlanningMode"
+      :error-message="updateError"
       @update="handleTreatmentUpdate"
       @delete="handleTreatmentDelete"
       @perform="handleTreatmentPerform"

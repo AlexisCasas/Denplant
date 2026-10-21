@@ -927,6 +927,18 @@
     "selectSurfaces": "Seleccionar Superficies",
     "selectedSurfaces": "Superficies seleccionadas",
     "surfacesSelected": "superficie(s) seleccionada(s)",
+    "surfacesLockedInPlan": "Las superficies no se pueden editar en el contexto del Plan.",
+    "surfacesLockedPrefix": "No se pudo guardar. Las superficies no se pueden cambiar:",
+    "surfacesLocked": {
+      "not_planned": "el tratamiento ya no está planificado.",
+      "not_single_tooth": "solo se editan en tratamientos de una sola pieza.",
+      "type_without_surfaces": "este tipo de tratamiento no usa superficies.",
+      "no_surfaces": "selecciona al menos una superficie antes de guardar.",
+      "linked_to_plan": "pertenece a un Plan de tratamiento; quítalo del Plan y vuelve a crearlo.",
+      "linked_to_budget": "está vinculado a un presupuesto.",
+      "price_snapshot_drift": "el precio del catálogo cambió desde que se creó; crea el tratamiento de nuevo.",
+      "locked": "la edición no es segura."
+    },
     "instructions": {
       "selectTreatment": "Selecciona un tratamiento para aplicar",
       "clickTooth": "Haz clic en el diente para aplicar"
@@ -1436,6 +1448,8 @@
     "youTag": "(tú)",
     "userActive": "Usuario activo",
     "isProfessional": "Ejerce como profesional",
+    "professionalRegistration": "Número de colegiatura",
+    "professionalRegistrationHelp": "Número de registro profesional del odontólogo.",
     "isProfessionalHelp": "Aparece en la agenda, tiene horario y se le pueden asignar tratamientos. Un administrador también puede ejercer.",
     "userInactiveNote": "(No podrá iniciar sesión)",
     "saveChanges": "Guardar Cambios",
@@ -1956,6 +1970,23 @@
     "deleteError": "Error al eliminar tipo de IVA"
   },
   "treatmentPlans": {
+    "linkRecovery": {
+      "title": "Tratamiento creado, pero no agregado al Plan.",
+      "blockedTitle": "No se pudo agregar al Plan",
+      "undoBlockedTitle": "No se puede deshacer",
+      "unknownAssociation": "No se puede confirmar que el tratamiento pertenezca a este Plan, así que no se eliminó. Puede estar en otro Plan.",
+      "added": "Tratamiento agregado al Plan",
+      "recovered": "Tratamiento agregado al Plan tras reintentar",
+      "reason": {
+        "locked": "El Plan está bloqueado por un presupuesto enviado o aceptado. Reabre o renegocia el presupuesto para modificarlo.",
+        "closed": "El Plan está cerrado o completado y no admite tratamientos.",
+        "other_plan": "Este tratamiento ya pertenece a otro Plan.",
+        "plan_missing": "El Plan ya no está disponible.",
+        "unverified": "No se pudo comprobar el estado del Plan. No se creó ningún tratamiento; vuelve a intentarlo.",
+        "invalid": "El tratamiento no es válido para este Plan.",
+        "error": "No se pudo confirmar la asociación. Puedes reintentar; no se creará un tratamiento nuevo."
+      }
+    },
     "title": "Planes de tratamiento",
     "description": "Gestiona planes de tratamiento para pacientes",
     "new": "Nuevo plan",
