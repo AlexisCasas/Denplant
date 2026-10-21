@@ -229,7 +229,11 @@ export function useTreatmentPlans() {
         data
       )
       if (currentPlan.value?.id === planId) {
-        currentPlan.value.items.push(response.data)
+        // POST /items is idempotent (DP-08.B1): a repeat answers 200 with the
+        // existing item, so replace by id instead of appending a duplicate.
+        const idx = currentPlan.value.items.findIndex(i => i.id === response.data.id)
+        if (idx === -1) currentPlan.value.items.push(response.data)
+        else currentPlan.value.items[idx] = response.data
       }
       return response.data
     } catch (error) {

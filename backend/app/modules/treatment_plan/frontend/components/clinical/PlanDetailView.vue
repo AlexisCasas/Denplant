@@ -11,6 +11,7 @@
 
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { TreatmentPlanDetail } from '~~/app/types'
+import { PERMISSIONS } from '~~/app/config/permissions'
 
 import ConfirmPlanModal from './modals/ConfirmPlanModal.vue'
 import ReopenPlanModal from './modals/ReopenPlanModal.vue'
@@ -39,6 +40,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const toast = useToast()
+const { can } = usePermissions()
 // The plan follows the same clinic/user preference as diagnosis.  It waits
 // for the preference before choosing a renderer, so it never flashes the
 // legacy chart for a MINSA clinic.
@@ -186,6 +188,13 @@ const isLocked = computed(() => {
 })
 
 const effectiveReadonly = computed(() => props.readonly || isLocked.value)
+
+// A linked quote is always useful context, including the draft created on
+// confirmation and historical terminal quotes. Editing the odontogram must
+// not hide this read-only navigation; budget.read remains the sole gate.
+const canViewBudget = computed(() =>
+  Boolean(props.plan.budget_id) && can(PERMISSIONS.budget.read)
+)
 
 // ============================================================================
 // Cancel plan — delegated to the parent's ClosePlanModal. The legacy in-line
@@ -566,6 +575,43 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
       </div>
     </div>
 
+    <!-- Linked budget — visible for drafts and historical budgets. The locked
+         banner below keeps the same action for sent/accepted budgets. -->
+    <div
+      v-if="canViewBudget && !isLocked"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-elevated)] px-3 py-2"
+    >
+      <div class="flex min-w-0 items-center gap-2 text-sm">
+        <UIcon
+          name="i-lucide-file-text"
+          class="h-4 w-4 shrink-0 text-[var(--ui-text-muted)]"
+        />
+        <span
+          v-if="plan.budget?.budget_number"
+          class="font-medium text-[var(--ui-text-highlighted)]"
+        >
+          {{ plan.budget.budget_number }}
+        </span>
+        <UBadge
+          v-if="plan.budget?.status"
+          color="neutral"
+          size="xs"
+          variant="subtle"
+        >
+          {{ t(`budget.status.${plan.budget.status}`) }}
+        </UBadge>
+      </div>
+      <UButton
+        :to="`/budgets/${plan.budget_id}`"
+        size="xs"
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-external-link"
+      >
+        {{ t('clinical.plans.locked.viewBudget') }}
+      </UButton>
+    </div>
+
     <!-- Locked banner — shown whenever plan has a live budget attached. -->
     <div
       v-if="isLocked"
@@ -584,7 +630,7 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
         </div>
       </div>
       <UButton
-        v-if="plan.budget_id"
+        v-if="canViewBudget"
         :to="`/budgets/${plan.budget_id}`"
         size="xs"
         color="warning"
