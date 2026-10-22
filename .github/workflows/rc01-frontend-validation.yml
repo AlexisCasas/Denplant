@@ -1,0 +1,54 @@
+name: RC01 Frontend Validation
+
+on:
+  push:
+    branches: [ci/denplant-rc01-frontend-validation]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint
+
+  frontend-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      - name: modules.json with every layer
+        working-directory: frontend
+        run: node scripts/modules-json.mjs ./module_layers
+      - name: Nuxt typecheck (host + all module layers)
+        working-directory: frontend
+        run: npx nuxt typecheck
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test
