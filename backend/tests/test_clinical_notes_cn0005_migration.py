@@ -15,13 +15,12 @@ from uuid import UUID, uuid4
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from app.core.auth.models import Clinic
+from app.modules.patients.models import Patient
 from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.auth.models import Clinic
-from app.modules.patients.models import Patient
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]

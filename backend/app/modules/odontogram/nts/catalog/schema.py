@@ -602,7 +602,7 @@ class NtsRule(BaseModel):
                 {selected}
                 if isinstance(selected, str)
                 else set(selected)
-                if isinstance(selected, (list, tuple, set, frozenset))
+                if isinstance(selected, list | tuple | set | frozenset)
                 else set()
             )
             for value in attribute.values:

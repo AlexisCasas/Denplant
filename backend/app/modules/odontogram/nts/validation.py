@@ -84,7 +84,7 @@ def _check_value(rule: NtsRule, definition: AttributeDef, value: Any) -> list[st
         return []
 
     if definition.kind is AttributeKind.ENUM_MULTI:
-        if isinstance(value, str) or not isinstance(value, (list, tuple)):
+        if isinstance(value, str) or not isinstance(value, list | tuple):
             return [f"{where}: expected a list of codes"]
         errors = [
             f"{where}: {item!r} is not one of {sorted(allowed)}"

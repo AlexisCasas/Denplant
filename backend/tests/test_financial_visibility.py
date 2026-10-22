@@ -124,7 +124,9 @@ async def test_middleware_leaves_unmarked_errors_and_non_json_untouched() -> Non
     request = _request()
 
     async def unauthorized(_: Request) -> StreamingResponse:
-        return StreamingResponse(iter([b'{"detail":"Unauthorized"}']), status_code=401, media_type="application/json")
+        return StreamingResponse(
+            iter([b'{"detail":"Unauthorized"}']), status_code=401, media_type="application/json"
+        )
 
     response = await financial_response_middleware(request, unauthorized)
     assert response.status_code == 401
@@ -146,7 +148,9 @@ async def test_middleware_preserves_malformed_json_body_after_inspection() -> No
     request.state.hide_financial_amounts = True
 
     async def call_next(_: Request) -> StreamingResponse:
-        return StreamingResponse(iter([b"not-json"]), status_code=502, media_type="application/json")
+        return StreamingResponse(
+            iter([b"not-json"]), status_code=502, media_type="application/json"
+        )
 
     response = await financial_response_middleware(request, call_next)
     body = await _body(response)

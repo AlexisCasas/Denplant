@@ -34,7 +34,7 @@ EDITABLE_RECORD_FIELDS = ("stage", "stage_label", "observations")
 
 def jsonable(value: Any) -> Any:
     """Convert a stored value into something JSONB accepts."""
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, str | int | float | bool):
         return value
     if isinstance(value, UUID):
         return str(value)
@@ -42,7 +42,7 @@ def jsonable(value: Any) -> Any:
         return value.astimezone(UTC).isoformat()
     if isinstance(value, dict):
         return {str(k): jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple, set, frozenset)):
+    if isinstance(value, list | tuple | set | frozenset):
         return [jsonable(v) for v in value]
     return str(value)
 

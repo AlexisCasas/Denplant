@@ -273,7 +273,9 @@ async def test_visualization_snapshot_is_immutable_after_mapping_and_status_chan
     assert data["status"] == "performed"
     assert data["visualization_snapshot"] == original
     for key, value in financial_snapshot.items():
-        assert data[key] is None if value is None else Decimal(str(data[key])) == Decimal(str(value))
+        assert (
+            data[key] is None if value is None else Decimal(str(data[key])) == Decimal(str(value))
+        )
 
 
 @pytest.mark.asyncio

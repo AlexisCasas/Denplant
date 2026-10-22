@@ -11,16 +11,15 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.auth.financial_visibility import mark_financial_response
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.patients.access import PatientAccessPolicy
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .access import AppointmentAccessPolicy
 from .kanban_service import KanbanDayService
@@ -29,15 +28,15 @@ from .schemas import (
     AppointmentCabinetAssignment,
     AppointmentCabinetEventResponse,
     AppointmentCreate,
+    AppointmentLabelCreate,
+    AppointmentLabelResponse,
+    AppointmentLabelUpdate,
     AppointmentResponse,
     AppointmentStatusEventResponse,
     AppointmentStatusTransition,
     AppointmentTreatmentNoteUpdate,
     AppointmentTreatmentResponse,
     AppointmentUpdate,
-    AppointmentLabelCreate,
-    AppointmentLabelResponse,
-    AppointmentLabelUpdate,
     CabinetCreate,
     CabinetResponse,
     CabinetUpdate,
@@ -45,10 +44,10 @@ from .schemas import (
 )
 from .service import (
     AlreadyInStateError,
+    AppointmentLabelService,
     AppointmentService,
     CabinetRequiredError,
     CabinetService,
-    AppointmentLabelService,
     InvalidTransitionError,
 )
 from .tz import safe_zone
@@ -67,7 +66,11 @@ async def list_appointment_labels(
     return ApiResponse(data=[AppointmentLabelResponse.model_validate(label) for label in labels])
 
 
-@router.post("/appointment-labels", response_model=ApiResponse[AppointmentLabelResponse], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/appointment-labels",
+    response_model=ApiResponse[AppointmentLabelResponse],
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_appointment_label(
     data: AppointmentLabelCreate,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
@@ -80,7 +83,9 @@ async def create_appointment_label(
         await db.refresh(label)
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Label name already exists") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Label name already exists"
+        ) from exc
     return ApiResponse(data=AppointmentLabelResponse.model_validate(label))
 
 
@@ -94,14 +99,20 @@ async def update_appointment_label(
 ) -> ApiResponse[AppointmentLabelResponse]:
     label = await AppointmentLabelService.get_label(db, ctx.clinic_id, label_id)
     if label is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment label not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Appointment label not found"
+        )
     try:
-        label = await AppointmentLabelService.update_label(db, label, data.model_dump(exclude_unset=True))
+        label = await AppointmentLabelService.update_label(
+            db, label, data.model_dump(exclude_unset=True)
+        )
         await db.commit()
         await db.refresh(label)
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Label name already exists") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Label name already exists"
+        ) from exc
     return ApiResponse(data=AppointmentLabelResponse.model_validate(label))
 
 

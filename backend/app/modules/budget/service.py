@@ -34,7 +34,7 @@ def _serialize_for_json(data: dict | None) -> dict | None:
 
     result = {}
     for key, value in data.items():
-        if isinstance(value, (date, datetime)):
+        if isinstance(value, date | datetime):
             result[key] = value.isoformat()
         elif isinstance(value, Decimal):
             result[key] = str(value)

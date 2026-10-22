@@ -106,7 +106,10 @@ class ToolRegistry:
         from app.core.agents.guardrails import check as guardrails_check
         from app.core.agents.service import ApprovalService, AuditService
         from app.core.agents.tooling import jsonify
-        from app.core.auth.financial_visibility import FinancialVisibilityPolicy, strip_financial_fields
+        from app.core.auth.financial_visibility import (
+            FinancialVisibilityPolicy,
+            strip_financial_fields,
+        )
         from app.core.auth.models import ClinicMembership, User
         from app.core.auth.permissions import get_role_permissions, permission_matches
         from sqlalchemy import select

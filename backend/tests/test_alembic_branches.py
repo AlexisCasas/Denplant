@@ -13,7 +13,6 @@ from pathlib import Path
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-
 from app.core.plugins.alembic_paths import discover_version_locations
 
 

@@ -219,7 +219,7 @@ def _plain(value: Any, where: str) -> Any:
     Floats are rejected everywhere in version 1 (see the module docstring
     and §10.5 rule 10).
     """
-    if value is None or isinstance(value, (str, bool)):
+    if value is None or isinstance(value, str | bool):
         return value
     if isinstance(value, float):
         raise CanonicalizationError(
@@ -232,7 +232,7 @@ def _plain(value: Any, where: str) -> Any:
             if not isinstance(key, str):
                 raise CanonicalizationError(f"{where}: object keys must be strings")
         return {k: _plain(v, f"{where}.{k}") for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_plain(v, f"{where}[{i}]") for i, v in enumerate(value)]
     raise CanonicalizationError(f"{where}: unsupported value type {type(value).__name__}")
 
@@ -278,7 +278,7 @@ def _emit(value: Any) -> str:
         # Keys sorted ascending by Unicode code point.
         items = ",".join(f"{_emit_string(key)}:{_emit(value[key])}" for key in sorted(value))
         return "{" + items + "}"
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return "[" + ",".join(_emit(item) for item in value) + "]"
     if isinstance(value, float):
         raise CanonicalizationError("floats are not permitted in canonicalization version 1")

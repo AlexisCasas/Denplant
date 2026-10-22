@@ -9,26 +9,25 @@ import re
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy.sql.elements import ColumnElement
-
 from app.core.auth.models import ClinicMembership
 from app.core.events import EventType, event_bus
 from app.modules.catalog.models import TreatmentCatalogItem  # noqa: F401
 from app.modules.odontogram.models import Treatment
 from app.modules.patients.models import Patient
 from app.modules.treatment_plan.models import PlannedTreatmentItem
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from .models import (
     Appointment,
     AppointmentCabinetEvent,
+    AppointmentLabel,
     AppointmentStatusEvent,
     AppointmentTreatment,
     Cabinet,
-    AppointmentLabel,
 )
 from .tz import as_utc, get_clinic_tz
 
@@ -150,7 +149,9 @@ class AppointmentLabelService:
     """Tenant-safe catalog and assignment validation for appointment labels."""
 
     @staticmethod
-    async def list_labels(db: AsyncSession, clinic_id: UUID, *, active_only: bool = False) -> list[AppointmentLabel]:
+    async def list_labels(
+        db: AsyncSession, clinic_id: UUID, *, active_only: bool = False
+    ) -> list[AppointmentLabel]:
         query = select(AppointmentLabel).where(AppointmentLabel.clinic_id == clinic_id)
         if active_only:
             query = query.where(AppointmentLabel.is_active.is_(True))
@@ -158,10 +159,14 @@ class AppointmentLabelService:
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_label(db: AsyncSession, clinic_id: UUID, label_id: UUID) -> AppointmentLabel | None:
-        result = await db.execute(select(AppointmentLabel).where(
-            AppointmentLabel.id == label_id, AppointmentLabel.clinic_id == clinic_id
-        ))
+    async def get_label(
+        db: AsyncSession, clinic_id: UUID, label_id: UUID
+    ) -> AppointmentLabel | None:
+        result = await db.execute(
+            select(AppointmentLabel).where(
+                AppointmentLabel.id == label_id, AppointmentLabel.clinic_id == clinic_id
+            )
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -172,7 +177,9 @@ class AppointmentLabelService:
         return label
 
     @staticmethod
-    async def update_label(db: AsyncSession, label: AppointmentLabel, data: dict) -> AppointmentLabel:
+    async def update_label(
+        db: AsyncSession, label: AppointmentLabel, data: dict
+    ) -> AppointmentLabel:
         for key, value in data.items():
             if value is not None:
                 setattr(label, key, value)
@@ -596,7 +603,9 @@ class AppointmentService:
             db=db,
         )
 
-        await db.refresh(appointment, ["patient", "professional", "treatments", "appointment_label"])
+        await db.refresh(
+            appointment, ["patient", "professional", "treatments", "appointment_label"]
+        )
         for treatment in appointment.treatments:
             await db.refresh(treatment, ["planned_item", "catalog_item"])
             if treatment.planned_item:

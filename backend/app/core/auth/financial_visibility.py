@@ -9,7 +9,6 @@ from fastapi import Depends, Request
 
 from .dependencies import ClinicContext, get_clinic_context
 
-
 # Deliberately exact field names.  Clinical counts, dates and treatment
 # sequence numbers must survive; these are the monetary values that never
 # belong in a dentist response.
@@ -87,7 +86,9 @@ def mark_financial_response(
     The marker is consumed after FastAPI has serialized the declared response
     schema, which prevents default-valued Pydantic fields from reappearing.
     """
-    request.state.hide_financial_amounts = not FinancialVisibilityPolicy.can_view_financial_amounts(ctx)
+    request.state.hide_financial_amounts = not FinancialVisibilityPolicy.can_view_financial_amounts(
+        ctx
+    )
 
 
 def strip_financial_fields(value: Any, *, _is_root: bool = True) -> Any:
@@ -107,7 +108,6 @@ def strip_financial_fields(value: Any, *, _is_root: bool = True) -> Any:
 def _is_financial_key(key: str) -> bool:
     """Recognize both the audited names and future amount/price variants."""
     normalized = key.lower()
-    return (
-        normalized in FINANCIAL_FIELD_NAMES
-        or normalized.endswith(("_amount", "_price", "_subtotal", "_discount", "_tax"))
+    return normalized in FINANCIAL_FIELD_NAMES or normalized.endswith(
+        ("_amount", "_price", "_subtotal", "_discount", "_tax")
     )

@@ -81,15 +81,9 @@ async def pref_world(
 
     db_session.add_all(
         [
-            ClinicMembership(
-                id=uuid4(), user_id=user1_id, clinic_id=clinic_a.id, role="dentist"
-            ),
-            ClinicMembership(
-                id=uuid4(), user_id=user1_id, clinic_id=clinic_b.id, role="dentist"
-            ),
-            ClinicMembership(
-                id=uuid4(), user_id=user2.id, clinic_id=clinic_a.id, role="dentist"
-            ),
+            ClinicMembership(id=uuid4(), user_id=user1_id, clinic_id=clinic_a.id, role="dentist"),
+            ClinicMembership(id=uuid4(), user_id=user1_id, clinic_id=clinic_b.id, role="dentist"),
+            ClinicMembership(id=uuid4(), user_id=user2.id, clinic_id=clinic_a.id, role="dentist"),
         ]
     )
     await db_session.commit()
@@ -209,9 +203,7 @@ async def test_preference_is_isolated_per_user(client: AsyncClient, pref_world: 
     world = pref_world
     url = f"{PREFERENCES_URL}?clinic_id={world['clinic_a']}"
 
-    u1 = await client.put(
-        url, headers=world["user1_headers"], json={"profile": "pe_nts_188_2022"}
-    )
+    u1 = await client.put(url, headers=world["user1_headers"], json={"profile": "pe_nts_188_2022"})
     assert u1.status_code == 200, u1.text
 
     # user2 is in the same clinic and must be unaffected.
@@ -250,14 +242,12 @@ async def test_preference_is_isolated_per_clinic(client: AsyncClient, pref_world
     set_b = await client.put(url_b, headers=world["user1_headers"], json={"profile": "original"})
     assert set_b.status_code == 200
 
-    assert (
-        (await client.get(url_a, headers=world["user1_headers"])).json()["data"]["profile"]
-        == "pe_nts_188_2022"
-    )
-    assert (
-        (await client.get(url_b, headers=world["user1_headers"])).json()["data"]["profile"]
-        == "original"
-    )
+    assert (await client.get(url_a, headers=world["user1_headers"])).json()["data"][
+        "profile"
+    ] == "pe_nts_188_2022"
+    assert (await client.get(url_b, headers=world["user1_headers"])).json()["data"][
+        "profile"
+    ] == "original"
 
 
 # ---------------------------------------------------------------------------
@@ -266,9 +256,7 @@ async def test_preference_is_isolated_per_clinic(client: AsyncClient, pref_world
 
 
 @pytest.mark.asyncio
-async def test_non_member_cannot_read_or_write_that_clinic(
-    client: AsyncClient, pref_world: dict
-):
+async def test_non_member_cannot_read_or_write_that_clinic(client: AsyncClient, pref_world: dict):
     world = pref_world
     url_b = f"{PREFERENCES_URL}?clinic_id={world['clinic_b']}"
 
@@ -280,9 +268,7 @@ async def test_non_member_cannot_read_or_write_that_clinic(
     assert put.status_code == 403
 
     # A user with no membership anywhere is rejected as well.
-    assert (
-        await client.get(PREFERENCES_URL, headers=world["outsider_headers"])
-    ).status_code == 403
+    assert (await client.get(PREFERENCES_URL, headers=world["outsider_headers"])).status_code == 403
     assert (
         await client.put(
             PREFERENCES_URL,
