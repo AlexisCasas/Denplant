@@ -9,17 +9,18 @@ import re
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
+
 from app.core.auth.models import ClinicMembership
 from app.core.events import EventType, event_bus
 from app.modules.catalog.models import TreatmentCatalogItem  # noqa: F401
 from app.modules.odontogram.models import Treatment
 from app.modules.patients.models import Patient
 from app.modules.treatment_plan.models import PlannedTreatmentItem
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy.sql.elements import ColumnElement
 
 from .models import (
     Appointment,

@@ -19,11 +19,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 
+from sqlalchemy import text
+
 from app.core.plugins.alembic_paths import alembic_cfg_path, boot_upgrade_targets
 from app.core.plugins.loader import register_discovered
 from app.core.plugins.state import ModuleState
 from app.database import async_session_maker
-from sqlalchemy import text
 
 
 def register(sub: argparse._SubParsersAction) -> None:

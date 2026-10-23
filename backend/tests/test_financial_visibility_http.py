@@ -12,6 +12,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+
 from app.core.auth.models import ClinicMembership, User
 from app.core.auth.service import create_access_token, hash_password
 from app.modules.agenda.models import Appointment, AppointmentTreatment

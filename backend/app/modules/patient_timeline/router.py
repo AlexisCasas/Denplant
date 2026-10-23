@@ -3,13 +3,14 @@
 from typing import Annotated
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
 from app.modules.patients.access import PatientAccessPolicy
 from app.modules.patients.service import PatientService
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import TimelineResponse
 from .service import TimelineService
