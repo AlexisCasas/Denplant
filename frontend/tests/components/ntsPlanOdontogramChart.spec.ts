@@ -136,7 +136,7 @@ describe('H1 — odontograma NTS del plan', () => {
     // The chart delegates the create→associate transaction to the shared
     // idempotent flow. `planTreatmentLink.spec.ts` exercises its preflight,
     // one-create, reconciliation and retry cases against the real composable.
-    expect(chartSource).toContain("import { usePlanTreatmentLink, type PlanCreateLinkResult } from '../../composables/usePlanTreatmentLink'")
+    expect(chartSource).toContain('import { usePlanTreatmentLink, type PlanCreateLinkResult } from \'../../composables/usePlanTreatmentLink\'')
     expect(chartSource).toContain('planLink.createAndLink(props.planId, create)')
     expect(chartSource).toContain('if (result.status === \'unlinked\')')
     expect(chartSource).toContain('const result = await planLink.retry()')
