@@ -133,7 +133,15 @@ describe('H1 — odontograma NTS del plan', () => {
   })
 
   it('attaches clinical mutations to the active plan and respects read-only mode', () => {
-    expect(chartSource).toContain('await treatmentPlansApi.addItem(props.planId, { treatment_id: treatment.id })')
+    // The chart delegates the create→associate transaction to the shared
+    // idempotent flow. `planTreatmentLink.spec.ts` exercises its preflight,
+    // one-create, reconciliation and retry cases against the real composable.
+    expect(chartSource).toContain("import { usePlanTreatmentLink, type PlanCreateLinkResult } from '../../composables/usePlanTreatmentLink'")
+    expect(chartSource).toContain('planLink.createAndLink(props.planId, create)')
+    expect(chartSource).toContain('if (result.status === \'unlinked\')')
+    expect(chartSource).toContain('const result = await planLink.retry()')
+    expect(chartSource).toContain('planLink.releaseTreatment(props.planId || undefined, treatmentId, deleteTreatment)')
+    expect(chartSource).not.toContain('treatmentPlansApi.addItem')
     expect(chartSource).toContain('v-if="!readonly && patientId"')
     expect(chartSource).toContain(':disabled="readonly"')
     expect(chartSource).toContain('@perform="handleTreatmentPerform"')
