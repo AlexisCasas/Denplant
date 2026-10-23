@@ -266,7 +266,7 @@ function handleClose() {
           color="error"
           variant="subtle"
           icon="i-lucide-circle-alert"
-          :description="surfaceSelectionError || errorMessage"
+          :description="surfaceSelectionError || errorMessage || undefined"
           class="mt-4"
         />
 
