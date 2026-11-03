@@ -17,13 +17,20 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.auth.models import ClinicMembership, User
 
 from .models import (
     Allergy,
+    DentalAnamnesis,
     EmergencyContact,
+    EndodonticRecord,
+    EndodonticRecordChannel,
     LegalGuardian,
     MedicalContext,
     Medication,
+    PediatricDentalAnamnesis,
     SurgicalHistory,
     SystemicDisease,
 )
@@ -451,3 +458,168 @@ class PatientsClinicalService:
             db, clinic_id, patient_id, context_fields, user_id
         )
         await db.flush()
+
+    # --- Specialty anamneses -------------------------------------------
+
+    @staticmethod
+    async def validate_professional(
+        db: AsyncSession, clinic_id: UUID, professional_id: UUID | None
+    ) -> bool:
+        """Accept only active professional members of the current clinic."""
+        if professional_id is None:
+            return True
+        return (
+            await db.scalar(
+                select(ClinicMembership.id)
+                .join(User, User.id == ClinicMembership.user_id)
+                .where(
+                    ClinicMembership.clinic_id == clinic_id,
+                    ClinicMembership.user_id == professional_id,
+                    ClinicMembership.is_professional.is_(True),
+                    User.is_active.is_(True),
+                )
+            )
+        ) is not None
+
+    @staticmethod
+    async def get_dental_anamnesis(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID
+    ) -> DentalAnamnesis | None:
+        return await db.scalar(
+            select(DentalAnamnesis).where(
+                DentalAnamnesis.clinic_id == clinic_id,
+                DentalAnamnesis.patient_id == patient_id,
+            )
+        )
+
+    @staticmethod
+    async def upsert_dental_anamnesis(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, data: dict[str, Any], user_id: UUID
+    ) -> DentalAnamnesis:
+        record = await PatientsClinicalService.get_dental_anamnesis(db, clinic_id, patient_id)
+        if record is None:
+            record = DentalAnamnesis(
+                patient_id=patient_id, clinic_id=clinic_id, last_updated_by=user_id, **data
+            )
+            db.add(record)
+        else:
+            for key, value in data.items():
+                setattr(record, key, value)
+            record.last_updated_by = user_id
+        await db.flush()
+        return record
+
+    @staticmethod
+    async def get_pediatric_dental_anamnesis(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID
+    ) -> PediatricDentalAnamnesis | None:
+        return await db.scalar(
+            select(PediatricDentalAnamnesis).where(
+                PediatricDentalAnamnesis.clinic_id == clinic_id,
+                PediatricDentalAnamnesis.patient_id == patient_id,
+            )
+        )
+
+    @staticmethod
+    async def upsert_pediatric_dental_anamnesis(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, data: dict[str, Any], user_id: UUID
+    ) -> PediatricDentalAnamnesis:
+        record = await PatientsClinicalService.get_pediatric_dental_anamnesis(
+            db, clinic_id, patient_id
+        )
+        if record is None:
+            record = PediatricDentalAnamnesis(
+                patient_id=patient_id, clinic_id=clinic_id, last_updated_by=user_id, **data
+            )
+            db.add(record)
+        else:
+            for key, value in data.items():
+                setattr(record, key, value)
+            record.last_updated_by = user_id
+        await db.flush()
+        return record
+
+    # --- Endodontic records --------------------------------------------
+
+    @staticmethod
+    def _record_query(clinic_id: UUID, patient_id: UUID):
+        return (
+            select(EndodonticRecord)
+            .options(selectinload(EndodonticRecord.channels))
+            .where(
+                EndodonticRecord.clinic_id == clinic_id,
+                EndodonticRecord.patient_id == patient_id,
+            )
+        )
+
+    @staticmethod
+    async def list_endodontic_records(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID
+    ) -> list[EndodonticRecord]:
+        result = await db.execute(
+            PatientsClinicalService._record_query(clinic_id, patient_id).order_by(
+                EndodonticRecord.created_at.desc()
+            )
+        )
+        return list(result.scalars().unique())
+
+    @staticmethod
+    async def get_endodontic_record(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, record_id: UUID
+    ) -> EndodonticRecord | None:
+        return await db.scalar(
+            PatientsClinicalService._record_query(clinic_id, patient_id).where(
+                EndodonticRecord.id == record_id
+            )
+        )
+
+    @staticmethod
+    async def _replace_channels(
+        db: AsyncSession, record: EndodonticRecord, channels: list[dict[str, Any]]
+    ) -> None:
+        result = await db.execute(
+            select(EndodonticRecordChannel).where(
+                EndodonticRecordChannel.endodontic_record_id == record.id
+            )
+        )
+        existing = {channel.channel_code: channel for channel in result.scalars()}
+        submitted_codes = {channel["channel_code"] for channel in channels}
+        for code, channel in existing.items():
+            if code not in submitted_codes:
+                await db.delete(channel)
+        for channel_data in channels:
+            channel = existing.get(channel_data["channel_code"])
+            if channel is None:
+                db.add(
+                    EndodonticRecordChannel(
+                        endodontic_record_id=record.id,
+                        **channel_data,
+                    )
+                )
+            else:
+                for key, value in channel_data.items():
+                    setattr(channel, key, value)
+        await db.flush()
+
+    @staticmethod
+    async def create_endodontic_record(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, data: dict[str, Any]
+    ) -> EndodonticRecord:
+        channels = data.pop("channels", [])
+        record = EndodonticRecord(clinic_id=clinic_id, patient_id=patient_id, **data)
+        db.add(record)
+        await db.flush()
+        await PatientsClinicalService._replace_channels(db, record, channels)
+        return record
+
+    @staticmethod
+    async def update_endodontic_record(
+        db: AsyncSession, record: EndodonticRecord, data: dict[str, Any]
+    ) -> EndodonticRecord:
+        channels = data.pop("channels", None)
+        for key, value in data.items():
+            setattr(record, key, value)
+        if channels is not None:
+            await PatientsClinicalService._replace_channels(db, record, channels)
+        await db.flush()
+        return record
