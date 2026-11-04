@@ -874,8 +874,10 @@ describe('the print control and the sheet it produces', () => {
     const printChart = printRoot()!.querySelector('[data-testid="nts-odontogram-chart"]')
     expect(printChart).not.toBeNull()
     expect(printChart!.querySelectorAll(toothCell)).toHaveLength(52)
+    // DP-17 keeps the screen on its active default permanent layout; print is
+    // the sole all/52-piece rendering path.
     expect(wrapper.find('[data-testid="nts-odontogram-chart"]').findAll(toothCell))
-      .toHaveLength(52)
+      .toHaveLength(32)
   })
 
   it('§27 — printing never touches document.title', async () => {

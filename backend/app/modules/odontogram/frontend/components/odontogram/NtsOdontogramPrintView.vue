@@ -413,6 +413,7 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
         :catalog="catalog"
         readonly
         :advisories="false"
+        dentition-mode="all"
       />
 
       <!-- 4. Especificaciones (§5.14). The block is always here: a missing

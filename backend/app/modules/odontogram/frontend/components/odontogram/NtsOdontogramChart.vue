@@ -19,13 +19,9 @@
  */
 
 import type { NtsCatalog, NtsRecord } from '../../types/nts'
-import { NTS_ROWS } from '../../utils/ntsDentition'
-import {
-  NTS_CHART_HEIGHT,
-  NTS_CHART_SCALE,
-  NTS_CHART_VIEWBOX,
-  NTS_CHART_WIDTH
-} from '../../utils/ntsChartGeometry'
+import { rowsForLayout, type NtsDentitionLayout } from '../../utils/ntsDentition'
+import type { DentitionMode } from '~~/app/utils/dentition'
+import { createNtsChartGeometry, NTS_CHART_SCALE } from '../../utils/ntsChartGeometry'
 import { resolveChart } from '../../utils/ntsRenderModel'
 import NtsDentitionRow from './NtsDentitionRow.vue'
 import NtsFindingLayer from './NtsFindingLayer.vue'
@@ -76,6 +72,8 @@ const props = withDefaults(
      * changes — only whether the page carries advice.
      */
     advisories?: boolean
+    /** `all` is reserved for the normative print view. */
+    dentitionMode?: DentitionMode | 'all'
   }>(),
   {
     record: null,
@@ -85,7 +83,8 @@ const props = withDefaults(
     selectedTeeth: () => [],
     anchorTeeth: () => [],
     catalog: null,
-    advisories: true
+    advisories: true,
+    dentitionMode: 'all'
   }
 )
 
@@ -118,9 +117,8 @@ const { t } = useI18n()
  * as it renders.
  */
 const CHART_SCALE = NTS_CHART_SCALE
-const CHART_MIN_WIDTH = NTS_CHART_WIDTH
-
-const rows = NTS_ROWS
+const rows = computed(() => rowsForLayout(props.dentitionMode as NtsDentitionLayout))
+const geometry = computed(() => createNtsChartGeometry(rows.value))
 
 const findingCount = computed(() => props.record?.findings.length ?? 0)
 
@@ -132,7 +130,7 @@ const findingCount = computed(() => props.record?.findings.length ?? 0)
  */
 const render = computed(() =>
   props.catalog && props.record
-    ? resolveChart(props.record.findings, props.catalog.rules)
+    ? resolveChart(props.record.findings, props.catalog.rules, geometry.value)
     : null
 )
 
@@ -205,7 +203,7 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
     >
       <div
         class="relative mx-auto py-2 space-y-1"
-        :style="{ minWidth: `${CHART_MIN_WIDTH}px` }"
+        :style="{ minWidth: `${geometry.width}px` }"
         data-testid="nts-chart-canvas"
       >
         <NtsDentitionRow
@@ -240,9 +238,9 @@ watch(hiddenSiglas, hidden => emit('overflow', hidden), { immediate: true })
         -->
         <svg
           class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2"
-          :viewBox="NTS_CHART_VIEWBOX"
-          :width="NTS_CHART_WIDTH"
-          :height="NTS_CHART_HEIGHT"
+          :viewBox="geometry.viewBox"
+          :width="geometry.width"
+          :height="geometry.height"
           :style="{ marginTop: '0' }"
           aria-hidden="true"
           focusable="false"

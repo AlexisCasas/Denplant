@@ -37,21 +37,8 @@
  */
 
 import type { NtsFinding, NtsFindingTarget, NtsRule } from '../types/nts'
-import type { NtsBox, NtsLevel, NtsPoint, NtsRowId, NtsSpan } from './ntsChartGeometry'
-import {
-  annotationBox,
-  apexPoint,
-  archSpan,
-  crownBox,
-  interproximalPoint,
-  localToGlobal,
-  numberAnchor,
-  occlusalBand,
-  occlusalDirection,
-  rangeSpan,
-  rootBox,
-  toothPlacement
-} from './ntsChartGeometry'
+import type { NtsBox, NtsChartGeometry, NtsLevel, NtsPoint, NtsRowId, NtsSpan } from './ntsChartGeometry'
+import { ALL_NTS_CHART_GEOMETRY } from './ntsChartGeometry'
 import type { NtsTooth } from './ntsDentition'
 import { NTS_TOOTH_STROKE, centralRegionsOf } from './ntsDentition'
 import type { NtsRegionFigure } from './ntsSurfaceGeometry'
@@ -562,38 +549,39 @@ function squareAround(point: NtsPoint, reference: NtsBox, fraction: number): Nts
 function placeSymbol(
   shape: NtsSymbolShape,
   at: string | undefined,
-  finding: NtsFinding
+  finding: NtsFinding,
+  geometry: NtsChartGeometry
 ): Placed | { reason: NtsUnsupportedReason } {
   const teeth = numberedSubjects(finding)
 
   switch (at) {
     case undefined:
-      return placeByShape(shape, teeth)
+      return placeByShape(shape, teeth, geometry)
 
     case 'crown': {
-      const box = teeth[0] !== undefined ? crownBox(teeth[0]) : null
+      const box = teeth[0] !== undefined ? geometry.crownBox(teeth[0]) : null
       return box ? { at: centreOf(box), bounds: squareAround(centreOf(box), box, 0.5) } : { reason: 'tooth_not_on_chart' }
     }
 
     case 'near_roots': {
-      const box = teeth[0] !== undefined ? rootBox(teeth[0]) : null
+      const box = teeth[0] !== undefined ? geometry.rootBox(teeth[0]) : null
       if (!box) return { reason: 'tooth_not_on_chart' }
       const point = centreOf(box)
       return { at: point, bounds: squareAround(point, box, 0.55) }
     }
 
     case 'tooth_number': {
-      const point = teeth[0] !== undefined ? numberAnchor(teeth[0]) : null
-      const box = teeth[0] !== undefined ? annotationBox(teeth[0]) : null
+      const point = teeth[0] !== undefined ? geometry.numberAnchor(teeth[0]) : null
+      const box = teeth[0] !== undefined ? geometry.annotationBox(teeth[0]) : null
       if (!point || !box) return { reason: 'tooth_not_on_chart' }
-      return { at: point, bounds: numberBounds(teeth[0]!, point) }
+      return { at: point, bounds: numberBounds(teeth[0]!, point, geometry) }
     }
 
     case 'tooth_numbers': {
       // One shape spanning both numbers: centred between them.
       if (teeth.length !== 2) return { reason: 'wrong_target_count' }
-      const first = numberAnchor(teeth[0]!)
-      const second = numberAnchor(teeth[1]!)
+      const first = geometry.numberAnchor(teeth[0]!)
+      const second = geometry.numberAnchor(teeth[1]!)
       if (!first || !second) return { reason: 'tooth_not_on_chart' }
       const point = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }
       return {
@@ -609,15 +597,15 @@ function placeSymbol(
 
     case 'between_teeth': {
       if (teeth.length !== 2) return { reason: 'wrong_target_count' }
-      const point = interproximalPoint(teeth[0]!, teeth[1]!, 'crown')
+      const point = geometry.interproximalPoint(teeth[0]!, teeth[1]!, 'crown')
       if (!point) return { reason: 'targets_not_adjacent' }
       // Sized from the pair itself, never from "the first tooth": the symbol
       // lives in the gutter the two crowns leave between them, so its width is
       // a little over that gutter (about an outline stroke into each crown) and
       // its height is half the shorter crown. Sorting the pair by position
       // first makes the result independent of selection order.
-      const first = crownBox(teeth[0]!)
-      const second = crownBox(teeth[1]!)
+      const first = geometry.crownBox(teeth[0]!)
+      const second = geometry.crownBox(teeth[1]!)
       if (!first || !second) return { reason: 'tooth_not_on_chart' }
       const [left, right] = first.x <= second.x ? [first, second] : [second, first]
       const gutter = Math.max(0, right.x - (left.x + left.width))
@@ -635,9 +623,9 @@ function placeSymbol(
         .filter(target => target.tooth_number !== null)
         .map(target => target.tooth_number!)
       if (references.length !== 2) return { reason: 'wrong_target_count' }
-      const point = interproximalPoint(references[0]!, references[1]!, 'apex')
+      const point = geometry.interproximalPoint(references[0]!, references[1]!, 'apex')
       if (!point) return { reason: 'targets_not_adjacent' }
-      const reference = crownBox(references[0]!)!
+      const reference = geometry.crownBox(references[0]!)!
       return { at: point, bounds: squareAround(point, reference, 0.85) }
     }
 
@@ -647,20 +635,21 @@ function placeSymbol(
 }
 
 /** The band a number-anchored shape is sized against. */
-function numberBounds(fdi: number, point: NtsPoint): NtsBox {
-  const placement = toothPlacement(fdi)!
+function numberBounds(fdi: number, point: NtsPoint, geometry: NtsChartGeometry): NtsBox {
+  const placement = geometry.toothPlacement(fdi)!
   const size = Math.min(placement.number.height, placement.number.width) * 1.1
   return { x: point.x - size / 2, y: point.y - size / 2, width: size, height: size }
 }
 
 function placeByShape(
   shape: NtsSymbolShape,
-  teeth: number[]
+  teeth: number[],
+  geometry: NtsChartGeometry
 ): Placed | { reason: NtsUnsupportedReason } {
   switch (shape) {
     case 'square_bordering_crown':
     case 'x_cross': {
-      const box = teeth[0] !== undefined ? crownBox(teeth[0]) : null
+      const box = teeth[0] !== undefined ? geometry.crownBox(teeth[0]) : null
       return box ? { at: centreOf(box), bounds: box } : { reason: 'tooth_not_on_chart' }
     }
     default:
@@ -768,15 +757,15 @@ function archesOf(finding: NtsFinding): string[] {
  * stretching the mark over the nested deciduous row would assert something
  * about those teeth that the norm does not.
  */
-function spansFor(finding: NtsFinding, level: NtsLevel): NtsSpan[] {
+function spansFor(finding: NtsFinding, level: NtsLevel, geometry: NtsChartGeometry): NtsSpan[] {
   const arches = archesOf(finding)
   if (arches.length > 0) {
     return arches
-      .map(arch => archSpan(arch as 'upper' | 'lower', level))
+      .map(arch => geometry.archSpan(arch as 'upper' | 'lower', level))
       .filter((span): span is NtsSpan => span !== null)
   }
   return subjectGroups(finding)
-    .map(teeth => rangeSpan(teeth, level))
+    .map(teeth => geometry.rangeSpan(teeth, level))
     .filter((span): span is NtsSpan => span !== null)
 }
 
@@ -835,7 +824,8 @@ const FREEHAND_LINE_STYLES: Readonly<Record<string, NtsUnsupportedReason>> = {
 function resolveLine(
   mark: CatalogMark,
   finding: NtsFinding,
-  base: DrawableBase
+  base: DrawableBase,
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
     { ...base, kind: 'unsupported', layer: NTS_LAYERS.line, reason, markKind: mark.kind }
@@ -847,13 +837,13 @@ function resolveLine(
 
   // A vertical line belongs to one tooth, not to a span: the norm draws it
   // down the tooth's own axis.
-  if (style === 'straight_vertical') return verticalLines(mark, finding, base)
+  if (style === 'straight_vertical') return verticalLines(mark, finding, base, geometry)
 
   const token = mark.params.at
   const level = token === undefined ? undefined : BAND_FOR_TOKEN[token]
   if (level === undefined) return fail('unknown_placement')
 
-  const spans = spansFor(finding, level)
+  const spans = spansFor(finding, level, geometry)
   if (spans.length === 0) return fail('no_targets')
 
   const strokes: NtsPoint[][] = []
@@ -889,13 +879,14 @@ function resolveLine(
 function verticalLines(
   mark: CatalogMark,
   finding: NtsFinding,
-  base: DrawableBase
+  base: DrawableBase,
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const strokes: NtsPoint[][] = []
 
   for (const fdi of numberedSubjects(finding)) {
-    const placement = toothPlacement(fdi)
-    const apex = apexPoint(fdi)
+    const placement = geometry.toothPlacement(fdi)
+    const apex = geometry.apexPoint(fdi)
     if (!placement || !apex) continue
     const crown = placement.crown
     const from = crown.y + crown.height / 2
@@ -929,7 +920,8 @@ function resolveConnector(
   mark: CatalogMark,
   finding: NtsFinding,
   base: DrawableBase,
-  siblings: readonly CatalogMark[]
+  siblings: readonly CatalogMark[],
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
     { ...base, kind: 'unsupported', layer: NTS_LAYERS.line, reason, markKind: mark.kind }
@@ -940,7 +932,7 @@ function resolveConnector(
   const level = token === undefined ? undefined : BAND_FOR_TOKEN[token]
   if (level === undefined) return fail('unknown_placement')
 
-  const spans = spansFor(finding, level)
+  const spans = spansFor(finding, level, geometry)
   if (spans.length === 0) return fail('no_targets')
 
   if (style === 'straight_line') {
@@ -956,7 +948,7 @@ function resolveConnector(
     if (joinsMarkers) {
       const strokes: NtsPoint[][] = []
       for (const teeth of subjectGroups(finding)) {
-        const markers = rangeEndpointMarkers(teeth, level)
+        const markers = rangeEndpointMarkers(teeth, level, geometry)
         if (markers.length < 2) continue
         const from = markers[0]!.bounds
         const to = markers[markers.length - 1]!.bounds
@@ -991,8 +983,8 @@ function resolveConnector(
     for (const target of subjects(finding)) {
       if (mark.role === null || target.role !== mark.role) continue
       if (target.tooth_number === null) continue
-      const placement = toothPlacement(target.tooth_number)
-      const toward = occlusalDirection(target.tooth_number)
+      const placement = geometry.toothPlacement(target.tooth_number)
+      const toward = geometry.occlusalDirection(target.tooth_number)
       if (!placement || toward === null) continue
       // Dropped from the band onto the tooth. The teeth lie on the biting side
       // of an apex band, so the tick follows the same sense as the arch's
@@ -1030,8 +1022,8 @@ function resolveConnector(
  *
  * `occlusalDirection` is +1 when a tooth's biting edge faces down the screen.
  */
-function arrowDirection(toward: string | undefined, fdi: number): number | null {
-  const occlusal = occlusalDirection(fdi)
+function arrowDirection(toward: string | undefined, fdi: number, geometry: NtsChartGeometry): number | null {
+  const occlusal = geometry.occlusalDirection(fdi)
   if (occlusal === null) return null
   switch (toward) {
     // "en sentido externo": out of the arch, away from the tooth.
@@ -1051,7 +1043,8 @@ function arrowDirection(toward: string | undefined, fdi: number): number | null 
 function resolveArrow(
   mark: CatalogMark,
   finding: NtsFinding,
-  base: DrawableBase
+  base: DrawableBase,
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
     { ...base, kind: 'unsupported', layer: NTS_LAYERS.arrow, reason, markKind: mark.kind }
@@ -1061,7 +1054,7 @@ function resolveArrow(
   const at = mark.params.at
   const teeth = numberedSubjects(finding)
 
-  if (style === 'two_crossed_curved') return crossedArrows(mark, teeth, base, at)
+  if (style === 'two_crossed_curved') return crossedArrows(mark, teeth, base, at, geometry)
 
   if (style !== 'zigzag' && style !== 'straight_vertical') {
     // A curved arrow follows "el sentido de la giroversión" — an observed
@@ -1073,10 +1066,10 @@ function resolveArrow(
 
   const fdi = teeth[0]
   if (fdi === undefined) return fail('no_targets')
-  const placement = toothPlacement(fdi)
+  const placement = geometry.toothPlacement(fdi)
   if (!placement) return fail('tooth_not_on_chart')
 
-  const direction = arrowDirection(mark.params.toward, fdi)
+  const direction = arrowDirection(mark.params.toward, fdi, geometry)
   if (direction === null) return fail('unknown_arrow_direction')
 
   const x = placement.center.x
@@ -1089,13 +1082,13 @@ function resolveArrow(
     tail = direction > 0 ? crown.y - ARROW_LENGTH / 2 : crown.y + crown.height + ARROW_LENGTH / 2
     tip = direction > 0 ? crown.y + crown.height : crown.y
   } else if (at === 'outside_occlusal') {
-    const band = occlusalBand(placement.row as NtsRowId)
+    const band = geometry.occlusalBand(placement.row as NtsRowId)
     if (band === null) return fail('unknown_placement')
     // Clear of the biting edge, on that side. An outward arrow runs away from
     // the band; an inward one runs back toward it.
-    const near = band + OUTSIDE_MARGIN * occlusalDirection(fdi)!
-    const far = near + ARROW_LENGTH * occlusalDirection(fdi)!
-    const outward = direction === occlusalDirection(fdi)
+    const near = band + OUTSIDE_MARGIN * geometry.occlusalDirection(fdi)!
+    const far = near + ARROW_LENGTH * geometry.occlusalDirection(fdi)!
+    const outward = direction === geometry.occlusalDirection(fdi)
     tail = outward ? near : far
     tip = outward ? far : near
   } else {
@@ -1141,7 +1134,8 @@ function crossedArrows(
   mark: CatalogMark,
   teeth: number[],
   base: DrawableBase,
-  at: string | undefined
+  at: string | undefined,
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [
     { ...base, kind: 'unsupported', layer: NTS_LAYERS.arrow, reason, markKind: mark.kind }
@@ -1150,7 +1144,7 @@ function crossedArrows(
   if (at !== 'tooth_numbers') return fail('unknown_placement')
   if (teeth.length !== 2) return fail('wrong_target_count')
 
-  const anchors = teeth.map(numberAnchor)
+  const anchors = teeth.map(geometry.numberAnchor)
   if (anchors.some(point => point === null)) return fail('tooth_not_on_chart')
 
   // Ordered by position on the chart, so the pair is drawn the same way round
@@ -1275,13 +1269,13 @@ function landmarkArea(
  * Move a figure from a tooth's own units onto the chart, working out on the
  * way which parts of its rim the tooth is actually drawn with.
  */
-function toChart(fdi: number, figure: NtsRegionFigure): NtsAreaFigure | null {
+function toChart(fdi: number, figure: NtsRegionFigure, geometry: NtsChartGeometry): NtsAreaFigure | null {
   const move = (rings: readonly NtsPoint[][]): NtsPoint[][] | null => {
     const moved: NtsPoint[][] = []
     for (const ring of rings) {
       const points: NtsPoint[] = []
       for (const point of ring) {
-        const placed = localToGlobal(fdi, point)
+        const placed = geometry.localToGlobal(fdi, point)
         if (!placed) return null
         points.push(placed)
       }
@@ -1309,7 +1303,8 @@ function resolveArea(
   mark: CatalogMark,
   finding: NtsFinding,
   base: DrawableBase,
-  kind: 'shape_fill' | 'outline'
+  kind: 'shape_fill' | 'outline',
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const layer = kind === 'shape_fill' ? NTS_LAYERS.fill : NTS_LAYERS.outline
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [{
@@ -1332,7 +1327,7 @@ function resolveArea(
 
   const produced: NtsRenderInstruction[] = []
   for (const fdi of teeth) {
-    const tooth = toothPlacement(fdi)?.tooth
+    const tooth = geometry.toothPlacement(fdi)?.tooth
     if (!tooth) {
       produced.push(...fail('tooth_not_on_chart'))
       continue
@@ -1348,7 +1343,7 @@ function resolveArea(
       continue
     }
 
-    const components = area.components.map(figure => toChart(fdi, figure))
+    const components = area.components.map(figure => toChart(fdi, figure, geometry))
     if (components.some(figure => figure === null)) {
       produced.push(...fail('tooth_not_on_chart'))
       continue
@@ -1362,7 +1357,7 @@ function resolveArea(
       fdi,
       components: components as NtsAreaFigure[],
       regions: area.regions,
-      structuralStroke: NTS_TOOTH_STROKE * (toothPlacement(fdi)?.scale ?? 1)
+      structuralStroke: NTS_TOOTH_STROKE * (geometry.toothPlacement(fdi)?.scale ?? 1)
     })
   }
 
@@ -1385,7 +1380,11 @@ const DRAWABLE_KINDS: ReadonlySet<string> = new Set([
   'outline'
 ])
 
-export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRender {
+export function resolveFinding(
+  finding: NtsFinding,
+  rule: NtsRule,
+  geometry: NtsChartGeometry = ALL_NTS_CHART_GEOMETRY
+): NtsFindingRender {
   const paint = paintFor(rule, finding)
   const base = {
     normVersion: finding.norm_version,
@@ -1430,13 +1429,13 @@ export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRe
     // a vertical tick per role-bearing target, a stroke per segment of a span.
     const drawable = { ...base, paint }
     const produced =
-      mark.kind === 'box_siglas' ? [resolveBox(mark, rule, finding, drawable)]
-        : mark.kind === 'symbol' ? resolveSymbol(mark, rule, finding, drawable)
-          : mark.kind === 'line' ? resolveLine(mark, finding, drawable)
-            : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable, marks)
-              : mark.kind === 'shape_fill' ? resolveArea(mark, finding, drawable, 'shape_fill')
-                : mark.kind === 'outline' ? resolveArea(mark, finding, drawable, 'outline')
-                  : resolveArrow(mark, finding, drawable)
+      mark.kind === 'box_siglas' ? [resolveBox(mark, rule, finding, drawable, geometry)]
+        : mark.kind === 'symbol' ? resolveSymbol(mark, rule, finding, drawable, geometry)
+          : mark.kind === 'line' ? resolveLine(mark, finding, drawable, geometry)
+            : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable, marks, geometry)
+              : mark.kind === 'shape_fill' ? resolveArea(mark, finding, drawable, 'shape_fill', geometry)
+                : mark.kind === 'outline' ? resolveArea(mark, finding, drawable, 'outline', geometry)
+                  : resolveArrow(mark, finding, drawable, geometry)
 
     instructions.push(...produced)
     if (produced.some(instruction => instruction.kind !== 'unsupported')) drawn += 1
@@ -1455,10 +1454,11 @@ function resolveBox(
   mark: CatalogMark,
   rule: NtsRule,
   finding: NtsFinding,
-  base: DrawableBase
+  base: DrawableBase,
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction {
   const fdi = numberedSubjects(finding)[0]
-  const box = fdi !== undefined ? annotationBox(fdi) : null
+  const box = fdi !== undefined ? geometry.annotationBox(fdi) : null
   if (fdi === undefined || !box) {
     return { ...base, kind: 'unsupported', layer: NTS_LAYERS.text, reason: 'tooth_not_on_chart', markKind: mark.kind }
   }
@@ -1489,7 +1489,8 @@ function resolveSymbol(
   mark: CatalogMark,
   rule: NtsRule,
   finding: NtsFinding,
-  base: DrawableBase
+  base: DrawableBase,
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   const shape = mark.params.shape
   const fail = (reason: NtsUnsupportedReason): NtsRenderInstruction[] => [{
@@ -1523,10 +1524,10 @@ function resolveSymbol(
   // target, placed at the band the mark declares. The two questions are read
   // from two fields, which is what NTS-05D.3a separated them for.
   if (mark.target_selector !== null) {
-    return resolveSelectedSymbols(mark, finding, base, emit, fail)
+    return resolveSelectedSymbols(mark, finding, base, emit, fail, geometry)
   }
 
-  const placed = placeSymbol(shape as NtsSymbolShape, mark.params.at, finding)
+  const placed = placeSymbol(shape as NtsSymbolShape, mark.params.at, finding, geometry)
   if ('reason' in placed) return fail(placed.reason)
   return [emit(placed)]
 }
@@ -1544,7 +1545,8 @@ function resolveSelectedSymbols(
   finding: NtsFinding,
   base: DrawableBase,
   emit: (placed: Placed) => NtsSymbolInstruction,
-  fail: (reason: NtsUnsupportedReason) => NtsRenderInstruction[]
+  fail: (reason: NtsUnsupportedReason) => NtsRenderInstruction[],
+  geometry: NtsChartGeometry
 ): NtsRenderInstruction[] {
   if (mark.target_selector !== 'range_endpoints') return fail('unknown_placement')
 
@@ -1554,7 +1556,7 @@ function resolveSelectedSymbols(
 
   const instructions: NtsSymbolInstruction[] = []
   for (const teeth of subjectGroups(finding)) {
-    for (const marker of rangeEndpointMarkers(teeth, level)) instructions.push(emit(marker))
+    for (const marker of rangeEndpointMarkers(teeth, level, geometry)) instructions.push(emit(marker))
   }
 
   return instructions.length > 0 ? instructions : fail('no_targets')
@@ -1567,15 +1569,15 @@ function resolveSelectedSymbols(
  * joins them, so the line can end exactly where the marker begins without
  * either one knowing the other's size.
  */
-function rangeEndpointMarkers(teeth: readonly number[], level: NtsLevel): Placed[] {
-  const span = rangeSpan(teeth, level)
+function rangeEndpointMarkers(teeth: readonly number[], level: NtsLevel, geometry: NtsChartGeometry): Placed[] {
+  const span = geometry.rangeSpan(teeth, level)
   if (!span || teeth.length === 0) return []
-  const ordered = orderedByColumn(teeth)
+  const ordered = orderedByColumn(teeth, geometry)
   const ends = ordered.length === 1 ? [ordered[0]!] : [ordered[0]!, ordered[ordered.length - 1]!]
 
   const markers: Placed[] = []
   for (const fdi of ends) {
-    const placement = toothPlacement(fdi)
+    const placement = geometry.toothPlacement(fdi)
     if (!placement) continue
     const point = { x: placement.center.x, y: span.y }
     markers.push({ at: point, bounds: squareAround(point, placement.crown, 0.35) })
@@ -1584,9 +1586,9 @@ function rangeEndpointMarkers(teeth: readonly number[], level: NtsLevel): Placed
 }
 
 /** Teeth sorted by where they sit on the chart, not by their number. */
-function orderedByColumn(teeth: readonly number[]): number[] {
+function orderedByColumn(teeth: readonly number[], geometry: NtsChartGeometry): number[] {
   return teeth
-    .map(fdi => ({ fdi, placement: toothPlacement(fdi) }))
+    .map(fdi => ({ fdi, placement: geometry.toothPlacement(fdi) }))
     .filter(entry => entry.placement !== null)
     .sort((a, b) => a.placement!.index - b.placement!.index)
     .map(entry => entry.fdi)
@@ -1616,7 +1618,8 @@ const BOX_CAPACITY = 2
  */
 export function resolveChart(
   findings: readonly NtsFinding[],
-  rules: readonly NtsRule[]
+  rules: readonly NtsRule[],
+  geometry: NtsChartGeometry = ALL_NTS_CHART_GEOMETRY
 ): NtsChartRender {
   const byRuleId = new Map(rules.map(rule => [rule.rule_id, rule]))
   const resolved: NtsFindingRender[] = []
@@ -1644,7 +1647,7 @@ export function resolveChart(
       })
       continue
     }
-    resolved.push(resolveFinding(finding, rule))
+    resolved.push(resolveFinding(finding, rule, geometry))
   }
 
   const instructions = resolved.flatMap(entry => entry.instructions)

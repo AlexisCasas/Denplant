@@ -7,7 +7,7 @@ import { nextTick } from 'vue'
 
 import NtsPlanOdontogramChart from '../../../backend/app/modules/treatment_plan/frontend/components/clinical/NtsPlanOdontogramChart.vue'
 import { NTS_ROWS } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
-import { NTS_CHART_VIEWBOX, toothPlacement } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
+import { toothPlacement } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
 import { therapeuticInstructions } from '../../../backend/app/modules/odontogram/frontend/utils/therapeuticVisualization'
 
 const chartSource = readFileSync(
@@ -39,14 +39,14 @@ async function mountChart(items = [item()]) {
 }
 
 describe('H1 — odontograma NTS del plan', () => {
-  it('uses all 52 NTS teeth in the same four row order', async () => {
+  it('uses the default permanent two-row NTS layout', async () => {
     const wrapper = await mountChart()
-    expect(wrapper.findAll('[data-testid^="nts-tooth-"]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-testid^="nts-tooth-"]')).toHaveLength(32)
     expect(wrapper.findAll('[data-row]').map(row => row.attributes('data-row')))
-      .toEqual(NTS_ROWS.map(row => row.id))
+      .toEqual(NTS_ROWS.filter(row => row.dentition === 'permanent').map(row => row.id))
   })
 
-  it.each([16, 55, 85, 46])('keeps tooth %i at its shared NTS placement', async (fdi) => {
+  it.each([16, 46])('keeps tooth %i at its shared NTS placement', async (fdi) => {
     const wrapper = await mountChart()
     const placement = toothPlacement(fdi)
     expect(placement).not.toBeNull()
@@ -55,8 +55,7 @@ describe('H1 — odontograma NTS del plan', () => {
     // The overlay consumes the same exported viewBox and each displayed tooth
     // is produced by NtsDentitionRow/NtsToothCell; there is no plan-local
     // placement table to drift from diagnosis.
-    expect(wrapper.find('[data-testid="nts-plan-chart-overlay"]').attributes('viewBox'))
-      .toBe(NTS_CHART_VIEWBOX)
+    expect(wrapper.find('[data-testid="nts-plan-chart-overlay"]').attributes('viewBox')).toMatch(/^0 0 \d+ \d+(?:\.\d+)?$/)
   })
 
   it('renders surface markers and keeps multiple plan treatments visible', async () => {
@@ -91,7 +90,7 @@ describe('H1 — odontograma NTS del plan', () => {
     expect(wrapper.findAll('[data-testid="nts-therapy-icon"]')).toHaveLength(1)
     expect(wrapper.findAll('[data-testid="nts-therapy-pattern"]')).toHaveLength(1)
     expect(wrapper.find('[data-role="pillar"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="nts-plan-chart-overlay"]').attributes('viewBox')).toBe(NTS_CHART_VIEWBOX)
+    expect(wrapper.find('[data-testid="nts-plan-chart-overlay"]').attributes('viewBox')).toMatch(/^0 0 \d+ \d+(?:\.\d+)?$/)
   })
 
   it('keeps generic H1.2 markers for null, partial, unknown and future snapshots', () => {

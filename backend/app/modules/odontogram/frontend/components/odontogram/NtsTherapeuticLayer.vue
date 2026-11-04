@@ -2,11 +2,11 @@
 /** Therapeutic-only overlay for the Plan NTS canvas; never renders MINSA findings. */
 import type { Surface } from '~~/app/types'
 import { getLateralIcon } from './LateralViewIcons'
-import { toothPlacement } from '../../utils/ntsChartGeometry'
+import type { NtsChartGeometry } from '../../utils/ntsChartGeometry'
 import { therapeuticInstructions, type TherapeuticLayer } from '../../utils/therapeuticVisualization'
 
-const props = defineProps<{ fdi: number, snapshot: unknown, surfaces?: Surface[] | null, itemStatus: 'pending' | 'completed' | 'cancelled', treatmentStatus?: string, role?: 'pillar' | 'pontic' | null, layer?: TherapeuticLayer }>()
-const placement = computed(() => toothPlacement(props.fdi))
+const props = defineProps<{ fdi: number, geometry: NtsChartGeometry, snapshot: unknown, surfaces?: Surface[] | null, itemStatus: 'pending' | 'completed' | 'cancelled', treatmentStatus?: string, role?: 'pillar' | 'pontic' | null, layer?: TherapeuticLayer }>()
+const placement = computed(() => props.geometry.toothPlacement(props.fdi))
 const instructions = computed(() => {
   if (props.itemStatus === 'cancelled') return []
   const all = therapeuticInstructions(props.snapshot)

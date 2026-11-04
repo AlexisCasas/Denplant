@@ -55,6 +55,7 @@ onMounted(() => {
   <NtsOdontogramShell
     v-else-if="profile === 'pe_nts_188_2022'"
     :patient-id="($attrs.patientId as string) ?? ($attrs['patient-id'] as string)"
+    :date-of-birth="($attrs.dateOfBirth as string | null | undefined) ?? ($attrs['date-of-birth'] as string | null | undefined)"
     norm-version="pe_nts_188_2022"
   />
 

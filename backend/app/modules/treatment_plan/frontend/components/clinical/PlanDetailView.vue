@@ -26,6 +26,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   /** Standalone mode: show patient link */
   standalone?: boolean
+  patientDateOfBirth?: string | null
 }>(), {
   standalone: false
 })
@@ -626,6 +627,7 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           ref="odontogramRef"
           :items="plan.items"
           :patient-id="patientId"
+          :date-of-birth="patientDateOfBirth"
           :plan-id="plan.id"
           :plan-title="plan.title || plan.plan_number"
           :readonly="effectiveReadonly"
@@ -640,6 +642,7 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           v-else-if="isOdontogramProfileLoaded"
           ref="odontogramRef"
           :patient-id="patientId"
+          :date-of-birth="patientDateOfBirth"
           :mode="effectiveReadonly ? 'view-only' : 'planning'"
           :plan-id="plan.id"
           :plan-title="plan.title || plan.plan_number"

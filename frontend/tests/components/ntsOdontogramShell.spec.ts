@@ -170,7 +170,7 @@ describe('NtsOdontogramShell', () => {
 
     expect(wrapper.find('[data-testid="nts-chart-pending"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-fdi]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi]')).toHaveLength(32)
   })
 
   it('still says the finding renderer is pending — the chart is layout only', async () => {
@@ -278,7 +278,7 @@ describe('NTS-05B §31 — chart / shell integration', () => {
 
     const wrapper = await mountShell()
 
-    expect(wrapper.findAll('[data-fdi]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi]')).toHaveLength(32)
     expect(wrapper.find('[data-testid="nts-chart-no-record"]').exists()).toBe(true)
     // Nothing was fabricated to fill the gap.
     expect(state.post).not.toHaveBeenCalled()
@@ -437,7 +437,7 @@ describe('NTS-05C — finding editor integration', () => {
     await wrapper.find('[data-testid="nts-rule-6.1.20"]').trigger('click')
     await settle()
 
-    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(32)
   })
 
   it('an arch-scoped rule shows an arch selector and never a tooth range', async () => {
@@ -596,7 +596,7 @@ describe('MANUAL-QA-05C — retargeting a saved finding from the UI', () => {
 
     await change.trigger('click')
     await settle()
-    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi][aria-pressed]')).toHaveLength(32)
   })
 
   it('a click then moves the finding to the new tooth, locally only', async () => {
@@ -1086,7 +1086,7 @@ describe('MANUAL-QA-05C #3 — save, refresh and the surface', () => {
     // state here, unmounting the chart and the editor mid-save.
     expect(wrapper.find('[data-testid="nts-loading"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="nts-odontogram-chart"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-fdi]')).toHaveLength(52)
+    expect(wrapper.findAll('[data-fdi]')).toHaveLength(32)
     // The editor closed once, before the refresh — not unmounted and rebuilt.
     expect(wrapper.find('[data-testid="nts-finding-editor"]').exists()).toBe(false)
     expect(state.post).toHaveBeenCalledTimes(1)

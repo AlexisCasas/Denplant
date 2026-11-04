@@ -19,6 +19,7 @@ import { clinicalModeFromQuery } from '~~/app/utils/clinicalModes'
 const props = defineProps<{
   patientId: string
   readonly?: boolean
+  patientDateOfBirth?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -169,11 +170,13 @@ watch(currentMode, (newMode) => {
     <HistoryMode
       v-if="currentMode === 'history'"
       :patient-id="patientId"
+      :date-of-birth="patientDateOfBirth"
     />
 
     <DiagnosisModeContainer
       v-else-if="currentMode === 'diagnosis'"
       :patient-id="patientId"
+      :patient-date-of-birth="patientDateOfBirth"
       :readonly="readonly"
       :can-add-note="canReadNotes"
       @create-plan="handleCreatePlan"
@@ -184,6 +187,7 @@ watch(currentMode, (newMode) => {
     <PlansMode
       v-else-if="currentMode === 'plans'"
       :patient-id="patientId"
+      :patient-date-of-birth="patientDateOfBirth"
       :initial-plan-id="targetPlanId"
       :readonly="readonly"
       @plan-activated="handlePlanActivated"

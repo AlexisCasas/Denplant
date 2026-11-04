@@ -462,6 +462,7 @@ function collect() {
             <div class="mt-4">
               <ClinicalTab
                 :patient-id="patientId"
+                :patient-date-of-birth="patient?.date_of_birth ?? null"
                 :readonly="!can(PERMISSIONS.odontogram.write)"
               />
             </div>

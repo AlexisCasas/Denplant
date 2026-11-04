@@ -25,6 +25,7 @@ import {
   NTS_CHART_VIEWBOX,
   NTS_CHART_WIDTH,
   NTS_PLACEMENTS,
+  createNtsChartGeometry,
   annotationBox,
   apexBand,
   apexPoint,
@@ -45,6 +46,7 @@ import {
 import {
   NTS_ALL_TEETH,
   NTS_ROWS,
+  rowsForLayout,
   rootCountFor,
   toothGeometry
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
@@ -86,6 +88,31 @@ describe('A/B — every tooth is placed exactly once, in the annex\'s order', ()
       expect(crownBox(absent)).toBeNull()
       expect(annotationBox(absent)).toBeNull()
     }
+  })
+})
+
+describe('DP-17 — row-derived dentition layouts', () => {
+  const all = createNtsChartGeometry(rowsForLayout('all'))
+  const permanent = createNtsChartGeometry(rowsForLayout('permanent'))
+  const deciduous = createNtsChartGeometry(rowsForLayout('deciduous'))
+
+  it('derives all from four rows and all 52 teeth', () => {
+    expect(all.rows).toHaveLength(4)
+    expect(all.placements).toHaveLength(52)
+  })
+
+  it('derives permanent from exactly its two rows and 32 teeth', () => {
+    expect(permanent.rows).toHaveLength(2)
+    expect(permanent.placements).toHaveLength(32)
+    expect(permanent.hasTooth(26)).toBe(true)
+    expect(permanent.hasTooth(55)).toBe(false)
+  })
+
+  it('derives deciduous from exactly its two rows and 20 teeth', () => {
+    expect(deciduous.rows).toHaveLength(2)
+    expect(deciduous.placements).toHaveLength(20)
+    expect(deciduous.hasTooth(55)).toBe(true)
+    expect(deciduous.hasTooth(26)).toBe(false)
   })
 })
 
@@ -509,10 +536,11 @@ describe('the layout constants still match the components they mirror', () => {
     expect(chart).toMatch(/'pt-3'/)
   })
 
-  it('the chart takes its scale and width from the geometry module', () => {
+  it('the chart takes scale and its active dimensions from the geometry module', () => {
     const chart = source('components/odontogram/NtsOdontogramChart.vue')
     expect(chart).toContain('NTS_CHART_SCALE')
-    expect(chart).toContain('NTS_CHART_WIDTH')
+    expect(chart).toContain('createNtsChartGeometry')
+    expect(chart).toContain('geometry.width')
     // ...and no longer keeps a second copy of either.
     expect(chart).not.toMatch(/const CHART_SCALE = 0\.\d+/)
     expect(NTS_CHART_SCALE).toBe(0.484)

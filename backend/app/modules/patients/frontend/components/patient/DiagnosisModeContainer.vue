@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   /** Whether "Añadir nota" (which leads to Evolución) is offered. */
   canAddNote?: boolean
+  patientDateOfBirth?: string | null
 }>(), { canAddNote: true })
 
 const emit = defineEmits<{
@@ -80,6 +81,7 @@ watch(activeKey, (value) => {
     :patient-id="patientId"
     :readonly="readonly"
     :can-add-note="canAddNote"
+    :patient-date-of-birth="patientDateOfBirth"
     @create-plan="emit('create-plan')"
     @continue-plan="(planId) => emit('continue-plan', planId)"
     @add-note="(tooth) => emit('add-note', tooth)"
@@ -101,6 +103,7 @@ watch(activeKey, (value) => {
         :patient-id="patientId"
         :readonly="readonly"
         :can-add-note="canAddNote"
+        :patient-date-of-birth="patientDateOfBirth"
         @create-plan="emit('create-plan')"
         @continue-plan="(planId) => emit('continue-plan', planId)"
         @add-note="(tooth) => emit('add-note', tooth)"

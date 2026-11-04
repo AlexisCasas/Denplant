@@ -32,17 +32,22 @@ import { useNtsFindingEditor } from '../../composables/useNtsFindingEditor'
 import { useNtsUnsavedChanges } from '../../composables/useNtsUnsavedChanges'
 import { useNtsPrintIdentity } from '../../composables/useNtsPrintIdentity'
 import { isContextualRuleSupported } from '../../utils/ntsContextualRules'
+import { suggestDentitionByAge, type DentitionMode } from '~~/app/utils/dentition'
 
 const props = defineProps<{
   patientId: string
   /** The profile value doubles as the norm version (see NTS-04A §3). */
   normVersion?: string
+  dateOfBirth?: string | null
 }>()
 
 const { t, locale } = useI18n()
 const { can } = usePermissions()
 
 const normVersion = computed(() => props.normVersion ?? 'pe_nts_188_2022')
+const dentitionMode = ref<DentitionMode>(suggestDentitionByAge(props.dateOfBirth).mode)
+const mixedDentitionAge = computed(() => suggestDentitionByAge(props.dateOfBirth).isMixedDentitionAge)
+watch(() => props.patientId, () => { dentitionMode.value = suggestDentitionByAge(props.dateOfBirth).mode })
 
 // Getters, not values: the shell can be reused across patients without being
 // remounted, and a snapshot here would silently keep loading the first one.
@@ -1076,6 +1081,18 @@ const printDeclarationList = computed(
           />
         </div>
 
+        <div class="flex flex-wrap items-center justify-between gap-2" data-testid="nts-dentition-selector">
+          <p v-if="mixedDentitionAge" class="text-caption text-subtle">
+            Posible dentición mixta: puede alternar entre Permanente y Temporal.
+          </p>
+          <SegmentedControl
+            class="ml-auto"
+            :model-value="dentitionMode"
+            :options="[{ value: 'permanent', label: 'Permanente' }, { value: 'deciduous', label: 'Temporal' }]"
+            @update:model-value="dentitionMode = $event as DentitionMode"
+          />
+        </div>
+
         <!--
           The official dental layout, with the findings drawn on it.
 
@@ -1092,6 +1109,7 @@ const printDeclarationList = computed(
           :purpose="chartPurpose"
           :selected-teeth="selectedTeeth"
           :anchor-teeth="editor.selection.value.anchors"
+          :dentition-mode="dentitionMode"
           @tooth-select="onToothSelect"
           @overflow="hiddenSiglas = $event"
         />

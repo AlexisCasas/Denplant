@@ -52,6 +52,8 @@ import {
   rootAxes,
   toothPlacement
 } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
+import { createNtsChartGeometry } from '../../../backend/app/modules/odontogram/frontend/utils/ntsChartGeometry'
+import { rowsForLayout } from '../../../backend/app/modules/odontogram/frontend/utils/ntsDentition'
 import type {
   NtsFinding,
   NtsFindingTarget,
@@ -178,6 +180,38 @@ const symbols = (r: ReturnType<typeof resolveFinding>) =>
   r.instructions.filter((i): i is NtsSymbolInstruction => i.kind === 'symbol')
 const unsupported = (r: ReturnType<typeof resolveFinding>) =>
   r.instructions.filter((i): i is NtsUnsupportedInstruction => i.kind === 'unsupported')
+
+describe('DP-17 — resolving against the active geometry', () => {
+  const textRule = rule({
+    rule_id: 'DP17.text',
+    attributes: [SIGLA_ATTR('code', ['X'])],
+    render: { color_semantics: 'good_or_non_pathological', marks: [boxMark('code')] }
+  })
+
+  it('renders 55 only in the deciduous layout and 26 only in the permanent layout without altering findings', () => {
+    const findings = [
+      finding({ rule_id: 'DP17.text', attributes: { code: 'X' }, targets: [target({ tooth_number: 55 })] }),
+      finding({ rule_id: 'DP17.text', attributes: { code: 'X' }, targets: [target({ tooth_number: 26 })] })
+    ]
+    const original = structuredClone(findings)
+    const deciduous = resolveChart(findings, [textRule], createNtsChartGeometry(rowsForLayout('deciduous')))
+    const permanent = resolveChart(findings, [textRule], createNtsChartGeometry(rowsForLayout('permanent')))
+    const textsFor = (chart: ReturnType<typeof resolveChart>) => chart.instructions.filter((instruction): instruction is NtsTextInstruction => instruction.kind === 'text').map(instruction => instruction.fdi)
+
+    expect(textsFor(deciduous)).toEqual([55])
+    expect(textsFor(permanent)).toEqual([26])
+    expect(findings).toEqual(original)
+  })
+
+  it('does not draw a connector whose targets cross out of the active layout', () => {
+    const connectorRule = rule({
+      rule_id: 'DP17.connector',
+      render: { color_semantics: 'good_or_non_pathological', marks: [{ kind: 'connector', params: { style: 'straight_line', at: 'over_crowns' }, text_from: null, suffix_from: null, role: null, target_selector: null }] }
+    })
+    const result = resolveChart([finding({ rule_id: 'DP17.connector', targets: [target({ tooth_number: 55 }), target({ id: 't2', tooth_number: 26 })] })], [connectorRule], createNtsChartGeometry(rowsForLayout('deciduous')))
+    expect(result.instructions.some(instruction => instruction.kind === 'connector')).toBe(false)
+  })
+})
 const fills = (r: ReturnType<typeof resolveFinding>) =>
   r.instructions.filter((i): i is NtsShapeFillInstruction => i.kind === 'shape_fill')
 const outlines = (r: ReturnType<typeof resolveFinding>) =>

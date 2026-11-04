@@ -12,8 +12,9 @@ import TreatmentBar from '../../../../odontogram/frontend/components/odontogram/
 import TreatmentEditModal from '../../../../odontogram/frontend/components/odontogram/TreatmentEditModal.vue'
 import { useTreatments } from '../../../../odontogram/frontend/composables/useTreatments'
 import { useTreatmentPlans } from '../../composables/useTreatmentPlans'
-import { NTS_ROWS } from '../../../../odontogram/frontend/utils/ntsDentition'
-import { NTS_CHART_HEIGHT, NTS_CHART_SCALE, NTS_CHART_VIEWBOX, NTS_CHART_WIDTH, toothPlacement } from '../../../../odontogram/frontend/utils/ntsChartGeometry'
+import { rowsForLayout } from '../../../../odontogram/frontend/utils/ntsDentition'
+import { suggestDentitionByAge, type DentitionMode } from '~~/app/utils/dentition'
+import { createNtsChartGeometry, NTS_CHART_SCALE } from '../../../../odontogram/frontend/utils/ntsChartGeometry'
 import NtsDentitionRow from '../../../../odontogram/frontend/components/odontogram/NtsDentitionRow.vue'
 import NtsTherapeuticLayer from '../../../../odontogram/frontend/components/odontogram/NtsTherapeuticLayer.vue'
 import TreatmentPlanVisualLegend from './TreatmentPlanVisualLegend.vue'
@@ -28,7 +29,8 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   highlightedTeeth?: number[]
   highlightedGlobalIds?: string[]
-}>(), { patientId: '', planId: '', planTitle: '', readonly: false, highlightedTeeth: () => [], highlightedGlobalIds: () => [] })
+  dateOfBirth?: string | null
+}>(), { patientId: '', planId: '', planTitle: '', readonly: false, highlightedTeeth: () => [], highlightedGlobalIds: () => [], dateOfBirth: null })
 const emit = defineEmits<{
   toothSelect: [fdi: number]
   toothHover: [fdi: number | null]
@@ -51,17 +53,26 @@ const showMultiToothConfirm = ref(false)
 const editingTreatment = ref<ToothTreatmentView | null>(null)
 const showTreatmentEditModal = ref(false)
 const undoStack = ref<string[]>([])
+const dentitionMode = ref<DentitionMode>(suggestDentitionByAge(props.dateOfBirth).mode)
+const mixedDentitionAge = computed(() => suggestDentitionByAge(props.dateOfBirth).isMixedDentitionAge)
+const visibleRows = computed(() => rowsForLayout(dentitionMode.value))
+const geometry = computed(() => createNtsChartGeometry(visibleRows.value))
 
 type MarkerSurface = 'M' | 'D' | 'O' | 'V' | 'L'
 interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], treatmentStatus: string, snapshot: unknown, surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
 const markers = computed<ToothMarker[]>(() => props.items.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, treatmentStatus: item.treatment?.status ?? 'planned', snapshot: item.treatment?.visualization_snapshot ?? null, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
-const markersByTooth = computed(() => markers.value.reduce<Record<number, ToothMarker[]>>((byTooth, marker) => { ;(byTooth[marker.fdi] ??= []).push(marker); return byTooth }, {}))
+const markersByTooth = computed(() => markers.value.filter(marker => geometry.value.hasTooth(marker.fdi)).reduce<Record<number, ToothMarker[]>>((byTooth, marker) => { ;(byTooth[marker.fdi] ??= []).push(marker); return byTooth }, {}))
 const orderedMarkersByTooth = computed(() => Object.fromEntries(Object.entries(markersByTooth.value).map(([fdi, toothMarkers]) => [fdi, orderedPlanMarkers(toothMarkers)])) as Record<number, ToothMarker[]>)
-const visibleTherapeuticLayers = computed<TherapeuticLayer[]>(() => THERAPEUTIC_LAYER_ORDER.filter(layer => markers.value.some(marker => isActivePlanMarker(marker) && therapeuticInstructions(marker.snapshot).some(instruction => instruction.layer === layer))))
+const visibleTherapeuticLayers = computed<TherapeuticLayer[]>(() => THERAPEUTIC_LAYER_ORDER.filter(layer => Object.values(markersByTooth.value).flat().some(marker => isActivePlanMarker(marker) && therapeuticInstructions(marker.snapshot).some(instruction => instruction.layer === layer))))
 const hasMultipleTreatments = computed(() => Object.values(markersByTooth.value).some(toothMarkers => activeTreatmentCount(toothMarkers) > 1))
 const hasCompletedMarkers = computed(() => markers.value.some(marker => marker.status === 'completed' || marker.treatmentStatus === 'performed'))
 const hasPendingMarkers = computed(() => markers.value.some(marker => isActivePlanMarker(marker) && marker.status === 'pending' && marker.treatmentStatus !== 'performed'))
-const bridges = computed(() => props.items.filter(item => item.treatment?.clinical_type === 'bridge').map(item => (item.treatment?.teeth ?? []).map(tooth => tooth.tooth_number).map(toothPlacement).filter((placement): placement is NonNullable<typeof placement> => placement !== null)).filter(placements => placements.length > 1))
+const bridges = computed(() => props.items
+  .filter(item => item.treatment?.clinical_type === 'bridge')
+  .map(item => (item.treatment?.teeth ?? []).map(tooth => geometry.value.toothPlacement(tooth.tooth_number)))
+  // A bridge is one relationship. Never draw a partial connector when any
+  // member is outside the active dentition layout.
+  .filter((placements): placements is NonNullable<typeof placements[number]>[] => placements.length > 1 && placements.every(placement => placement !== null)))
 const planTreatmentIds = computed(() => new Set(props.items.map(item => item.treatment_id)))
 const planTreatments = computed(() => treatments.value.filter(treatment => planTreatmentIds.value.has(treatment.id)))
 const selectedToothTreatments = computed(() => !selectedTooth.value ? [] : planTreatments.value.map(treatment => viewForTooth(treatment, selectedTooth.value!)).filter((treatment): treatment is ToothTreatmentView => treatment !== null))
@@ -70,11 +81,12 @@ const isClickToApplyMode = computed(() => selectedTreatmentType.value !== null |
 const multiToothConfig = computed<MultiToothTreatmentConfig | null>(() => selectedTreatmentType.value ? getMultiToothConfig(selectedTreatmentType.value) : null)
 
 function surfacePoint(marker: ToothMarker, surface: MarkerSurface) {
-  const crown = toothPlacement(marker.fdi)?.crown
+  const crown = geometry.value.toothPlacement(marker.fdi)?.crown
   if (!crown) return null
   const { x, y, width: w, height: h } = crown
   return { M: { x: x + w * 0.22, y: y + h * 0.5 }, D: { x: x + w * 0.78, y: y + h * 0.5 }, O: { x: x + w * 0.5, y: y + h * 0.5 }, V: { x: x + w * 0.5, y: y + h * 0.22 }, L: { x: x + w * 0.5, y: y + h * 0.78 } }[surface]
 }
+function placement(fdi: number) { return geometry.value.toothPlacement(fdi) }
 function markerTone(marker: ToothMarker) { return marker.status === 'completed' ? 'var(--color-success-500)' : marker.status === 'cancelled' ? 'var(--color-text-dimmed)' : 'var(--color-primary-500)' }
 function markerTitle(marker: ToothMarker) { return `${marker.type}${marker.role ? ` (${marker.role})` : ''}` }
 function treatmentLabel(treatment: ToothTreatmentView) { return treatment.catalog_item?.names?.[locale.value] || treatment.catalog_item?.names?.es || t(`odontogram.treatments.types.${treatment.clinical_type}`, treatment.clinical_type) }
@@ -138,6 +150,7 @@ async function handleTreatmentDelete(treatmentId: string) { await deleteTreatmen
 async function handleTreatmentPerform(treatmentId: string) { await performTreatment(treatmentId); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
 onMounted(() => refetchTreatments())
 watch(() => props.patientId, () => refetchTreatments())
+watch(() => props.patientId, () => { dentitionMode.value = suggestDentitionByAge(props.dateOfBirth).mode })
 defineExpose({ refetchTreatments })
 </script>
 
@@ -147,6 +160,10 @@ defineExpose({ refetchTreatments })
     data-testid="nts-plan-odontogram-chart"
     aria-label="Odontograma del plan de tratamiento"
   >
+    <div class="flex flex-wrap items-center justify-between gap-2" data-testid="nts-plan-dentition-selector">
+      <p v-if="mixedDentitionAge" class="text-caption text-subtle">Posible dentición mixta: puede alternar entre Permanente y Temporal.</p>
+      <SegmentedControl class="ml-auto" :model-value="dentitionMode" :options="[{ value: 'permanent', label: 'Permanente' }, { value: 'deciduous', label: 'Temporal' }]" @update:model-value="dentitionMode = $event as DentitionMode" />
+    </div>
     <p
       class="text-caption text-subtle"
       data-testid="nts-plan-odontogram-description"
@@ -160,11 +177,11 @@ defineExpose({ refetchTreatments })
       <div
         class="relative mx-auto py-2 space-y-1"
         :class="{ 'cursor-crosshair': isClickToApplyMode && !readonly }"
-        :style="{ minWidth: `${NTS_CHART_WIDTH}px` }"
+        :style="{ minWidth: `${geometry.width}px` }"
         data-testid="nts-plan-chart-canvas"
       >
         <NtsDentitionRow
-          v-for="row in NTS_ROWS"
+          v-for="row in visibleRows"
           :key="row.id"
           :row="row"
           :scale="NTS_CHART_SCALE"
@@ -176,9 +193,9 @@ defineExpose({ refetchTreatments })
         />
         <svg
           class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2"
-          :viewBox="NTS_CHART_VIEWBOX"
-          :width="NTS_CHART_WIDTH"
-          :height="NTS_CHART_HEIGHT"
+          :viewBox="geometry.viewBox"
+          :width="geometry.width"
+          :height="geometry.height"
           aria-hidden="true"
           focusable="false"
           data-testid="nts-plan-chart-overlay"
@@ -195,6 +212,7 @@ defineExpose({ refetchTreatments })
                 v-for="marker in toothMarkers"
                 :key="`therapy-${layer}-${marker.itemId}`"
                 :fdi="marker.fdi"
+                :geometry="geometry"
                 :snapshot="marker.snapshot"
                 :surfaces="marker.surfaces"
                 :item-status="marker.status"
@@ -223,11 +241,11 @@ defineExpose({ refetchTreatments })
           <template
             v-for="(toothMarkers, fdi) in orderedMarkersByTooth"
             :key="fdi"
-          ><template v-if="toothPlacement(Number(fdi))"><rect
-            :x="toothPlacement(Number(fdi))!.crown.x"
-            :y="toothPlacement(Number(fdi))!.crown.y"
-            :width="toothPlacement(Number(fdi))!.crown.width"
-            :height="toothPlacement(Number(fdi))!.crown.height"
+          ><template v-if="placement(Number(fdi))"><rect
+            :x="placement(Number(fdi))!.crown.x"
+            :y="placement(Number(fdi))!.crown.y"
+            :width="placement(Number(fdi))!.crown.width"
+            :height="placement(Number(fdi))!.crown.height"
             rx="2"
             fill="none"
             :stroke="markerTone(toothMarkers[0]!)"
@@ -235,8 +253,8 @@ defineExpose({ refetchTreatments })
           /><circle
             v-for="(marker, markerIndex) in toothMarkers"
             :key="marker.itemId"
-            :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 5 - markerIndex * 6"
-            :cy="toothPlacement(Number(fdi))!.annotation.y + 6"
+            :cx="placement(Number(fdi))!.annotation.x + placement(Number(fdi))!.annotation.width - 5 - markerIndex * 6"
+            :cy="placement(Number(fdi))!.annotation.y + 6"
             r="2.5"
             :fill="markerTone(marker)"
           ><title>{{ markerTitle(marker) }}</title></circle><template
@@ -254,13 +272,13 @@ defineExpose({ refetchTreatments })
             data-testid="nts-plan-treatment-count"
             :aria-label="`${activeTreatmentCount(toothMarkers)} tratamientos vigentes en la pieza ${fdi}`"
           ><circle
-            :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
-            :cy="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 3"
+            :cx="placement(Number(fdi))!.annotation.x + placement(Number(fdi))!.annotation.width - 3"
+            :cy="placement(Number(fdi))!.annotation.y + placement(Number(fdi))!.annotation.height - 3"
             r="5"
             fill="var(--color-primary-700)"
           /><text
-            :x="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
-            :y="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 1.5"
+            :x="placement(Number(fdi))!.annotation.x + placement(Number(fdi))!.annotation.width - 3"
+            :y="placement(Number(fdi))!.annotation.y + placement(Number(fdi))!.annotation.height - 1.5"
             text-anchor="middle"
             font-size="6"
             fill="white"

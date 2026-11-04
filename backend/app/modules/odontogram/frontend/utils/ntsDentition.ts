@@ -145,6 +145,19 @@ export const NTS_ROWS: readonly NtsDentitionRow[] = [
 /** Every tooth the chart renders: 32 permanent + 20 deciduous = 52. */
 export const NTS_ALL_TEETH: readonly NtsTooth[] = NTS_ROWS.flatMap(row => row.teeth)
 
+/** Screen projection for DP-17.  The canonical four-row definition above is
+ * intentionally retained for records and normative printing. */
+export function rowsForDentition(dentition: NtsDentition): readonly NtsDentitionRow[] {
+  return NTS_ROWS.filter(row => row.dentition === dentition)
+}
+
+/** All visual layouts supported by the renderer. `all` is print-only. */
+export type NtsDentitionLayout = NtsDentition | 'all'
+
+export function rowsForLayout(layout: NtsDentitionLayout): readonly NtsDentitionRow[] {
+  return layout === 'all' ? NTS_ROWS : rowsForDentition(layout)
+}
+
 // ---------------------------------------------------------------------------
 // tooth cell geometry
 // ---------------------------------------------------------------------------

@@ -129,6 +129,29 @@ describe('§27 — FDI order of the four rows', () => {
   })
 })
 
+describe('DP-17 — active NTS dentition layouts', () => {
+  it('renders only deciduous rows and rebuilds the overlay for temporal teeth', async () => {
+    const wrapper = await mountChart({ dentitionMode: 'deciduous' })
+    expect(wrapper.findAll('[data-testid^="nts-tooth-"]')).toHaveLength(20)
+    expect(wrapper.find('[data-testid="nts-tooth-55"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-tooth-26"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="nts-chart-overlay"]').attributes('viewBox')).not.toBe(NTS_CHART_VIEWBOX)
+  })
+
+  it('renders only permanent rows and can alternate without changing the supplied record', async () => {
+    const record = makeRecord()
+    const wrapper = await mountChart({ dentitionMode: 'permanent', record })
+    expect(wrapper.findAll('[data-testid^="nts-tooth-"]')).toHaveLength(32)
+    expect(wrapper.find('[data-testid="nts-tooth-26"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nts-tooth-55"]').exists()).toBe(false)
+    await wrapper.setProps({ dentitionMode: 'deciduous' })
+    expect(wrapper.find('[data-testid="nts-tooth-55"]').exists()).toBe(true)
+    await wrapper.setProps({ dentitionMode: 'permanent' })
+    expect(wrapper.find('[data-testid="nts-tooth-26"]').exists()).toBe(true)
+    expect(record.findings).toEqual([])
+  })
+})
+
 // ---------------------------------------------------------------------------
 // §10 — orientation
 // ---------------------------------------------------------------------------

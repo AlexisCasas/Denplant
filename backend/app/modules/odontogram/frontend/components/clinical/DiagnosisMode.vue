@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   /** Whether "Añadir nota" is offered (the host decides: it needs notes access). */
   canAddNote?: boolean
+  patientDateOfBirth?: string | null
 }>(), { canAddNote: true })
 
 const emit = defineEmits<{
@@ -169,6 +170,7 @@ async function handleTreatmentsChanged() {
              and profile-unaware. -->
         <OdontogramProfileView
           :patient-id="patientId"
+          :date-of-birth="patientDateOfBirth"
           mode="diagnosis"
           :highlighted-teeth-prop="hoveredTeeth"
           @tooth-hover="handleToothHover"

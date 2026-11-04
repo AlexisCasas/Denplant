@@ -454,12 +454,12 @@ describe('NTS print layout — the shell mounts one document', () => {
     expect(wrapper.find('[data-testid="nts-print-root"]').exists()).toBe(false)
   })
 
-  it('§6 — exactly 52 tooth cells on screen, and exactly 52 on the sheet', async () => {
+  it('§6 — 32 active screen cells and exactly 52 on the print sheet', async () => {
     route({ current: record() })
     const wrapper = await shell()
 
     const screenChart = wrapper.find('[data-testid="nts-odontogram-chart"]')
-    expect(screenChart.findAll(TOOTH_CELL)).toHaveLength(52)
+    expect(screenChart.findAll(TOOTH_CELL)).toHaveLength(32)
 
     const printChart = printRoot()!.querySelector('[data-testid="nts-odontogram-chart"]')
     expect(printChart).not.toBeNull()

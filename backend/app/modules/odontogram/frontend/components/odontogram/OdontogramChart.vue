@@ -22,6 +22,7 @@ import { PERMANENT_TEETH, DECIDUOUS_TEETH, TREATMENT_SHORTCUTS } from '~~/app/co
 import { calculateToothRange, getMultiToothConfig, isSameArch } from '~~/app/config/odontogramConstants'
 import { viewsForTooth } from '~~/app/utils/treatmentView'
 import { isSurfaceTreatment } from './TreatmentIcons'
+import { suggestDentitionByAge, type DentitionMode } from '~~/app/utils/dentition'
 
 export type OdontogramMode = 'full' | 'view-only' | 'diagnosis' | 'planning'
 
@@ -37,6 +38,7 @@ const props = withDefaults(defineProps<{
   planId?: string
   /** Plan title shown as context banner inside the TreatmentBar (planning mode). */
   planTitle?: string
+  dateOfBirth?: string | null
 }>(), {
   mode: 'full',
   highlightedTeethProp: () => [],
@@ -93,7 +95,8 @@ const treatmentPlansApi = useTreatmentPlans()
 // State
 // ============================================================================
 
-const dentitionMode = ref<'permanent' | 'deciduous'>('permanent')
+const dentitionMode = ref<DentitionMode>(suggestDentitionByAge(props.dateOfBirth).mode)
+const mixedDentitionAge = computed(() => suggestDentitionByAge(props.dateOfBirth).isMixedDentitionAge)
 const selectedTooth = ref<number | null>(null)
 const showSurfaceSelector = ref(false)
 const hoveredTooth = ref<number | null>(null)
@@ -201,6 +204,7 @@ onUnmounted(() => {
 
 watch(() => props.patientId, async (newId) => {
   if (newId) {
+    dentitionMode.value = suggestDentitionByAge(props.dateOfBirth).mode
     returnToCurrentView()
     await Promise.all([
       fetchOdontogram(newId),
@@ -691,6 +695,9 @@ defineExpose({
         @update:model-value="(v) => (dentitionMode = v as 'permanent' | 'deciduous')"
       />
     </div>
+    <p v-if="mixedDentitionAge" class="text-caption text-subtle mb-3">
+      Posible dentición mixta: puede alternar entre Permanente y Temporal.
+    </p>
 
     <!-- Timeline Slider (only in standalone 'full' mode; HistoryMode renders its own) -->
     <TimelineSlider
