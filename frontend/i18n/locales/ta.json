@@ -392,6 +392,10 @@
     "tabs": {
       "summary": "சுருக்கம்",
       "info": "தகவல்",
+      "information": "தகவல்",
+      "dentalAnamnesis": "பல் மருத்துவ வரலாறு",
+      "pediatricDentalAnamnesis": "குழந்தைப் பல் மருத்துவ வரலாறு",
+      "endodontics": "எண்டோடான்டிக்ஸ்",
       "clinical": "மருத்துவம்",
       "odontogram": "பல் வரைபடம்",
       "administration": "நிர்வாகம்",
@@ -404,6 +408,44 @@
       "documents": "ஆவணங்கள்",
       "gallery": "படத்தொகுப்பு"
     },
+    "dentalAnamnesis": {
+      "doctor": "மருத்துவர்", "selectDoctor": "நிபுணரைத் தேர்ந்தெடுக்கவும்", "consultationReason": "ஆலோசனைக்கான காரணம்",
+      "currentIllness": "தற்போதைய நோய்", "illnessDuration": "நோயின் காலம்", "mainSymptoms": "முக்கிய அறிகுறிகள்", "chronologicalNarrative": "காலவரிசை விவரம்", "biologicalFunctions": "உயிரியல் செயல்பாடுகள்",
+      "history": "மருத்துவ வரலாறு", "familyHistory": "குடும்ப வரலாறு", "personalHistory": "தனிப்பட்ட வரலாறு", "haveYouHad": "உங்களுக்கு உள்ளதா அல்லது இருந்ததா?",
+      "highBloodPressure": "உயர் இரத்த அழுத்தம்", "lowBloodPressure": "குறைந்த இரத்த அழுத்தம்", "hepatitis": "கல்லீரல் அழற்சி", "gastritis": "இரைப்பை அழற்சி", "ulcers": "புண்கள்", "hiv": "HIV", "diabetes": "நீரிழிவு", "asthma": "ஆஸ்துமா", "smoker": "புகைபிடிக்கிறீர்களா?", "additionalComment": "கூடுதல் கருத்து",
+      "dentalHistory": "பல் / கூடுதல் வரலாறு", "bloodDiseases": "இரத்த நோய்கள்", "heartProblems": "இதய பிரச்சினைகள்", "otherDisease": "வேறு ஏதேனும் நோய் உள்ளதா?", "brushingFrequency": "ஒரு நாளில் எத்தனை முறை பற்களைத் துலக்குகிறீர்கள்?", "bleedingGums": "ஈறுகளில் இரத்தம் வருகிறதா?", "abnormalExtractionBleeding": "பல் அகற்றிய பிறகு அசாதாரண இரத்தப்போக்கு ஏற்பட்டதா?", "bruxism": "பற்களை அரைக்கிறீர்களா அல்லது இறுக்குகிறீர்களா?", "mouthDiscomfort": "வாயில் பிற அசௌகரியங்கள்", "allergies": "ஒவ்வாமைகள்", "recentMajorSurgery": "சமீப ஆண்டுகளில் பெரிய அறுவை சிகிச்சை செய்துள்ளீர்களா?", "permanentMedication": "நிரந்தரமாக ஏதேனும் மருந்து எடுத்துக்கொள்கிறீர்களா?", "detail": "விவரம்",
+      "clinicalExam": "மருத்துவ பரிசோதனை", "vitalSigns": "முக்கிய உடல் அறிகுறிகள்", "bloodPressure": "BP", "pulse": "நாடித்துடிப்பு", "heartRate": "HR", "respiratoryRate": "RR", "temperature": "வெப்பநிலை", "extraoralExam": "வாய்க்கு வெளியேயான பரிசோதனை", "intraoralExam": "வாய்க்குள்ளான பரிசோதனை", "auxiliaryExamResults": "துணை பரிசோதனை முடிவுகள்", "observations": "குறிப்புகள்",
+      "no": "இல்லை", "yes": "ஆம்", "save": "சேமிக்கவும்", "saveUnavailable": "சேமித்தல் விரைவில் கிடைக்கும்.",
+      "placeholders": {
+        "consultationReason": "எ.கா. கீழ் வலது கடைவாய்ப்பல்லில் வலி", "illnessDuration": "எ.கா. 3 நாட்கள்", "mainSymptoms": "எ.கா. மெல்லும்போது வலி, குளிர் உணர்திறன்", "chronologicalNarrative": "எ.கா. 3 நாட்களுக்கு முன் தொடங்கி படிப்படியாக அதிகரித்தது", "biologicalFunctions": "எ.கா. தூக்கம் சரியாக உள்ளது, பசி இயல்பாக உள்ளது", "familyHistory": "எ.கா. தாய்க்கு உயர் இரத்த அழுத்தம்", "personalHistory": "எ.கா. குறிப்பிடத்தக்க வரலாறு இல்லை", "additionalComment": "எ.கா. தொடர்புடைய கூடுதல் தகவல்", "brushingFrequency": "எ.கா. ஒரு நாளில் 3 முறை", "bloodDiseases": "எ.கா. இரத்த சோகை", "heartProblems": "எ.கா. இதயத் துடிப்பு ஒழுங்கின்மை", "otherDisease": "எ.கா. தைராய்டு குறைபாடு", "mouthDiscomfort": "எ.கா. பல் உணர்திறன்", "allergies": "எ.கா. பெனிசிலின்", "recentMajorSurgery": "எ.கா. 2021 இல் குடல்வால் அறுவை சிகிச்சை", "permanentMedication": "எ.கா. லோசார்டன் 50 mg", "extraoralExam": "எ.கா. வெளிப்படையான மாற்றங்கள் இல்லை", "intraoralExam": "எ.கா. பின்புறப் பகுதியில் ஈறு வீக்கம்", "auxiliaryExamResults": "எ.கா. குறிப்பிடத்தக்க கண்டறிதல்கள் இல்லாத பனோரமிக் எக்ஸ்ரே", "observations": "எ.கா. செயல்முறைகளின் போது நோயாளி பதட்டத்தை தெரிவிக்கிறார்"
+      }
+    },
+    "pediatricDentalAnamnesis": {
+      "doctor": "மருத்துவர்", "selectDoctor": "நிபுணரைத் தேர்ந்தெடுக்கவும்", "consultationReason": "ஆலோசனைக்கான காரணம்", "motherName": "தாயின் பெயர்", "fatherName": "தந்தையின் பெயர்", "siblingsCount": "உடன்பிறப்புகளின் எண்ணிக்கை", "birthOrder": "பிறப்பு வரிசை",
+      "currentIllness": "தற்போதைய நோய்", "diseaseType": "நோயின் வகை", "chronologicalNarrative": "காலவரிசை விவரம்",
+      "prenatalHistory": "கர்ப்பகால வரலாறு", "maternalDiseases": "தாயின் நோய்கள்", "pregnancyComplications": "கர்ப்பகாலத்தில் சிக்கல்கள் இருந்ததா?", "prematureBaby": "குழந்தை குறைமாதத்தில் பிறந்ததா?", "birthWeight": "பிறப்பு எடை", "comment": "கருத்து",
+      "postnatalHistory": "பிறப்புக்குப் பிந்தைய வரலாறு", "birthProblems": "பிரசவத்தில் பிரச்சினைகள் இருந்ததா?", "pacifierUse": "சூப்பி பயன்படுத்துகிறதா?", "bottleUse": "பாட்டில் பயன்படுத்துகிறதா?", "thumbSucking": "விரல் சூப்புகிறதா/சூப்பியதா?", "medicationOrTherapy": "மருந்து அல்லது சிகிச்சை எடுக்கிறதா?", "allergiesOrIntolerances": "எதற்காவது ஒவ்வாமை அல்லது சகிப்புத்தன்மையின்மை உள்ளதா?", "brushesBeforeSleep": "தூங்குவதற்கு முன் பல் துலக்குகிறதா?", "openMouthOrSnores": "வாய் திறந்து தூங்குகிறதா அல்லது குறட்டை விடுகிறதா?", "detail": "விவரம்", "additionalComment": "கூடுதல் கருத்து",
+      "feedingAndHygiene": "உணவுப் பழக்கங்கள் / சுகாதாரம்", "sweetsConsumption": "எவ்வளவு இனிப்பு சாப்பிடுகிறது?", "timesPerDay": "ஒரு நாளுக்கு முறை", "daysPerWeek": "நாட்கள்/வாரம்", "milkType": "குழந்தை எந்த வகை பால் பெறுகிறது?", "dentalHygiene": "குழந்தையின் பற்களை எப்படித் துலக்குகிறீர்கள்?", "dailyDiet": "காலை உணவிலிருந்து உங்கள் குழந்தையின் ஒரு நாள் உணவை விவரிக்கவும்.", "parentingStyle": "உங்களை அதிகாரமான, ஒத்துழைக்கும், கவலையற்ற அல்லது அதிக பாதுகாப்பான பெற்றோராகக் கருதுகிறீர்களா?",
+      "finalSection": "இறுதி மதிப்பீடு", "oralHabits": "வாய்ப் பழக்கங்கள்", "brushingTechnique": "பல் துலக்கும் நுட்பம்", "clinicalExam": "மருத்துவ பரிசோதனை", "observations": "குறிப்புகள்", "no": "இல்லை", "yes": "ஆம்", "save": "சேமிக்கவும்", "saveUnavailable": "சேமித்தல் விரைவில் கிடைக்கும்."
+    },
+    "endodonticForm": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "yes": "Yes", "no": "No", "save": "Save", "saveUnavailable": "Saving will be available soon.",
+      "priorEndodonticTreatment": "Previous endodontic treatment?", "painHistory": "Pain history", "additionalNote": "Additional note", "toothNumber": "Tooth no.",
+      "clinicalExam": "CLINICAL EXAMINATION", "anatomicalCrown": "Anatomical crown", "caries": "Caries", "restoration": "Restoration", "bruxism": "Bruxism", "fracture": "Fracture", "fractureWithPulpExposure": "Fracture with pulp exposure",
+      "inflammationPresent": "Inflammation present", "fistulas": "Fistulas", "gingivitis": "Gingivitis", "pockets": "Pockets", "calculus": "Calculus", "specify": "Specify", "mobility": "Mobility", "probing": "Probing",
+      "painCharacteristics": "Pain characteristics", "spontaneous": "Spontaneous", "provoked": "Provoked", "cold": "Cold", "heat": "Heat", "chewing": "Chewing", "nocturnal": "Nocturnal", "air": "Air", "sweet": "Sweet", "acidic": "Acidic", "radiated": "Radiated", "diffuse": "Diffuse", "stabbing": "Stabbing", "continuous": "Continuous", "intermittent": "Intermittent", "sporadic": "Sporadic",
+      "percussionPain": "Pain on percussion", "palpationPain": "Pain on palpation", "horizontal": "Horizontal", "vertical": "Vertical", "vestibular": "Vestibular", "lingualPalatal": "Lingual/Palatal", "additionalClinicalNote": "Additional clinical examination note",
+      "vitalityTest": "VITALITY TEST", "test": "Test", "result": "Yes/No", "duration": "Duration", "intensity": "Intensity", "selectUnavailable": "No options defined",
+      "radiographicExam": "RADIOGRAPHIC EXAMINATION", "pulpChamber": "Pulp chamber", "open": "Open", "closed": "Closed", "wide": "Wide", "narrow": "Narrow", "pulpStones": "Pulp stones", "canals": "Canal(s)", "singleCanal": "Single", "twoCanals": "2 canals", "threeCanals": "3 canals", "fourCanals": "4 canals", "straight": "Straight", "curved": "Curved", "previouslyTreated": "Previously treated", "openApex": "Open apex",
+      "furcationLesion": "Furcation lesion", "apicalLesion": "Apical lesion", "lateralLesion": "Lateral lesion", "endoPerioLesion": "Endo-perio lesion", "dwarfRoots": "Dwarf roots", "rootFracture": "Root fracture", "calcification": "Calcification", "periodontalLigament": "Periodontal ligament", "resorption": "Resorption", "additionalRadiographicNote": "Additional radiographic note",
+      "presumptivePulpalDiagnosis": "PRESUMPTIVE PULPAL DIAGNOSIS", "normalPulp": "Normal pulp", "reversiblePulpitis": "Reversible pulpitis", "symptomaticIrreversiblePulpitis": "Symptomatic irreversible pulpitis", "asymptomaticIrreversiblePulpitis": "Asymptomatic irreversible pulpitis", "pulpNecrosis": "Pulp necrosis", "diagnosisPreviouslyTreated": "Previously treated", "previouslyInitiated": "Previously initiated",
+      "periapicalDiagnosis": "PERIAPICAL DIAGNOSIS", "healthyApicalTissues": "Healthy apical tissues", "acuteApicalPeriodontitis": "Acute apical periodontitis (symptomatic)", "chronicApicalPeriodontitis": "Chronic apical periodontitis (asymptomatic)", "acuteApicalAbscess": "Acute apical abscess (without fistula)", "chronicApicalAbscess": "Chronic apical abscess (with fistula)", "condensingOsteitis": "Condensing osteitis",
+      "definitiveDiagnosis": "DEFINITIVE DIAGNOSIS", "irreversiblePulpitis": "Irreversible pulpitis", "necroticPulp": "Necrotic pulp",
+      "indicatedTreatment": "INDICATED TREATMENT", "biopulpectomy": "Biopulpectomy", "apicoectomy": "Apicoectomy", "necropulpectomy": "Necropulpectomy", "hemisection": "Hemisection", "retreatment": "Retreatment", "radicectomy": "Radicectomy", "whitening": "Whitening", "extraction": "Extraction",
+      "clinicalData": "CLINICAL DATA", "identification": "Identification", "canal": "Canal", "workingLength": "Working length (mm)", "referencePoint": "Reference point", "initialFile": "Initial file", "finalApicalFile": "Final apical file", "cementType": "Cement type", "masterGuttaPerchaCone": "Master gutta-percha cone", "single": "Single", "palatalLingual": "Palatal/Lingual", "mesiolingual": "Mesiolingual", "mesiobuccal": "Mesiobuccal", "distal": "Distal", "distobuccal": "Distobuccal", "distolingual": "Distolingual",
+      "finalSection": "FINAL SECTION", "operativeAccidents": "Operative accidents", "postEndodonticRestoration": "Indicated post-endodontic restoration", "post": "Post", "amalgamResin": "Amalgam/Resin", "crown": "Crown", "other": "Other", "prognosis": "Prognosis", "favorable": "Favorable", "unfavorable": "Unfavorable", "reserved": "Reserved"
+    },
+    "anamneses": { "loadError": "மருத்துவப் படிவத்தை ஏற்ற முடியவில்லை.", "saveError": "மருத்துவப் படிவத்தைச் சேமிக்க முடியவில்லை. உங்கள் தரவு பாதுகாக்கப்பட்டது.", "dentalSaved": "பல் மருத்துவ வரலாறு வெற்றிகரமாகச் சேமிக்கப்பட்டது.", "pediatricSaved": "குழந்தைப் பல் மருத்துவ வரலாறு வெற்றிகரமாகச் சேமிக்கப்பட்டது.", "endodonticSaved": "எண்டோடான்டிக்ஸ் பதிவு வெற்றிகரமாகச் சேமிக்கப்பட்டது." },
     "historyPlaceholder": "மருத்துவக் குறிப்புகள் எதிர்கால பதிப்பில் கிடைக்கும்",
     "noAppointments": "இந்த நோயாளிக்கு சந்திப்புகள் எதுவும் இல்லை",
     "scheduleAppointment": "சந்திப்பை திட்டமிடு",

@@ -392,6 +392,10 @@
     "tabs": {
       "summary": "Résumé",
       "info": "Infos",
+      "information": "Informations",
+      "dentalAnamnesis": "Anamnèse dentaire",
+      "pediatricDentalAnamnesis": "Anamnèse odontopédiatrique",
+      "endodontics": "Endodontie",
       "clinical": "Clinique",
       "odontogram": "Odontogramme",
       "administration": "Administration",
@@ -404,6 +408,44 @@
       "documents": "Documents",
       "gallery": "Galerie"
     },
+    "dentalAnamnesis": {
+      "doctor": "Docteur", "selectDoctor": "Sélectionner un professionnel", "consultationReason": "Motif de consultation",
+      "currentIllness": "MALADIE ACTUELLE", "illnessDuration": "Durée de la maladie", "mainSymptoms": "Principaux signes et symptômes", "chronologicalNarrative": "Récit chronologique", "biologicalFunctions": "Fonctions biologiques",
+      "history": "ANTÉCÉDENTS", "familyHistory": "Antécédents familiaux", "personalHistory": "Antécédents personnels", "haveYouHad": "Avez-vous ou avez-vous eu ?",
+      "highBloodPressure": "Hypertension artérielle", "lowBloodPressure": "Hypotension artérielle", "hepatitis": "Hépatite", "gastritis": "Gastrite", "ulcers": "Ulcères", "hiv": "VIH", "diabetes": "Diabète", "asthma": "Asthme", "smoker": "Fumez-vous ?", "additionalComment": "Commentaire supplémentaire",
+      "dentalHistory": "ANTÉCÉDENTS DENTAIRES / COMPLÉMENTAIRES", "bloodDiseases": "Maladies du sang", "heartProblems": "Problèmes cardiaques", "otherDisease": "Souffrez-vous d'une autre maladie ?", "brushingFrequency": "Combien de fois par jour vous brossez-vous les dents ?", "bleedingGums": "Vos gencives saignent-elles ?", "abnormalExtractionBleeding": "Avez-vous eu des saignements anormaux après une extraction ?", "bruxism": "Grincez-vous ou serrez-vous les dents ?", "mouthDiscomfort": "Autres gênes dans la bouche", "allergies": "Allergies", "recentMajorSurgery": "Avez-vous subi une opération importante ces dernières années ?", "permanentMedication": "Prenez-vous des médicaments de façon permanente ?", "detail": "Détail",
+      "clinicalExam": "EXAMEN CLINIQUE", "vitalSigns": "Signes vitaux", "bloodPressure": "TA", "pulse": "Pouls", "heartRate": "FC", "respiratoryRate": "FR", "temperature": "Température", "extraoralExam": "Examen extra-oral", "intraoralExam": "Examen intra-oral", "auxiliaryExamResults": "Résultat des examens auxiliaires", "observations": "Observations",
+      "no": "Non", "yes": "Oui", "save": "Enregistrer", "saveUnavailable": "L'enregistrement sera bientôt disponible.",
+      "placeholders": {
+        "consultationReason": "Ex. Douleur à la molaire inférieure droite", "illnessDuration": "Ex. 3 jours", "mainSymptoms": "Ex. Douleur à la mastication, sensibilité au froid", "chronologicalNarrative": "Ex. A commencé il y a 3 jours et a augmenté progressivement", "biologicalFunctions": "Ex. Sommeil préservé, appétit normal", "familyHistory": "Ex. Mère avec hypertension", "personalHistory": "Ex. Sans antécédents notables", "additionalComment": "Ex. Information complémentaire pertinente", "brushingFrequency": "Ex. 3 fois par jour", "bloodDiseases": "Ex. Anémie", "heartProblems": "Ex. Arythmie", "otherDisease": "Ex. Hypothyroïdie", "mouthDiscomfort": "Ex. Sensibilité dentaire", "allergies": "Ex. Pénicilline", "recentMajorSurgery": "Ex. Appendicectomie en 2021", "permanentMedication": "Ex. Losartan 50 mg", "extraoralExam": "Ex. Aucune altération visible", "intraoralExam": "Ex. Gencive enflammée dans la zone postérieure", "auxiliaryExamResults": "Ex. Radiographie panoramique sans résultat notable", "observations": "Ex. Le patient signale de l'anxiété pendant les procédures"
+      }
+    },
+    "pediatricDentalAnamnesis": {
+      "doctor": "Docteur", "selectDoctor": "Sélectionner un professionnel", "consultationReason": "Motif de consultation", "motherName": "Nom de la mère", "fatherName": "Nom du père", "siblingsCount": "Nombre de frères et sœurs", "birthOrder": "Ordre de naissance",
+      "currentIllness": "MALADIE ACTUELLE", "diseaseType": "Type de maladie", "chronologicalNarrative": "Récit chronologique",
+      "prenatalHistory": "ANTÉCÉDENTS PRÉNATAUX", "maternalDiseases": "Maladies maternelles", "pregnancyComplications": "Y a-t-il eu des complications pendant la grossesse ?", "prematureBaby": "Le bébé était-il prématuré ?", "birthWeight": "Poids à la naissance", "comment": "Commentaire",
+      "postnatalHistory": "ANTÉCÉDENTS POSTNATAUX", "birthProblems": "Problèmes lors de l'accouchement ?", "pacifierUse": "Utilisation de tétine ?", "bottleUse": "Utilisation du biberon ?", "thumbSucking": "L'enfant suce-t-il/suçait-il son doigt ?", "medicationOrTherapy": "L'enfant prend-il un médicament ou suit-il une thérapie ?", "allergiesOrIntolerances": "L'enfant est-il allergique ou intolérant à quelque chose ?", "brushesBeforeSleep": "L'enfant se brosse-t-il les dents avant de dormir ?", "openMouthOrSnores": "L'enfant dort-il la bouche ouverte ou ronfle-t-il ?", "detail": "Détail", "additionalComment": "Commentaire supplémentaire",
+      "feedingAndHygiene": "HABITUDES ALIMENTAIRES / HYGIÈNE", "sweetsConsumption": "Combien de sucreries l'enfant mange-t-il ?", "timesPerDay": "Fois par jour", "daysPerWeek": "jours/semaine", "milkType": "Quel type de lait reçoit le bébé ?", "dentalHygiene": "Comment lavez-vous les dents du bébé ou de l'enfant ?", "dailyDiet": "Décrivez une journée de repas de votre bébé/enfant à partir du petit-déjeuner.", "parentingStyle": "Vous considérez-vous comme un parent autoritaire, coopératif, insouciant ou surprotecteur ?",
+      "finalSection": "ÉVALUATION FINALE", "oralHabits": "Habitudes orales", "brushingTechnique": "Technique de brossage", "clinicalExam": "Examen clinique", "observations": "Observations", "no": "Non", "yes": "Oui", "save": "Enregistrer", "saveUnavailable": "L'enregistrement sera bientôt disponible."
+    },
+    "endodonticForm": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "yes": "Yes", "no": "No", "save": "Save", "saveUnavailable": "Saving will be available soon.",
+      "priorEndodonticTreatment": "Previous endodontic treatment?", "painHistory": "Pain history", "additionalNote": "Additional note", "toothNumber": "Tooth no.",
+      "clinicalExam": "CLINICAL EXAMINATION", "anatomicalCrown": "Anatomical crown", "caries": "Caries", "restoration": "Restoration", "bruxism": "Bruxism", "fracture": "Fracture", "fractureWithPulpExposure": "Fracture with pulp exposure",
+      "inflammationPresent": "Inflammation present", "fistulas": "Fistulas", "gingivitis": "Gingivitis", "pockets": "Pockets", "calculus": "Calculus", "specify": "Specify", "mobility": "Mobility", "probing": "Probing",
+      "painCharacteristics": "Pain characteristics", "spontaneous": "Spontaneous", "provoked": "Provoked", "cold": "Cold", "heat": "Heat", "chewing": "Chewing", "nocturnal": "Nocturnal", "air": "Air", "sweet": "Sweet", "acidic": "Acidic", "radiated": "Radiated", "diffuse": "Diffuse", "stabbing": "Stabbing", "continuous": "Continuous", "intermittent": "Intermittent", "sporadic": "Sporadic",
+      "percussionPain": "Pain on percussion", "palpationPain": "Pain on palpation", "horizontal": "Horizontal", "vertical": "Vertical", "vestibular": "Vestibular", "lingualPalatal": "Lingual/Palatal", "additionalClinicalNote": "Additional clinical examination note",
+      "vitalityTest": "VITALITY TEST", "test": "Test", "result": "Yes/No", "duration": "Duration", "intensity": "Intensity", "selectUnavailable": "No options defined",
+      "radiographicExam": "RADIOGRAPHIC EXAMINATION", "pulpChamber": "Pulp chamber", "open": "Open", "closed": "Closed", "wide": "Wide", "narrow": "Narrow", "pulpStones": "Pulp stones", "canals": "Canal(s)", "singleCanal": "Single", "twoCanals": "2 canals", "threeCanals": "3 canals", "fourCanals": "4 canals", "straight": "Straight", "curved": "Curved", "previouslyTreated": "Previously treated", "openApex": "Open apex",
+      "furcationLesion": "Furcation lesion", "apicalLesion": "Apical lesion", "lateralLesion": "Lateral lesion", "endoPerioLesion": "Endo-perio lesion", "dwarfRoots": "Dwarf roots", "rootFracture": "Root fracture", "calcification": "Calcification", "periodontalLigament": "Periodontal ligament", "resorption": "Resorption", "additionalRadiographicNote": "Additional radiographic note",
+      "presumptivePulpalDiagnosis": "PRESUMPTIVE PULPAL DIAGNOSIS", "normalPulp": "Normal pulp", "reversiblePulpitis": "Reversible pulpitis", "symptomaticIrreversiblePulpitis": "Symptomatic irreversible pulpitis", "asymptomaticIrreversiblePulpitis": "Asymptomatic irreversible pulpitis", "pulpNecrosis": "Pulp necrosis", "diagnosisPreviouslyTreated": "Previously treated", "previouslyInitiated": "Previously initiated",
+      "periapicalDiagnosis": "PERIAPICAL DIAGNOSIS", "healthyApicalTissues": "Healthy apical tissues", "acuteApicalPeriodontitis": "Acute apical periodontitis (symptomatic)", "chronicApicalPeriodontitis": "Chronic apical periodontitis (asymptomatic)", "acuteApicalAbscess": "Acute apical abscess (without fistula)", "chronicApicalAbscess": "Chronic apical abscess (with fistula)", "condensingOsteitis": "Condensing osteitis",
+      "definitiveDiagnosis": "DEFINITIVE DIAGNOSIS", "irreversiblePulpitis": "Irreversible pulpitis", "necroticPulp": "Necrotic pulp",
+      "indicatedTreatment": "INDICATED TREATMENT", "biopulpectomy": "Biopulpectomy", "apicoectomy": "Apicoectomy", "necropulpectomy": "Necropulpectomy", "hemisection": "Hemisection", "retreatment": "Retreatment", "radicectomy": "Radicectomy", "whitening": "Whitening", "extraction": "Extraction",
+      "clinicalData": "CLINICAL DATA", "identification": "Identification", "canal": "Canal", "workingLength": "Working length (mm)", "referencePoint": "Reference point", "initialFile": "Initial file", "finalApicalFile": "Final apical file", "cementType": "Cement type", "masterGuttaPerchaCone": "Master gutta-percha cone", "single": "Single", "palatalLingual": "Palatal/Lingual", "mesiolingual": "Mesiolingual", "mesiobuccal": "Mesiobuccal", "distal": "Distal", "distobuccal": "Distobuccal", "distolingual": "Distolingual",
+      "finalSection": "FINAL SECTION", "operativeAccidents": "Operative accidents", "postEndodonticRestoration": "Indicated post-endodontic restoration", "post": "Post", "amalgamResin": "Amalgam/Resin", "crown": "Crown", "other": "Other", "prognosis": "Prognosis", "favorable": "Favorable", "unfavorable": "Unfavorable", "reserved": "Reserved"
+    },
+    "anamneses": { "loadError": "Impossible de charger le formulaire clinique.", "saveError": "Impossible d’enregistrer le formulaire clinique. Vos données ont été conservées.", "dentalSaved": "Anamnèse dentaire enregistrée avec succès.", "pediatricSaved": "Anamnèse odontopédiatrique enregistrée avec succès.", "endodonticSaved": "Fiche d’endodontie enregistrée avec succès." },
     "historyPlaceholder": "Notes cliniques disponibles dans une future version",
     "noAppointments": "Ce patient n'a aucun rendez-vous",
     "scheduleAppointment": "Programmer un rendez-vous",
