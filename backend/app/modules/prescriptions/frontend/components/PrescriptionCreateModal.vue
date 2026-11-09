@@ -18,10 +18,12 @@
  * patient is added by whoever makes the request.
  */
 
-import type { PrescriptionCreatePayload, WriteError } from '../types/prescriptions'
+import type { PrescriptionCreatePayload, PrescriptionMedication, PrescriptionMedicationInput, WriteError } from '../types/prescriptions'
 import { usePrescriptionDraft } from '../composables/usePrescriptionDraft'
+import { usePrescriptionMedicationFavorites } from '../composables/usePrescriptionMedicationFavorites'
 import { createErrorKey, MAX_ITEMS } from '../utils/prescriptionForm'
 import PrescriptionItemFields from './PrescriptionItemFields.vue'
+import PrescriptionMedicationPicker from './PrescriptionMedicationPicker.vue'
 
 const props = defineProps<{
   patientName: string | null
@@ -40,6 +42,20 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const draft = usePrescriptionDraft()
 const { validUntil, items, errors, canAdd, canRemove } = draft
+const medicationFavorites = usePrescriptionMedicationFavorites()
+const {
+  favorites,
+  results,
+  loadingFavorites,
+  searching,
+  favoritesError,
+  searchError
+} = medicationFavorites
+const favoriteIds = ref<Record<number, string>>({})
+const favoriteErrors = ref<Record<number, boolean>>({})
+const favoriteBusy = computed(() => medicationFavorites.savingKeys.value.length > 0)
+
+onMounted(() => void medicationFavorites.loadFavorites())
 
 type Step = 'form' | 'confirm' | 'discard'
 const step = ref<Step>('form')
@@ -91,6 +107,35 @@ async function addItem(): Promise<void> {
   if (key === null) return
   await nextTick()
   body.value?.querySelector<HTMLElement>(`[data-item-key="${key}"] input`)?.focus()
+}
+
+function selectMedication(medication: PrescriptionMedication): void {
+  const key = draft.applyMedication(medication)
+  if (key !== null) favoriteIds.value[key] = medication.favorite_id || ''
+}
+
+function updateItem(key: number, field: Parameters<typeof draft.setField>[1], value: string): void {
+  draft.setField(key, field, value)
+  // A changed reusable field describes a different favorite; do not remove the original.
+  if (['active_ingredient', 'commercial_name', 'strength', 'pharmaceutical_form', 'presentation', 'route'].includes(field)) {
+    favoriteIds.value[key] = ''
+  }
+}
+
+async function toggleFavorite(input: PrescriptionMedicationInput, favoriteId: string | null, key: number): Promise<void> {
+  favoriteErrors.value[key] = false
+  try {
+    if (favoriteId) {
+      if (!await medicationFavorites.removeFavorite(favoriteId)) throw new Error('favorite removal failed')
+      favoriteIds.value[key] = ''
+      return
+    }
+    const saved = await medicationFavorites.saveFavorite(input)
+    if (!saved) throw new Error('favorite save failed')
+    favoriteIds.value[key] = saved.favorite_id || ''
+  } catch {
+    favoriteErrors.value[key] = true
+  }
 }
 
 /** Every way out of the dialog (button, Escape, overlay) goes through here. */
@@ -215,6 +260,18 @@ function issue(): void {
             >
               {{ t('prescriptions.create.medications') }}
             </h3>
+            <PrescriptionMedicationPicker
+              :disabled="submitting"
+              :favorites="favorites"
+              :results="results"
+              :loading-favorites="loadingFavorites"
+              :searching="searching"
+              :favorites-error="favoritesError"
+              :search-error="searchError"
+              class="mb-3"
+              @select="selectMedication"
+              @search="medicationFavorites.scheduleSearch"
+            />
             <div class="space-y-3">
               <PrescriptionItemFields
                 v-for="(item, index) in items"
@@ -224,8 +281,12 @@ function issue(): void {
                 :errors="errors.items[item.key]"
                 :can-remove="canRemove"
                 :disabled="submitting"
-                @update="(field, value) => draft.setField(item.key, field, value)"
+                :favorite-id="favoriteIds[item.key] || null"
+                :favorite-busy="favoriteBusy"
+                :favorite-error="favoriteErrors[item.key]"
+                @update="(field, value) => updateItem(item.key, field, value)"
                 @remove="draft.removeItem(item.key)"
+                @toggle-favorite="(input, favoriteId) => toggleFavorite(input, favoriteId, item.key)"
               />
             </div>
             <div class="mt-3 flex items-center gap-3 flex-wrap">

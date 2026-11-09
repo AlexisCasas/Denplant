@@ -20,7 +20,13 @@ from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
 
-from .models import Prescription, PrescriptionCounter, PrescriptionItem
+from .models import (
+    Prescription,
+    PrescriptionCounter,
+    PrescriptionItem,
+    PrescriptionMedication,
+    PrescriptionMedicationFavorite,
+)
 from .router import router
 
 
@@ -55,7 +61,13 @@ class PrescriptionsModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [Prescription, PrescriptionItem, PrescriptionCounter]
+        return [
+            Prescription,
+            PrescriptionItem,
+            PrescriptionCounter,
+            PrescriptionMedication,
+            PrescriptionMedicationFavorite,
+        ]
 
     def get_router(self) -> APIRouter:
         return router

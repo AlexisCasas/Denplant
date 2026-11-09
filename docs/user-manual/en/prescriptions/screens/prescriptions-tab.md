@@ -76,6 +76,11 @@ changed here.
 
 ### Medications
 
+Above the cards, **My frequent medications** and search let you copy reusable
+descriptive values into an empty card or a new card. Dose, frequency, duration,
+quantity and instructions stay empty and editable. The star on each card saves
+or removes that medication from the current dentist's private favorites.
+
 A prescription has one or more medications, each in its own card (*Medication
 1*, *Medication 2*…). Fields marked * are required.
 

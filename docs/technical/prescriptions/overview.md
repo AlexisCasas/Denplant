@@ -89,8 +89,10 @@ Rules:
   permissions. The Clinical tab's `readonly` flag is never used.
 - **No drafts persisted anywhere**; the form is destroyed on close or on a patient
   change.
-- **No pharmacological intelligence**: free text only, no search, calculation or
-  warnings.
+- **Reusable descriptions**: remote search and private favorites copy only the
+  medicine's descriptive fields into the existing draft. Dose, frequency,
+  duration, quantity and instructions remain free, patient-specific text; there
+  is no recommendation, calculation or warning.
 - Date-only values are formatted without UTC parsing; `valid_until` is not
   compared with the browser's today, the backend compares it with the clinic's
   issue date.
@@ -104,6 +106,8 @@ Rules:
 | `prescriptions` | header, `item_count`, status, void fields, numbering and the identity snapshots |
 | `prescription_items` | medications, free text; composite FK `(prescription_id, clinic_id)` |
 | `prescription_counters` | last number per `(clinic_id, year)` |
+| `prescription_medications` | clinic-scoped reusable descriptive medication values |
+| `prescription_medication_favorites` | a dentist's private medication shortcuts |
 
 Snapshots are taken at issue so a prescription never rewrites itself: patient
 (name, national id and type, date of birth), prescriber (name, registration

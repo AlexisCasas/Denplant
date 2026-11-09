@@ -204,6 +204,63 @@ class PrescriptionCounter(Base):
     __table_args__ = (CheckConstraint("last_number >= 1", name="ck_prescription_counter_positive"),)
 
 
+class PrescriptionMedication(Base):
+    """A reusable, clinic-scoped medication description.
+
+    This deliberately holds only non-clinical defaults.  It is never linked to
+    issued prescription items, which remain the immutable free-text snapshot.
+    """
+
+    __tablename__ = "prescription_medications"
+
+    id: Mapped[UUID] = mapped_column(SAUUID(as_uuid=True), primary_key=True, default=uuid4)
+    clinic_id: Mapped[UUID] = mapped_column(
+        SAUUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False
+    )
+    active_ingredient: Mapped[str] = mapped_column(String(200), nullable=False)
+    commercial_name: Mapped[str | None] = mapped_column(String(200))
+    strength: Mapped[str] = mapped_column(String(100), nullable=False)
+    pharmaceutical_form: Mapped[str] = mapped_column(String(100), nullable=False)
+    presentation: Mapped[str | None] = mapped_column(String(200))
+    default_route: Mapped[str] = mapped_column(String(100), nullable=False)
+    #: Stable SHA-256 of the normalised reusable fields; prevents duplicate rows.
+    dedupe_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("id", "clinic_id", name="uq_rx_medication_id_clinic"),
+        UniqueConstraint("clinic_id", "dedupe_key", name="uq_rx_medication_clinic_dedupe"),
+        Index("idx_rx_medication_clinic_active_ingredient", "clinic_id", "active", "active_ingredient"),
+    )
+
+
+class PrescriptionMedicationFavorite(Base):
+    """One dentist's private shortcut to a reusable medication description."""
+
+    __tablename__ = "prescription_medication_favorites"
+
+    id: Mapped[UUID] = mapped_column(SAUUID(as_uuid=True), primary_key=True, default=uuid4)
+    clinic_id: Mapped[UUID] = mapped_column(
+        SAUUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False
+    )
+    doctor_id: Mapped[UUID] = mapped_column(SAUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    medication_id: Mapped[UUID] = mapped_column(SAUUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["medication_id", "clinic_id"],
+            ["prescription_medications.id", "prescription_medications.clinic_id"],
+            name="fk_rx_favorite_medication_clinic",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("doctor_id", "medication_id", name="uq_rx_favorite_doctor_medication"),
+        Index("idx_rx_favorite_doctor_created", "doctor_id", "created_at"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Immutability triggers
 #

@@ -75,6 +75,14 @@ clínica. Esos datos los toma el sistema y no se pueden cambiar aquí.
 
 ### Medicamentos
 
+Encima de las tarjetas puedes usar **Mis frecuentes** o buscar por principio
+activo o nombre comercial. Al elegir uno se rellenan sus datos reutilizables
+(principio activo, nombre comercial, concentración, forma, presentación y vía)
+en una tarjeta existente vacía o en una nueva. La dosis, frecuencia, duración,
+cantidad e indicaciones siguen vacías y editables. La estrella de cada tarjeta
+guarda o quita ese medicamento de tus frecuentes; son privados para cada
+odontólogo.
+
 Cada receta lleva uno o varios medicamentos, cada uno en su propia tarjeta
 (*Medicamento 1*, *Medicamento 2*…). Los campos marcados con * son obligatorios.
 

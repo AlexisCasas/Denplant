@@ -18,6 +18,7 @@ import {
   type ItemDraft,
   type ItemField
 } from '../utils/prescriptionForm'
+import type { PrescriptionMedication } from '../types/prescriptions'
 
 export function usePrescriptionDraft() {
   const validUntil = ref('')
@@ -70,6 +71,27 @@ export function usePrescriptionDraft() {
     revalidate()
   }
 
+  /** Copy only reusable medication values. Patient-specific fields stay blank/editable. */
+  function applyMedication(medication: PrescriptionMedication): number | null {
+    const target = items.value.find(item =>
+      (Object.keys(item) as Array<keyof ItemDraft>).every(
+        field => field === 'key' || String(item[field]) === ''
+      )
+    )
+    const key = target?.key ?? addItem()
+    if (key === null) return null
+    const item = items.value.find(candidate => candidate.key === key)
+    if (!item) return null
+    item.active_ingredient = medication.active_ingredient
+    item.commercial_name = medication.commercial_name || ''
+    item.strength = medication.strength
+    item.pharmaceutical_form = medication.pharmaceutical_form
+    item.presentation = medication.presentation || ''
+    item.route = medication.default_route
+    revalidate()
+    return key
+  }
+
   /** Check everything; `true` when it may go on to the confirmation. */
   function validate(): boolean {
     attempted.value = true
@@ -104,6 +126,7 @@ export function usePrescriptionDraft() {
     setValidUntil,
     setField,
     addItem,
+    applyMedication,
     removeItem,
     validate,
     rejectValidUntil,

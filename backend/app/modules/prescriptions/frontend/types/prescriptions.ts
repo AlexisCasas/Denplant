@@ -139,6 +139,37 @@ export interface PrescriptionVoidPayload {
   reason: string
 }
 
+/** Reusable descriptive fields only; never dose, schedule or instructions. */
+export interface PrescriptionMedicationInput {
+  active_ingredient: string
+  commercial_name?: string
+  strength: string
+  pharmaceutical_form: string
+  presentation?: string
+  default_route: string
+}
+
+export interface PrescriptionMedication {
+  id: string
+  active_ingredient: string
+  commercial_name: string | null
+  strength: string
+  pharmaceutical_form: string
+  presentation: string | null
+  default_route: string
+  favorite_id: string | null
+}
+
+export interface PrescriptionMedicationResponse {
+  data: PrescriptionMedication[]
+  message: string | null
+}
+
+export interface PrescriptionMedicationFavoriteResponse {
+  data: PrescriptionMedication & { favorite_id: string }
+  message: string | null
+}
+
 /** How a failed write came back: the HTTP status and the backend's own code. */
 export interface WriteError {
   status: number | null

@@ -25,10 +25,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from hashlib import sha256
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,8 +51,10 @@ from .models import (
     Prescription,
     PrescriptionCounter,
     PrescriptionItem,
+    PrescriptionMedication,
+    PrescriptionMedicationFavorite,
 )
-from .schemas import PrescriptionCreate
+from .schemas import PrescriptionCreate, PrescriptionMedicationInput
 
 #: The role that may issue. A constant, not a permission: see the module docstring.
 PRESCRIBER_ROLE = "dentist"
@@ -107,6 +110,14 @@ class SummaryRow:
     item_count: int
     status: str
     voided_at: datetime | None
+
+
+@dataclass(frozen=True)
+class MedicationRow:
+    """Medication plus the requesting dentist's optional private favorite."""
+
+    medication: PrescriptionMedication
+    favorite_id: UUID | None
 
 
 class PrescriptionService:
@@ -183,6 +194,158 @@ class PrescriptionService:
             .returning(table.c.last_number)
         )
         return int((await db.execute(statement)).scalar_one())
+
+    # ------------------------------------------------------------------
+    # reusable medication shortcuts (never part of issuing)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _medication_values(data: PrescriptionMedicationInput) -> dict[str, str | None]:
+        """Canonicalise only enough to prevent duplicate reusable records.
+
+        The display values are already Pydantic-trimmed.  No drug names are
+        interpreted, substituted or clinically validated here.
+        """
+        values = data.model_dump()
+        parts = [
+            " ".join((values[field] or "").casefold().split())
+            for field in (
+                "active_ingredient",
+                "commercial_name",
+                "strength",
+                "pharmaceutical_form",
+                "presentation",
+                "default_route",
+            )
+        ]
+        values["dedupe_key"] = sha256("\x1f".join(parts).encode()).hexdigest()
+        return values
+
+    @staticmethod
+    async def search_medications(
+        db: AsyncSession, ctx: ClinicContext, query: str, *, limit: int = 20
+    ) -> list[MedicationRow]:
+        """Search the clinic's reusable descriptions without exposing favorites."""
+        PrescriptionService.require_eligible_prescriber(ctx)
+        term = query.strip()
+        if not term:
+            return []
+        # Escape SQL LIKE metacharacters so a literal '%' or '_' in a search
+        # field is not silently treated as a broad wildcard.
+        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        rows = await db.execute(
+            select(PrescriptionMedication, PrescriptionMedicationFavorite.id)
+            .outerjoin(
+                PrescriptionMedicationFavorite,
+                (PrescriptionMedicationFavorite.medication_id == PrescriptionMedication.id)
+                & (PrescriptionMedicationFavorite.clinic_id == ctx.clinic_id)
+                & (PrescriptionMedicationFavorite.doctor_id == ctx.user_id),
+            )
+            .where(
+                PrescriptionMedication.clinic_id == ctx.clinic_id,
+                PrescriptionMedication.active.is_(True),
+                or_(
+                    PrescriptionMedication.active_ingredient.ilike(pattern, escape="\\"),
+                    PrescriptionMedication.commercial_name.ilike(pattern, escape="\\"),
+                ),
+            )
+            .order_by(PrescriptionMedication.active_ingredient, PrescriptionMedication.strength)
+            .limit(limit)
+        )
+        return [MedicationRow(medication=row[0], favorite_id=row[1]) for row in rows.all()]
+
+    @staticmethod
+    async def list_favorite_medications(
+        db: AsyncSession, ctx: ClinicContext, *, limit: int = 12
+    ) -> list[MedicationRow]:
+        """Only the authenticated dentist's shortcuts, newest first."""
+        PrescriptionService.require_eligible_prescriber(ctx)
+        rows = await db.execute(
+            select(PrescriptionMedication, PrescriptionMedicationFavorite.id)
+            .join(
+                PrescriptionMedicationFavorite,
+                (PrescriptionMedicationFavorite.medication_id == PrescriptionMedication.id)
+                & (PrescriptionMedicationFavorite.clinic_id == ctx.clinic_id),
+            )
+            .where(
+                PrescriptionMedicationFavorite.doctor_id == ctx.user_id,
+                PrescriptionMedication.active.is_(True),
+            )
+            .order_by(PrescriptionMedicationFavorite.created_at.desc())
+            .limit(limit)
+        )
+        return [MedicationRow(medication=row[0], favorite_id=row[1]) for row in rows.all()]
+
+    @staticmethod
+    async def save_favorite_medication(
+        db: AsyncSession, ctx: ClinicContext, data: PrescriptionMedicationInput
+    ) -> MedicationRow:
+        """Create/reuse a clinic description then create the doctor's private favorite.
+
+        Both unique constraints are used as the duplicate barrier, so concurrent
+        clicks cannot create either duplicate medication descriptions or favorites.
+        """
+        PrescriptionService.require_eligible_prescriber(ctx)
+        values = PrescriptionService._medication_values(data)
+        now = datetime.now(UTC)
+        medication_table = PrescriptionMedication.__table__
+        medication_id = (
+            await db.execute(
+                pg_insert(medication_table)
+                .values(id=uuid4(), clinic_id=ctx.clinic_id, active=True, created_at=now, updated_at=now, **values)
+                .on_conflict_do_nothing(constraint="uq_rx_medication_clinic_dedupe")
+                .returning(medication_table.c.id)
+            )
+        ).scalar_one_or_none()
+        if medication_id is None:
+            medication_id = await db.scalar(
+                select(PrescriptionMedication.id).where(
+                    PrescriptionMedication.clinic_id == ctx.clinic_id,
+                    PrescriptionMedication.dedupe_key == values["dedupe_key"],
+                )
+            )
+        assert medication_id is not None
+
+        favorite_table = PrescriptionMedicationFavorite.__table__
+        await db.execute(
+            pg_insert(favorite_table)
+            .values(
+                id=uuid4(), clinic_id=ctx.clinic_id, doctor_id=ctx.user_id,
+                medication_id=medication_id, created_at=now,
+            )
+            .on_conflict_do_nothing(constraint="uq_rx_favorite_doctor_medication")
+        )
+        row = (
+            await db.execute(
+                select(PrescriptionMedication, PrescriptionMedicationFavorite.id)
+                .join(
+                    PrescriptionMedicationFavorite,
+                    PrescriptionMedicationFavorite.medication_id == PrescriptionMedication.id,
+                )
+                .where(
+                    PrescriptionMedication.id == medication_id,
+                    PrescriptionMedication.clinic_id == ctx.clinic_id,
+                    PrescriptionMedicationFavorite.doctor_id == ctx.user_id,
+                )
+            )
+        ).one()
+        return MedicationRow(medication=row[0], favorite_id=row[1])
+
+    @staticmethod
+    async def remove_favorite_medication(
+        db: AsyncSession, ctx: ClinicContext, favorite_id: UUID
+    ) -> bool:
+        """Remove only the caller's shortcut; the shared reusable description remains."""
+        PrescriptionService.require_eligible_prescriber(ctx)
+        removed = await db.execute(
+            delete(PrescriptionMedicationFavorite).where(
+                PrescriptionMedicationFavorite.id == favorite_id,
+                PrescriptionMedicationFavorite.clinic_id == ctx.clinic_id,
+                PrescriptionMedicationFavorite.doctor_id == ctx.user_id,
+            )
+        )
+        return bool(removed.rowcount)
 
     # ------------------------------------------------------------------
     # issue

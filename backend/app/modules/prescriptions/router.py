@@ -36,6 +36,9 @@ from .exceptions import (
 from .pdf import PrescriptionPDFService, pdf_filename, resolve_locale
 from .schemas import (
     PrescriptionCreate,
+    PrescriptionMedicationFavoriteResponse,
+    PrescriptionMedicationInput,
+    PrescriptionMedicationResponse,
     PrescriptionResponse,
     PrescriptionSummaryResponse,
     PrescriptionVoid,
@@ -99,6 +102,73 @@ async def issue_prescription(
     dates and snapshots all come from the server."""
     prescription = await _guard(PrescriptionService.issue(db, ctx, data))
     return ApiResponse(data=PrescriptionResponse.model_validate(prescription))
+
+
+def _medication_response(row) -> PrescriptionMedicationResponse:
+    medication = PrescriptionMedicationResponse.model_validate(row.medication)
+    return medication.model_copy(update={"favorite_id": row.favorite_id})
+
+
+@router.get(
+    "/medications/search",
+    response_model=ApiResponse[list[PrescriptionMedicationResponse]],
+    summary="Search reusable prescription medications",
+)
+async def search_medications(
+    q: Annotated[str, Query(min_length=2, max_length=100)],
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("prescriptions.prescribe"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> ApiResponse[list[PrescriptionMedicationResponse]]:
+    rows = await _guard(PrescriptionService.search_medications(db, ctx, q, limit=limit))
+    return ApiResponse(data=[_medication_response(row) for row in rows])
+
+
+@router.get(
+    "/medication-favorites",
+    response_model=ApiResponse[list[PrescriptionMedicationFavoriteResponse]],
+    summary="The authenticated dentist's favorite prescription medications",
+)
+async def list_medication_favorites(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("prescriptions.prescribe"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[list[PrescriptionMedicationFavoriteResponse]]:
+    rows = await _guard(PrescriptionService.list_favorite_medications(db, ctx))
+    return ApiResponse(
+        data=[PrescriptionMedicationFavoriteResponse.model_validate(_medication_response(row)) for row in rows]
+    )
+
+
+@router.post(
+    "/medication-favorites",
+    response_model=ApiResponse[PrescriptionMedicationFavoriteResponse],
+    summary="Save a reusable medication as the authenticated dentist's favorite",
+)
+async def save_medication_favorite(
+    data: PrescriptionMedicationInput,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("prescriptions.prescribe"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PrescriptionMedicationFavoriteResponse]:
+    row = await _guard(PrescriptionService.save_favorite_medication(db, ctx, data))
+    return ApiResponse(data=PrescriptionMedicationFavoriteResponse.model_validate(_medication_response(row)))
+
+
+@router.delete(
+    "/medication-favorites/{favorite_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove the authenticated dentist's favorite shortcut",
+)
+async def remove_medication_favorite(
+    favorite_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("prescriptions.prescribe"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    await _guard(PrescriptionService.remove_favorite_medication(db, ctx, favorite_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

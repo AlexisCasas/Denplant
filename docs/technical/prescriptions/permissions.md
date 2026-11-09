@@ -14,6 +14,13 @@ namespaces them as `prescriptions.<name>`).
 | `prescriptions.prescribe` | Issue a prescription | `POST /api/v1/prescriptions` |
 | `prescriptions.void` | Void an issued prescription | `POST /api/v1/prescriptions/{prescription_id}/void` |
 
+Medication search and favorite endpoints use `prescriptions.prescribe` and the
+same dentist-with-registration eligibility as issuing: `GET
+/api/v1/prescriptions/medications/search`, `GET`/`POST
+/api/v1/prescriptions/medication-favorites`, and `DELETE
+/api/v1/prescriptions/medication-favorites/{favorite_id}`. Favorites are always
+filtered by the authenticated dentist and clinic.
+
 ## Role assignment
 
 `manifest.role_permissions` grants `read`, `prescribe` and `void` to `dentist`

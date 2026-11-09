@@ -17,6 +17,7 @@ import {
   type ItemDraft,
   type ItemField
 } from '../utils/prescriptionForm'
+import type { PrescriptionMedicationInput } from '../types/prescriptions'
 
 const props = defineProps<{
   item: ItemDraft
@@ -25,11 +26,15 @@ const props = defineProps<{
   errors?: Partial<Record<ItemField, FieldError>>
   canRemove: boolean
   disabled?: boolean
+  favoriteId?: string | null
+  favoriteBusy?: boolean
+  favoriteError?: boolean
 }>()
 
 const emit = defineEmits<{
   update: [field: ItemField, value: string]
   remove: []
+  toggleFavorite: [input: PrescriptionMedicationInput, favoriteId: string | null]
 }>()
 
 const { t } = useI18n()
@@ -68,6 +73,26 @@ function messageFor(field: ItemField): string | undefined {
     ? t('prescriptions.create.validation.tooLong', { max: FIELD_LIMITS[field] })
     : t('prescriptions.create.validation.required')
 }
+
+function favoriteInput(): PrescriptionMedicationInput | null {
+  const required = [
+    props.item.active_ingredient, props.item.strength, props.item.pharmaceutical_form, props.item.route
+  ]
+  if (required.some(value => !value.trim())) return null
+  return {
+    active_ingredient: props.item.active_ingredient,
+    commercial_name: props.item.commercial_name || undefined,
+    strength: props.item.strength,
+    pharmaceutical_form: props.item.pharmaceutical_form,
+    presentation: props.item.presentation || undefined,
+    default_route: props.item.route
+  }
+}
+
+function toggleFavorite(): void {
+  const input = favoriteInput()
+  if (input) emit('toggleFavorite', input, props.favoriteId ?? null)
+}
 </script>
 
 <template>
@@ -84,18 +109,31 @@ function messageFor(field: ItemField): string | undefined {
       >
         {{ t('prescriptions.create.medication', { n: number }) }}
       </h4>
-      <UButton
-        v-if="canRemove"
-        size="xs"
-        color="error"
-        variant="ghost"
-        icon="i-lucide-trash-2"
-        :disabled="disabled"
-        :aria-label="t('prescriptions.create.removeMedication', { n: number })"
-        :data-testid="`prescription-item-${number}-remove`"
-        @click="emit('remove')"
-      />
+      <div class="flex items-center gap-1">
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          :icon="favoriteId ? 'i-lucide-star' : 'i-lucide-star-off'"
+          :disabled="disabled || favoriteBusy || !favoriteInput()"
+          :title="t(favoriteId ? 'prescriptions.create.favorites.remove' : 'prescriptions.create.favorites.save')"
+          :data-testid="`prescription-item-${number}-favorite`"
+          @click="toggleFavorite"
+        />
+        <UButton
+          v-if="canRemove"
+          size="xs"
+          color="error"
+          variant="ghost"
+          icon="i-lucide-trash-2"
+          :disabled="disabled"
+          :aria-label="t('prescriptions.create.removeMedication', { n: number })"
+          :data-testid="`prescription-item-${number}-remove`"
+          @click="emit('remove')"
+        />
+      </div>
     </header>
+    <p v-if="favoriteError" class="text-caption text-error">{{ t('prescriptions.create.favorites.saveError') }}</p>
 
     <div class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
       <div

@@ -91,6 +91,13 @@ from app.modules.patients_clinical.models import (  # noqa: F401
     SurgicalHistory,
     SystemicDisease,
 )
+from app.modules.prescriptions.models import (  # noqa: F401
+    Prescription,
+    PrescriptionCounter,
+    PrescriptionItem,
+    PrescriptionMedication,
+    PrescriptionMedicationFavorite,
+)
 from app.modules.payments.models import (  # noqa: F401
     PatientEarnedEntry,
     Payment,

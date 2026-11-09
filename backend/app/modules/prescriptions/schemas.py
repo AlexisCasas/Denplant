@@ -67,6 +67,42 @@ class PrescriptionVoid(_Request):
     reason: Required2000
 
 
+class PrescriptionMedicationInput(_Request):
+    """Reusable, non-clinical values copied into a draft only on user action."""
+
+    active_ingredient: Required200
+    commercial_name: str | None = Field(default=None, max_length=200)
+    strength: Required100
+    pharmaceutical_form: Required100
+    presentation: str | None = Field(default=None, max_length=200)
+    default_route: Required100
+
+    @field_validator("commercial_name", "presentation")
+    @classmethod
+    def _blank_is_absent(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+class PrescriptionMedicationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    active_ingredient: str
+    commercial_name: str | None
+    strength: str
+    pharmaceutical_form: str
+    presentation: str | None
+    default_route: str
+    favorite_id: UUID | None = None
+
+
+class PrescriptionMedicationFavoriteResponse(PrescriptionMedicationResponse):
+    favorite_id: UUID
+
+
 class PrescriptionItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

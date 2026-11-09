@@ -89,6 +89,8 @@
       "medications": "Medications",
       "medication": "Medication {n}",
       "addMedication": "Add medication",
+      "favorites": { "title": "My frequent medications", "loading": "Loading…", "empty": "You do not have frequent medications yet.", "error": "Your frequent medications could not be loaded.", "save": "Save to my frequent medications", "remove": "In my frequent medications", "saveError": "The frequent medication could not be updated." },
+      "search": { "placeholder": "Search by active ingredient or brand name…", "loading": "Searching…", "empty": "No medications found.", "error": "Medications could not be searched." },
       "removeMedication": "Remove medication {n}",
       "maxItems": "The maximum of {max} medications has been reached.",
       "required": "Required",

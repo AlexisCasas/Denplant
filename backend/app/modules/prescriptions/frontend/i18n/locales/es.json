@@ -89,6 +89,8 @@
       "medications": "Medicamentos",
       "medication": "Medicamento {n}",
       "addMedication": "Añadir medicamento",
+      "favorites": { "title": "Mis frecuentes", "loading": "Cargando…", "empty": "Aún no tienes medicamentos frecuentes.", "error": "No se pudieron cargar tus frecuentes.", "save": "Guardar en mis frecuentes", "remove": "En mis frecuentes", "saveError": "No se pudo actualizar el medicamento frecuente." },
+      "search": { "placeholder": "Buscar por principio activo o nombre comercial…", "loading": "Buscando…", "empty": "No se encontraron medicamentos.", "error": "No se pudo buscar medicamentos." },
       "removeMedication": "Eliminar medicamento {n}",
       "maxItems": "Se alcanzó el máximo de {max} medicamentos.",
       "required": "Obligatorio",
