@@ -1263,13 +1263,14 @@ export type PaymentMethod = 'cash' | 'card' | 'bank_transfer' | 'direct_debit' |
 // refunds, ledger, reports. See ADR 0010.
 // ============================================================================
 
-export type AllocationTarget = 'budget' | 'on_account'
+export type AllocationTarget = 'budget' | 'budget_item' | 'on_account'
 export type RefundReason = 'duplicate' | 'overpaid' | 'treatment_cancelled' | 'dispute' | 'other'
 
 export interface PaymentAllocation {
   id: string
   target_type: AllocationTarget
   target_id?: string
+  budget_item_id?: string
   amount: number
   created_at: string
   created_by: string
@@ -1279,7 +1280,14 @@ export interface PaymentAllocation {
 export interface PaymentAllocationCreate {
   target_type: AllocationTarget
   target_id?: string
+  budget_item_id?: string
   amount: number
+}
+
+export interface BudgetItemPaymentSummary {
+  budget_item_id: string
+  paid: number
+  balance: number
 }
 
 export interface PaymentRefund {
