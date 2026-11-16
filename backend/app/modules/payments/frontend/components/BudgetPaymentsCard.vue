@@ -9,7 +9,7 @@
  * the ``ModuleSlot`` contract.
  */
 
-import type { PaymentAllocation, PaymentMethod } from '~~/app/types'
+import type { BudgetItem, PaymentAllocation, PaymentMethod } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
 
 interface BudgetCtx {
@@ -20,6 +20,7 @@ interface BudgetCtx {
     total: number | string
     status: string
     patient?: { id: string, first_name: string, last_name: string } | null
+    items?: BudgetItem[]
   } | null
 }
 
@@ -229,6 +230,7 @@ function handleCreated() {
         ? `${ctx.budget.patient.first_name} ${ctx.budget.patient.last_name}`
         : undefined"
       :pending-amount="pending"
+      :budget-items="ctx.budget.items"
       @created="handleCreated"
     />
   </UCard>

@@ -22,7 +22,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.auth.models import User
 from app.core.list_query import parse_sort
-from app.modules.budget.models import Budget
+from app.modules.budget.models import Budget, BudgetItem
 
 from .models import (
     PatientEarnedEntry,
@@ -165,7 +165,7 @@ class PaymentReadService:
             select(PaymentAllocation)
             .where(
                 PaymentAllocation.clinic_id == clinic_id,
-                PaymentAllocation.target_type == "budget",
+                PaymentAllocation.target_type.in_(("budget", "budget_item")),
                 PaymentAllocation.budget_id == budget_id,
             )
             .options(joinedload(PaymentAllocation.payment))
@@ -180,11 +180,58 @@ class PaymentReadService:
         result = await db.execute(
             select(func.coalesce(func.sum(PaymentAllocation.amount), Decimal("0"))).where(
                 PaymentAllocation.clinic_id == clinic_id,
-                PaymentAllocation.target_type == "budget",
+                PaymentAllocation.target_type.in_(("budget", "budget_item")),
                 PaymentAllocation.budget_id == budget_id,
             )
         )
         return result.scalar_one()
+
+    @staticmethod
+    async def item_summaries_for_budget(
+        db: AsyncSession, clinic_id: UUID, budget_id: UUID
+    ) -> dict[UUID, tuple[Decimal, Decimal]]:
+        """Return (paid, balance) for each item.
+
+        Refunds reduce a payment's item allocations pro-rata. This is the
+        only deterministic allocation possible for legacy Refund rows, which
+        intentionally do not name a target; a full refund therefore zeros all
+        of its item allocations without erasing their audit trail.
+        """
+        refunds = (
+            select(Refund.payment_id, func.coalesce(func.sum(Refund.amount), Decimal("0")).label("amount"))
+            .group_by(Refund.payment_id)
+            .subquery()
+        )
+        paid_rows = await db.execute(
+            select(
+                PaymentAllocation.budget_item_id,
+                func.coalesce(
+                    func.sum(
+                        PaymentAllocation.amount
+                        * ((Payment.amount - func.coalesce(refunds.c.amount, Decimal("0"))) / Payment.amount)
+                    ),
+                    Decimal("0"),
+                ),
+            )
+            .join(Payment, Payment.id == PaymentAllocation.payment_id)
+            .outerjoin(refunds, refunds.c.payment_id == Payment.id)
+            .where(
+                PaymentAllocation.clinic_id == clinic_id,
+                PaymentAllocation.target_type == "budget_item",
+                PaymentAllocation.budget_id == budget_id,
+            )
+            .group_by(PaymentAllocation.budget_item_id)
+        )
+        paid_by_item = {row[0]: row[1] for row in paid_rows.all()}
+        item_rows = await db.execute(
+            select(BudgetItem.id, BudgetItem.line_total).where(
+                BudgetItem.clinic_id == clinic_id, BudgetItem.budget_id == budget_id
+            )
+        )
+        return {
+            item_id: (paid_by_item.get(item_id, Decimal("0")), max(Decimal("0"), total - paid_by_item.get(item_id, Decimal("0"))))
+            for item_id, total in item_rows.all()
+        }
 
     # --- Cross-module bulk summaries (for /budgets and /patients lists) ---
     #
@@ -216,7 +263,7 @@ class PaymentReadService:
             )
             .where(
                 PaymentAllocation.clinic_id == clinic_id,
-                PaymentAllocation.target_type == "budget",
+                PaymentAllocation.target_type.in_(("budget", "budget_item")),
                 PaymentAllocation.budget_id.in_(budget_ids),
             )
             .group_by(PaymentAllocation.budget_id)
@@ -357,7 +404,7 @@ class PaymentReadService:
             )
             .where(
                 PaymentAllocation.clinic_id == clinic_id,
-                PaymentAllocation.target_type == "budget",
+                PaymentAllocation.target_type.in_(("budget", "budget_item")),
                 PaymentAllocation.budget_id.isnot(None),
             )
             .group_by(PaymentAllocation.budget_id)

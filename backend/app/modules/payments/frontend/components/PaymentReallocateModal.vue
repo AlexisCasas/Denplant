@@ -6,7 +6,7 @@
  * the budget's invoices transactionally (issue #178), so this is also
  * the "apply to invoice" action reception was missing.
  */
-import type { PaymentRecord } from '~~/app/types'
+import type { AllocationTarget, PaymentRecord } from '~~/app/types'
 
 const props = defineProps<{
   open: boolean
@@ -26,12 +26,16 @@ const { format: formatCurrency } = useCurrency()
 const toast = useToast()
 
 const target = ref('')
+const budgetItemId = ref('')
+const targetType = ref<AllocationTarget>('budget')
 const isSubmitting = ref(false)
 const errorMsg = ref<string | null>(null)
 
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
     target.value = ''
+    budgetItemId.value = ''
+    targetType.value = 'budget'
     errorMsg.value = null
   }
 })
@@ -42,7 +46,7 @@ async function submit() {
   errorMsg.value = null
   try {
     const updated = await reallocate(props.paymentId, {
-      allocations: [{ target_type: 'budget', target_id: target.value, amount: props.amount }]
+      allocations: [{ target_type: targetType.value, target_id: target.value, budget_item_id: targetType.value === 'budget_item' ? budgetItemId.value : undefined, amount: props.amount }]
     })
     if (updated) {
       toast.add({ title: t('payments.reallocate.success'), color: 'success' })
@@ -69,11 +73,13 @@ async function submit() {
           {{ t('payments.reallocate.hint', { amount: formatCurrency(amount) }) }}
         </p>
         <UFormField :label="t('payments.target.label')">
+          <USelect v-model="targetType" :items="[{ label: 'Presupuesto completo', value: 'budget' }, { label: 'Tratamiento', value: 'budget_item' }]" class="mb-2" />
           <AllocationTargetSelect
             v-model="target"
             :patient-id="patientId"
             budgets-only
           />
+          <BudgetItemTargetSelect v-if="targetType === 'budget_item'" v-model="budgetItemId" :budget-id="target" class="mt-2" />
         </UFormField>
         <p
           v-if="errorMsg"
@@ -92,7 +98,7 @@ async function submit() {
           {{ t('payments.new.cancel') }}
         </UButton>
         <UButton
-          :disabled="!target || isSubmitting"
+          :disabled="!target || (targetType === 'budget_item' && !budgetItemId) || isSubmitting"
           :loading="isSubmitting"
           @click="submit"
         >

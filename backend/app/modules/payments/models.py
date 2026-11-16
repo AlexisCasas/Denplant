@@ -33,7 +33,7 @@ PAYMENT_METHODS = ["cash", "card", "bank_transfer", "direct_debit", "insurance",
 
 # Allocation targets that don't require a foreign key (``on_account``)
 # vs targets backed by another row (``budget``).
-ALLOCATION_TARGET_TYPES = ["budget", "on_account"]
+ALLOCATION_TARGET_TYPES = ["budget", "budget_item", "on_account"]
 
 # Closed list of refund reason codes. UI shows localized labels; this is
 # the storage form. ``other`` allows free-text reason_note for the long
@@ -123,6 +123,12 @@ class PaymentAllocation(Base, TimestampMixin):
     budget_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("budgets.id", ondelete="RESTRICT"), nullable=True, default=None, index=True
     )
+    # A specific billable line.  ``budget_id`` remains populated too so
+    # budget-level consumers can aggregate both old general payments and
+    # new line-level payments without guessing a parent from history.
+    budget_item_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("budget_items.id", ondelete="RESTRICT"), nullable=True, default=None, index=True
+    )
 
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
 
@@ -137,18 +143,20 @@ class PaymentAllocation(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_alloc_amount_positive"),
         CheckConstraint(
-            "(target_type = 'budget' AND budget_id IS NOT NULL) "
-            "OR (target_type = 'on_account' AND budget_id IS NULL)",
+            "(target_type = 'budget' AND budget_id IS NOT NULL AND budget_item_id IS NULL) "
+            "OR (target_type = 'budget_item' AND budget_id IS NOT NULL AND budget_item_id IS NOT NULL) "
+            "OR (target_type = 'on_account' AND budget_id IS NULL AND budget_item_id IS NULL)",
             name="ck_alloc_target_consistency",
         ),
         Index("idx_alloc_payment", "payment_id"),
         Index("idx_alloc_clinic_budget", "clinic_id", "budget_id"),
+        Index("idx_alloc_clinic_budget_item", "clinic_id", "budget_item_id"),
     )
 
     @property
     def target_id(self) -> UUID | None:
         """Public accessor over the heterogeneous target reference."""
-        if self.target_type == "budget":
+        if self.target_type in ("budget", "budget_item"):
             return self.budget_id
         return None
 
