@@ -33,8 +33,10 @@ related_permissions:
   - budget.write
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/new.vue
+  - backend/app/modules/budget/frontend/composables/useBudgetDraft.ts
+  - backend/app/modules/budget/frontend/components/budget/wizard
   - backend/app/modules/budget/router.py
-last_verified_commit: b1b82f5
+last_verified_commit: 50ec879
 ---
 
 # Nuevo presupuesto
@@ -66,18 +68,32 @@ estado `draft` y el flujo continúa desde el
 
 > Requiere `budget.write`.
 
-1. Si no vienes de la ficha del paciente, selecciona el paciente en
-   la cabecera.
-2. Añade ítems desde el catálogo. Por cada línea puedes elegir:
-   - Diente y superficies (notación FDI).
-   - Cantidad, precio unitario (precargado del catálogo),
-     descuento por línea (porcentaje o absoluto).
-   - Tipo de IVA (precargado del catálogo).
-3. Aplica un descuento global si procede.
-4. Revisa los totales en el panel lateral.
-5. **Guardar**. El presupuesto se crea en `draft` y te lleva al
-   [detalle](./budgets_id.md) para enviarlo, firmarlo o
-   facturarlo más tarde.
+El formulario es un asistente de 3 pasos. Nada se guarda hasta el
+último paso: puedes ir y volver entre pasos sin perder lo escrito.
+
+1. **Datos del presupuesto.** Selecciona el paciente (se muestran
+   su documento, teléfono y edad si constan), la vigencia y las
+   notas para el paciente / internas.
+2. **Añadir tratamientos.** Busca en el catálogo (pestaña
+   *Frecuentes* con los más usados) y pulsa **+** para añadir una
+   línea, o usa **Agregar tratamiento** para indicar pieza,
+   superficies, cantidad y descuento de línea. Desde la tabla puedes
+   cambiar la cantidad, editar o quitar cada línea y aplicar un
+   descuento global (porcentaje o absoluto).
+3. **Resumen y confirmar.** Revisa paciente, tratamientos, notas y
+   totales y pulsa **Crear presupuesto**. Se envía una única
+   petición `POST /budgets` con las líneas y el descuento global; el
+   presupuesto nace en `draft` y te lleva al
+   [detalle](./budgets_id.md) para enviarlo, firmarlo o facturarlo
+   más tarde.
+
+![1](../../../../screenshots/budget/budgets-new-step1.png)
+![2](../../../../screenshots/budget/budgets-new-step2.png)
+![3](../../../../screenshots/budget/budgets-new-step3.png)
+
+Los totales de los pasos 2 y 3 son una vista previa con la misma
+fórmula que el servidor; las cifras definitivas son las que calcula
+el backend al crear.
 
 ## Crear desde un plan de tratamiento
 
