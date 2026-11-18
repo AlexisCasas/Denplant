@@ -21,6 +21,7 @@ from .schemas import (
     PatientCreate,
     PatientExtendedResponse,
     PatientExtendedUpdate,
+    PatientPermanentDeleteRequest,
     PatientResponse,
     PatientUpdate,
 )
@@ -149,7 +150,39 @@ async def delete_patient(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Patient not found",
         )
-    await PatientService.archive_patient(db, patient)
+    await PatientService.archive_patient(db, patient, archived_by=ctx.user_id)
+
+
+@router.post("/{patient_id}/restore", response_model=ApiResponse[PatientResponse])
+async def restore_patient(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PatientResponse]:
+    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    patient = await PatientService.restore_patient(db, patient, restored_by=ctx.user_id)
+    return ApiResponse(data=PatientResponse.model_validate(patient))
+
+
+@router.delete("/{patient_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def permanently_delete_patient(
+    patient_id: UUID,
+    data: PatientPermanentDeleteRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients.delete_permanent"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    if data.confirmation != "ELIMINAR":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid confirmation"
+        )
+    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await PatientService.permanently_delete_patient(db, patient, deleted_by=ctx.user_id)
 
 
 # --- Extended info ------------------------------------------------------

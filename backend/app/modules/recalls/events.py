@@ -26,7 +26,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Recall
+from .models import Recall, RecallContactAttempt
 from .service import RecallService, RecallSettingsService
 
 logger = logging.getLogger(__name__)
@@ -184,5 +184,49 @@ async def on_patient_archived(data: dict[str, Any], *, db: AsyncSession) -> None
     result = await db.execute(stmt)
     now = datetime.now(UTC)
     for recall in result.scalars().all():
+        recall.status_before_patient_archive = recall.status
+        recall.suspended_by_patient_archive = True
         recall.status = "needs_review"
         recall.updated_at = now
+
+
+async def on_patient_restored(data: dict[str, Any], *, db: AsyncSession) -> None:
+    """Restore exactly the recall state saved by the archive cascade.
+
+    Legacy ``needs_review`` rows lack the marker; they deterministically stay
+    in review rather than being guessed as pending.
+    """
+    patient_id = _safe_uuid(data.get("patient_id"))
+    clinic_id = _safe_uuid(data.get("clinic_id"))
+    if not patient_id:
+        return
+    stmt = select(Recall).where(
+        Recall.patient_id == patient_id, Recall.suspended_by_patient_archive.is_(True)
+    )
+    if clinic_id:
+        stmt = stmt.where(Recall.clinic_id == clinic_id)
+    for recall in (await db.execute(stmt)).scalars().all():
+        if recall.status_before_patient_archive:
+            recall.status = recall.status_before_patient_archive
+        recall.status_before_patient_archive = None
+        recall.suspended_by_patient_archive = False
+
+
+async def on_patient_permanent_delete(data: dict[str, Any], *, db: AsyncSession) -> None:
+    patient_id = _safe_uuid(data.get("patient_id"))
+    clinic_id = _safe_uuid(data.get("clinic_id"))
+    if patient_id and clinic_id:
+        await db.execute(
+            RecallContactAttempt.__table__.delete().where(
+                RecallContactAttempt.recall_id.in_(
+                    select(Recall.id).where(
+                        Recall.patient_id == patient_id, Recall.clinic_id == clinic_id
+                    )
+                )
+            )
+        )
+        await db.execute(
+            Recall.__table__.delete().where(
+                Recall.patient_id == patient_id, Recall.clinic_id == clinic_id
+            )
+        )

@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType
 from app.core.plugins import BaseModule
+from app.core.scheduling import ScheduledJob
 
-from .models import Document, MediaAttachment
+from .models import Document, MediaAttachment, MediaPurgeOutbox
 from .router import router
 from .service import DocumentService
 
@@ -48,7 +49,7 @@ class MediaModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [Document, MediaAttachment]
+        return [Document, MediaAttachment, MediaPurgeOutbox]
 
     def get_router(self) -> APIRouter:
         return router
@@ -61,10 +62,26 @@ class MediaModule(BaseModule):
             "attachments.write",
         ]
 
+    def get_scheduled_jobs(self) -> list[ScheduledJob]:
+        from .tasks import JOB_ID_PURGE_OUTBOX, process_media_purge_outbox
+
+        return [
+            ScheduledJob(
+                id=JOB_ID_PURGE_OUTBOX,
+                func=process_media_purge_outbox,
+                trigger="interval",
+                trigger_args={"minutes": 1},
+                name="Process media purge outbox (every minute)",
+                max_instances=1,
+            )
+        ]
+
     def get_event_handlers(self) -> dict[str, Any]:
         """Register event handlers."""
         return {
             EventType.PATIENT_ARCHIVED: self._on_patient_archived,
+            EventType.PATIENT_RESTORED: self._on_patient_restored,
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: self._on_patient_permanent_delete,
         }
 
     async def _on_patient_archived(self, data: dict, *, db: AsyncSession) -> None:
@@ -88,3 +105,15 @@ class MediaModule(BaseModule):
         await DocumentService.archive_patient_documents(
             db, UUID(str(clinic_id)), UUID(str(patient_id))
         )
+
+    async def _on_patient_restored(self, data: dict, *, db: AsyncSession) -> None:
+        if data.get("patient_id") and data.get("clinic_id"):
+            await DocumentService.restore_patient_documents(
+                db, UUID(str(data["clinic_id"])), UUID(str(data["patient_id"]))
+            )
+
+    async def _on_patient_permanent_delete(self, data: dict, *, db: AsyncSession) -> None:
+        if data.get("patient_id") and data.get("clinic_id"):
+            await DocumentService.queue_patient_document_purge(
+                db, UUID(str(data["clinic_id"])), UUID(str(data["patient_id"]))
+            )

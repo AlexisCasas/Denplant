@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- feat(DP-33): patient lifecycle events now archive/restore only the relevant
+  documents. Permanent patient deletion queues originals and generated image
+  variants in a retryable purge outbox, drained every minute by the module's
+  scheduler job after the database transaction commits.
+
 - fix(#184): type-check clean — drop the `onRequest` hook that cast ofetch's `Headers` to delete `Content-Type` (ofetch already leaves it unset for `FormData`).
 - fix(#183): `patient.archived` cascade is transactional (ADR 0019) — the documents are archived with the patient, and no longer stay archived when the request rolls back. Covered end-to-end now that it shares the publisher's session.
 - fix(events): repair the `patient.archived` cascade, which had never

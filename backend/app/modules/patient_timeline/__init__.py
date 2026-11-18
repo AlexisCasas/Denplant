@@ -63,7 +63,10 @@ class PatientTimelineModule(BaseModule):
 
     def get_event_handlers(self) -> dict[str, Any]:
         """Populate the timeline from other modules' events."""
+        from .deletion import on_patient_permanent_delete
+
         return {
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
             # Visits
             EventType.APPOINTMENT_SCHEDULED: events.on_appointment_scheduled,
             EventType.APPOINTMENT_CONFIRMED: events.on_appointment_confirmed,

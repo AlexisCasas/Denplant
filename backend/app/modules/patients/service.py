@@ -5,6 +5,7 @@ Moved from ``app.modules.clinical.service`` in Fase B.1 chunk 2.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -14,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.events import EventType, event_bus
 from app.core.list_query import parse_sort
 
-from .models import Patient
+from .models import Patient, PatientPermanentDeletionAudit
 
 # Public field name → SQL column. Decouples the URL from internal naming
 # and prevents callers from sorting by arbitrary columns.
@@ -283,8 +284,12 @@ class PatientService:
         return patient
 
     @staticmethod
-    async def archive_patient(db: AsyncSession, patient: Patient) -> Patient:
+    async def archive_patient(
+        db: AsyncSession, patient: Patient, *, archived_by: UUID | None = None
+    ) -> Patient:
         patient.status = "archived"
+        patient.archived_at = datetime.now(UTC)
+        patient.archived_by = archived_by
         await db.flush()
 
         await event_bus.publish(
@@ -293,3 +298,82 @@ class PatientService:
             db=db,
         )
         return patient
+
+    @staticmethod
+    async def restore_patient(db: AsyncSession, patient: Patient, *, restored_by: UUID) -> Patient:
+        if patient.status != "archived":
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Patient is not archived")
+        patient.status = "active"
+        patient.restored_at = datetime.now(UTC)
+        patient.restored_by = restored_by
+        await db.flush()
+        await event_bus.publish(
+            EventType.PATIENT_RESTORED,
+            {
+                "patient_id": str(patient.id),
+                "clinic_id": str(patient.clinic_id),
+                "restored_by": str(restored_by),
+            },
+            db=db,
+        )
+        return patient
+
+    @staticmethod
+    async def permanently_delete_patient(
+        db: AsyncSession, patient: Patient, *, deleted_by: UUID
+    ) -> None:
+        """Delete module-owned data through transactional event handlers.
+
+        The caller has already resolved the patient by ``clinic_id``.  The
+        audit insert and every subscriber share this session, so any raised
+        error rolls all database work back in ``get_db``.
+        """
+        # Fiscal records are immutable by policy.  This preflight happens
+        # before creating even the deletion audit, so a 409 changes nothing.
+        fiscal = await db.scalar(
+            text(
+                "SELECT EXISTS (SELECT 1 FROM invoices i "
+                "LEFT JOIN verifactu_records vr ON vr.invoice_id = i.id "
+                "WHERE i.patient_id = :patient_id AND i.clinic_id = :clinic_id "
+                "AND (vr.id IS NOT NULL OR i.invoice_number IS NOT NULL OR i.status <> 'draft'))"
+            ),
+            {"patient_id": patient.id, "clinic_id": patient.clinic_id},
+        )
+        if fiscal:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="El paciente posee documentos fiscales que impiden su eliminación definitiva.",
+            )
+        audit = PatientPermanentDeletionAudit(
+            old_patient_id=patient.id,
+            clinic_id=patient.clinic_id,
+            patient_name=patient.full_name,
+            deleted_by=deleted_by,
+            deleted_at=datetime.now(UTC),
+            action="patient.permanently_deleted",
+        )
+        db.add(audit)
+        await db.flush()
+        payload = {
+            "patient_id": str(patient.id),
+            "clinic_id": str(patient.clinic_id),
+            "deleted_by": str(deleted_by),
+        }
+        # A fixed phase sequence removes dependent rows before their parents;
+        # each subscriber only acts in the phase it owns.
+        for phase in (
+            "financial",
+            "notes",
+            "appointments",
+            "plans",
+            "budgets",
+            "odontogram",
+            "clinical",
+        ):
+            await event_bus.publish(
+                EventType.PATIENT_PERMANENT_DELETE_REQUESTED,
+                {**payload, "phase": phase},
+                db=db,
+            )
+        await db.delete(patient)
+        await db.flush()

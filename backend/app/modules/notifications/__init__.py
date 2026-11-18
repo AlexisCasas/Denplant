@@ -103,9 +103,11 @@ class NotificationsModule(BaseModule):
         ]
 
     def get_event_handlers(self) -> dict:
+        from .deletion import on_patient_permanent_delete
         from .handlers import NotificationHandlers
 
         return {
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
             EventType.APPOINTMENT_SCHEDULED: NotificationHandlers.on_appointment_scheduled,
             EventType.APPOINTMENT_CANCELLED: NotificationHandlers.on_appointment_cancelled,
             EventType.PATIENT_CREATED: NotificationHandlers.on_patient_created,

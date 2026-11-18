@@ -9,11 +9,11 @@ per-row tables. Alerts moved with them to
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Date, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,12 @@ class Patient(Base, TimestampMixin):
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="active")  # active, archived
+    # Lifecycle metadata is intentionally kept on the identity row.  The
+    # permanent-delete audit below survives removal of this row.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    restored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    restored_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     # Operational opt-out: when true, recalls / outreach modules must
     # exclude the patient from active call lists and surface them in a
     # ``needs_review`` bucket instead.
@@ -76,3 +82,20 @@ class Patient(Base, TimestampMixin):
     def has_complete_billing_info(self) -> bool:
         """Check if patient has minimum billing info for invoicing."""
         return bool(self.billing_name and self.billing_tax_id)
+
+
+class PatientPermanentDeletionAudit(Base):
+    """Minimal immutable record retained after a patient is removed.
+
+    Deliberately has no foreign key to ``patients``.
+    """
+
+    __tablename__ = "patient_permanent_deletion_audits"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    old_patient_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
+    patient_name: Mapped[str] = mapped_column(String(201))
+    deleted_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    action: Mapped[str] = mapped_column(String(64), default="patient.permanently_deleted")

@@ -55,4 +55,8 @@ class OdontogramModule(BaseModule):
     def get_event_handlers(self) -> dict:
         # Propagation from plan -> treatment performed now lives directly in
         # TreatmentPlanService.complete_item, so no subscriptions are needed here.
-        return {}
+        from app.core.events import EventType
+
+        from .deletion import on_patient_permanent_delete
+
+        return {EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete}

@@ -9,7 +9,7 @@ from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
 
-from .models import Patient
+from .models import Patient, PatientPermanentDeletionAudit
 from .router import router
 
 
@@ -31,7 +31,9 @@ class PatientsModule(BaseModule):
             "admin": ["*"],
             "dentist": ["*"],
             "hygienist": ["read"],
-            "assistant": ["*"],
+            # Keep the existing operational capabilities but do not grant
+            # irreversible deletion implicitly.
+            "assistant": ["read", "write"],
             "receptionist": ["read", "write"],
         },
         "frontend": {
@@ -49,13 +51,13 @@ class PatientsModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [Patient]
+        return [Patient, PatientPermanentDeletionAudit]
 
     def get_router(self) -> APIRouter:
         return router
 
     def get_permissions(self) -> list[str]:
-        return ["read", "write"]
+        return ["read", "write", "delete_permanent"]
 
     def get_tools(self) -> list:
         from . import tools

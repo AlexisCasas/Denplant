@@ -65,6 +65,17 @@ through `attachment_registry`.
 ## Events consumed
 
 - `patient.archived` → cascade soft-archive of associated documents.
+- `patient.restored` → restore only documents archived by the patient
+  lifecycle (or use the deterministic legacy fallback).
+- `patient.permanent_delete_requested` → remove document rows in the same
+  transaction and queue their original and generated variants for physical
+  storage purge.
+
+## Background jobs
+
+- `media_purge_outbox` runs every minute with one instance at a time. It
+  drains pending/failed physical-file deletion intents using its own session;
+  failures remain retryable and do not undo the committed patient deletion.
 
 ## Lifecycle
 

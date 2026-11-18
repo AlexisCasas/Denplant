@@ -209,6 +209,10 @@ const summaryCards = computed(() =>
 
 // Archive patient
 const isArchiveModalOpen = ref(false)
+const isRestoreModalOpen = ref(false)
+const isPermanentDeleteModalOpen = ref(false)
+const permanentConfirmation = ref('')
+const canPermanentlyDelete = computed(() => can(PERMISSIONS.patients.deletePermanent))
 
 async function archivePatient() {
   isSubmitting.value = true
@@ -234,6 +238,37 @@ async function archivePatient() {
   } finally {
     isSubmitting.value = false
     isArchiveModalOpen.value = false
+  }
+}
+
+async function restorePatient() {
+  isSubmitting.value = true
+  try {
+    await api.post(`/api/v1/patients/${patientId}/restore`, {})
+    toast.add({ title: t('common.success'), description: 'Paciente desarchivado correctamente.', color: 'success' })
+    await refresh()
+  } catch {
+    toast.add({ title: t('common.error'), description: t('common.serverError'), color: 'error' })
+  } finally {
+    isSubmitting.value = false
+    isRestoreModalOpen.value = false
+  }
+}
+
+async function permanentlyDeletePatient() {
+  if (permanentConfirmation.value !== 'ELIMINAR') return
+  isSubmitting.value = true
+  try {
+    await api.$api(`/api/v1/patients/${patientId}/permanent`, {
+      method: 'DELETE', body: { confirmation: 'ELIMINAR' }
+    })
+    toast.add({ title: t('common.success'), description: 'Paciente eliminado definitivamente.', color: 'success' })
+    await router.push('/patients')
+  } catch {
+    toast.add({ title: t('common.error'), description: t('common.serverError'), color: 'error' })
+  } finally {
+    isSubmitting.value = false
+    isPermanentDeleteModalOpen.value = false
   }
 }
 
@@ -325,6 +360,7 @@ function collect() {
         @new-note="newNote"
         @collect="collect"
         @archive="isArchiveModalOpen = true"
+        @restore="isRestoreModalOpen = true"
       />
 
       <main class="w-full min-w-0">
@@ -438,6 +474,7 @@ function collect() {
                   </div>
                 </div>
                 <UButton
+                  v-if="patient?.status === 'active'"
                   variant="outline"
                   color="error"
                   icon="i-lucide-archive"
@@ -445,6 +482,26 @@ function collect() {
                   @click="isArchiveModalOpen = true"
                 >
                   {{ t('patients.archive') }}
+                </UButton>
+                <UButton
+                  v-else
+                  variant="outline"
+                  color="primary"
+                  icon="i-lucide-archive-restore"
+                  size="sm"
+                  @click="isRestoreModalOpen = true"
+                >
+                  Desarchivar paciente
+                </UButton>
+                <UButton
+                  v-if="canPermanentlyDelete"
+                  variant="outline"
+                  color="error"
+                  icon="i-lucide-trash-2"
+                  size="sm"
+                  @click="isPermanentDeleteModalOpen = true"
+                >
+                  Eliminar definitivamente
                 </UButton>
               </div>
             </div>
@@ -534,6 +591,76 @@ function collect() {
                 @click="archivePatient"
               >
                 {{ t('patients.archive') }}
+              </UButton>
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="isRestoreModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-h1 text-default">
+              Desarchivar paciente
+            </h2>
+          </template>
+          <p class="text-body text-muted">
+            ¿Deseas desarchivar a {{ patient?.first_name }} {{ patient?.last_name }}? El paciente y su historial volverán a estar disponibles.
+          </p>
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <UButton
+                variant="outline"
+                color="neutral"
+                @click="isRestoreModalOpen = false"
+              >
+                {{ t('patients.cancel') }}
+              </UButton><UButton
+                color="primary"
+                :loading="isSubmitting"
+                @click="restorePatient"
+              >
+                Desarchivar paciente
+              </UButton>
+            </div>
+          </template>
+        </UCard>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="isPermanentDeleteModalOpen">
+      <template #content>
+        <UCard>
+          <template #header>
+            <h2 class="text-h1 text-default">
+              Eliminar definitivamente a {{ patient?.first_name }} {{ patient?.last_name }}
+            </h2>
+          </template>
+          <p class="text-body text-muted">
+            Esta acción eliminará permanentemente al paciente y toda la información relacionada que pueda eliminarse de forma segura, incluyendo historial clínico, tratamientos, odontograma, citas, presupuestos, pagos, documentos e imágenes. Esta acción no se puede deshacer.
+          </p>
+          <UInput
+            v-model="permanentConfirmation"
+            class="mt-4"
+            placeholder="Escribe ELIMINAR"
+          />
+          <template #footer>
+            <div class="flex justify-end gap-3">
+              <UButton
+                variant="outline"
+                color="neutral"
+                @click="isPermanentDeleteModalOpen = false"
+              >
+                {{ t('patients.cancel') }}
+              </UButton><UButton
+                color="error"
+                :disabled="permanentConfirmation !== 'ELIMINAR'"
+                :loading="isSubmitting"
+                @click="permanentlyDeletePatient"
+              >
+                Eliminar definitivamente
               </UButton>
             </div>
           </template>

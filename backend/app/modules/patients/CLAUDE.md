@@ -41,6 +41,12 @@ fields stay manual.
 
 ## Events emitted
 
+- `patient.restored` — emitted after a patient archive is reverted; payload
+  includes `patient_id`, `clinic_id`, and `restored_by`.
+- `patient.permanent_delete_requested` — transactional deletion cascade;
+  payload includes `patient_id`, `clinic_id`, `deleted_by`, and lifecycle
+  phase.
+
 | Event | When | Payload keys |
 |---|---|---|
 | `patient.created` | `PatientService.create` succeeds | `patient_id`, `clinic_id` |

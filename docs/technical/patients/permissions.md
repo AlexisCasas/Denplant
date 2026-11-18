@@ -12,6 +12,7 @@ permission registry namespaces them as `patients.<name>`).
 |------------|--------|-------------|
 | `patients.read` | Read patient identity rows (list, recent, detail, extended GET). | `GET /api/v1/patients`, `GET /api/v1/patients/recent`, `GET /api/v1/patients/{id}`, `GET /api/v1/patients/{id}/extended` |
 | `patients.write` | Create, update, archive, edit extended demographics. | `POST /api/v1/patients`, `PUT /api/v1/patients/{id}`, `DELETE /api/v1/patients/{id}`, `PUT /api/v1/patients/{id}/extended` |
+| `patients.delete_permanent` | Irreversibly delete a non-fiscal patient after the `ELIMINAR` confirmation. | `DELETE /api/v1/patients/{id}/permanent` |
 
 ## Role assignment
 
@@ -19,11 +20,11 @@ Default role mappings (in `backend/app/core/auth/permissions.py`):
 
 | Role | Patients access |
 |------|-----------------|
-| `admin` | Both (via `*`). |
-| `dentist` | Both (via `clinical.*`). |
-| `hygienist` | Read only (`clinical.patients.read`). |
-| `assistant` | Both (`clinical.patients.*`). |
-| `receptionist` | Both (`clinical.patients.*`). |
+| `admin` | All, including permanent deletion. |
+| `dentist` | All, including permanent deletion. |
+| `hygienist` | Read only. |
+| `assistant` | Read and write; no permanent deletion. |
+| `receptionist` | Read and write; no permanent deletion. |
 
 ## Adding a new permission
 

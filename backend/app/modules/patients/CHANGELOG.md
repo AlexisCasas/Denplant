@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- feat(DP-33): archive and restore patients with actor/timestamp metadata;
+  administrators and dentists may permanently delete a patient after an
+  explicit confirmation. Permanent deletion is transactionally cascaded to
+  participating modules, blocks fiscal records, and retains a minimal audit
+  row without the deleted patient's foreign key.
+
 - fix(#184): type-check clean. `PatientUpdate`/`PatientExtendedUpdate` are declared explicitly with `| null` (an explicit `null` clears the field — the section edit modal already relied on it); `ClinicalMode` moves to the shared types (the tab imported it from another module's `.vue`); the visit summary renders the treatment's localized `names` (`.name` never existed); the Administration → Budgets tab shows the linked plan number via `plan_number_snapshot` (the old `treatment_plan_id` check never rendered); `UAvatar :ui.text` is `fallback` in Nuxt UI v4.
 - fix(#183): `patient.created` / `patient.archived` are published with `db=` so the notifications, recalls and media handlers see the row and roll back with it (ADR 0019).
 - feat(onboarding): optional getting-started rule `first-patient` — suggests creating the first patient.
