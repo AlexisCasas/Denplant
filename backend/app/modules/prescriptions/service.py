@@ -293,7 +293,14 @@ class PrescriptionService:
         medication_id = (
             await db.execute(
                 pg_insert(medication_table)
-                .values(id=uuid4(), clinic_id=ctx.clinic_id, active=True, created_at=now, updated_at=now, **values)
+                .values(
+                    id=uuid4(),
+                    clinic_id=ctx.clinic_id,
+                    active=True,
+                    created_at=now,
+                    updated_at=now,
+                    **values,
+                )
                 .on_conflict_do_nothing(constraint="uq_rx_medication_clinic_dedupe")
                 .returning(medication_table.c.id)
             )
@@ -311,8 +318,11 @@ class PrescriptionService:
         await db.execute(
             pg_insert(favorite_table)
             .values(
-                id=uuid4(), clinic_id=ctx.clinic_id, doctor_id=ctx.user_id,
-                medication_id=medication_id, created_at=now,
+                id=uuid4(),
+                clinic_id=ctx.clinic_id,
+                doctor_id=ctx.user_id,
+                medication_id=medication_id,
+                created_at=now,
             )
             .on_conflict_do_nothing(constraint="uq_rx_favorite_doctor_medication")
         )

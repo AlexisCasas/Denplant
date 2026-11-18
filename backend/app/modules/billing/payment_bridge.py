@@ -96,7 +96,7 @@ async def reconcile_payment(
         .where(
             PaymentAllocation.clinic_id == clinic_id,
             PaymentAllocation.payment_id == payment_id,
-            PaymentAllocation.target_type == "budget",
+            PaymentAllocation.target_type.in_(("budget", "budget_item")),
         )
         .group_by(PaymentAllocation.budget_id)
     )
@@ -180,7 +180,7 @@ async def sweep_budget_into_invoice(db: AsyncSession, *, invoice: Invoice, actor
         .where(
             PaymentAllocation.clinic_id == invoice.clinic_id,
             PaymentAllocation.budget_id == invoice.budget_id,
-            PaymentAllocation.target_type == "budget",
+            PaymentAllocation.target_type.in_(("budget", "budget_item")),
         )
         .group_by(PaymentAllocation.payment_id)
         .order_by(func.min(PaymentAllocation.created_at))

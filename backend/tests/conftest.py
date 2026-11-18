@@ -67,7 +67,7 @@ from app.modules.odontogram.nts.models import (  # noqa: F401
     NtsRecordAuditEvent,
     NtsRecordSpecification,
 )
-from app.modules.patients.models import Patient  # noqa: F401
+from app.modules.patients.models import Patient, PatientPermanentDeletionAudit  # noqa: F401
 from app.modules.payments.models import (  # noqa: F401
     PatientEarnedEntry,
     Payment,

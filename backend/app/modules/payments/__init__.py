@@ -85,6 +85,8 @@ class PaymentsModule(BaseModule):
         return tools.get_tools()
 
     def get_event_handlers(self) -> dict:
+        from .deletion import on_patient_permanent_delete
+
         return {
             EventType.ODONTOGRAM_TREATMENT_PERFORMED: on_treatment_performed,
             # Per-session earned signal (multi-session billing).
@@ -92,4 +94,5 @@ class PaymentsModule(BaseModule):
             # ``treatment_plan.treatment_completed`` handler was removed
             # to avoid double-booking the same treatment.
             EventType.TREATMENT_PLAN_ITEM_SESSION_COMPLETED: on_session_completed,
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
         }

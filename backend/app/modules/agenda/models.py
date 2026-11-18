@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -108,6 +109,9 @@ class Appointment(Base, TimestampMixin):
         DateTime(timezone=True), server_default=func.now()
     )
     color: Mapped[str | None] = mapped_column(String(7))
+    appointment_label_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("appointment_labels.id", ondelete="SET NULL"), index=True, nullable=True
+    )
 
     clinic: Mapped[Clinic] = relationship(back_populates="appointments")
     # No ``back_populates`` — patients is foundational and cannot
@@ -117,6 +121,7 @@ class Appointment(Base, TimestampMixin):
     professional: Mapped[User] = relationship(foreign_keys=[professional_id])
     cabinet_assigner: Mapped[User | None] = relationship(foreign_keys=[cabinet_assigned_by])
     cabinet_ref: Mapped[Cabinet | None] = relationship()
+    appointment_label: Mapped[AppointmentLabel | None] = relationship()
 
     treatments: Mapped[list[AppointmentTreatment]] = relationship(
         back_populates="appointment",
@@ -150,6 +155,22 @@ class Appointment(Base, TimestampMixin):
             "status IN (" + ", ".join(f"'{s}'" for s in APPOINTMENT_STATUSES) + ")",
             name="ck_appointment_status_valid",
         ),
+    )
+
+
+class AppointmentLabel(Base, TimestampMixin):
+    """Clinic-owned visual label, separate from clinical status."""
+
+    __tablename__ = "appointment_labels"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
+    name: Mapped[str] = mapped_column(String(40))
+    color: Mapped[str] = mapped_column(String(7))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+
+    __table_args__ = (
+        Index("uq_appointment_label_clinic_name_ci", "clinic_id", func.lower(name), unique=True),
     )
 
 

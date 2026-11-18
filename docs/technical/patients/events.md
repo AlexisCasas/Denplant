@@ -14,7 +14,9 @@ Per-module slice of [`docs/events-catalog.md`](../../events-catalog.md)
 |-------|--------|------|---------|
 | `patient.created` | `service.py:PatientService.create` | After insert + extended row commit. | `patient_id` (UUID), `clinic_id` (UUID) |
 | `patient.updated` | `service.py:PatientService.update` | After partial update commit. | `patient_id` (UUID), `changes` (dict of changed fields) |
-| `patient.archived` | `service.py:PatientService.archive` | After soft-delete (status → archived). | `patient_id` (UUID) |
+| `patient.archived` | `service.py:PatientService.archive` | After soft-delete (status → archived). | `patient_id` (UUID), `clinic_id` (UUID) |
+| `patient.restored` | `service.py:PatientService.restore` | After an archive is reversed. | `patient_id` (UUID), `clinic_id` (UUID), `restored_by` (UUID) |
+| `patient.permanent_delete_requested` | `service.py:PatientService.permanently_delete_patient` | Before physical deletion, once per owned-data phase. | `patient_id` (UUID), `clinic_id` (UUID), `deleted_by` (UUID), `phase` (string) |
 
 Subscribers are listed in the auto-generated [events catalog](../../events-catalog.md).
 

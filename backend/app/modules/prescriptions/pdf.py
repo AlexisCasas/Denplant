@@ -417,12 +417,15 @@ def _load_weasyprint() -> Any:
 
 
 def _url_fetcher(weasyprint: Any) -> Any:
-    # WeasyPrint >= 68 has a fetcher class that can be limited by protocol; older
-    # versions take a plain callable.
-    fetcher_class = getattr(weasyprint, "URLFetcher", None)
-    if fetcher_class is not None:
-        return fetcher_class(allowed_protocols=("data",))
-    return data_only_url_fetcher
+    # URLFetcher moved out of WeasyPrint's top-level namespace in version 70.
+    # Import it from its documented module so current releases retain the
+    # protocol allow-list. Older compatible releases still use the callable.
+    try:
+        from weasyprint.urls import URLFetcher
+    except (ImportError, AttributeError):
+        return data_only_url_fetcher
+    else:
+        return URLFetcher(allowed_protocols=("data",))
 
 
 def _html_to_pdf(html_content: str, prescription_id: UUID) -> bytes:

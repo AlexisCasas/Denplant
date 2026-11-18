@@ -117,6 +117,7 @@ class TreatmentPlanModule(BaseModule):
         ]
 
     def get_event_handlers(self) -> dict[str, Any]:
+        from .deletion import on_patient_permanent_delete
         from .events import (
             on_appointment_completed,
             on_budget_accepted,
@@ -128,6 +129,7 @@ class TreatmentPlanModule(BaseModule):
         )
 
         return {
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
             EventType.APPOINTMENT_COMPLETED: on_appointment_completed,
             EventType.BUDGET_ACCEPTED: on_budget_accepted,
             EventType.BUDGET_CANCELLED: on_budget_cancelled,

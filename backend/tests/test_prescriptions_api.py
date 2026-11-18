@@ -1039,6 +1039,25 @@ async def test_a_prescription_does_not_rewrite_itself_when_its_sources_change(ap
 
 
 @pytest.mark.asyncio
+async def test_updating_registration_only_affects_future_prescriptions(api, env):
+    issued = await _issue(api, env)
+
+    update = await api.put(
+        f"/api/v1/auth/users/{env.dentist_id}",
+        headers=env.admin,
+        json={"professional_id": "  COP-NUEVO  "},
+    )
+    assert update.status_code == 200
+    assert update.json()["data"]["professional_id"] == "COP-NUEVO"
+
+    historical = (await _get(api, env.admin, issued["id"])).json()["data"]
+    assert historical["prescriber_professional_id_snapshot"] == "COP-111"
+
+    later = await _issue(api, env)
+    assert later["prescriber_professional_id_snapshot"] == "COP-NUEVO"
+
+
+@pytest.mark.asyncio
 async def test_a_new_prescription_after_the_change_uses_the_new_values(api, env, inspect):
     await _issue(api, env)
     session = inspect()

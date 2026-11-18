@@ -21,6 +21,8 @@ from .events import (
     on_appointment_completed,
     on_appointment_scheduled,
     on_patient_archived,
+    on_patient_permanent_delete,
+    on_patient_restored,
     on_treatment_plan_completed,
 )
 from .models import Recall, RecallContactAttempt, RecallSettings
@@ -81,6 +83,8 @@ class RecallsModule(BaseModule):
             "appointment.cancelled": on_appointment_cancelled,
             "treatment_plan.treatment_completed": on_treatment_plan_completed,
             "patient.archived": on_patient_archived,
+            "patient.restored": on_patient_restored,
+            "patient.permanent_delete_requested": on_patient_permanent_delete,
         }
 
     def get_tools(self) -> list:

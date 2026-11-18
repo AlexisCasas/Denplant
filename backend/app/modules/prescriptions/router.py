@@ -137,7 +137,10 @@ async def list_medication_favorites(
 ) -> ApiResponse[list[PrescriptionMedicationFavoriteResponse]]:
     rows = await _guard(PrescriptionService.list_favorite_medications(db, ctx))
     return ApiResponse(
-        data=[PrescriptionMedicationFavoriteResponse.model_validate(_medication_response(row)) for row in rows]
+        data=[
+            PrescriptionMedicationFavoriteResponse.model_validate(_medication_response(row))
+            for row in rows
+        ]
     )
 
 
@@ -153,7 +156,9 @@ async def save_medication_favorite(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PrescriptionMedicationFavoriteResponse]:
     row = await _guard(PrescriptionService.save_favorite_medication(db, ctx, data))
-    return ApiResponse(data=PrescriptionMedicationFavoriteResponse.model_validate(_medication_response(row)))
+    return ApiResponse(
+        data=PrescriptionMedicationFavoriteResponse.model_validate(_medication_response(row))
+    )
 
 
 @router.delete(

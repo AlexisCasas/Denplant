@@ -22,6 +22,7 @@ from .schemas import (
     PatientCreate,
     PatientExtendedResponse,
     PatientExtendedUpdate,
+    PatientPermanentDeleteRequest,
     PatientResponse,
     PatientUpdate,
 )
@@ -58,6 +59,7 @@ async def list_patients(
     patient_ids: list[UUID] | None = Query(default=None),
     city: str | None = Query(default=None, max_length=100),
     do_not_contact: bool | None = Query(default=None),
+    statuses: list[str] | None = Query(default=None, alias="status"),
     include_archived: bool = Query(default=False),
     sort: str | None = Query(default=None, max_length=50),
 ) -> PaginatedApiResponse[PatientResponse]:
@@ -67,6 +69,9 @@ async def list_patients(
     filters such as "with debt > 0" (resolved server-side by the
     payments module, then passed in here).
     """
+    include_archived_for_scope = include_archived or (
+        statuses is not None and "archived" in statuses
+    )
     patients, total = await PatientService.list_patients(
         db,
         ctx.clinic_id,
@@ -76,9 +81,13 @@ async def list_patients(
         patient_ids=patient_ids,
         city=city,
         do_not_contact=do_not_contact,
+        statuses=statuses,
         include_archived=include_archived,
         sort=sort,
-        access_predicate=PatientAccessPolicy.predicate(ctx),
+        access_predicate=PatientAccessPolicy.list_predicate(
+            ctx,
+            include_archived=include_archived_for_scope,
+        ),
     )
     return PaginatedApiResponse(
         data=[PatientResponse.model_validate(p) for p in patients],
@@ -162,7 +171,39 @@ async def delete_patient(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Patient not found",
         )
-    await PatientService.archive_patient(db, patient)
+    await PatientService.archive_patient(db, patient, archived_by=ctx.user_id)
+
+
+@router.post("/{patient_id}/restore", response_model=ApiResponse[PatientResponse])
+async def restore_patient(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PatientResponse]:
+    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    patient = await PatientService.restore_patient(db, patient, restored_by=ctx.user_id)
+    return ApiResponse(data=PatientResponse.model_validate(patient))
+
+
+@router.delete("/{patient_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def permanently_delete_patient(
+    patient_id: UUID,
+    data: PatientPermanentDeleteRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients.delete_permanent"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    if data.confirmation != "ELIMINAR":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid confirmation"
+        )
+    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    await PatientService.permanently_delete_patient(db, patient, deleted_by=ctx.user_id)
 
 
 # --- Extended info ------------------------------------------------------

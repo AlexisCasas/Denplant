@@ -53,6 +53,10 @@ class PatientUpdate(BaseModel):
     billing_email: EmailStr | None = None
 
 
+class PatientPermanentDeleteRequest(BaseModel):
+    confirmation: str
+
+
 class PatientResponse(BaseModel):
     id: UUID
     clinic_id: UUID

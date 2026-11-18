@@ -24,6 +24,10 @@ class EventType:
     PATIENT_CREATED = "patient.created"
     PATIENT_UPDATED = "patient.updated"
     PATIENT_ARCHIVED = "patient.archived"
+    PATIENT_RESTORED = "patient.restored"
+    # Transactional cleanup event; subscribers receive the publisher's DB
+    # session and must raise to abort the whole deletion.
+    PATIENT_PERMANENT_DELETE_REQUESTED = "patient.permanent_delete_requested"
     PATIENT_MEDICAL_UPDATED = "patient.medical_updated"
 
     # Appointment events

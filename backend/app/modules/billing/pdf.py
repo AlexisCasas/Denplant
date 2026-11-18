@@ -1,12 +1,15 @@
 """Invoice PDF generation service."""
 
 import asyncio
+import base64
 import hashlib
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from app.core.clinic_branding import logo_data_uri
 from app.core.utils.currency import format_currency as _fmt_currency
 
 if TYPE_CHECKING:
@@ -68,6 +71,7 @@ class InvoicePDFService:
         # Generate HTML content. ``total_paid`` / ``balance_due`` are
         # computed by callers (billing service) since they are no longer
         # stored on Invoice.
+        logo = await logo_data_uri(clinic)
         html_content = InvoicePDFService._generate_html(
             invoice,
             clinic,
@@ -76,6 +80,7 @@ class InvoicePDFService:
             extra_pdf_data or {},
             total_paid=total_paid or Decimal("0"),
             balance_due=balance_due if balance_due is not None else invoice.total,
+            logo=logo,
         )
 
         # WeasyPrint is CPU-bound; offload to a thread so the event
@@ -96,9 +101,16 @@ class InvoicePDFService:
         extra_pdf_data: dict | None = None,
         total_paid: Decimal = Decimal("0"),
         balance_due: Decimal | None = None,
+        logo: str | None = None,
     ) -> str:
         """Generate HTML content for the invoice."""
         extra = extra_pdf_data or {}
+        dental_background_data_uri = (
+            "data:image/png;base64,"
+            + base64.b64encode(
+                (Path(__file__).parent / "assets" / "dental-page-background.png").read_bytes()
+            ).decode("ascii")
+        )
         # Localized labels
         labels = InvoicePDFService._get_labels(locale)
 
@@ -130,7 +142,6 @@ class InvoicePDFService:
                 </td>
                 <td class="quantity">{item.quantity}</td>
                 <td class="price">{format_currency(item.unit_price)}</td>
-                {f'<td class="discount">{format_currency(item.line_discount)}</td>' if item.line_discount else '<td class="discount">-</td>'}
                 <td class="vat">{item.vat_rate}%</td>
                 <td class="total">{format_currency(item.line_total)}</td>
             </tr>
@@ -150,8 +161,10 @@ class InvoicePDFService:
                 left: 50%;
                 transform: translate(-50%, -50%) rotate(-45deg);
                 font-size: 120px;
-                color: rgba(200, 200, 200, 0.3);
-                z-index: 1000;
+                font-weight: 600;
+                letter-spacing: 3px;
+                color: rgba(114, 208, 221, 0.12);
+                z-index: 0;
                 pointer-events: none;
             }
             """
@@ -221,62 +234,77 @@ class InvoicePDFService:
                     padding: 0;
                     box-sizing: border-box;
                 }}
+                @page {{
+                    size: A4;
+                    margin: 18mm 16mm 24mm;
+                    background-color: #fff;
+                    background-image: url("{dental_background_data_uri}");
+                    background-repeat: no-repeat;
+                    background-position: 120% 110%;
+                    background-size: 118mm auto;
+                }}
                 body {{
                     font-family: 'Helvetica Neue', Arial, sans-serif;
-                    font-size: 11pt;
+                    font-size: 10pt;
                     line-height: 1.4;
-                    color: #333;
-                    padding: 20mm;
+                    color: #2f3d40;
+                    padding: 0;
                 }}
                 {watermark_style}
                 .header {{
                     display: flex;
                     justify-content: space-between;
-                    margin-bottom: 30px;
-                    padding-bottom: 20px;
-                    border-bottom: 2px solid #2563eb;
+                    align-items: center;
+                    margin-bottom: 11mm;
+                    padding: 2mm 0 5mm;
+                    border-bottom: 1px solid #72d0dd;
                 }}
                 .clinic-info {{
                     max-width: 60%;
+                    padding-top: 0;
                 }}
                 .clinic-name {{
-                    font-size: 18pt;
-                    font-weight: bold;
-                    color: #1e40af;
-                    margin-bottom: 5px;
+                    font-size: 15pt;
+                    font-weight: 600;
+                    color: #246575;
+                    margin-bottom: 4px;
+                    letter-spacing: .1px;
                 }}
                 .clinic-details {{
-                    font-size: 9pt;
-                    color: #666;
+                    font-size: 8pt;
+                    line-height: 1.45;
+                    color: #718186;
                 }}
                 .invoice-info {{
                     text-align: right;
                 }}
                 .invoice-number {{
-                    font-size: 14pt;
-                    font-weight: bold;
-                    color: #1e40af;
+                    font-size: 13pt;
+                    font-weight: 700;
+                    color: #246575;
+                    letter-spacing: .3px;
                 }}
                 .invoice-meta {{
-                    font-size: 9pt;
-                    color: #666;
-                    margin-top: 5px;
+                    font-size: 8pt;
+                    color: #718186;
+                    margin-top: 4px;
                 }}
                 .status-badge {{
                     display: inline-block;
-                    padding: 3px 10px;
+                    padding: 2px 8px;
+                    border: 1px solid transparent;
                     border-radius: 12px;
-                    font-size: 9pt;
-                    font-weight: bold;
+                    font-size: 7.5pt;
+                    font-weight: 600;
                     text-transform: uppercase;
                     margin-top: 8px;
                 }}
-                .status-draft {{ background: #e5e7eb; color: #374151; }}
-                .status-issued {{ background: #dbeafe; color: #1e40af; }}
-                .status-partial {{ background: #fef3c7; color: #92400e; }}
-                .status-paid {{ background: #d1fae5; color: #065f46; }}
-                .status-cancelled {{ background: #fee2e2; color: #991b1b; }}
-                .status-voided {{ background: #e5e7eb; color: #6b7280; }}
+                .status-draft {{ background: #f1f5f5; border-color: #dce8e9; color: #52656a; }}
+                .status-issued {{ background: #effafa; border-color: #cfecee; color: #246575; }}
+                .status-partial {{ background: #fdf8e9; border-color: #f1e5bd; color: #8c6822; }}
+                .status-paid {{ background: #edf8f4; border-color: #d5eee4; color: #236c59; }}
+                .status-cancelled {{ background: #fdf1f2; border-color: #f3dce0; color: #a34450; }}
+                .status-voided {{ background: #f1f5f5; border-color: #dce8e9; color: #66757a; }}
 
                 .credit-note-ref {{
                     margin-top: 10px;
@@ -287,49 +315,64 @@ class InvoicePDFService:
                 }}
 
                 .section {{
-                    margin-bottom: 25px;
+                    margin-bottom: 9mm;
                 }}
                 .section-title {{
-                    font-size: 11pt;
-                    font-weight: bold;
-                    color: #1e40af;
-                    margin-bottom: 10px;
-                    padding-bottom: 5px;
-                    border-bottom: 1px solid #e5e7eb;
+                    font-size: 10pt;
+                    font-weight: 600;
+                    color: #246575;
+                    margin-bottom: 9px;
+                    padding-bottom: 4px;
+                    border-bottom: 1px solid #bce7ec;
                 }}
                 .billing-info {{
                     display: flex;
-                    gap: 40px;
+                    gap: 8mm;
                 }}
                 .info-group {{
-                    min-width: 200px;
+                    min-width: 0;
+                    flex: 1 1 0;
+                }}
+                .info-group:nth-child(2) {{
+                    flex: 1.35 1 0;
+                }}
+                .info-label,
+                .info-value {{
+                    min-width: 0;
+                    white-space: normal;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
                 }}
                 .info-label {{
-                    font-size: 9pt;
-                    color: #666;
-                    margin-bottom: 2px;
+                    font-size: 8pt;
+                    color: #718186;
+                    margin-bottom: 3px;
+                    letter-spacing: .55px;
+                    text-transform: uppercase;
                 }}
                 .info-value {{
-                    font-weight: 500;
+                    font-size: 10pt;
+                    font-weight: 600;
+                    color: #2f3d40;
                 }}
 
                 table {{
                     width: 100%;
                     border-collapse: collapse;
-                    margin-bottom: 20px;
+                    margin-bottom: 6mm;
                 }}
                 th {{
-                    background: #f3f4f6;
-                    padding: 10px 8px;
+                    background: #f2fafb;
+                    padding: 9px 7px;
                     text-align: left;
                     font-size: 9pt;
                     font-weight: 600;
-                    color: #374151;
-                    border-bottom: 2px solid #e5e7eb;
+                    color: #315e69;
+                    border-bottom: 1px solid #bce7ec;
                 }}
                 td {{
-                    padding: 10px 8px;
-                    border-bottom: 1px solid #e5e7eb;
+                    padding: 9px 7px;
+                    border-bottom: 1px solid #e7f0f1;
                     vertical-align: top;
                 }}
                 tr:last-child td {{
@@ -339,43 +382,45 @@ class InvoicePDFService:
                 .description {{ width: auto; }}
                 .quantity {{ width: 50px; text-align: center; }}
                 .price {{ width: 90px; text-align: right; }}
-                .discount {{ width: 80px; text-align: right; color: #059669; }}
                 .vat {{ width: 50px; text-align: center; }}
                 .total {{ width: 100px; text-align: right; font-weight: 500; }}
-                .code {{ color: #6b7280; }}
-                .tooth {{ color: #9ca3af; }}
+                .clinic-logo {{ max-width: 48mm; max-height: 18mm; margin-bottom: 3mm; object-fit: contain; object-position: left center; }}
+                .clinic-logo + .clinic-name {{ display: none; }}
+                .code {{ color: #718186; }}
+                .tooth {{ color: #87979b; }}
 
                 .totals {{
                     float: right;
                     width: 320px;
-                    margin-top: 20px;
+                    margin-top: 6mm;
                 }}
                 .totals table {{
                     margin-bottom: 0;
                 }}
                 .totals td {{
-                    padding: 6px 8px;
+                    padding: 7px 8px;
                     border-bottom: none;
                 }}
                 .totals .label {{
                     text-align: left;
-                    color: #666;
+                    color: #66757a;
                 }}
                 .totals .value {{
                     text-align: right;
                     font-weight: 500;
+                    color: #2f3d40;
                 }}
                 .totals .grand-total {{
-                    font-size: 14pt;
-                    font-weight: bold;
-                    color: #1e40af;
-                    border-top: 2px solid #1e40af;
-                    padding-top: 10px;
+                    font-size: 15pt;
+                    font-weight: 700;
+                    color: #246575;
+                    border-top: 2px solid #72d0dd;
+                    padding-top: 8px;
                 }}
                 .totals .balance-due {{
-                    font-size: 12pt;
-                    font-weight: bold;
-                    color: #dc2626;
+                    font-size: 11.5pt;
+                    font-weight: 600;
+                    color: #c65762;
                 }}
                 .totals .paid {{
                     color: #059669;
@@ -383,39 +428,40 @@ class InvoicePDFService:
 
                 .notes-section {{
                     clear: both;
-                    padding-top: 30px;
-                    margin-top: 30px;
-                    border-top: 1px solid #e5e7eb;
+                    padding-top: 9mm;
+                    margin-top: 9mm;
+                    border-top: 1px solid #d8e9eb;
                 }}
                 .notes-content {{
-                    background: #f9fafb;
-                    padding: 15px;
-                    border-radius: 8px;
+                    background: #f7fbfb;
+                    padding: 4mm;
+                    border-radius: 6px;
                     font-size: 10pt;
                     color: #4b5563;
                 }}
 
                 .payment-info {{
-                    margin-top: 20px;
-                    padding: 15px;
-                    background: #eff6ff;
-                    border-radius: 8px;
-                    font-size: 10pt;
+                    margin-top: 5mm;
+                    padding: 3mm 4mm;
+                    background: #f5fbfc;
+                    border: 1px solid #dfedef;
+                    border-radius: 6px;
+                    font-size: 9pt;
                 }}
                 .payment-info strong {{
-                    color: #1e40af;
+                    color: #246575;
                 }}
 
                 .footer {{
                     position: fixed;
-                    bottom: 15mm;
-                    left: 20mm;
-                    right: 20mm;
-                    font-size: 8pt;
-                    color: #9ca3af;
+                    bottom: 14mm;
+                    left: 16mm;
+                    right: 16mm;
+                    font-size: 7.5pt;
+                    color: #8a9ba0;
                     text-align: center;
-                    border-top: 1px solid #e5e7eb;
-                    padding-top: 10px;
+                    border-top: 1px solid #72d0dd;
+                    padding-top: 7px;
                 }}
 
                 .compliance-qr {{
@@ -463,6 +509,7 @@ class InvoicePDFService:
 
             <div class="header">
                 <div class="clinic-info">
+                    {f'<img class="clinic-logo" src="{logo}" alt="">' if logo else ""}
                     <div class="clinic-name">{clinic.name if clinic else "Dental Clinic"}</div>
                     <div class="clinic-details">
                         {
@@ -530,7 +577,6 @@ class InvoicePDFService:
                             <th class="description">{labels["description"]}</th>
                             <th class="quantity">{labels["qty"]}</th>
                             <th class="price">{labels["unit_price"]}</th>
-                            <th class="discount">{labels["discount"]}</th>
                             <th class="vat">{labels["vat"]}</th>
                             <th class="total">{labels["total"]}</th>
                         </tr>
@@ -653,11 +699,11 @@ class InvoicePDFService:
             "qty": "Cant.",
             "unit_price": "Precio Unit.",
             "discount": "Descuento",
-            "vat": "IVA",
+            "vat": "IGV",
             "total": "Total",
             "subtotal": "Subtotal",
             "total_discount": "Descuento total",
-            "tax": "IVA",
+            "tax": "IGV",
             "grand_total": "TOTAL",
             "total_paid": "Total pagado",
             "balance_due": "Pendiente",
@@ -692,11 +738,11 @@ class InvoicePDFService:
             "qty": "Qty",
             "unit_price": "Unit Price",
             "discount": "Discount",
-            "vat": "VAT",
+            "vat": "IGV",
             "total": "Total",
             "subtotal": "Subtotal",
             "total_discount": "Total discount",
-            "tax": "VAT",
+            "tax": "IGV",
             "grand_total": "TOTAL",
             "total_paid": "Total paid",
             "balance_due": "Balance due",

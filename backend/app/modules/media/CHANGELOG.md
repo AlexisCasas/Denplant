@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- feat(DP-33): patient lifecycle events now archive/restore only the relevant
+  documents. Permanent patient deletion queues originals and generated image
+  variants in a retryable purge outbox, drained every minute by the module's
+  scheduler job after the database transaction commits.
+
 - security: enforce central patient access before document, file, upload, pairing, and attachment operations.
 
 - fix(#184): type-check clean — drop the `onRequest` hook that cast ofetch's `Headers` to delete `Content-Type` (ofetch already leaves it unset for `FormData`).

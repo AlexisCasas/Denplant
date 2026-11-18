@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.prescriptions_fixtures import api, env  # noqa: F401
+pytest_plugins = ("tests.prescriptions_fixtures",)
 
 
 BASE = "/api/v1/prescriptions"
@@ -31,7 +31,9 @@ async def test_favorites_are_idempotent_private_and_searchable(api, env):
 
     mine = await api.get(f"{BASE}/medication-favorites", headers=env.dentist)
     assert len(mine.json()["data"]) == 1
-    assert (await api.get(f"{BASE}/medication-favorites", headers=env.dentist2)).json()["data"] == []
+    assert (await api.get(f"{BASE}/medication-favorites", headers=env.dentist2)).json()[
+        "data"
+    ] == []
 
     search = await api.get(f"{BASE}/medications/search?q=panadol", headers=env.dentist)
     assert search.status_code == 200
@@ -40,6 +42,8 @@ async def test_favorites_are_idempotent_private_and_searchable(api, env):
 
     assert (await api.get(f"{BASE}/medications/search?q=p", headers=env.dentist)).status_code == 422
 
-    removed = await api.delete(f"{BASE}/medication-favorites/{saved['favorite_id']}", headers=env.dentist)
+    removed = await api.delete(
+        f"{BASE}/medication-favorites/{saved['favorite_id']}", headers=env.dentist
+    )
     assert removed.status_code == 204
     assert (await api.get(f"{BASE}/medication-favorites", headers=env.dentist)).json()["data"] == []

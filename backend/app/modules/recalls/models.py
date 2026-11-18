@@ -98,6 +98,10 @@ class Recall(Base, TimestampMixin):
     reason_note: Mapped[str | None] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(String(10), nullable=False, default="normal")
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
+    status_before_patient_archive: Mapped[str | None] = mapped_column(String(30))
+    suspended_by_patient_archive: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     recommended_by: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     assigned_professional_id: Mapped[UUID | None] = mapped_column(

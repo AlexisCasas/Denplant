@@ -64,14 +64,24 @@ def test_it_exposes_no_ai_tools_and_no_event_handlers(module) -> None:
     assert module.get_event_handlers() == {}
 
 
-def test_the_router_has_no_put_patch_or_delete() -> None:
-    methods = {method for route in router.routes for method in getattr(route, "methods", set())}
-    assert methods == {"GET", "POST"}
+def test_the_router_only_deletes_private_favorite_shortcuts() -> None:
+    routes = [
+        (path, method)
+        for route in router.routes
+        for path in [route.path]
+        for method in getattr(route, "methods", set())
+    ]
+    assert all(method not in {"PUT", "PATCH"} for _, method in routes)
+    assert [(path, method) for path, method in routes if method == "DELETE"] == [
+        ("/medication-favorites/{favorite_id}", "DELETE")
+    ]
 
 
-def test_the_models_are_the_three_tables(module) -> None:
+def test_the_models_are_prescription_tables_only(module) -> None:
     assert {m.__tablename__ for m in module.get_models()} == {
         "prescriptions",
         "prescription_items",
         "prescription_counters",
+        "prescription_medications",
+        "prescription_medication_favorites",
     }

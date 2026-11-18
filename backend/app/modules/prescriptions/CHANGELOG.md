@@ -2,10 +2,6 @@
 
 ## Unreleased
 
-- feat: add clinic-scoped reusable medication descriptions and private dentist
-  favorites. Search and favorites only prefill the existing free-text draft;
-  they never alter issued prescriptions or calculate clinical values.
-
 - feat: **new module — immutable, printable medication prescriptions.** A dentist
   writes a prescription for a patient, prints it as an A4 PDF and signs it by
   hand; an issued prescription is never edited or deleted, only voided. This is

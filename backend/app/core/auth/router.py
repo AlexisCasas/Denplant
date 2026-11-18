@@ -408,6 +408,7 @@ async def list_users(
             email=m.user.email,
             first_name=m.user.first_name,
             last_name=m.user.last_name,
+            professional_id=m.user.professional_id,
             is_active=m.user.is_active,
             role=m.role,
             is_professional=m.is_professional,
@@ -483,6 +484,7 @@ async def create_user(
         password_hash=hash_password(data.password or secrets.token_urlsafe(32)),
         first_name=data.first_name,
         last_name=data.last_name,
+        professional_id=data.professional_id,
     )
     db.add(user)
     await db.flush()
@@ -635,6 +637,10 @@ async def update_user(
         user.first_name = data.first_name
     if data.last_name is not None:
         user.last_name = data.last_name
+    # Keep the global value on omitted updates; explicit null (including a
+    # blank value normalized by the schema) clears it intentionally.
+    if "professional_id" in data.model_fields_set:
+        user.professional_id = data.professional_id
     if data.is_active is not None:
         user.is_active = data.is_active
         # Increment token version to invalidate existing tokens when deactivating
@@ -662,6 +668,7 @@ async def update_user(
             email=user.email,
             first_name=user.first_name,
             last_name=user.last_name,
+            professional_id=user.professional_id,
             is_active=user.is_active,
             role=membership.role,
             is_professional=membership.is_professional,

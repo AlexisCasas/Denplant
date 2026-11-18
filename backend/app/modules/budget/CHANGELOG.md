@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-- feat(ui): **"New budget" is a 3-step wizard** (details → add treatments → review and confirm). Frontend only: no API, model or migration changes. State is kept locally (`useBudgetDraft`) and the final step sends one `POST /budgets` with `items[]` and the global discount, which the endpoint already accepted. Totals in steps 2–3 are a client preview of `_calculate_line_totals` / `_recalculate_totals` (covered by `tests/composables/budgetDraftTotals.test.ts`). Adds `budget.wizard.*` i18n keys (es, en).
-
 - feat(QW-BUDGET): **printable budget: figures, clinic identity, logo, immutable signed PDF.**
   - `pdf.py` is split into `build_pdf_context` (every figure and string, derived and formatted — the rules live here), `render_html` (presentation only, the part a client template replaces) and WeasyPrint. All database text is HTML-escaped.
   - The table has a VAT column per line; the totals block is derived for display (`Subtotal − line discounts − global discount = Taxable base`, `+ VAT = Total`). The global discount is spread by `pricing.allocate_global_discount` only, VAT is the remainder to `budget.total`, so the shown total is exactly `budget.total`. Persisted formulas are unchanged.

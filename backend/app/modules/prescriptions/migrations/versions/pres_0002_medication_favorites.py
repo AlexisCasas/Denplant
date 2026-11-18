@@ -74,5 +74,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("idx_rx_favorite_doctor_created", table_name="prescription_medication_favorites")
     op.drop_table("prescription_medication_favorites")
-    op.drop_index("idx_rx_medication_clinic_active_ingredient", table_name="prescription_medications")
+    op.drop_index(
+        "idx_rx_medication_clinic_active_ingredient", table_name="prescription_medications"
+    )
     op.drop_table("prescription_medications")

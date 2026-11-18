@@ -232,7 +232,9 @@ class PrescriptionMedication(Base):
     __table_args__ = (
         UniqueConstraint("id", "clinic_id", name="uq_rx_medication_id_clinic"),
         UniqueConstraint("clinic_id", "dedupe_key", name="uq_rx_medication_clinic_dedupe"),
-        Index("idx_rx_medication_clinic_active_ingredient", "clinic_id", "active", "active_ingredient"),
+        Index(
+            "idx_rx_medication_clinic_active_ingredient", "clinic_id", "active", "active_ingredient"
+        ),
     )
 
 
@@ -245,7 +247,9 @@ class PrescriptionMedicationFavorite(Base):
     clinic_id: Mapped[UUID] = mapped_column(
         SAUUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False
     )
-    doctor_id: Mapped[UUID] = mapped_column(SAUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    doctor_id: Mapped[UUID] = mapped_column(
+        SAUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     medication_id: Mapped[UUID] = mapped_column(SAUUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

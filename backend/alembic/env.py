@@ -84,19 +84,16 @@ from app.modules.patient_timeline.models import PatientTimeline  # noqa: F401
 from app.modules.patients.models import Patient  # noqa: F401
 from app.modules.patients_clinical.models import (  # noqa: F401
     Allergy,
+    DentalAnamnesis,
     EmergencyContact,
+    EndodonticRecord,
+    EndodonticRecordChannel,
     LegalGuardian,
     MedicalContext,
     Medication,
+    PediatricDentalAnamnesis,
     SurgicalHistory,
     SystemicDisease,
-)
-from app.modules.prescriptions.models import (  # noqa: F401
-    Prescription,
-    PrescriptionCounter,
-    PrescriptionItem,
-    PrescriptionMedication,
-    PrescriptionMedicationFavorite,
 )
 from app.modules.payments.models import (  # noqa: F401
     PatientEarnedEntry,
@@ -104,6 +101,13 @@ from app.modules.payments.models import (  # noqa: F401
     PaymentAllocation,
     PaymentHistory,
     Refund,
+)
+from app.modules.prescriptions.models import (  # noqa: F401
+    Prescription,
+    PrescriptionCounter,
+    PrescriptionItem,
+    PrescriptionMedication,
+    PrescriptionMedicationFavorite,
 )
 from app.modules.recalls.models import (  # noqa: F401
     Recall,

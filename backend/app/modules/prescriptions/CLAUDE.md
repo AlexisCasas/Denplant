@@ -65,11 +65,9 @@ inside the detail). There is no edit, no delete, no duplicate and no draft.
 - **Field limits are the backend's** (`schemas.py`): required fields are trimmed
   and 1 to 200/100 characters; optional ones are trimmed and omitted when empty;
   1 to 50 medications; void reason 1 to 2000. Free text only.
-- **Reusable medication shortcuts only**: clinic-scoped descriptions can be
-  searched by active ingredient or commercial name and saved as private dentist
-  favorites. They only prefill descriptive draft fields; there is no vademecum,
-  structured units, dose calculation, interaction or contraindication check,
-  and no link to `patients_clinical.Medication`.
+- **No pharmacological intelligence**: no search, vademecum, autocomplete,
+  structured units, dose calculation, interaction or contraindication check, and
+  no link to `patients_clinical.Medication`.
 - **Errors** are mapped by the backend's `code` (`utils/prescriptionForm.ts`),
   never by its text, and FastAPI's validation array becomes "review the fields".
   Writes pass `silentForbidden: true` to `useApi` (an opt-in added for these writes) so
