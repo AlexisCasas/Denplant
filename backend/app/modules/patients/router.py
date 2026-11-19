@@ -124,7 +124,10 @@ async def get_patient(
 ) -> ApiResponse[PatientResponse]:
     """Get a patient by ID."""
     patient = await PatientService.get_patient(
-        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+        db,
+        ctx.clinic_id,
+        patient_id,
+        access_predicate=PatientAccessPolicy.list_predicate(ctx, include_archived=True),
     )
     if not patient:
         raise HTTPException(
@@ -218,7 +221,10 @@ async def get_patient_extended(
 ) -> ApiResponse[PatientExtendedResponse]:
     """Get patient with extended identity/demographics info."""
     patient = await PatientService.get_patient(
-        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+        db,
+        ctx.clinic_id,
+        patient_id,
+        access_predicate=PatientAccessPolicy.list_predicate(ctx, include_archived=True),
     )
     if not patient:
         raise HTTPException(

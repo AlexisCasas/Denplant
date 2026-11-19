@@ -142,6 +142,118 @@ async def test_restore_http_permissions_state_and_clinic_isolation(
 
 
 @pytest.mark.asyncio
+async def test_archived_patient_detail_http_keeps_clinic_scope_and_related_rows(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_clinic: Clinic,
+    test_patient: Patient,
+) -> None:
+    """Archived patients remain readable by ID for restore, never cross-clinic."""
+    admin = await _headers(db_session, test_clinic, "admin")
+    related = PatientTimeline(
+        clinic_id=test_clinic.id,
+        patient_id=test_patient.id,
+        event_type="qa.related",
+        event_category="clinical",
+        source_table="qa",
+        source_id=uuid4(),
+        title="QA related row",
+        description=None,
+        event_data=None,
+        occurred_at=datetime.now(UTC),
+        created_by=None,
+    )
+    db_session.add(related)
+    await db_session.commit()
+
+    for suffix in ("", "/extended"):
+        response = await client.get(f"/api/v1/patients/{test_patient.id}{suffix}", headers=admin)
+        assert response.status_code == 200, response.text
+        assert response.json()["data"]["status"] == "active"
+
+    assert (await client.delete(f"/api/v1/patients/{test_patient.id}", headers=admin)).status_code == 204
+    for suffix in ("", "/extended"):
+        response = await client.get(f"/api/v1/patients/{test_patient.id}{suffix}", headers=admin)
+        assert response.status_code == 200, response.text
+        assert response.json()["data"]["status"] == "archived"
+
+    other = Clinic(id=uuid4(), name="Other detail", tax_id="B87654322", address={})
+    db_session.add(other)
+    await db_session.commit()
+    other_admin = await _headers(db_session, other, "admin")
+    for suffix in ("", "/extended"):
+        assert (
+            await client.get(f"/api/v1/patients/{test_patient.id}{suffix}", headers=other_admin)
+        ).status_code == 404
+    assert (await client.get(f"/api/v1/patients/{uuid4()}", headers=admin)).status_code == 404
+
+    assert (
+        await client.post(f"/api/v1/patients/{test_patient.id}/restore", headers=admin)
+    ).status_code == 200
+    assert await db_session.scalar(select(PatientTimeline.id).where(PatientTimeline.id == related.id))
+    restored = await client.get(f"/api/v1/patients/{test_patient.id}/extended", headers=admin)
+    assert restored.status_code == 200
+    assert restored.json()["data"]["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_archived_patient_detail_preserves_dentist_creator_scope_http(
+    client: AsyncClient, db_session: AsyncSession, test_clinic: Clinic
+) -> None:
+    dentist = User(
+        email=f"detail-dentist-{uuid4()}@example.test",
+        password_hash=hash_password("TestPass1234"),
+        first_name="Detail",
+        last_name="Dentist",
+    )
+    other_dentist = User(
+        email=f"detail-other-dentist-{uuid4()}@example.test",
+        password_hash=hash_password("TestPass1234"),
+        first_name="Other",
+        last_name="Dentist",
+    )
+    db_session.add_all([dentist, other_dentist])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            ClinicMembership(id=uuid4(), user_id=dentist.id, clinic_id=test_clinic.id, role="dentist"),
+            ClinicMembership(
+                id=uuid4(), user_id=other_dentist.id, clinic_id=test_clinic.id, role="dentist"
+            ),
+        ]
+    )
+    mine = Patient(
+        clinic_id=test_clinic.id,
+        first_name="Mine",
+        last_name="Archived",
+        status="archived",
+        created_by_user_id=dentist.id,
+    )
+    someone_elses = Patient(
+        clinic_id=test_clinic.id,
+        first_name="Other",
+        last_name="Archived",
+        status="archived",
+        created_by_user_id=other_dentist.id,
+    )
+    db_session.add_all([mine, someone_elses])
+    await db_session.commit()
+    dentist_headers = {
+        "Authorization": f"Bearer {create_access_token(dentist.id, token_version=dentist.token_version)}"
+    }
+
+    for suffix in ("", "/extended"):
+        assert (
+            await client.get(f"/api/v1/patients/{mine.id}{suffix}", headers=dentist_headers)
+        ).status_code == 200
+        assert (
+            await client.get(
+                f"/api/v1/patients/{someone_elses.id}{suffix}", headers=dentist_headers
+            )
+        ).status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_restore_without_patients_write_is_forbidden_http(
     client: AsyncClient,
     db_session: AsyncSession,
