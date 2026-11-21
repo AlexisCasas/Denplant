@@ -124,9 +124,14 @@ async def test_active_navigation_filtered_for_hygienist(
     patients_paths = {item["to"] for item in by_name["patients"]["navigation"]}
     assert "/patients" in patients_paths
 
-    # Reports require reports.billing.read, which hygienist lacks.
+    # Hygienist can open the reports shell for scheduling-only reports.
+    # Financial reporting remains protected by reports.billing.read.
     reports_paths = {item["to"] for item in by_name["reports"]["navigation"]}
-    assert "/reports" not in reports_paths
+    assert "/reports" in reports_paths
+    from app.core.auth.permissions import has_permission
+
+    assert has_permission("hygienist", "reports.scheduling.read")
+    assert not has_permission("hygienist", "reports.billing.read")
 
 
 @pytest.mark.asyncio
