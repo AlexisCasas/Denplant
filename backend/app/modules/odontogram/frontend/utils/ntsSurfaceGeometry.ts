@@ -371,7 +371,9 @@ function groupByAdjacency(edgesPerRing: readonly NtsPoint[][][]): number[][] {
 
   const parent = edgesPerRing.map((_, index) => index)
   const find = (x: number): number => (parent[x] === x ? x : (parent[x] = find(parent[x]!)))
-  const union = (a: number, b: number) => { parent[find(a)] = find(b) }
+  const union = (a: number, b: number) => {
+    parent[find(a)] = find(b)
+  }
 
   for (const bucket of owners.values()) {
     for (let i = 1; i < bucket.length; i++) union(bucket[0]!, bucket[i]!)
