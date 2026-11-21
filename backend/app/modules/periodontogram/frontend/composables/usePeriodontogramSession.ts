@@ -46,6 +46,29 @@ export function usePeriodontogramSession() {
   const lastError = ref<string | null>(null)
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const pendingPayloads = new Map<string, Record<string, unknown>>()
+  // Multiple sites may save concurrently. An individual completed PATCH
+  // must not mark the entire session as saved while others are pending.
+  const inFlight = new Set<Promise<void>>()
+
+  function syncSaveState(): void {
+    saving.value = inFlight.size > 0
+    dirty.value = pendingPayloads.size > 0 || inFlight.size > 0
+  }
+
+  async function trackedSave(operation: Promise<void>): Promise<void> {
+    inFlight.add(operation)
+    syncSaveState()
+    try {
+      await operation
+      lastError.value = null
+    } catch (e) {
+      lastError.value = e instanceof Error ? e.message : 'save_failed'
+      throw e
+    } finally {
+      inFlight.delete(operation)
+      syncSaveState()
+    }
+  }
 
   function _flushKey(key: string, exec: (payload: Record<string, unknown>) => Promise<void>) {
     return async () => {
@@ -53,15 +76,10 @@ export function usePeriodontogramSession() {
       if (!payload) return
       pendingPayloads.delete(key)
       pendingTimers.delete(key)
-      saving.value = true
       try {
-        await exec(payload)
-        lastError.value = null
-        dirty.value = false
-      } catch (e) {
-        lastError.value = e instanceof Error ? e.message : 'save_failed'
-      } finally {
-        saving.value = false
+        await trackedSave(exec(payload))
+      } catch {
+        // The error is stored by trackedSave and surfaced by the chart.
       }
     }
   }
@@ -114,28 +132,29 @@ export function usePeriodontogramSession() {
       const payload = pendingPayloads.get(key)
       if (!payload) continue
       pendingPayloads.delete(key)
-      saving.value = true
       try {
         if (key.startsWith('tooth:')) {
           const toothNumber = Number(key.slice('tooth:'.length))
-          await api.patch(
+          await trackedSave(api.patch(
             `/api/v1/periodontogram/snapshots/${snapshotId}/teeth/${toothNumber}`,
             payload
-          )
+          ))
         } else if (key.startsWith('site:')) {
           const [, toothStr, siteCode] = key.split(':')
-          await api.patch(
+          await trackedSave(api.patch(
             `/api/v1/periodontogram/snapshots/${snapshotId}/teeth/${toothStr}/sites/${siteCode}`,
             payload
-          )
+          ))
         }
-      } catch (e) {
-        lastError.value = e instanceof Error ? e.message : 'save_failed'
-      } finally {
-        saving.value = false
+      } catch {
+        // trackedSave captured the error; closing must not lose a failed edit.
       }
     }
-    dirty.value = false
+    // A previously started debounce timer may already be saving: don't close
+    // the snapshot until every in-flight write has settled.
+    await Promise.allSettled(Array.from(inFlight))
+    syncSaveState()
+    if (lastError.value) throw new Error(lastError.value)
   }
 
   async function closeSession(snapshotId: string, notes?: string): Promise<PerioSnapshotDetail> {
