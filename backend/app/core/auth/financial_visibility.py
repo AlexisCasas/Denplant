@@ -9,7 +9,6 @@ from fastapi import Depends, Request
 
 from .dependencies import ClinicContext, get_clinic_context
 
-
 # Deliberately exact field names.  Clinical counts, dates and treatment
 # sequence numbers must survive; these are the monetary values that never
 # belong in a dentist response.
