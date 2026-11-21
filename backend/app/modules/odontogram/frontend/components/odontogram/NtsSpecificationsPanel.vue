@@ -29,9 +29,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  create: [text: string]
-  update: [id: string, text: string, findingId: string | null]
-  remove: [id: string]
+  'create': [text: string]
+  'update': [id: string, text: string, findingId: string | null]
+  'remove': [id: string]
   /** Whether a composer or an inline edit holds text that is not saved. */
   'update:dirty': [dirty: boolean]
 }>()

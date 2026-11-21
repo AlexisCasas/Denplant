@@ -135,16 +135,16 @@ export interface NtsTextInstruction extends NtsInstructionBase {
   line: number | null
 }
 
-export type NtsSymbolShape =
-  | 'circle'
-  | 'circle_enclosing_sigla'
-  | 'inverted_parenthesis'
-  | 'square'
-  | 'square_bordering_crown'
-  | 'square_with_cross'
-  | 'triangle'
-  | 'two_intersecting_circles'
-  | 'x_cross'
+export type NtsSymbolShape
+  = | 'circle'
+    | 'circle_enclosing_sigla'
+    | 'inverted_parenthesis'
+    | 'square'
+    | 'square_bordering_crown'
+    | 'square_with_cross'
+    | 'triangle'
+    | 'two_intersecting_circles'
+    | 'x_cross'
 
 export interface NtsSymbolInstruction extends NtsInstructionBase {
   kind: 'symbol'
@@ -159,11 +159,11 @@ export interface NtsSymbolInstruction extends NtsInstructionBase {
   enclosedText?: string
 }
 
-export type NtsLineStyle =
-  | 'straight_horizontal'
-  | 'straight_vertical'
-  | 'two_parallel_horizontal'
-  | 'zigzag'
+export type NtsLineStyle
+  = | 'straight_horizontal'
+    | 'straight_vertical'
+    | 'two_parallel_horizontal'
+    | 'zigzag'
 
 /**
  * A stroke, or several, already resolved to chart coordinates.
@@ -212,43 +212,43 @@ export interface NtsArrowInstruction extends NtsInstructionBase {
 }
 
 /** Why something could not be drawn. Always reported, never swallowed. */
-export type NtsUnsupportedReason =
-  | 'mark_kind_not_in_slice'
-  | 'unknown_symbol_shape'
-  | 'unknown_placement'
-  | 'missing_attribute_value'
-  | 'unknown_variant_code'
-  | 'tooth_not_on_chart'
-  | 'targets_not_adjacent'
-  | 'wrong_target_count'
-  | 'needs_range_orchestration'
+export type NtsUnsupportedReason
+  = | 'mark_kind_not_in_slice'
+    | 'unknown_symbol_shape'
+    | 'unknown_placement'
+    | 'missing_attribute_value'
+    | 'unknown_variant_code'
+    | 'tooth_not_on_chart'
+    | 'targets_not_adjacent'
+    | 'wrong_target_count'
+    | 'needs_range_orchestration'
   /** The norm draws the shape the clinician observed; there is no channel. */
-  | 'needs_clinician_shape'
+    | 'needs_clinician_shape'
   /** The norm anchors the mark to anatomy the chart does not model. */
-  | 'needs_fissure_anatomy'
+    | 'needs_fissure_anatomy'
   /** The direction is a clinical observation the norm leaves unenumerated. */
-  | 'needs_clinical_direction'
-  | 'unknown_line_style'
-  | 'unknown_connector_style'
-  | 'unknown_arrow_style'
-  | 'unknown_arrow_direction'
-  | 'no_targets'
-  | 'unknown_fill_style'
-  | 'unknown_outline_style'
+    | 'needs_clinical_direction'
+    | 'unknown_line_style'
+    | 'unknown_connector_style'
+    | 'unknown_arrow_style'
+    | 'unknown_arrow_direction'
+    | 'no_targets'
+    | 'unknown_fill_style'
+    | 'unknown_outline_style'
   /** The mark says which attribute supplies its regions; the mark has none. */
-  | 'missing_region_source'
+    | 'missing_region_source'
   /** The bound attribute is there but is not a set of codes. */
-  | 'invalid_region_source'
+    | 'invalid_region_source'
   /** The codes are well formed and name no geometry on this tooth. */
-  | 'unresolved_regions'
+    | 'unresolved_regions'
   /** The mark is anchored to a landmark this chart does not model. */
-  | 'unknown_landmark'
+    | 'unknown_landmark'
   /**
    * The norm ties this rule's colour to a good/bad state the finding does not
    * carry, or carries as something the catalog does not enumerate. Both
    * colours are clinical claims, so neither may be assumed.
    */
-  | 'missing_condition_state'
+    | 'missing_condition_state'
 
 export interface NtsUnsupportedInstruction extends NtsInstructionBase {
   kind: 'unsupported'
@@ -336,15 +336,15 @@ export interface NtsOutlineInstruction extends NtsInstructionBase {
   structuralStroke: number
 }
 
-export type NtsRenderInstruction =
-  | NtsTextInstruction
-  | NtsSymbolInstruction
-  | NtsLineInstruction
-  | NtsConnectorInstruction
-  | NtsArrowInstruction
-  | NtsShapeFillInstruction
-  | NtsOutlineInstruction
-  | NtsUnsupportedInstruction
+export type NtsRenderInstruction
+  = | NtsTextInstruction
+    | NtsSymbolInstruction
+    | NtsLineInstruction
+    | NtsConnectorInstruction
+    | NtsArrowInstruction
+    | NtsShapeFillInstruction
+    | NtsOutlineInstruction
+    | NtsUnsupportedInstruction
 
 /** How much of a finding this slice can actually draw. */
 export type NtsCompleteness = 'complete' | 'partial' | 'unsupported'
@@ -1429,21 +1429,27 @@ export function resolveFinding(finding: NtsFinding, rule: NtsRule): NtsFindingRe
     // One mark can become several instructions: a pair of endpoint symbols,
     // a vertical tick per role-bearing target, a stroke per segment of a span.
     const drawable = { ...base, paint }
-    const produced =
-      mark.kind === 'box_siglas' ? [resolveBox(mark, rule, finding, drawable)]
-        : mark.kind === 'symbol' ? resolveSymbol(mark, rule, finding, drawable)
-          : mark.kind === 'line' ? resolveLine(mark, finding, drawable)
-            : mark.kind === 'connector' ? resolveConnector(mark, finding, drawable, marks)
-              : mark.kind === 'shape_fill' ? resolveArea(mark, finding, drawable, 'shape_fill')
-                : mark.kind === 'outline' ? resolveArea(mark, finding, drawable, 'outline')
+    const produced
+      = mark.kind === 'box_siglas'
+        ? [resolveBox(mark, rule, finding, drawable)]
+        : mark.kind === 'symbol'
+          ? resolveSymbol(mark, rule, finding, drawable)
+          : mark.kind === 'line'
+            ? resolveLine(mark, finding, drawable)
+            : mark.kind === 'connector'
+              ? resolveConnector(mark, finding, drawable, marks)
+              : mark.kind === 'shape_fill'
+                ? resolveArea(mark, finding, drawable, 'shape_fill')
+                : mark.kind === 'outline'
+                  ? resolveArea(mark, finding, drawable, 'outline')
                   : resolveArrow(mark, finding, drawable)
 
     instructions.push(...produced)
     if (produced.some(instruction => instruction.kind !== 'unsupported')) drawn += 1
   }
 
-  const completeness: NtsCompleteness =
-    drawn === 0 ? 'unsupported' : drawn === total ? 'complete' : 'partial'
+  const completeness: NtsCompleteness
+    = drawn === 0 ? 'unsupported' : drawn === total ? 'complete' : 'partial'
 
   return { ...base, completeness, instructions }
 }

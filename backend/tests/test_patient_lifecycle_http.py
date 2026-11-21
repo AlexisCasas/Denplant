@@ -171,7 +171,9 @@ async def test_archived_patient_detail_http_keeps_clinic_scope_and_related_rows(
         assert response.status_code == 200, response.text
         assert response.json()["data"]["status"] == "active"
 
-    assert (await client.delete(f"/api/v1/patients/{test_patient.id}", headers=admin)).status_code == 204
+    assert (
+        await client.delete(f"/api/v1/patients/{test_patient.id}", headers=admin)
+    ).status_code == 204
     for suffix in ("", "/extended"):
         response = await client.get(f"/api/v1/patients/{test_patient.id}{suffix}", headers=admin)
         assert response.status_code == 200, response.text
@@ -190,7 +192,9 @@ async def test_archived_patient_detail_http_keeps_clinic_scope_and_related_rows(
     assert (
         await client.post(f"/api/v1/patients/{test_patient.id}/restore", headers=admin)
     ).status_code == 200
-    assert await db_session.scalar(select(PatientTimeline.id).where(PatientTimeline.id == related.id))
+    assert await db_session.scalar(
+        select(PatientTimeline.id).where(PatientTimeline.id == related.id)
+    )
     restored = await client.get(f"/api/v1/patients/{test_patient.id}/extended", headers=admin)
     assert restored.status_code == 200
     assert restored.json()["data"]["status"] == "active"
@@ -216,7 +220,9 @@ async def test_archived_patient_detail_preserves_dentist_creator_scope_http(
     await db_session.flush()
     db_session.add_all(
         [
-            ClinicMembership(id=uuid4(), user_id=dentist.id, clinic_id=test_clinic.id, role="dentist"),
+            ClinicMembership(
+                id=uuid4(), user_id=dentist.id, clinic_id=test_clinic.id, role="dentist"
+            ),
             ClinicMembership(
                 id=uuid4(), user_id=other_dentist.id, clinic_id=test_clinic.id, role="dentist"
             ),

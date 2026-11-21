@@ -527,7 +527,7 @@ onBeforeRouteLeave(() => {
   if (!unsaved.dirty.value) return true
 
   // Text the clinician typed and nobody has sent: theirs to abandon.
-  // eslint-disable-next-line no-alert
+
   return window.confirm(t('odontogram.nts.unsaved.leavePage'))
 })
 
@@ -996,7 +996,9 @@ const printDeclarationList = computed(
             <dt class="text-subtle">
               {{ t('odontogram.nts.field.normVersion') }}
             </dt>
-            <dd data-testid="nts-historical-norm">{{ historicalRecord.norm_version }}</dd>
+            <dd data-testid="nts-historical-norm">
+              {{ historicalRecord.norm_version }}
+            </dd>
           </dl>
         </UCard>
 

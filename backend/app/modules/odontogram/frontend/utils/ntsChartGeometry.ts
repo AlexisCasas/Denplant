@@ -135,11 +135,11 @@ const ROW_TOPS: readonly number[] = NTS_ROWS.map((_, index) => {
 })
 
 /** Height of the coordinate space: four rows, their gaps and the padding. */
-export const NTS_CHART_HEIGHT =
-  ROW_TOPS[ROW_TOPS.length - 1]! +
-  (PADDED_ROWS.has(NTS_ROWS[NTS_ROWS.length - 1]!.id) ? ROW_TOP_PADDING : 0) +
-  CELL_HEIGHT +
-  CANVAS_PADDING_Y
+export const NTS_CHART_HEIGHT
+  = ROW_TOPS[ROW_TOPS.length - 1]!
+    + (PADDED_ROWS.has(NTS_ROWS[NTS_ROWS.length - 1]!.id) ? ROW_TOP_PADDING : 0)
+    + CELL_HEIGHT
+    + CANVAS_PADDING_Y
 
 /**
  * The viewBox an overlay must use to sit exactly on the chart.

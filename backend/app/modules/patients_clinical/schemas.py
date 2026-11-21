@@ -372,31 +372,78 @@ class PediatricDentalAnamnesisResponse(PediatricDentalAnamnesisInput):
 
 
 CHANNEL_CODES = {
-    "single", "vestibular", "palatal_lingual", "mesiolingual", "mesiobuccal",
-    "distal", "distobuccal", "distolingual",
+    "single",
+    "vestibular",
+    "palatal_lingual",
+    "mesiolingual",
+    "mesiobuccal",
+    "distal",
+    "distobuccal",
+    "distolingual",
 }
-ANATOMICAL_CROWN_CODES = {"caries", "restoration", "bruxism", "fracture", "fractureWithPulpExposure"}
+ANATOMICAL_CROWN_CODES = {
+    "caries",
+    "restoration",
+    "bruxism",
+    "fracture",
+    "fractureWithPulpExposure",
+}
 PAIN_CHARACTERISTIC_CODES = {
-    "spontaneous", "provoked", "cold", "heat", "chewing", "nocturnal", "air", "sweet",
-    "acidic", "radiated", "diffuse", "stabbing", "continuous", "intermittent", "sporadic",
+    "spontaneous",
+    "provoked",
+    "cold",
+    "heat",
+    "chewing",
+    "nocturnal",
+    "air",
+    "sweet",
+    "acidic",
+    "radiated",
+    "diffuse",
+    "stabbing",
+    "continuous",
+    "intermittent",
+    "sporadic",
 }
 PERCUSSION_CODES = {"horizontal", "vertical"}
 PALPATION_CODES = {"vestibular", "lingualPalatal"}
 PULP_CHAMBER_CODES = {"open", "closed", "wide", "narrow", "pulpStones"}
 CANALS_COUNT_CODES = {"singleCanal", "twoCanals", "threeCanals", "fourCanals"}
-CANALS_CHARACTERISTIC_CODES = {"straight", "curved", "wide", "narrow", "previouslyTreated", "openApex"}
+CANALS_CHARACTERISTIC_CODES = {
+    "straight",
+    "curved",
+    "wide",
+    "narrow",
+    "previouslyTreated",
+    "openApex",
+}
 PULPAL_DIAGNOSIS_CODES = {
-    "normalPulp", "reversiblePulpitis", "symptomaticIrreversiblePulpitis",
-    "asymptomaticIrreversiblePulpitis", "pulpNecrosis", "diagnosisPreviouslyTreated", "previouslyInitiated",
+    "normalPulp",
+    "reversiblePulpitis",
+    "symptomaticIrreversiblePulpitis",
+    "asymptomaticIrreversiblePulpitis",
+    "pulpNecrosis",
+    "diagnosisPreviouslyTreated",
+    "previouslyInitiated",
 }
 PERIAPICAL_DIAGNOSIS_CODES = {
-    "healthyApicalTissues", "acuteApicalPeriodontitis", "chronicApicalPeriodontitis",
-    "acuteApicalAbscess", "chronicApicalAbscess", "condensingOsteitis",
+    "healthyApicalTissues",
+    "acuteApicalPeriodontitis",
+    "chronicApicalPeriodontitis",
+    "acuteApicalAbscess",
+    "chronicApicalAbscess",
+    "condensingOsteitis",
 }
 DEFINITIVE_DIAGNOSIS_CODES = {"irreversiblePulpitis", "necroticPulp"}
 INDICATED_TREATMENT_CODES = {
-    "biopulpectomy", "apicoectomy", "necropulpectomy", "hemisection", "retreatment",
-    "radicectomy", "whitening", "extraction",
+    "biopulpectomy",
+    "apicoectomy",
+    "necropulpectomy",
+    "hemisection",
+    "retreatment",
+    "radicectomy",
+    "whitening",
+    "extraction",
 }
 RESTORATION_CODES = {"post", "amalgamResin", "crown", "other"}
 
@@ -495,51 +542,63 @@ class EndodonticRecordFields(BaseModel):
 
     @field_validator("anatomical_crown")
     @classmethod
-    def validate_anatomical_crown(cls, value: list[str]) -> list[str]: return _ensure_codes(value, ANATOMICAL_CROWN_CODES)
+    def validate_anatomical_crown(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, ANATOMICAL_CROWN_CODES)
 
     @field_validator("pain_characteristics")
     @classmethod
-    def validate_pain_characteristics(cls, value: list[str]) -> list[str]: return _ensure_codes(value, PAIN_CHARACTERISTIC_CODES)
+    def validate_pain_characteristics(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, PAIN_CHARACTERISTIC_CODES)
 
     @field_validator("percussion_pain")
     @classmethod
-    def validate_percussion_pain(cls, value: list[str]) -> list[str]: return _ensure_codes(value, PERCUSSION_CODES)
+    def validate_percussion_pain(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, PERCUSSION_CODES)
 
     @field_validator("palpation_pain")
     @classmethod
-    def validate_palpation_pain(cls, value: list[str]) -> list[str]: return _ensure_codes(value, PALPATION_CODES)
+    def validate_palpation_pain(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, PALPATION_CODES)
 
     @field_validator("pulp_chamber")
     @classmethod
-    def validate_pulp_chamber(cls, value: list[str]) -> list[str]: return _ensure_codes(value, PULP_CHAMBER_CODES)
+    def validate_pulp_chamber(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, PULP_CHAMBER_CODES)
 
     @field_validator("canals_count")
     @classmethod
-    def validate_canals_count(cls, value: list[str]) -> list[str]: return _ensure_codes(value, CANALS_COUNT_CODES)
+    def validate_canals_count(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, CANALS_COUNT_CODES)
 
     @field_validator("canals_characteristics")
     @classmethod
-    def validate_canals_characteristics(cls, value: list[str]) -> list[str]: return _ensure_codes(value, CANALS_CHARACTERISTIC_CODES)
+    def validate_canals_characteristics(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, CANALS_CHARACTERISTIC_CODES)
 
     @field_validator("presumptive_pulpal_diagnosis")
     @classmethod
-    def validate_pulpal_diagnoses(cls, value: list[str]) -> list[str]: return _ensure_codes(value, PULPAL_DIAGNOSIS_CODES)
+    def validate_pulpal_diagnoses(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, PULPAL_DIAGNOSIS_CODES)
 
     @field_validator("periapical_diagnosis")
     @classmethod
-    def validate_periapical_diagnoses(cls, value: list[str]) -> list[str]: return _ensure_codes(value, PERIAPICAL_DIAGNOSIS_CODES)
+    def validate_periapical_diagnoses(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, PERIAPICAL_DIAGNOSIS_CODES)
 
     @field_validator("definitive_diagnosis")
     @classmethod
-    def validate_definitive_diagnoses(cls, value: list[str]) -> list[str]: return _ensure_codes(value, DEFINITIVE_DIAGNOSIS_CODES)
+    def validate_definitive_diagnoses(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, DEFINITIVE_DIAGNOSIS_CODES)
 
     @field_validator("indicated_treatment")
     @classmethod
-    def validate_indicated_treatment(cls, value: list[str]) -> list[str]: return _ensure_codes(value, INDICATED_TREATMENT_CODES)
+    def validate_indicated_treatment(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, INDICATED_TREATMENT_CODES)
 
     @field_validator("post_endodontic_restoration")
     @classmethod
-    def validate_restoration(cls, value: list[str]) -> list[str]: return _ensure_codes(value, RESTORATION_CODES)
+    def validate_restoration(cls, value: list[str]) -> list[str]:
+        return _ensure_codes(value, RESTORATION_CODES)
 
     @field_validator("prognosis")
     @classmethod

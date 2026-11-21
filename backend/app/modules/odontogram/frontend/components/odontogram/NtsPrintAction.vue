@@ -194,10 +194,16 @@ async function confirmPrint(): Promise<void> {
           >
             <template #description>
               <div class="space-y-1">
-                <p v-if="unsupportedCount > 0" data-testid="nts-print-unsupported-count">
+                <p
+                  v-if="unsupportedCount > 0"
+                  data-testid="nts-print-unsupported-count"
+                >
                   {{ t('odontogram.nts.print.unsupportedCount', { count: unsupportedCount }) }}
                 </p>
-                <p v-if="partialCount > 0" data-testid="nts-print-partial-count">
+                <p
+                  v-if="partialCount > 0"
+                  data-testid="nts-print-partial-count"
+                >
                   {{ t('odontogram.nts.print.partialCount', { count: partialCount }) }}
                 </p>
                 <p>{{ t('odontogram.nts.print.incompleteNote') }}</p>

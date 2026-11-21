@@ -691,9 +691,7 @@ async def get_pediatric_dental_anamnesis(
         db, ctx.clinic_id, patient_id
     )
     return ApiResponse(
-        data=PediatricDentalAnamnesisResponse.model_validate(record)
-        if record is not None
-        else None
+        data=PediatricDentalAnamnesisResponse.model_validate(record) if record is not None else None
     )
 
 
@@ -777,7 +775,9 @@ async def get_endodontic_record(
         db, ctx.clinic_id, patient_id, record_id
     )
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endodontic record not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Endodontic record not found"
+        )
     return ApiResponse(data=EndodonticRecordResponse.model_validate(record))
 
 
@@ -798,7 +798,9 @@ async def update_endodontic_record(
         db, ctx.clinic_id, patient_id, record_id
     )
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endodontic record not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Endodontic record not found"
+        )
     payload = data.model_dump(exclude_unset=True)
     if "professional_id" in payload:
         await _ensure_professional(db, ctx, payload["professional_id"])

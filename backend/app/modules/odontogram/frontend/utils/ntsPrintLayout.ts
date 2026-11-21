@@ -58,11 +58,11 @@ export const NTS_PRINT_PAGE = {
   marginLeftMm: 10
 } as const
 
-export const NTS_PRINT_CONTENT_WIDTH_MM =
-  NTS_PRINT_PAGE.widthMm - NTS_PRINT_PAGE.marginLeftMm - NTS_PRINT_PAGE.marginRightMm
+export const NTS_PRINT_CONTENT_WIDTH_MM
+  = NTS_PRINT_PAGE.widthMm - NTS_PRINT_PAGE.marginLeftMm - NTS_PRINT_PAGE.marginRightMm
 
-export const NTS_PRINT_CONTENT_HEIGHT_MM =
-  NTS_PRINT_PAGE.heightMm - NTS_PRINT_PAGE.marginTopMm - NTS_PRINT_PAGE.marginBottomMm
+export const NTS_PRINT_CONTENT_HEIGHT_MM
+  = NTS_PRINT_PAGE.heightMm - NTS_PRINT_PAGE.marginTopMm - NTS_PRINT_PAGE.marginBottomMm
 
 // ---------------------------------------------------------------------------
 // the chart on paper

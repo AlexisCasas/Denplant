@@ -198,7 +198,10 @@ class PaymentReadService:
         of its item allocations without erasing their audit trail.
         """
         refunds = (
-            select(Refund.payment_id, func.coalesce(func.sum(Refund.amount), Decimal("0")).label("amount"))
+            select(
+                Refund.payment_id,
+                func.coalesce(func.sum(Refund.amount), Decimal("0")).label("amount"),
+            )
             .group_by(Refund.payment_id)
             .subquery()
         )
@@ -208,7 +211,10 @@ class PaymentReadService:
                 func.coalesce(
                     func.sum(
                         PaymentAllocation.amount
-                        * ((Payment.amount - func.coalesce(refunds.c.amount, Decimal("0"))) / Payment.amount)
+                        * (
+                            (Payment.amount - func.coalesce(refunds.c.amount, Decimal("0")))
+                            / Payment.amount
+                        )
                     ),
                     Decimal("0"),
                 ),
@@ -229,7 +235,10 @@ class PaymentReadService:
             )
         )
         return {
-            item_id: (paid_by_item.get(item_id, Decimal("0")), max(Decimal("0"), total - paid_by_item.get(item_id, Decimal("0"))))
+            item_id: (
+                paid_by_item.get(item_id, Decimal("0")),
+                max(Decimal("0"), total - paid_by_item.get(item_id, Decimal("0"))),
+            )
             for item_id, total in item_rows.all()
         }
 

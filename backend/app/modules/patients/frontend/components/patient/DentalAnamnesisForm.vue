@@ -206,7 +206,10 @@ onMounted(fetchProfessionals)
 <template>
   <div class="mx-auto w-full max-w-6xl space-y-8 py-2 sm:py-4">
     <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-      <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.doctor')">
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.dentalAnamnesis.doctor')"
+      >
         <USelect
           v-model="form.professionalId"
           :items="professionalOptions"
@@ -219,7 +222,10 @@ onMounted(fetchProfessionals)
         />
       </UFormField>
 
-      <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.consultationReason')">
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.dentalAnamnesis.consultationReason')"
+      >
         <UInput
           v-model="form.consultationReason"
           :placeholder="t('patientDetail.dentalAnamnesis.placeholders.consultationReason')"
@@ -235,17 +241,47 @@ onMounted(fetchProfessionals)
         </h2>
       </div>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.illnessDuration')">
-          <UInput class="w-full" v-model="form.currentIllness.duration" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.illnessDuration')" />
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.illnessDuration')"
+        >
+          <UInput
+            v-model="form.currentIllness.duration"
+            class="w-full"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.illnessDuration')"
+          />
         </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.mainSymptoms')">
-          <UInput class="w-full" v-model="form.currentIllness.symptoms" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.mainSymptoms')" />
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.mainSymptoms')"
+        >
+          <UInput
+            v-model="form.currentIllness.symptoms"
+            class="w-full"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.mainSymptoms')"
+          />
         </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.chronologicalNarrative')">
-          <UTextarea class="w-full" v-model="form.currentIllness.chronology" :rows="3" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.chronologicalNarrative')" />
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.chronologicalNarrative')"
+        >
+          <UTextarea
+            v-model="form.currentIllness.chronology"
+            class="w-full"
+            :rows="3"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.chronologicalNarrative')"
+          />
         </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.biologicalFunctions')">
-          <UTextarea class="w-full" v-model="form.currentIllness.biologicalFunctions" :rows="3" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.biologicalFunctions')" />
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.biologicalFunctions')"
+        >
+          <UTextarea
+            v-model="form.currentIllness.biologicalFunctions"
+            class="w-full"
+            :rows="3"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.biologicalFunctions')"
+          />
         </UFormField>
       </div>
     </section>
@@ -257,11 +293,27 @@ onMounted(fetchProfessionals)
         </h2>
       </div>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.familyHistory')">
-          <UTextarea class="w-full" v-model="form.history.family" :rows="3" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.familyHistory')" />
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.familyHistory')"
+        >
+          <UTextarea
+            v-model="form.history.family"
+            class="w-full"
+            :rows="3"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.familyHistory')"
+          />
         </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.personalHistory')">
-          <UTextarea class="w-full" v-model="form.history.personal" :rows="3" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.personalHistory')" />
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.personalHistory')"
+        >
+          <UTextarea
+            v-model="form.history.personal"
+            class="w-full"
+            :rows="3"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.personalHistory')"
+          />
         </UFormField>
       </div>
 
@@ -288,8 +340,16 @@ onMounted(fetchProfessionals)
         </div>
       </div>
 
-      <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.additionalComment')">
-        <UTextarea class="w-full" v-model="form.history.additionalComment" :rows="3" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.additionalComment')" />
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.dentalAnamnesis.additionalComment')"
+      >
+        <UTextarea
+          v-model="form.history.additionalComment"
+          class="w-full"
+          :rows="3"
+          :placeholder="t('patientDetail.dentalAnamnesis.placeholders.additionalComment')"
+        />
       </UFormField>
     </section>
 
@@ -301,62 +361,200 @@ onMounted(fetchProfessionals)
       </div>
       <div class="grid grid-cols-1 items-start gap-x-6 md:grid-cols-2">
         <div class="space-y-0">
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.bloodDiseases')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.bloodDiseases" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.bloodDiseases === 'yes'" class="w-full" v-model="form.dentalHistory.bloodDiseasesDetail" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.bloodDiseases')" />
-          </div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.otherDisease')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.otherDisease" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.otherDisease === 'yes'" class="w-full" v-model="form.dentalHistory.otherDiseaseDetail" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.otherDisease')" />
-          </div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.bleedingGums')">
-          <div class="border-b border-default/70 py-3"><URadioGroup v-model="form.dentalHistory.bleedingGums" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" /></div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.bruxism')">
-          <div class="border-b border-default/70 py-3"><URadioGroup v-model="form.dentalHistory.bruxism" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" /></div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.allergies')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.allergies" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.allergies === 'yes'" class="w-full" v-model="form.dentalHistory.allergiesDetail" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.allergies')" />
-          </div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.permanentMedication')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.permanentMedication" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.permanentMedication === 'yes'" class="w-full" v-model="form.dentalHistory.permanentMedicationDetail" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.permanentMedication')" />
-          </div>
-        </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.bloodDiseases')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.bloodDiseases"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.bloodDiseases === 'yes'"
+                v-model="form.dentalHistory.bloodDiseasesDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.bloodDiseases')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.otherDisease')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.otherDisease"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.otherDisease === 'yes'"
+                v-model="form.dentalHistory.otherDiseaseDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.otherDisease')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.bleedingGums')"
+          >
+            <div class="border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.bleedingGums"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.bruxism')"
+          >
+            <div class="border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.bruxism"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.allergies')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.allergies"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.allergies === 'yes'"
+                v-model="form.dentalHistory.allergiesDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.allergies')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.permanentMedication')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.permanentMedication"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.permanentMedication === 'yes'"
+                v-model="form.dentalHistory.permanentMedicationDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.permanentMedication')"
+              />
+            </div>
+          </UFormField>
         </div>
         <div class="space-y-0">
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.heartProblems')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.heartProblems" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.heartProblems === 'yes'" class="w-full" v-model="form.dentalHistory.heartProblemsDetail" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.heartProblems')" />
-          </div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.brushingFrequency')">
-          <div class="border-b border-default/70 py-3"><UInput class="w-full" v-model="form.dentalHistory.brushingFrequency" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.brushingFrequency')" /></div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.abnormalExtractionBleeding')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.abnormalExtractionBleeding" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.abnormalExtractionBleeding === 'yes'" class="w-full" v-model="form.dentalHistory.abnormalExtractionBleedingDetail" :placeholder="t('patientDetail.dentalAnamnesis.detail')" />
-          </div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.mouthDiscomfort')">
-          <div class="border-b border-default/70 py-3"><UInput class="w-full" v-model="form.dentalHistory.mouthDiscomfort" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.mouthDiscomfort')" /></div>
-        </UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.recentMajorSurgery')">
-          <div class="space-y-3 border-b border-default/70 py-3">
-            <URadioGroup v-model="form.dentalHistory.recentMajorSurgery" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-            <UInput v-if="form.dentalHistory.recentMajorSurgery === 'yes'" class="w-full" v-model="form.dentalHistory.recentMajorSurgeryDetail" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.recentMajorSurgery')" />
-          </div>
-        </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.heartProblems')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.heartProblems"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.heartProblems === 'yes'"
+                v-model="form.dentalHistory.heartProblemsDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.heartProblems')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.brushingFrequency')"
+          >
+            <div class="border-b border-default/70 py-3">
+              <UInput
+                v-model="form.dentalHistory.brushingFrequency"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.brushingFrequency')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.abnormalExtractionBleeding')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.abnormalExtractionBleeding"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.abnormalExtractionBleeding === 'yes'"
+                v-model="form.dentalHistory.abnormalExtractionBleedingDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.detail')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.mouthDiscomfort')"
+          >
+            <div class="border-b border-default/70 py-3">
+              <UInput
+                v-model="form.dentalHistory.mouthDiscomfort"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.mouthDiscomfort')"
+              />
+            </div>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.recentMajorSurgery')"
+          >
+            <div class="space-y-3 border-b border-default/70 py-3">
+              <URadioGroup
+                v-model="form.dentalHistory.recentMajorSurgery"
+                :items="yesNoOptions"
+                value-key="value"
+                label-key="label"
+                orientation="horizontal"
+              />
+              <UInput
+                v-if="form.dentalHistory.recentMajorSurgery === 'yes'"
+                v-model="form.dentalHistory.recentMajorSurgeryDetail"
+                class="w-full"
+                :placeholder="t('patientDetail.dentalAnamnesis.placeholders.recentMajorSurgery')"
+              />
+            </div>
+          </UFormField>
         </div>
       </div>
     </section>
@@ -372,27 +570,124 @@ onMounted(fetchProfessionals)
           {{ t('patientDetail.dentalAnamnesis.vitalSigns') }}
         </h3>
         <div class="mt-4 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.bloodPressure')"><UInput class="w-full" v-model="form.clinicalExam.bloodPressure"><template #trailing><span class="text-muted text-xs">mmHg</span></template></UInput></UFormField>
-          <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.pulse')"><UInput class="w-full" v-model="form.clinicalExam.pulse" /></UFormField>
-          <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.heartRate')"><UInput class="w-full" v-model="form.clinicalExam.heartRate" /></UFormField>
-          <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.respiratoryRate')"><UInput class="w-full" v-model="form.clinicalExam.respiratoryRate" /></UFormField>
-          <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.temperature')"><UInput class="w-full" v-model="form.clinicalExam.temperature"><template #trailing><span class="text-muted text-xs">°C</span></template></UInput></UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.bloodPressure')"
+          >
+            <UInput
+              v-model="form.clinicalExam.bloodPressure"
+              class="w-full"
+            >
+              <template #trailing>
+                <span class="text-muted text-xs">mmHg</span>
+              </template>
+            </UInput>
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.pulse')"
+          >
+            <UInput
+              v-model="form.clinicalExam.pulse"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.heartRate')"
+          >
+            <UInput
+              v-model="form.clinicalExam.heartRate"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.respiratoryRate')"
+          >
+            <UInput
+              v-model="form.clinicalExam.respiratoryRate"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            class="w-full"
+            :label="t('patientDetail.dentalAnamnesis.temperature')"
+          >
+            <UInput
+              v-model="form.clinicalExam.temperature"
+              class="w-full"
+            >
+              <template #trailing>
+                <span class="text-muted text-xs">°C</span>
+              </template>
+            </UInput>
+          </UFormField>
         </div>
       </div>
 
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.extraoralExam')"><UTextarea class="w-full" v-model="form.clinicalExam.extraoralExam" :rows="4" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.extraoralExam')" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.intraoralExam')"><UTextarea class="w-full" v-model="form.clinicalExam.intraoralExam" :rows="4" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.intraoralExam')" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.auxiliaryExamResults')"><UTextarea class="w-full" v-model="form.clinicalExam.auxiliaryExamResults" :rows="4" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.auxiliaryExamResults')" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.dentalAnamnesis.observations')"><UTextarea class="w-full" v-model="form.clinicalExam.observations" :rows="4" :placeholder="t('patientDetail.dentalAnamnesis.placeholders.observations')" /></UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.extraoralExam')"
+        >
+          <UTextarea
+            v-model="form.clinicalExam.extraoralExam"
+            class="w-full"
+            :rows="4"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.extraoralExam')"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.intraoralExam')"
+        >
+          <UTextarea
+            v-model="form.clinicalExam.intraoralExam"
+            class="w-full"
+            :rows="4"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.intraoralExam')"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.auxiliaryExamResults')"
+        >
+          <UTextarea
+            v-model="form.clinicalExam.auxiliaryExamResults"
+            class="w-full"
+            :rows="4"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.auxiliaryExamResults')"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.dentalAnamnesis.observations')"
+        >
+          <UTextarea
+            v-model="form.clinicalExam.observations"
+            class="w-full"
+            :rows="4"
+            :placeholder="t('patientDetail.dentalAnamnesis.placeholders.observations')"
+          />
+        </UFormField>
       </div>
     </section>
 
     <div class="flex flex-col items-start gap-3 border-t border-default/70 pt-6 sm:flex-row sm:items-center sm:justify-end">
-      <p v-if="isLoading" class="text-caption text-muted sm:order-first sm:mr-auto">
+      <p
+        v-if="isLoading"
+        class="text-caption text-muted sm:order-first sm:mr-auto"
+      >
         {{ t('common.loading') }}
       </p>
-      <UButton color="primary" icon="i-lucide-save" :loading="isSaving" :disabled="!props.patientId || isLoading || isSaving" @click="save">
+      <UButton
+        color="primary"
+        icon="i-lucide-save"
+        :loading="isSaving"
+        :disabled="!props.patientId || isLoading || isSaving"
+        @click="save"
+      >
         {{ t('patientDetail.dentalAnamnesis.save') }}
       </UButton>
     </div>

@@ -47,7 +47,9 @@ class AppointmentLabelCreate(AppointmentLabelBase):
 
 class AppointmentLabelUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=40)
-    color: str | None = Field(default=None, min_length=7, max_length=7, pattern=r"^#[0-9A-Fa-f]{6}$")
+    color: str | None = Field(
+        default=None, min_length=7, max_length=7, pattern=r"^#[0-9A-Fa-f]{6}$"
+    )
     is_active: bool | None = None
 
     @field_validator("name")
@@ -74,6 +76,7 @@ class AppointmentLabelResponse(AppointmentLabelBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # --- Professional brief -------------------------------------------------
 

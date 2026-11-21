@@ -42,11 +42,17 @@ class AllocationCreate(BaseModel):
 
     @model_validator(mode="after")
     def _check_target_id(self) -> "AllocationCreate":
-        if self.target_type == "budget" and (self.target_id is None or self.budget_item_id is not None):
+        if self.target_type == "budget" and (
+            self.target_id is None or self.budget_item_id is not None
+        ):
             raise ValueError("budget allocations require target_id and no budget_item_id")
-        if self.target_type == "budget_item" and (self.target_id is None or self.budget_item_id is None):
+        if self.target_type == "budget_item" and (
+            self.target_id is None or self.budget_item_id is None
+        ):
             raise ValueError("budget_item allocations require target_id and budget_item_id")
-        if self.target_type == "on_account" and (self.target_id is not None or self.budget_item_id is not None):
+        if self.target_type == "on_account" and (
+            self.target_id is not None or self.budget_item_id is not None
+        ):
             raise ValueError("on_account allocations cannot target a budget or budget item")
         return self
 

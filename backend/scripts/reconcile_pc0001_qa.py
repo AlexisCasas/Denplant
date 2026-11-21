@@ -115,7 +115,9 @@ def _expected_fks(table: sa.Table) -> set[tuple[tuple[str, ...], str, tuple[str,
     return result
 
 
-def _actual_fks(inspector: sa.Inspector, table: str) -> set[tuple[tuple[str, ...], str, tuple[str, ...], str | None]]:
+def _actual_fks(
+    inspector: sa.Inspector, table: str
+) -> set[tuple[tuple[str, ...], str, tuple[str, ...], str | None]]:
     return {
         (
             tuple(fk["constrained_columns"]),
@@ -128,7 +130,10 @@ def _actual_fks(inspector: sa.Inspector, table: str) -> set[tuple[tuple[str, ...
 
 
 def _expected_indexes(table: sa.Table) -> set[tuple[str, tuple[str, ...], bool]]:
-    return {(index.name, tuple(column.name for column in index.columns), index.unique) for index in table.indexes}
+    return {
+        (index.name, tuple(column.name for column in index.columns), index.unique)
+        for index in table.indexes
+    }
 
 
 def _actual_indexes(inspector: sa.Inspector, table: str) -> set[tuple[str, tuple[str, ...], bool]]:
@@ -179,14 +184,20 @@ def compare_schema(connection: sa.Connection, expected: sa.MetaData) -> list[str
             physical = columns[column_name]
             physical_type = physical["type"].compile(dialect=postgresql.dialect()).lower()
             if not _types_match(declared, physical["type"]):
-                problems.append(f"{name}.{column_name}: type {_type_name(declared)!r} != {physical_type!r}")
+                problems.append(
+                    f"{name}.{column_name}: type {_type_name(declared)!r} != {physical_type!r}"
+                )
             if declared.nullable != physical["nullable"]:
-                problems.append(f"{name}.{column_name}: nullable {declared.nullable} != {physical['nullable']}")
+                problems.append(
+                    f"{name}.{column_name}: nullable {declared.nullable} != {physical['nullable']}"
+                )
             if _default(declared.server_default) != _default(physical.get("default")):
                 problems.append(f"{name}.{column_name}: default differs")
 
         expected_pk = tuple(column.name for column in table.primary_key.columns)
-        actual_pk = tuple((inspector.get_pk_constraint(name) or {}).get("constrained_columns") or ())
+        actual_pk = tuple(
+            (inspector.get_pk_constraint(name) or {}).get("constrained_columns") or ()
+        )
         if expected_pk != actual_pk:
             problems.append(f"{name}: primary key {expected_pk!r} != {actual_pk!r}")
         if _expected_fks(table) != _actual_fks(inspector, name):
@@ -221,10 +232,16 @@ async def run(database_url: str, verify_only: bool) -> dict[str, Any]:
             if not exists:
                 raise RuntimeError("alembic_version does not exist")
             before = list(
-                (await async_connection.scalars(sa.text("SELECT version_num FROM alembic_version ORDER BY version_num"))).all()
+                (
+                    await async_connection.scalars(
+                        sa.text("SELECT version_num FROM alembic_version ORDER BY version_num")
+                    )
+                ).all()
             )
             if "pc_0002" in before:
-                raise RuntimeError("pc_0002 is already recorded; this reconciler is only for pc_0001")
+                raise RuntimeError(
+                    "pc_0002 is already recorded; this reconciler is only for pc_0001"
+                )
             inserted = False
             if REVISION not in before and not verify_only:
                 await async_connection.execute(
@@ -233,11 +250,17 @@ async def run(database_url: str, verify_only: bool) -> dict[str, Any]:
                 )
                 inserted = True
             after = list(
-                (await async_connection.scalars(sa.text("SELECT version_num FROM alembic_version ORDER BY version_num"))).all()
+                (
+                    await async_connection.scalars(
+                        sa.text("SELECT version_num FROM alembic_version ORDER BY version_num")
+                    )
+                ).all()
             )
             expected_after = sorted(set(before) | ({REVISION} if not verify_only else set()))
             if after != expected_after:
-                raise RuntimeError("alembic_version verification failed; transaction will roll back")
+                raise RuntimeError(
+                    "alembic_version verification failed; transaction will roll back"
+                )
             return {
                 "database": database_name,
                 "validated_tables": len(expected.tables),
@@ -256,7 +279,9 @@ def main() -> int:
     parser.add_argument("--database-url", required=True)
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
-    print(json.dumps(asyncio.run(run(args.database_url, args.verify_only)), indent=2, sort_keys=True))
+    print(
+        json.dumps(asyncio.run(run(args.database_url, args.verify_only)), indent=2, sort_keys=True)
+    )
     return 0
 
 

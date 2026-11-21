@@ -961,18 +961,14 @@ class OdontogramPreferenceService:
         return row.profile if row is not None else DEFAULT_ODONTOGRAM_PROFILE
 
     @staticmethod
-    async def set_profile(
-        db: AsyncSession, clinic_id: UUID, user_id: UUID, profile: str
-    ) -> str:
+    async def set_profile(db: AsyncSession, clinic_id: UUID, user_id: UUID, profile: str) -> str:
         """Upsert the caller's own preference. Raises ValueError if unsupported."""
         if not is_valid_odontogram_profile(profile):
             raise ValueError(f"Unsupported odontogram profile: {profile}")
 
         row = await OdontogramPreferenceService._get_row(db, clinic_id, user_id)
         if row is None:
-            row = OdontogramUserPreference(
-                clinic_id=clinic_id, user_id=user_id, profile=profile
-            )
+            row = OdontogramUserPreference(clinic_id=clinic_id, user_id=user_id, profile=profile)
             db.add(row)
         else:
             row.profile = profile

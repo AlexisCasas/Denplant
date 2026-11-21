@@ -69,13 +69,17 @@ async def _validate_allocations_for_clinic(
     # allocation insert, so concurrent collectors cannot both spend the same
     # pending balance.
     items = (
-        await db.execute(
-            select(BudgetItem)
-            .where(BudgetItem.id.in_(item_ids))
-            .order_by(BudgetItem.id)
-            .with_for_update()
+        (
+            await db.execute(
+                select(BudgetItem)
+                .where(BudgetItem.id.in_(item_ids))
+                .order_by(BudgetItem.id)
+                .with_for_update()
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     by_id = {item.id: item for item in items}
     for spec in item_specs:
         item = by_id.get(spec["budget_item_id"])
@@ -87,7 +91,10 @@ async def _validate_allocations_for_clinic(
             raise PaymentWorkflowError("Budget item does not belong to the requested budget")
 
         refunded = (
-            select(Refund.payment_id, func.coalesce(func.sum(Refund.amount), Decimal("0")).label("amount"))
+            select(
+                Refund.payment_id,
+                func.coalesce(func.sum(Refund.amount), Decimal("0")).label("amount"),
+            )
             .group_by(Refund.payment_id)
             .subquery()
         )
@@ -96,7 +103,10 @@ async def _validate_allocations_for_clinic(
                 func.coalesce(
                     func.sum(
                         PaymentAllocation.amount
-                        * ((Payment.amount - func.coalesce(refunded.c.amount, Decimal("0"))) / Payment.amount)
+                        * (
+                            (Payment.amount - func.coalesce(refunded.c.amount, Decimal("0")))
+                            / Payment.amount
+                        )
                     ),
                     Decimal("0"),
                 )
@@ -107,7 +117,11 @@ async def _validate_allocations_for_clinic(
                 PaymentAllocation.clinic_id == clinic_id,
                 PaymentAllocation.target_type == "budget_item",
                 PaymentAllocation.budget_item_id == item.id,
-                *([PaymentAllocation.payment_id != exclude_payment_id] if exclude_payment_id else []),
+                *(
+                    [PaymentAllocation.payment_id != exclude_payment_id]
+                    if exclude_payment_id
+                    else []
+                ),
             )
         )
         paid = paid_result.scalar_one()
@@ -211,7 +225,9 @@ async def record_payment(
             payment_id=payment.id,
             target_type=spec["target_type"],
             budget_id=spec.get("target_id") if spec["target_type"] != "on_account" else None,
-            budget_item_id=spec.get("budget_item_id") if spec["target_type"] == "budget_item" else None,
+            budget_item_id=spec.get("budget_item_id")
+            if spec["target_type"] == "budget_item"
+            else None,
             amount=Decimal(str(spec["amount"])),
             created_by=recorded_by,
         )
@@ -233,7 +249,9 @@ async def record_payment(
                     {
                         "target_type": spec["target_type"],
                         "target_id": str(spec["target_id"]) if spec.get("target_id") else None,
-                        "budget_item_id": str(spec["budget_item_id"]) if spec.get("budget_item_id") else None,
+                        "budget_item_id": str(spec["budget_item_id"])
+                        if spec.get("budget_item_id")
+                        else None,
                         "amount": str(spec["amount"]),
                     }
                     for spec in allocations
@@ -318,7 +336,9 @@ async def reallocate_payment(
             payment_id=payment.id,
             target_type=spec["target_type"],
             budget_id=spec.get("target_id") if spec["target_type"] != "on_account" else None,
-            budget_item_id=spec.get("budget_item_id") if spec["target_type"] == "budget_item" else None,
+            budget_item_id=spec.get("budget_item_id")
+            if spec["target_type"] == "budget_item"
+            else None,
             amount=Decimal(str(spec["amount"])),
             created_by=changed_by,
         )
@@ -338,7 +358,9 @@ async def reallocate_payment(
                     {
                         "target_type": spec["target_type"],
                         "target_id": str(spec["target_id"]) if spec.get("target_id") else None,
-                        "budget_item_id": str(spec["budget_item_id"]) if spec.get("budget_item_id") else None,
+                        "budget_item_id": str(spec["budget_item_id"])
+                        if spec.get("budget_item_id")
+                        else None,
                         "amount": str(spec["amount"]),
                     }
                     for spec in new_allocations

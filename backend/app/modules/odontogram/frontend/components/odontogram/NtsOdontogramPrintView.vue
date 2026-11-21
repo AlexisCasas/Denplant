@@ -281,56 +281,56 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
       <tbody>
         <tr>
           <td class="p-0">
-      <!-- 1 + 2. DenPlant identification and the annex's one date.
+            <!-- 1 + 2. DenPlant identification and the annex's one date.
            Outside the normative block: the annex has no patient header. -->
-      <header
-        class="space-y-2"
-        data-testid="nts-print-header"
-      >
-        <h1
-          class="text-h2 text-default"
-          data-testid="nts-print-title"
-        >
-          {{ t('odontogram.nts.print.title') }}
-        </h1>
+            <header
+              class="space-y-2"
+              data-testid="nts-print-header"
+            >
+              <h1
+                class="text-h2 text-default"
+                data-testid="nts-print-title"
+              >
+                {{ t('odontogram.nts.print.title') }}
+              </h1>
 
-        <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <!-- Absent fields are omitted, never rendered as a dash: an empty
+              <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                <!-- Absent fields are omitted, never rendered as a dash: an empty
                row reads as "this patient has none", which is a different
                claim from "this page did not have it". -->
-          <template v-if="patient?.fullName">
-            <dt class="text-subtle">
-              {{ t('odontogram.nts.print.patient') }}
-            </dt>
-            <dd data-testid="nts-print-patient-name">
-              {{ patient.fullName }}
-            </dd>
-          </template>
+                <template v-if="patient?.fullName">
+                  <dt class="text-subtle">
+                    {{ t('odontogram.nts.print.patient') }}
+                  </dt>
+                  <dd data-testid="nts-print-patient-name">
+                    {{ patient.fullName }}
+                  </dd>
+                </template>
 
-          <template v-if="patient?.documentNumber">
-            <dt class="text-subtle">
-              {{ t('odontogram.nts.print.document') }}
-            </dt>
-            <dd data-testid="nts-print-patient-document">
-              <template v-if="patient.documentType">
-                {{ patient.documentType.toUpperCase() }}
-              </template>
-              {{ patient.documentNumber }}
-            </dd>
-          </template>
+                <template v-if="patient?.documentNumber">
+                  <dt class="text-subtle">
+                    {{ t('odontogram.nts.print.document') }}
+                  </dt>
+                  <dd data-testid="nts-print-patient-document">
+                    <template v-if="patient.documentType">
+                      {{ patient.documentType.toUpperCase() }}
+                    </template>
+                    {{ patient.documentNumber }}
+                  </dd>
+                </template>
 
-          <template v-if="date">
-            <dt class="text-subtle">
-              {{ t('odontogram.nts.print.date') }}
-            </dt>
-            <dd data-testid="nts-print-date">
-              {{ date }}
-            </dd>
-          </template>
-        </dl>
-      </header>
+                <template v-if="date">
+                  <dt class="text-subtle">
+                    {{ t('odontogram.nts.print.date') }}
+                  </dt>
+                  <dd data-testid="nts-print-date">
+                    {{ date }}
+                  </dd>
+                </template>
+              </dl>
+            </header>
 
-      <!--
+            <!--
         2b. What kind of document this is — before the chart, so it cannot be
         read after the fact.
 
@@ -345,131 +345,131 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
         qualification carried only by colour is a qualification that can be
         switched off in a print dialog.
       -->
-      <section
-        v-if="status?.isQualified"
-        class="border-2 border-current px-3 py-2 space-y-1"
-        data-testid="nts-print-qualification"
-        :data-status="status.status"
-        :data-superseded="status.isSuperseded ? 'true' : 'false'"
-      >
-        <p
-          v-if="status.status === 'draft'"
-          class="text-sm font-bold tracking-wide"
-          data-testid="nts-print-qualification-draft"
-        >
-          {{ t('odontogram.nts.print.draftQualification') }}
-          — {{ t('odontogram.nts.print.draftNotFinal') }}
-        </p>
+            <section
+              v-if="status?.isQualified"
+              class="border-2 border-current px-3 py-2 space-y-1"
+              data-testid="nts-print-qualification"
+              :data-status="status.status"
+              :data-superseded="status.isSuperseded ? 'true' : 'false'"
+            >
+              <p
+                v-if="status.status === 'draft'"
+                class="text-sm font-bold tracking-wide"
+                data-testid="nts-print-qualification-draft"
+              >
+                {{ t('odontogram.nts.print.draftQualification') }}
+                — {{ t('odontogram.nts.print.draftNotFinal') }}
+              </p>
 
-        <p
-          v-else-if="status.status === 'discarded'"
-          class="text-sm font-bold tracking-wide"
-          data-testid="nts-print-qualification-discarded"
-        >
-          {{ t('odontogram.nts.print.discardedQualification') }}
-          — {{ t('odontogram.nts.print.discardedHint') }}
-        </p>
+              <p
+                v-else-if="status.status === 'discarded'"
+                class="text-sm font-bold tracking-wide"
+                data-testid="nts-print-qualification-discarded"
+              >
+                {{ t('odontogram.nts.print.discardedQualification') }}
+                — {{ t('odontogram.nts.print.discardedHint') }}
+              </p>
 
-        <!-- Finalized, but a later record exists. Said plainly, and without
+              <!-- Finalized, but a later record exists. Said plainly, and without
              implying this one was wrong. -->
-        <p
-          v-if="status.isSuperseded"
-          class="text-sm font-bold tracking-wide"
-          data-testid="nts-print-qualification-superseded"
-        >
-          {{ t('odontogram.nts.print.supersededQualification') }}
-          — {{ t('odontogram.nts.print.supersededHint') }}
-        </p>
+              <p
+                v-if="status.isSuperseded"
+                class="text-sm font-bold tracking-wide"
+                data-testid="nts-print-qualification-superseded"
+              >
+                {{ t('odontogram.nts.print.supersededQualification') }}
+                — {{ t('odontogram.nts.print.supersededHint') }}
+              </p>
 
-        <!-- Carried forward from an earlier record and never reviewed. The
+              <!-- Carried forward from an earlier record and never reviewed. The
              count is what stops this sheet reading as a reviewed document;
              nothing here confirms anything on the clinician's behalf. -->
-        <p
-          v-if="status.status === 'draft' && carriedForward > 0"
-          class="text-sm"
-          data-testid="nts-print-qualification-carried-forward"
-        >
-          {{ t('odontogram.nts.print.pendingCarriedForward', { count: carriedForward }) }}
-        </p>
+              <p
+                v-if="status.status === 'draft' && carriedForward > 0"
+                class="text-sm"
+                data-testid="nts-print-qualification-carried-forward"
+              >
+                {{ t('odontogram.nts.print.pendingCarriedForward', { count: carriedForward }) }}
+              </p>
 
-        <p
-          v-if="status.status === 'discarded' && record?.discard_reason"
-          class="text-sm"
-          data-testid="nts-print-qualification-discard-reason"
-        >
-          {{ t('odontogram.nts.print.discardReason') }}: {{ record.discard_reason }}
-        </p>
-      </section>
+              <p
+                v-if="status.status === 'discarded' && record?.discard_reason"
+                class="text-sm"
+                data-testid="nts-print-qualification-discard-reason"
+              >
+                {{ t('odontogram.nts.print.discardReason') }}: {{ record.discard_reason }}
+              </p>
+            </section>
 
-      <!--
+            <!--
         3. The graphic. The same component, the same catalog, the same
         geometry — with the editing advisories turned off, because a printed
         sheet cannot act on advice.
       -->
-      <!-- No `data-testid` here: it would fall through onto the chart's own
+            <!-- No `data-testid` here: it would fall through onto the chart's own
            root and rename it. The chart is identified by its own id. -->
-      <NtsOdontogramChart
-        :record="record"
-        :catalog="catalog"
-        readonly
-        :advisories="false"
-      />
+            <NtsOdontogramChart
+              :record="record"
+              :catalog="catalog"
+              readonly
+              :advisories="false"
+            />
 
-      <!-- 4. Especificaciones (§5.14). The block is always here: a missing
+            <!-- 4. Especificaciones (§5.14). The block is always here: a missing
            block cannot be told apart from one nobody filled in. -->
-      <section data-testid="nts-print-specifications">
-        <h2 class="text-sm font-medium text-default">
-          {{ t('odontogram.nts.print.specifications') }}
-        </h2>
+            <section data-testid="nts-print-specifications">
+              <h2 class="text-sm font-medium text-default">
+                {{ t('odontogram.nts.print.specifications') }}
+              </h2>
 
-        <ol
-          v-if="specifications.length > 0"
-          class="mt-2 space-y-1 text-sm list-decimal list-inside"
-          data-testid="nts-print-spec-list"
-        >
-          <li
-            v-for="(specification, index) in specifications"
-            :key="specification.id"
-            class="whitespace-pre-wrap break-words"
-            :data-testid="`nts-print-spec-item-${index}`"
-          >
-            {{ specification.text }}
-          </li>
-        </ol>
+              <ol
+                v-if="specifications.length > 0"
+                class="mt-2 space-y-1 text-sm list-decimal list-inside"
+                data-testid="nts-print-spec-list"
+              >
+                <li
+                  v-for="(specification, index) in specifications"
+                  :key="specification.id"
+                  class="whitespace-pre-wrap break-words"
+                  :data-testid="`nts-print-spec-item-${index}`"
+                >
+                  {{ specification.text }}
+                </li>
+              </ol>
 
-        <p
-          v-else
-          class="mt-2 text-sm text-subtle"
-          data-testid="nts-print-spec-empty"
-        >
-          {{ t('odontogram.nts.print.emptySpecifications') }}
-        </p>
-      </section>
+              <p
+                v-else
+                class="mt-2 text-sm text-subtle"
+                data-testid="nts-print-spec-empty"
+              >
+                {{ t('odontogram.nts.print.emptySpecifications') }}
+              </p>
+            </section>
 
-      <!-- 5. Observaciones (§5.15), as persisted. Line breaks preserved. -->
-      <section data-testid="nts-print-observations">
-        <h2 class="text-sm font-medium text-default">
-          {{ t('odontogram.nts.print.observations') }}
-        </h2>
+            <!-- 5. Observaciones (§5.15), as persisted. Line breaks preserved. -->
+            <section data-testid="nts-print-observations">
+              <h2 class="text-sm font-medium text-default">
+                {{ t('odontogram.nts.print.observations') }}
+              </h2>
 
-        <p
-          v-if="observations.length > 0"
-          class="mt-2 text-sm whitespace-pre-wrap break-words"
-          data-testid="nts-print-observations-text"
-        >
-          {{ observations }}
-        </p>
+              <p
+                v-if="observations.length > 0"
+                class="mt-2 text-sm whitespace-pre-wrap break-words"
+                data-testid="nts-print-observations-text"
+              >
+                {{ observations }}
+              </p>
 
-        <p
-          v-else
-          class="mt-2 text-sm text-subtle"
-          data-testid="nts-print-observations-empty"
-        >
-          {{ t('odontogram.nts.print.emptyObservations') }}
-        </p>
-      </section>
+              <p
+                v-else
+                class="mt-2 text-sm text-subtle"
+                data-testid="nts-print-observations-empty"
+              >
+                {{ t('odontogram.nts.print.emptyObservations') }}
+              </p>
+            </section>
 
-      <!--
+            <!--
         6. What the drawing could not carry.
 
         After Observaciones, not before it, so that no DenPlant content is
@@ -478,124 +478,124 @@ function declarationText(declaration: (typeof declarations.value)[number]): stri
         present at all because a tooth whose finding was not drawn must not
         read as a tooth with nothing found.
       -->
-      <section
-        v-if="declarations.length > 0"
-        class="border-t border-default pt-3"
-        data-testid="nts-print-declarations"
-      >
-        <h2 class="text-sm font-medium text-default">
-          {{ t('odontogram.nts.print.incompleteFindings') }}
-        </h2>
-        <p class="mt-1 text-caption text-subtle">
-          {{ t('odontogram.nts.print.systemNote') }}
-        </p>
+            <section
+              v-if="declarations.length > 0"
+              class="border-t border-default pt-3"
+              data-testid="nts-print-declarations"
+            >
+              <h2 class="text-sm font-medium text-default">
+                {{ t('odontogram.nts.print.incompleteFindings') }}
+              </h2>
+              <p class="mt-1 text-caption text-subtle">
+                {{ t('odontogram.nts.print.systemNote') }}
+              </p>
 
-        <ul class="mt-2 space-y-1 text-sm">
-          <li
-            v-for="declaration in declarations"
-            :key="declaration.findingId"
-            :data-testid="`nts-print-declaration-${declaration.findingId}`"
-            :data-completeness="declaration.completeness"
-          >
-            {{ declarationText(declaration) }}
-          </li>
-        </ul>
-      </section>
+              <ul class="mt-2 space-y-1 text-sm">
+                <li
+                  v-for="declaration in declarations"
+                  :key="declaration.findingId"
+                  :data-testid="`nts-print-declaration-${declaration.findingId}`"
+                  :data-completeness="declaration.completeness"
+                >
+                  {{ declarationText(declaration) }}
+                </li>
+              </ul>
+            </section>
 
-      <!-- 7. Who recorded it (§5.3). Identification, not a signature; no
+            <!-- 7. Who recorded it (§5.3). Identification, not a signature; no
            firma y sello line, which belongs to the Ficha. -->
-      <section
-        v-if="professional"
-        data-testid="nts-print-professional"
-      >
-        <h2 class="text-sm font-medium text-default">
-          {{ t('odontogram.nts.print.professional') }}
-        </h2>
+            <section
+              v-if="professional"
+              data-testid="nts-print-professional"
+            >
+              <h2 class="text-sm font-medium text-default">
+                {{ t('odontogram.nts.print.professional') }}
+              </h2>
 
-        <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <template v-if="professional.name">
-            <dt class="text-subtle">
-              {{ t('odontogram.nts.print.registeredBy') }}
-            </dt>
-            <dd data-testid="nts-print-professional-name">
-              {{ professional.name }}
-            </dd>
-          </template>
+              <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                <template v-if="professional.name">
+                  <dt class="text-subtle">
+                    {{ t('odontogram.nts.print.registeredBy') }}
+                  </dt>
+                  <dd data-testid="nts-print-professional-name">
+                    {{ professional.name }}
+                  </dd>
+                </template>
 
-          <template v-if="professional.role">
-            <dt class="text-subtle">
-              {{ t('odontogram.nts.print.role') }}
-            </dt>
-            <dd data-testid="nts-print-professional-role">
-              {{ professional.role }}
-            </dd>
-          </template>
+                <template v-if="professional.role">
+                  <dt class="text-subtle">
+                    {{ t('odontogram.nts.print.role') }}
+                  </dt>
+                  <dd data-testid="nts-print-professional-role">
+                    {{ professional.role }}
+                  </dd>
+                </template>
 
-          <template v-if="professional.professionalId">
-            <dt class="text-subtle">
-              {{ t('odontogram.nts.print.professionalId') }}
-            </dt>
-            <dd data-testid="nts-print-professional-id">
-              {{ professional.professionalId }}
-            </dd>
-          </template>
-        </dl>
-      </section>
+                <template v-if="professional.professionalId">
+                  <dt class="text-subtle">
+                    {{ t('odontogram.nts.print.professionalId') }}
+                  </dt>
+                  <dd data-testid="nts-print-professional-id">
+                    {{ professional.professionalId }}
+                  </dd>
+                </template>
+              </dl>
+            </section>
 
-      <!-- 8. Technical footer: what ties this sheet to a stored record. -->
-      <section
-        v-if="footer"
-        class="border-t border-default pt-3"
-        data-testid="nts-print-footer"
-      >
-        <h2 class="text-caption font-medium text-subtle">
-          {{ t('odontogram.nts.print.technical') }}
-        </h2>
+            <!-- 8. Technical footer: what ties this sheet to a stored record. -->
+            <section
+              v-if="footer"
+              class="border-t border-default pt-3"
+              data-testid="nts-print-footer"
+            >
+              <h2 class="text-caption font-medium text-subtle">
+                {{ t('odontogram.nts.print.technical') }}
+              </h2>
 
-        <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-caption text-subtle">
-          <dt>{{ t('odontogram.nts.print.recordId') }}</dt>
-          <dd
-            class="break-all"
-            data-testid="nts-print-record-id"
-          >
-            {{ footer.recordId }}
-          </dd>
+              <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-caption text-subtle">
+                <dt>{{ t('odontogram.nts.print.recordId') }}</dt>
+                <dd
+                  class="break-all"
+                  data-testid="nts-print-record-id"
+                >
+                  {{ footer.recordId }}
+                </dd>
 
-          <dt>{{ t('odontogram.nts.print.normVersion') }}</dt>
-          <dd data-testid="nts-print-norm-version">
-            {{ footer.normVersion }}
-          </dd>
+                <dt>{{ t('odontogram.nts.print.normVersion') }}</dt>
+                <dd data-testid="nts-print-norm-version">
+                  {{ footer.normVersion }}
+                </dd>
 
-          <dt>{{ t('odontogram.nts.print.status') }}</dt>
-          <dd data-testid="nts-print-status">
-            {{ statusText(footer.status) }}
-            <template v-if="status?.isSuperseded">
-              · {{ statusText('superseded') }}
-            </template>
-          </dd>
+                <dt>{{ t('odontogram.nts.print.status') }}</dt>
+                <dd data-testid="nts-print-status">
+                  {{ statusText(footer.status) }}
+                  <template v-if="status?.isSuperseded">
+                    · {{ statusText('superseded') }}
+                  </template>
+                </dd>
 
-          <dt>{{ t('odontogram.nts.print.contentFingerprint') }}</dt>
-          <!--
+                <dt>{{ t('odontogram.nts.print.contentFingerprint') }}</dt>
+                <!--
             Whole or absent. `break-all` lets a 64-character digest wrap
             across lines rather than be clipped: a truncated fingerprint
             attests nothing, so it is never shortened to fit.
           -->
-          <dd
-            v-if="footer.contentHash"
-            class="break-all font-mono"
-            data-testid="nts-print-content-hash"
-          >
-            {{ footer.contentHash }}
-            <span class="font-sans">({{ footer.hashAlgorithm }})</span>
-          </dd>
-          <dd
-            v-else
-            data-testid="nts-print-content-hash-unavailable"
-          >
-            {{ t('odontogram.nts.print.fingerprintUnavailable') }}
-          </dd>
-        </dl>
-      </section>
+                <dd
+                  v-if="footer.contentHash"
+                  class="break-all font-mono"
+                  data-testid="nts-print-content-hash"
+                >
+                  {{ footer.contentHash }}
+                  <span class="font-sans">({{ footer.hashAlgorithm }})</span>
+                </dd>
+                <dd
+                  v-else
+                  data-testid="nts-print-content-hash-unavailable"
+                >
+                  {{ t('odontogram.nts.print.fingerprintUnavailable') }}
+                </dd>
+              </dl>
+            </section>
           </td>
         </tr>
       </tbody>

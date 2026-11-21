@@ -105,12 +105,9 @@ class InvoicePDFService:
     ) -> str:
         """Generate HTML content for the invoice."""
         extra = extra_pdf_data or {}
-        dental_background_data_uri = (
-            "data:image/png;base64,"
-            + base64.b64encode(
-                (Path(__file__).parent / "assets" / "dental-page-background.png").read_bytes()
-            ).decode("ascii")
-        )
+        dental_background_data_uri = "data:image/png;base64," + base64.b64encode(
+            (Path(__file__).parent / "assets" / "dental-page-background.png").read_bytes()
+        ).decode("ascii")
         # Localized labels
         labels = InvoicePDFService._get_labels(locale)
 

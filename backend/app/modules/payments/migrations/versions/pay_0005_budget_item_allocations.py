@@ -50,5 +50,7 @@ def downgrade() -> None:
         "OR (target_type = 'on_account' AND budget_id IS NULL)",
     )
     op.drop_index("idx_alloc_clinic_budget_item", table_name="payment_allocations")
-    op.drop_constraint("fk_payment_allocations_budget_item_id", "payment_allocations", type_="foreignkey")
+    op.drop_constraint(
+        "fk_payment_allocations_budget_item_id", "payment_allocations", type_="foreignkey"
+    )
     op.drop_column("payment_allocations", "budget_item_id")

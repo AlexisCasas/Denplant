@@ -220,9 +220,7 @@ class OdontogramUserPreference(Base, TimestampMixin):
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    profile: Mapped[str] = mapped_column(
-        String(30), default=OdontogramProfile.ORIGINAL.value
-    )
+    profile: Mapped[str] = mapped_column(String(30), default=OdontogramProfile.ORIGINAL.value)
 
     # Relationships
     clinic: Mapped["Clinic"] = relationship()

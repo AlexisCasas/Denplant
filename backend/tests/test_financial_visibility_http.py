@@ -25,7 +25,6 @@ from app.modules.treatment_plan.models import (
     TreatmentPlan,
 )
 
-
 FINANCIAL_KEYS = {
     "price",
     "default_price",
@@ -83,14 +82,10 @@ async def financial_http_world(db_session, test_clinic):
     )
     db_session.add(dentist_b)
     db_session.add(
-        ClinicMembership(
-            id=uuid4(), user_id=dentist.id, clinic_id=test_clinic.id, role="dentist"
-        )
+        ClinicMembership(id=uuid4(), user_id=dentist.id, clinic_id=test_clinic.id, role="dentist")
     )
     db_session.add(
-        ClinicMembership(
-            id=uuid4(), user_id=dentist_b.id, clinic_id=test_clinic.id, role="dentist"
-        )
+        ClinicMembership(id=uuid4(), user_id=dentist_b.id, clinic_id=test_clinic.id, role="dentist")
     )
     category = TreatmentCategory(
         id=uuid4(),
@@ -214,7 +209,9 @@ async def plan_and_agenda_world(db_session, test_clinic, financial_http_world):
         catalog_item_id=item.id,
         display_order=1,
     )
-    db_session.add_all([patient, treatment, plan, planned_item, session, appointment, appointment_treatment])
+    db_session.add_all(
+        [patient, treatment, plan, planned_item, session, appointment, appointment_treatment]
+    )
     await db_session.commit()
     return {"plan_id": plan.id, "appointment_id": appointment.id, **financial_http_world}
 
@@ -257,7 +254,9 @@ async def test_catalog_http_response_is_sanitized_for_dentist_but_not_admin(
     client, auth_headers, financial_http_world
 ):
     item_id = financial_http_world["item_id"]
-    dentist = await client.get(f"/api/v1/catalog/items/{item_id}", headers=financial_http_world["dentist_headers"])
+    dentist = await client.get(
+        f"/api/v1/catalog/items/{item_id}", headers=financial_http_world["dentist_headers"]
+    )
     admin = await client.get(f"/api/v1/catalog/items/{item_id}", headers=auth_headers)
 
     assert dentist.status_code == 200, dentist.text

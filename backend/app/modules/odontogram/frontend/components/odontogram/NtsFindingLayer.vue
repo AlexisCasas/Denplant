@@ -143,8 +143,8 @@ function shaftPath(arrow: NtsArrowShape): string {
     const [, control, end] = arrow.points as [NtsPoint, NtsPoint, NtsPoint]
     return `M${round(first.x)},${round(first.y)} Q${round(control.x)},${round(control.y)} ${round(end.x)},${round(end.y)}`
   }
-  return `M${round(first.x)},${round(first.y)} ` +
-    rest.map(point => `L${round(point.x)},${round(point.y)}`).join(' ')
+  return `M${round(first.x)},${round(first.y)} `
+    + rest.map(point => `L${round(point.x)},${round(point.y)}`).join(' ')
 }
 
 /** The head, as two strokes meeting at the tip and opening back along the shaft. */
@@ -166,9 +166,9 @@ function headPath(arrow: NtsArrowShape): string {
   const left = { x: -ux * cos - -uy * sin, y: -ux * sin + -uy * cos }
   const right = { x: -ux * cos + -uy * sin, y: ux * sin + -uy * cos }
 
-  return `M${round(tip.x + left.x * size)},${round(tip.y + left.y * size)} ` +
-    `L${round(tip.x)},${round(tip.y)} ` +
-    `L${round(tip.x + right.x * size)},${round(tip.y + right.y * size)}`
+  return `M${round(tip.x + left.x * size)},${round(tip.y + left.y * size)} `
+    + `L${round(tip.x)},${round(tip.y)} `
+    + `L${round(tip.x + right.x * size)},${round(tip.y + right.y * size)}`
 }
 
 /** Only the siglas that were given a line. The rest are counted by an overflow. */
@@ -516,7 +516,9 @@ function intersectingCircles(s: NtsSymbolInstruction): Array<{ cx: number, cy: n
           font-weight="600"
           :fill="ink(symbol.paint)"
           :data-testid="`nts-sigla-${symbol.findingId}`"
-        >{{ symbol.enclosedText }}</text>
+        >
+          {{ symbol.enclosedText }}
+        </text>
       </template>
     </g>
 
@@ -535,7 +537,9 @@ function intersectingCircles(s: NtsSymbolInstruction): Array<{ cx: number, cy: n
       :data-fdi="entry.fdi"
       :data-paint="entry.paint"
       :data-testid="`nts-sigla-${entry.findingId}`"
-    >{{ entry.text }}</text>
+    >
+      {{ entry.text }}
+    </text>
 
     <!--
       Overflow indicator. NOT an NTS symbol: the norm defines no "+n" and this
@@ -553,6 +557,8 @@ function intersectingCircles(s: NtsSymbolInstruction): Array<{ cx: number, cy: n
       fill="var(--color-text-muted)"
       :data-fdi="overflow.fdi"
       :data-testid="`nts-box-overflow-${overflow.fdi}`"
-    >+{{ overflow.hidden }}</text>
+    >
+      +{{ overflow.hidden }}
+    </text>
   </g>
 </template>

@@ -382,17 +382,17 @@ export function pendingCarriedForwardCount(record: NtsRecord | null): number {
  *   visible and disabled so the reason can be read, because a control that
  *   silently does nothing is worse than one that says why.
  */
-export type NtsPrintBlocker =
-  | 'no_record'
-  | 'catalog_unavailable'
-  | 'norm_mismatch'
-  | 'loading'
-  | 'opening_historical'
-  | 'refreshing'
-  | 'writing'
-  | 'dirty'
-  | 'refresh_failed'
-  | 'conflict'
+export type NtsPrintBlocker
+  = | 'no_record'
+    | 'catalog_unavailable'
+    | 'norm_mismatch'
+    | 'loading'
+    | 'opening_historical'
+    | 'refreshing'
+    | 'writing'
+    | 'dirty'
+    | 'refresh_failed'
+    | 'conflict'
 
 /** Blockers that mean "not now"; the rest mean "not here". */
 const TRANSIENT_BLOCKERS: ReadonlySet<NtsPrintBlocker> = new Set<NtsPrintBlocker>([

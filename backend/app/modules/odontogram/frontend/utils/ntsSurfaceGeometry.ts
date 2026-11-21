@@ -449,7 +449,7 @@ function encloses(ring: readonly NtsPoint[], point: NtsPoint): boolean {
  * signed areas sum to the figure's true area.
  */
 function orient(loops: NtsPoint[][]): NtsPoint[][] {
-  return loops.map(loop => {
+  return loops.map((loop) => {
     const depth = loops.filter(other => other !== loop && encloses(other, loop[0]!)).length
     const wantPositive = depth % 2 === 0
     return (cross(loop) > 0) === wantPositive ? loop : [...loop].reverse()

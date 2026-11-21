@@ -526,7 +526,7 @@ function trifurcated(
   const baseSpread = width * TRIFURCATED.baseSpread
   const tipSpread = width * TRIFURCATED.tipSpread
 
-  const shapes = [-1, 0, 1].map(side => {
+  const shapes = [-1, 0, 1].map((side) => {
     const baseCentre = centre + baseSpread * side
     const apex = r(centre + tipSpread * side)
     const left = r(baseCentre - half)

@@ -133,7 +133,12 @@ function toggleFavorite(): void {
         />
       </div>
     </header>
-    <p v-if="favoriteError" class="text-caption text-error">{{ t('prescriptions.create.favorites.saveError') }}</p>
+    <p
+      v-if="favoriteError"
+      class="text-caption text-error"
+    >
+      {{ t('prescriptions.create.favorites.saveError') }}
+    </p>
 
     <div class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
       <div

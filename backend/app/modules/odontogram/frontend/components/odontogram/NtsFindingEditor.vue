@@ -8,10 +8,9 @@
  * scope, and every mutation from `useNtsFindingEditor`.
  */
 
-import type { NtsFinding, NtsRule } from '../../types/nts'
+import type { NtsFinding, NtsRule, NtsRuleAttribute, NtsSpecificationRequirement } from '../../types/nts'
 import type { NtsArchCode, NtsSelectionProblem, NtsTargetSelection } from '../../utils/ntsFindingModel'
 import type { NtsPickMode } from '../../composables/useNtsFindingEditor'
-import type { NtsRuleAttribute, NtsSpecificationRequirement } from '../../types/nts'
 import NtsFindingPicker from './NtsFindingPicker.vue'
 import NtsAttributeEditor from './NtsAttributeEditor.vue'
 import NtsTargetEditor from './NtsTargetEditor.vue'
@@ -34,15 +33,15 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  selectRule: [rule: NtsRule]
+  'selectRule': [rule: NtsRule]
   'update:attributes': [value: Record<string, unknown>]
-  retargetSubject: []
-  retargetAnchors: []
-  stopRetarget: []
-  toggleArch: [arch: NtsArchCode]
-  setRole: [tooth: number, role: string | null]
-  save: []
-  cancel: []
+  'retargetSubject': []
+  'retargetAnchors': []
+  'stopRetarget': []
+  'toggleArch': [arch: NtsArchCode]
+  'setRole': [tooth: number, role: string | null]
+  'save': []
+  'cancel': []
 }>()
 
 const { t } = useI18n()

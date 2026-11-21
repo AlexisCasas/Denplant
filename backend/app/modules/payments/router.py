@@ -278,8 +278,10 @@ async def item_summaries_for_budget(
 ) -> ApiResponse[list[BudgetItemPaymentSummary]]:
     rows = await PaymentReadService.item_summaries_for_budget(db, ctx.clinic_id, budget_id)
     return ApiResponse(
-        data=[BudgetItemPaymentSummary(budget_item_id=item_id, paid=paid, balance=balance)
-              for item_id, (paid, balance) in rows.items()]
+        data=[
+            BudgetItemPaymentSummary(budget_item_id=item_id, paid=paid, balance=balance)
+            for item_id, (paid, balance) in rows.items()
+        ]
     )
 
 

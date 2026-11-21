@@ -341,13 +341,13 @@ export interface NtsExpectedVersionPayload {
 // ---------------------------------------------------------------------------
 
 /** Machine-readable codes the NTS API returns. */
-export type NtsErrorCode =
-  | 'nts_record_not_found'
-  | 'nts_version_conflict'
-  | 'nts_state_conflict'
-  | 'nts_draft_conflict'
-  | 'nts_clinical_validation'
-  | 'nts_norm_version_unknown'
+export type NtsErrorCode
+  = | 'nts_record_not_found'
+    | 'nts_version_conflict'
+    | 'nts_state_conflict'
+    | 'nts_draft_conflict'
+    | 'nts_clinical_validation'
+    | 'nts_norm_version_unknown'
 
 /** A normalised API failure, whatever shape the transport delivered. */
 export interface NtsApiError {

@@ -378,115 +378,554 @@ onMounted(fetchProfessionals)
 <template>
   <div class="mx-auto w-full max-w-6xl space-y-8 py-2 sm:py-4">
     <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(9rem,.45fr)]">
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.doctor')">
-        <USelect v-model="form.professionalId" class="w-full" :items="professionalOptions" value-key="value" label-key="label" :loading="isLoadingProfessionals" :placeholder="t('patientDetail.endodonticForm.selectDoctor')" icon="i-lucide-user-round" />
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.doctor')"
+      >
+        <USelect
+          v-model="form.professionalId"
+          class="w-full"
+          :items="professionalOptions"
+          value-key="value"
+          label-key="label"
+          :loading="isLoadingProfessionals"
+          :placeholder="t('patientDetail.endodonticForm.selectDoctor')"
+          icon="i-lucide-user-round"
+        />
       </UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.priorEndodonticTreatment')"><UInput v-model="form.priorEndodonticTreatment" class="w-full" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.toothNumber')"><UInput v-model="form.toothNumber" class="w-full" /></UFormField>
-      <UFormField class="w-full md:col-span-2" :label="t('patientDetail.endodonticForm.painHistory')"><UTextarea v-model="form.painHistory" class="w-full" :rows="3" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.initialNote" class="w-full" :rows="3" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.priorEndodonticTreatment')"
+      >
+        <UInput
+          v-model="form.priorEndodonticTreatment"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.toothNumber')"
+      >
+        <UInput
+          v-model="form.toothNumber"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full md:col-span-2"
+        :label="t('patientDetail.endodonticForm.painHistory')"
+      >
+        <UTextarea
+          v-model="form.painHistory"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.initialNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </div>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.clinicalExam') }}</h2></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.anatomicalCrown')">
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.clinicalExam') }}
+        </h2>
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.anatomicalCrown')"
+      >
         <div class="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-          <UCheckbox v-for="option in anatomicalCrownOptions" :key="option.value" v-model="form.anatomicalCrown" :value="option.value" :label="option.label" />
+          <UCheckbox
+            v-for="option in anatomicalCrownOptions"
+            :key="option.value"
+            v-model="form.anatomicalCrown"
+            :value="option.value"
+            :label="option.label"
+          />
         </div>
       </UFormField>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-3 lg:grid-cols-2">
-        <div v-for="question in clinicalStatusQuestions" :key="question.key" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-default/70 py-3">
+        <div
+          v-for="question in clinicalStatusQuestions"
+          :key="question.key"
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-default/70 py-3"
+        >
           <span class="text-sm text-default">{{ question.label }}</span>
-          <URadioGroup v-model="form.clinicalStatus[question.key]" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" class="shrink-0" />
-          <USelect v-if="question.associated === 'select'" v-model="form.clinicalStatusDetails[question.key]" class="min-w-44 flex-1" :items="emptySelectOptions" :placeholder="t(`patientDetail.endodonticForm.${question.detailLabel}`)" />
-          <UInput v-else-if="question.associated === 'input'" v-model="form.clinicalStatusDetails[question.key]" class="min-w-44 flex-1" :placeholder="t('patientDetail.endodonticForm.probing')" />
+          <URadioGroup
+            v-model="form.clinicalStatus[question.key]"
+            :items="yesNoOptions"
+            value-key="value"
+            label-key="label"
+            orientation="horizontal"
+            class="shrink-0"
+          />
+          <USelect
+            v-if="question.associated === 'select'"
+            v-model="form.clinicalStatusDetails[question.key]"
+            class="min-w-44 flex-1"
+            :items="emptySelectOptions"
+            :placeholder="t(`patientDetail.endodonticForm.${question.detailLabel}`)"
+          />
+          <UInput
+            v-else-if="question.associated === 'input'"
+            v-model="form.clinicalStatusDetails[question.key]"
+            class="min-w-44 flex-1"
+            :placeholder="t('patientDetail.endodonticForm.probing')"
+          />
         </div>
       </div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.painCharacteristics')">
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.painCharacteristics')"
+      >
         <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
-          <UCheckbox v-for="option in painCharacteristicOptions" :key="option.value" v-model="form.painCharacteristics" :value="option.value" :label="option.label" />
+          <UCheckbox
+            v-for="option in painCharacteristicOptions"
+            :key="option.value"
+            v-model="form.painCharacteristics"
+            :value="option.value"
+            :label="option.label"
+          />
         </div>
       </UFormField>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.endodonticForm.percussionPain')"><div class="flex flex-wrap gap-x-5 gap-y-2"><UCheckbox v-for="option in percussionOptions" :key="option.value" v-model="form.percussionPain" :value="option.value" :label="option.label" /></div></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.endodonticForm.palpationPain')"><div class="flex flex-wrap gap-x-5 gap-y-2"><UCheckbox v-for="option in palpationOptions" :key="option.value" v-model="form.palpationPain" :value="option.value" :label="option.label" /></div></UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.endodonticForm.percussionPain')"
+        >
+          <div class="flex flex-wrap gap-x-5 gap-y-2">
+            <UCheckbox
+              v-for="option in percussionOptions"
+              :key="option.value"
+              v-model="form.percussionPain"
+              :value="option.value"
+              :label="option.label"
+            />
+          </div>
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.endodonticForm.palpationPain')"
+        >
+          <div class="flex flex-wrap gap-x-5 gap-y-2">
+            <UCheckbox
+              v-for="option in palpationOptions"
+              :key="option.value"
+              v-model="form.palpationPain"
+              :value="option.value"
+              :label="option.label"
+            />
+          </div>
+        </UFormField>
       </div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalClinicalNote')"><UTextarea v-model="form.clinicalExamNote" class="w-full" :rows="3" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalClinicalNote')"
+      >
+        <UTextarea
+          v-model="form.clinicalExamNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.vitalityTest') }}</h2></div>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.vitalityTest') }}
+        </h2>
+      </div>
       <div class="hidden grid-cols-[minmax(9rem,.8fr)_minmax(12rem,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-6 text-sm font-medium text-muted lg:grid">
         <span>{{ t('patientDetail.endodonticForm.test') }}</span><span>{{ t('patientDetail.endodonticForm.result') }}</span><span>{{ t('patientDetail.endodonticForm.duration') }}</span><span>{{ t('patientDetail.endodonticForm.intensity') }}</span>
       </div>
-      <div v-for="test in ['heat', 'cold'] as const" :key="test" class="grid grid-cols-1 items-start gap-x-6 gap-y-3 border-b border-default/70 py-3 lg:grid-cols-[minmax(9rem,.8fr)_minmax(12rem,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div
+        v-for="test in ['heat', 'cold'] as const"
+        :key="test"
+        class="grid grid-cols-1 items-start gap-x-6 gap-y-3 border-b border-default/70 py-3 lg:grid-cols-[minmax(9rem,.8fr)_minmax(12rem,1fr)_minmax(0,1fr)_minmax(0,1fr)]"
+      >
         <span class="pt-1 text-sm font-medium text-default">{{ t(`patientDetail.endodonticForm.${test}`) }}</span>
-        <URadioGroup v-model="form.vitality[test]" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" />
-        <UFormField class="w-full lg:hidden" :label="t('patientDetail.endodonticForm.duration')" /><USelect v-model="form.vitality[`${test}Duration`]" class="w-full" :items="emptySelectOptions" :placeholder="t('patientDetail.endodonticForm.selectUnavailable')" />
-        <UFormField class="w-full lg:hidden" :label="t('patientDetail.endodonticForm.intensity')" /><USelect v-model="form.vitality[`${test}Intensity`]" class="w-full" :items="emptySelectOptions" :placeholder="t('patientDetail.endodonticForm.selectUnavailable')" />
+        <URadioGroup
+          v-model="form.vitality[test]"
+          :items="yesNoOptions"
+          value-key="value"
+          label-key="label"
+          orientation="horizontal"
+        />
+        <UFormField
+          class="w-full lg:hidden"
+          :label="t('patientDetail.endodonticForm.duration')"
+        /><USelect
+          v-model="form.vitality[`${test}Duration`]"
+          class="w-full"
+          :items="emptySelectOptions"
+          :placeholder="t('patientDetail.endodonticForm.selectUnavailable')"
+        />
+        <UFormField
+          class="w-full lg:hidden"
+          :label="t('patientDetail.endodonticForm.intensity')"
+        /><USelect
+          v-model="form.vitality[`${test}Intensity`]"
+          class="w-full"
+          :items="emptySelectOptions"
+          :placeholder="t('patientDetail.endodonticForm.selectUnavailable')"
+        />
       </div>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.radiographicExam') }}</h2></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.pulpChamber')"><div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-5"><UCheckbox v-for="option in pulpChamberOptions" :key="option.value" v-model="form.pulpChamber" :value="option.value" :label="option.label" /></div></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.canals')"><div class="space-y-3"><div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4"><UCheckbox v-for="option in canalsCountOptions" :key="option.value" v-model="form.canalsCount" :value="option.value" :label="option.label" /></div><div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6"><UCheckbox v-for="option in canalsCharacteristicsOptions" :key="option.value" v-model="form.canalsCharacteristics" :value="option.value" :label="option.label" /></div></div></UFormField>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.radiographicExam') }}
+        </h2>
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.pulpChamber')"
+      >
+        <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
+          <UCheckbox
+            v-for="option in pulpChamberOptions"
+            :key="option.value"
+            v-model="form.pulpChamber"
+            :value="option.value"
+            :label="option.label"
+          />
+        </div>
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.canals')"
+      >
+        <div class="space-y-3">
+          <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+            <UCheckbox
+              v-for="option in canalsCountOptions"
+              :key="option.value"
+              v-model="form.canalsCount"
+              :value="option.value"
+              :label="option.label"
+            />
+          </div><div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
+            <UCheckbox
+              v-for="option in canalsCharacteristicsOptions"
+              :key="option.value"
+              v-model="form.canalsCharacteristics"
+              :value="option.value"
+              :label="option.label"
+            />
+          </div>
+        </div>
+      </UFormField>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-3 lg:grid-cols-2">
-        <div v-for="question in radiographicQuestions" :key="question.key" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-default/70 py-3">
+        <div
+          v-for="question in radiographicQuestions"
+          :key="question.key"
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-default/70 py-3"
+        >
           <span class="text-sm text-default">{{ question.label }}</span>
-          <URadioGroup v-model="form.radiographicFindings[question.key]" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" class="shrink-0" />
-          <USelect v-if="question.associated" v-model="form.radiographicDetails[question.key]" class="min-w-44 flex-1" :items="emptySelectOptions" :placeholder="t('patientDetail.endodonticForm.selectUnavailable')" />
+          <URadioGroup
+            v-model="form.radiographicFindings[question.key]"
+            :items="yesNoOptions"
+            value-key="value"
+            label-key="label"
+            orientation="horizontal"
+            class="shrink-0"
+          />
+          <USelect
+            v-if="question.associated"
+            v-model="form.radiographicDetails[question.key]"
+            class="min-w-44 flex-1"
+            :items="emptySelectOptions"
+            :placeholder="t('patientDetail.endodonticForm.selectUnavailable')"
+          />
         </div>
       </div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalRadiographicNote')"><UTextarea v-model="form.radiographicNote" class="w-full" :rows="3" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalRadiographicNote')"
+      >
+        <UTextarea
+          v-model="form.radiographicNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.presumptivePulpalDiagnosis') }}</h2></div>
-      <div class="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3"><UCheckbox v-for="option in presumptivePulpalOptions" :key="option.value" v-model="form.presumptivePulpalDiagnosis" :value="option.value" :label="option.label" /></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.presumptivePulpalNote" class="w-full" :rows="3" /></UFormField>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.presumptivePulpalDiagnosis') }}
+        </h2>
+      </div>
+      <div class="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+        <UCheckbox
+          v-for="option in presumptivePulpalOptions"
+          :key="option.value"
+          v-model="form.presumptivePulpalDiagnosis"
+          :value="option.value"
+          :label="option.label"
+        />
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.presumptivePulpalNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.periapicalDiagnosis') }}</h2></div>
-      <div class="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3"><UCheckbox v-for="option in periapicalOptions" :key="option.value" v-model="form.periapicalDiagnosis" :value="option.value" :label="option.label" /></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.periapicalNote" class="w-full" :rows="3" /></UFormField>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.periapicalDiagnosis') }}
+        </h2>
+      </div>
+      <div class="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+        <UCheckbox
+          v-for="option in periapicalOptions"
+          :key="option.value"
+          v-model="form.periapicalDiagnosis"
+          :value="option.value"
+          :label="option.label"
+        />
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.periapicalNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.definitiveDiagnosis') }}</h2></div>
-      <div class="flex flex-wrap gap-x-6 gap-y-2"><UCheckbox v-for="option in definitiveDiagnosisOptions" :key="option.value" v-model="form.definitiveDiagnosis" :value="option.value" :label="option.label" /></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.definitiveNote" class="w-full" :rows="3" /></UFormField>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.definitiveDiagnosis') }}
+        </h2>
+      </div>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <UCheckbox
+          v-for="option in definitiveDiagnosisOptions"
+          :key="option.value"
+          v-model="form.definitiveDiagnosis"
+          :value="option.value"
+          :label="option.label"
+        />
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.definitiveNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.indicatedTreatment') }}</h2></div>
-      <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-4"><UCheckbox v-for="option in indicatedTreatmentOptions" :key="option.value" v-model="form.indicatedTreatment" :value="option.value" :label="option.label" /></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.indicatedTreatmentNote" class="w-full" :rows="3" /></UFormField>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.indicatedTreatment') }}
+        </h2>
+      </div>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
+        <UCheckbox
+          v-for="option in indicatedTreatmentOptions"
+          :key="option.value"
+          v-model="form.indicatedTreatment"
+          :value="option.value"
+          :label="option.label"
+        />
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.indicatedTreatmentNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.clinicalData') }}</h2></div>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.clinicalData') }}
+        </h2>
+      </div>
       <div class="overflow-x-auto rounded-token-lg border border-default">
         <table class="min-w-[1100px] w-full text-sm">
-          <thead class="bg-surface-muted/50 text-left text-muted"><tr><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.identification') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.canal') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.workingLength') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.referencePoint') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.initialFile') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.finalApicalFile') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.cementType') }}</th><th class="px-3 py-2">{{ t('patientDetail.endodonticForm.masterGuttaPerchaCone') }}</th></tr></thead>
-          <tbody><tr v-for="row in clinicalRows" :key="row.id" class="border-t border-default/70"><th class="whitespace-nowrap px-3 py-2 text-left font-medium text-default">{{ t(`patientDetail.endodonticForm.${row.id}`) }}</th><td class="p-2"><UInput v-model="row.canal" class="w-full" /></td><td class="p-2"><UInput v-model="row.workingLength" class="w-full" /></td><td class="p-2"><UInput v-model="row.referencePoint" class="w-full" /></td><td class="p-2"><UInput v-model="row.initialFile" class="w-full" /></td><td class="p-2"><UInput v-model="row.finalApicalFile" class="w-full" /></td><td class="p-2"><UInput v-model="row.cementType" class="w-full" /></td><td class="p-2"><UInput v-model="row.masterGuttaPerchaCone" class="w-full" /></td></tr></tbody>
+          <thead class="bg-surface-muted/50 text-left text-muted">
+            <tr>
+              <th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.identification') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.canal') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.workingLength') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.referencePoint') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.initialFile') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.finalApicalFile') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.cementType') }}
+              </th><th class="px-3 py-2">
+                {{ t('patientDetail.endodonticForm.masterGuttaPerchaCone') }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in clinicalRows"
+              :key="row.id"
+              class="border-t border-default/70"
+            >
+              <th class="whitespace-nowrap px-3 py-2 text-left font-medium text-default">
+                {{ t(`patientDetail.endodonticForm.${row.id}`) }}
+              </th><td class="p-2">
+                <UInput
+                  v-model="row.canal"
+                  class="w-full"
+                />
+              </td><td class="p-2">
+                <UInput
+                  v-model="row.workingLength"
+                  class="w-full"
+                />
+              </td><td class="p-2">
+                <UInput
+                  v-model="row.referencePoint"
+                  class="w-full"
+                />
+              </td><td class="p-2">
+                <UInput
+                  v-model="row.initialFile"
+                  class="w-full"
+                />
+              </td><td class="p-2">
+                <UInput
+                  v-model="row.finalApicalFile"
+                  class="w-full"
+                />
+              </td><td class="p-2">
+                <UInput
+                  v-model="row.cementType"
+                  class="w-full"
+                />
+              </td><td class="p-2">
+                <UInput
+                  v-model="row.masterGuttaPerchaCone"
+                  class="w-full"
+                />
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.clinicalDataNote" class="w-full" :rows="3" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.clinicalDataNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.endodonticForm.finalSection') }}</h2></div>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.operativeAccidents')"><UTextarea v-model="form.operativeAccidents" class="w-full" :rows="3" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.postEndodonticRestoration')"><div class="flex flex-wrap gap-x-6 gap-y-2"><UCheckbox v-for="option in restorationOptions" :key="option.value" v-model="form.postEndodonticRestoration" :value="option.value" :label="option.label" /></div></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.prognosis')"><URadioGroup v-model="form.prognosis" :items="prognosisOptions" value-key="value" label-key="label" orientation="horizontal" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.endodonticForm.additionalNote')"><UTextarea v-model="form.finalNote" class="w-full" :rows="3" /></UFormField>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.endodonticForm.finalSection') }}
+        </h2>
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.operativeAccidents')"
+      >
+        <UTextarea
+          v-model="form.operativeAccidents"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.postEndodonticRestoration')"
+      >
+        <div class="flex flex-wrap gap-x-6 gap-y-2">
+          <UCheckbox
+            v-for="option in restorationOptions"
+            :key="option.value"
+            v-model="form.postEndodonticRestoration"
+            :value="option.value"
+            :label="option.label"
+          />
+        </div>
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.prognosis')"
+      >
+        <URadioGroup
+          v-model="form.prognosis"
+          :items="prognosisOptions"
+          value-key="value"
+          label-key="label"
+          orientation="horizontal"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.endodonticForm.additionalNote')"
+      >
+        <UTextarea
+          v-model="form.finalNote"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <div class="flex flex-col items-start gap-3 border-t border-default/70 pt-6 sm:flex-row sm:items-center sm:justify-end">
-      <p class="text-caption text-muted sm:order-first sm:mr-auto">{{ isLoading ? t('common.loading') : t('patientDetail.endodonticForm.saveUnavailable') }}</p>
-      <UButton color="primary" icon="i-lucide-save" :loading="isSaving" :disabled="!props.patientId || isLoading || isSaving" @click="save">{{ t('patientDetail.endodonticForm.save') }}</UButton>
+      <p class="text-caption text-muted sm:order-first sm:mr-auto">
+        {{ isLoading ? t('common.loading') : t('patientDetail.endodonticForm.saveUnavailable') }}
+      </p>
+      <UButton
+        color="primary"
+        icon="i-lucide-save"
+        :loading="isSaving"
+        :disabled="!props.patientId || isLoading || isSaving"
+        @click="save"
+      >
+        {{ t('patientDetail.endodonticForm.save') }}
+      </UButton>
     </div>
   </div>
 </template>

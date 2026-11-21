@@ -84,7 +84,9 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_patients_clinical_dental_anamnesis_clinic_id"),
-        "patients_clinical_dental_anamnesis", ["clinic_id"], unique=False,
+        "patients_clinical_dental_anamnesis",
+        ["clinic_id"],
+        unique=False,
     )
 
     op.create_table(
@@ -141,7 +143,9 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_patients_clinical_pediatric_dental_anamnesis_clinic_id"),
-        "patients_clinical_pediatric_dental_anamnesis", ["clinic_id"], unique=False,
+        "patients_clinical_pediatric_dental_anamnesis",
+        ["clinic_id"],
+        unique=False,
     )
 
     op.create_table(
@@ -154,7 +158,9 @@ def upgrade() -> None:
         sa.Column("prior_endodontic_treatment", sa.Text(), nullable=True),
         sa.Column("pain_history", sa.Text(), nullable=True),
         sa.Column("initial_note", sa.Text(), nullable=True),
-        sa.Column("anatomical_crown", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "anatomical_crown", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"
+        ),
         sa.Column("inflammation", sa.Boolean(), nullable=True),
         sa.Column("inflammation_detail", sa.Text(), nullable=True),
         sa.Column("fistulas", sa.Boolean(), nullable=True),
@@ -164,9 +170,18 @@ def upgrade() -> None:
         sa.Column("pockets", sa.Boolean(), nullable=True),
         sa.Column("pockets_detail", sa.Text(), nullable=True),
         sa.Column("calculus", sa.Boolean(), nullable=True),
-        sa.Column("pain_characteristics", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
-        sa.Column("percussion_pain", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
-        sa.Column("palpation_pain", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "pain_characteristics",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
+        sa.Column(
+            "percussion_pain", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"
+        ),
+        sa.Column(
+            "palpation_pain", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"
+        ),
         sa.Column("clinical_exam_note", sa.Text(), nullable=True),
         sa.Column("heat_response", sa.Boolean(), nullable=True),
         sa.Column("heat_duration", sa.String(length=100), nullable=True),
@@ -174,9 +189,18 @@ def upgrade() -> None:
         sa.Column("cold_response", sa.Boolean(), nullable=True),
         sa.Column("cold_duration", sa.String(length=100), nullable=True),
         sa.Column("cold_intensity", sa.String(length=100), nullable=True),
-        sa.Column("pulp_chamber", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
-        sa.Column("canals_count", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
-        sa.Column("canals_characteristics", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "pulp_chamber", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"
+        ),
+        sa.Column(
+            "canals_count", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"
+        ),
+        sa.Column(
+            "canals_characteristics",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("furcation_lesion", sa.Boolean(), nullable=True),
         sa.Column("apical_lesion", sa.Boolean(), nullable=True),
         sa.Column("lateral_lesion", sa.Boolean(), nullable=True),
@@ -191,17 +215,42 @@ def upgrade() -> None:
         sa.Column("resorption", sa.Boolean(), nullable=True),
         sa.Column("resorption_detail", sa.Text(), nullable=True),
         sa.Column("radiographic_note", sa.Text(), nullable=True),
-        sa.Column("presumptive_pulpal_diagnosis", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "presumptive_pulpal_diagnosis",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("presumptive_pulpal_note", sa.Text(), nullable=True),
-        sa.Column("periapical_diagnosis", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "periapical_diagnosis",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("periapical_note", sa.Text(), nullable=True),
-        sa.Column("definitive_diagnosis", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "definitive_diagnosis",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("definitive_note", sa.Text(), nullable=True),
-        sa.Column("indicated_treatment", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "indicated_treatment",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("indicated_treatment_note", sa.Text(), nullable=True),
         sa.Column("clinical_data_note", sa.Text(), nullable=True),
         sa.Column("operative_accidents", sa.Text(), nullable=True),
-        sa.Column("post_endodontic_restoration", postgresql.ARRAY(sa.String()), nullable=False, server_default="{}"),
+        sa.Column(
+            "post_endodontic_restoration",
+            postgresql.ARRAY(sa.String()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("prognosis", sa.String(length=20), nullable=True),
         sa.Column("final_note", sa.Text(), nullable=True),
         *_audit_columns(),
@@ -210,8 +259,18 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["professional_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_pc_endo_clinic_patient_created", "patients_clinical_endodontic_record", ["clinic_id", "patient_id", "created_at"], unique=False)
-    op.create_index("ix_pc_endo_clinic_patient_tooth", "patients_clinical_endodontic_record", ["clinic_id", "patient_id", "tooth_number"], unique=False)
+    op.create_index(
+        "ix_pc_endo_clinic_patient_created",
+        "patients_clinical_endodontic_record",
+        ["clinic_id", "patient_id", "created_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_pc_endo_clinic_patient_tooth",
+        "patients_clinical_endodontic_record",
+        ["clinic_id", "patient_id", "tooth_number"],
+        unique=False,
+    )
 
     op.create_table(
         "patients_clinical_endodontic_record_channel",
@@ -239,17 +298,32 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_patients_clinical_endodontic_record_channel_endodontic_record_id"),
-        "patients_clinical_endodontic_record_channel", ["endodontic_record_id"], unique=False,
+        "patients_clinical_endodontic_record_channel",
+        ["endodontic_record_id"],
+        unique=False,
     )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_patients_clinical_endodontic_record_channel_endodontic_record_id"), table_name="patients_clinical_endodontic_record_channel")
+    op.drop_index(
+        op.f("ix_patients_clinical_endodontic_record_channel_endodontic_record_id"),
+        table_name="patients_clinical_endodontic_record_channel",
+    )
     op.drop_table("patients_clinical_endodontic_record_channel")
-    op.drop_index("ix_pc_endo_clinic_patient_tooth", table_name="patients_clinical_endodontic_record")
-    op.drop_index("ix_pc_endo_clinic_patient_created", table_name="patients_clinical_endodontic_record")
+    op.drop_index(
+        "ix_pc_endo_clinic_patient_tooth", table_name="patients_clinical_endodontic_record"
+    )
+    op.drop_index(
+        "ix_pc_endo_clinic_patient_created", table_name="patients_clinical_endodontic_record"
+    )
     op.drop_table("patients_clinical_endodontic_record")
-    op.drop_index(op.f("ix_patients_clinical_pediatric_dental_anamnesis_clinic_id"), table_name="patients_clinical_pediatric_dental_anamnesis")
+    op.drop_index(
+        op.f("ix_patients_clinical_pediatric_dental_anamnesis_clinic_id"),
+        table_name="patients_clinical_pediatric_dental_anamnesis",
+    )
     op.drop_table("patients_clinical_pediatric_dental_anamnesis")
-    op.drop_index(op.f("ix_patients_clinical_dental_anamnesis_clinic_id"), table_name="patients_clinical_dental_anamnesis")
+    op.drop_index(
+        op.f("ix_patients_clinical_dental_anamnesis_clinic_id"),
+        table_name="patients_clinical_dental_anamnesis",
+    )
     op.drop_table("patients_clinical_dental_anamnesis")

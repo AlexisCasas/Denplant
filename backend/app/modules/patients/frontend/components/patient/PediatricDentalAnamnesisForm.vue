@@ -195,7 +195,10 @@ onMounted(fetchProfessionals)
 <template>
   <div class="mx-auto w-full max-w-6xl space-y-8 py-2 sm:py-4">
     <div class="w-full max-w-xl">
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.doctor')">
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.doctor')"
+      >
         <USelect
           v-model="form.professionalId"
           class="w-full"
@@ -210,81 +213,329 @@ onMounted(fetchProfessionals)
     </div>
 
     <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
-      <UFormField class="w-full sm:col-span-2 xl:col-span-4" :label="t('patientDetail.pediatricDentalAnamnesis.consultationReason')">
-        <UInput v-model="form.consultationReason" class="w-full" />
+      <UFormField
+        class="w-full sm:col-span-2 xl:col-span-4"
+        :label="t('patientDetail.pediatricDentalAnamnesis.consultationReason')"
+      >
+        <UInput
+          v-model="form.consultationReason"
+          class="w-full"
+        />
       </UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.motherName')"><UInput v-model="form.motherName" class="w-full" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.fatherName')"><UInput v-model="form.fatherName" class="w-full" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.siblingsCount')"><UInput v-model="form.siblingsCount" class="w-full" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.birthOrder')"><UInput v-model="form.birthOrder" class="w-full" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.motherName')"
+      >
+        <UInput
+          v-model="form.motherName"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.fatherName')"
+      >
+        <UInput
+          v-model="form.fatherName"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.siblingsCount')"
+      >
+        <UInput
+          v-model="form.siblingsCount"
+          class="w-full"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.birthOrder')"
+      >
+        <UInput
+          v-model="form.birthOrder"
+          class="w-full"
+        />
+      </UFormField>
     </div>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.pediatricDentalAnamnesis.currentIllness') }}</h2></div>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.pediatricDentalAnamnesis.currentIllness') }}
+        </h2>
+      </div>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.diseaseType')"><UTextarea v-model="form.currentIllness.diseaseType" class="w-full" :rows="3" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.chronologicalNarrative')"><UTextarea v-model="form.currentIllness.chronology" class="w-full" :rows="3" /></UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.diseaseType')"
+        >
+          <UTextarea
+            v-model="form.currentIllness.diseaseType"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.chronologicalNarrative')"
+        >
+          <UTextarea
+            v-model="form.currentIllness.chronology"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
       </div>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.pediatricDentalAnamnesis.prenatalHistory') }}</h2></div>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.pediatricDentalAnamnesis.prenatalHistory') }}
+        </h2>
+      </div>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.maternalDiseases')"><UInput v-model="form.prenatal.maternalDiseases" class="w-full" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.pregnancyComplications')"><URadioGroup v-model="form.prenatal.pregnancyComplications" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.prematureBaby')"><URadioGroup v-model="form.prenatal.prematureBaby" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.birthWeight')"><UInput v-model="form.prenatal.birthWeight" class="w-full"><template #trailing><span class="text-muted text-xs">kg</span></template></UInput></UFormField>
-        <UFormField class="w-full md:col-span-2" :label="t('patientDetail.pediatricDentalAnamnesis.comment')"><UTextarea v-model="form.prenatal.comment" class="w-full" :rows="3" /></UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.maternalDiseases')"
+        >
+          <UInput
+            v-model="form.prenatal.maternalDiseases"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.pregnancyComplications')"
+        >
+          <URadioGroup
+            v-model="form.prenatal.pregnancyComplications"
+            :items="yesNoOptions"
+            value-key="value"
+            label-key="label"
+            orientation="horizontal"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.prematureBaby')"
+        >
+          <URadioGroup
+            v-model="form.prenatal.prematureBaby"
+            :items="yesNoOptions"
+            value-key="value"
+            label-key="label"
+            orientation="horizontal"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.birthWeight')"
+        >
+          <UInput
+            v-model="form.prenatal.birthWeight"
+            class="w-full"
+          >
+            <template #trailing>
+              <span class="text-muted text-xs">kg</span>
+            </template>
+          </UInput>
+        </UFormField>
+        <UFormField
+          class="w-full md:col-span-2"
+          :label="t('patientDetail.pediatricDentalAnamnesis.comment')"
+        >
+          <UTextarea
+            v-model="form.prenatal.comment"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
       </div>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.pediatricDentalAnamnesis.postnatalHistory') }}</h2></div>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.pediatricDentalAnamnesis.postnatalHistory') }}
+        </h2>
+      </div>
       <div class="grid grid-cols-1 items-start gap-x-6 md:grid-cols-2">
-        <div v-for="(column, columnIndex) in postnatalQuestionColumns" :key="columnIndex" class="space-y-0">
-          <UFormField v-for="question in column" :key="question.key" class="w-full">
+        <div
+          v-for="(column, columnIndex) in postnatalQuestionColumns"
+          :key="columnIndex"
+          class="space-y-0"
+        >
+          <UFormField
+            v-for="question in column"
+            :key="question.key"
+            class="w-full"
+          >
             <div class="space-y-3 border-b border-default/70 py-3">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span class="text-sm text-default">{{ question.label }}</span>
-                <URadioGroup v-model="form.postnatal[question.key]" :items="yesNoOptions" value-key="value" label-key="label" orientation="horizontal" class="shrink-0" />
+                <URadioGroup
+                  v-model="form.postnatal[question.key]"
+                  :items="yesNoOptions"
+                  value-key="value"
+                  label-key="label"
+                  orientation="horizontal"
+                  class="shrink-0"
+                />
               </div>
-              <UInput v-if="form.postnatal[question.key] === 'yes'" v-model="form.postnatal[question.detailKey]" class="w-full" :placeholder="t('patientDetail.pediatricDentalAnamnesis.detail')" />
+              <UInput
+                v-if="form.postnatal[question.key] === 'yes'"
+                v-model="form.postnatal[question.detailKey]"
+                class="w-full"
+                :placeholder="t('patientDetail.pediatricDentalAnamnesis.detail')"
+              />
             </div>
           </UFormField>
         </div>
       </div>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.additionalComment')"><UTextarea v-model="form.postnatal.additionalComment" class="w-full" :rows="3" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.additionalComment')"
+      >
+        <UTextarea
+          v-model="form.postnatal.additionalComment"
+          class="w-full"
+          :rows="3"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.pediatricDentalAnamnesis.feedingAndHygiene') }}</h2></div>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.sweetsConsumption')">
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.pediatricDentalAnamnesis.feedingAndHygiene') }}
+        </h2>
+      </div>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.sweetsConsumption')"
+      >
         <div class="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-          <div class="flex items-center gap-2"><UInput v-model="form.habits.sweetsTimesPerDay" class="w-full" /><span class="shrink-0 text-sm text-muted">{{ t('patientDetail.pediatricDentalAnamnesis.timesPerDay') }}</span></div>
-          <div class="flex items-center gap-2"><UInput v-model="form.habits.sweetsDaysPerWeek" class="w-full" /><span class="shrink-0 text-sm text-muted">{{ t('patientDetail.pediatricDentalAnamnesis.daysPerWeek') }}</span></div>
+          <div class="flex items-center gap-2">
+            <UInput
+              v-model="form.habits.sweetsTimesPerDay"
+              class="w-full"
+            /><span class="shrink-0 text-sm text-muted">{{ t('patientDetail.pediatricDentalAnamnesis.timesPerDay') }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <UInput
+              v-model="form.habits.sweetsDaysPerWeek"
+              class="w-full"
+            /><span class="shrink-0 text-sm text-muted">{{ t('patientDetail.pediatricDentalAnamnesis.daysPerWeek') }}</span>
+          </div>
         </div>
       </UFormField>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.milkType')"><UInput v-model="form.habits.milkType" class="w-full" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.dentalHygiene')"><UInput v-model="form.habits.dentalHygiene" class="w-full" /></UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.milkType')"
+        >
+          <UInput
+            v-model="form.habits.milkType"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.dentalHygiene')"
+        >
+          <UInput
+            v-model="form.habits.dentalHygiene"
+            class="w-full"
+          />
+        </UFormField>
       </div>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.dailyDiet')"><UTextarea v-model="form.habits.dailyDiet" class="w-full" :rows="4" /></UFormField>
-      <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.parentingStyle')"><UInput v-model="form.habits.parentingStyle" class="w-full" /></UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.dailyDiet')"
+      >
+        <UTextarea
+          v-model="form.habits.dailyDiet"
+          class="w-full"
+          :rows="4"
+        />
+      </UFormField>
+      <UFormField
+        class="w-full"
+        :label="t('patientDetail.pediatricDentalAnamnesis.parentingStyle')"
+      >
+        <UInput
+          v-model="form.habits.parentingStyle"
+          class="w-full"
+        />
+      </UFormField>
     </section>
 
     <section class="space-y-5">
-      <div class="border-b border-primary/20 pb-3"><h2 class="text-ui font-semibold tracking-wide text-primary">{{ t('patientDetail.pediatricDentalAnamnesis.finalSection') }}</h2></div>
+      <div class="border-b border-primary/20 pb-3">
+        <h2 class="text-ui font-semibold tracking-wide text-primary">
+          {{ t('patientDetail.pediatricDentalAnamnesis.finalSection') }}
+        </h2>
+      </div>
       <div class="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-2">
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.oralHabits')"><UTextarea v-model="form.final.oralHabits" class="w-full" :rows="3" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.brushingTechnique')"><UTextarea v-model="form.final.brushingTechnique" class="w-full" :rows="3" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.clinicalExam')"><UTextarea v-model="form.final.clinicalExam" class="w-full" :rows="3" /></UFormField>
-        <UFormField class="w-full" :label="t('patientDetail.pediatricDentalAnamnesis.observations')"><UTextarea v-model="form.final.observations" class="w-full" :rows="3" /></UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.oralHabits')"
+        >
+          <UTextarea
+            v-model="form.final.oralHabits"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.brushingTechnique')"
+        >
+          <UTextarea
+            v-model="form.final.brushingTechnique"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.clinicalExam')"
+        >
+          <UTextarea
+            v-model="form.final.clinicalExam"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
+        <UFormField
+          class="w-full"
+          :label="t('patientDetail.pediatricDentalAnamnesis.observations')"
+        >
+          <UTextarea
+            v-model="form.final.observations"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
       </div>
     </section>
 
     <div class="flex flex-col items-start gap-3 border-t border-default/70 pt-6 sm:flex-row sm:items-center sm:justify-end">
-      <p class="text-caption text-muted sm:order-first sm:mr-auto">{{ isLoading ? t('common.loading') : t('patientDetail.pediatricDentalAnamnesis.saveUnavailable') }}</p>
-      <UButton color="primary" icon="i-lucide-save" :loading="isSaving" :disabled="!props.patientId || isLoading || isSaving" @click="save">{{ t('patientDetail.pediatricDentalAnamnesis.save') }}</UButton>
+      <p class="text-caption text-muted sm:order-first sm:mr-auto">
+        {{ isLoading ? t('common.loading') : t('patientDetail.pediatricDentalAnamnesis.saveUnavailable') }}
+      </p>
+      <UButton
+        color="primary"
+        icon="i-lucide-save"
+        :loading="isSaving"
+        :disabled="!props.patientId || isLoading || isSaving"
+        @click="save"
+      >
+        {{ t('patientDetail.pediatricDentalAnamnesis.save') }}
+      </UButton>
     </div>
   </div>
 </template>

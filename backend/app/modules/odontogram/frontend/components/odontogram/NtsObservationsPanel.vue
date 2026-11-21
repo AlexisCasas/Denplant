@@ -24,7 +24,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: [text: string | null]
+  'save': [text: string | null]
   /**
    * Whether there is text here the server has not been told about.
    *
