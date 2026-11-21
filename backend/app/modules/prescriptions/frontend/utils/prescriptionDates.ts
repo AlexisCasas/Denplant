@@ -67,13 +67,13 @@ export function formatDateOnly(value: string | null | undefined, locale: LocaleI
 }
 
 /** An instant, in the user's own timezone. */
-export function formatDateTime(value: string | null | undefined, locale: string): string {
+export function formatDateTime(value: string | null | undefined, locale: LocaleInput): string {
   if (!value) return ''
   const moment = new Date(value)
   if (Number.isNaN(moment.getTime())) return value
   const resolvedLocale = localeString(locale)
   try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(moment)
+    return new Intl.DateTimeFormat(resolvedLocale, { dateStyle: 'medium', timeStyle: 'short' }).format(moment)
   } catch {
     return value
   }
