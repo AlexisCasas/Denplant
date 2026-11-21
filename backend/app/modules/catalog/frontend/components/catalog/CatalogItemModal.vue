@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { buildSystemCommercialPayload } from '../../composables/useCatalog'
 import type {
   CatalogItemSessionInput,
   PricingStrategy,
@@ -8,10 +9,12 @@ import type {
   TreatmentCatalogItemCreate
 } from '~~/app/types'
 import {
-  ALL_TREATMENT_TYPES,
+  CATALOG_ODONTOGRAM_TREATMENT_TYPES,
   TREATMENT_CATEGORIES,
-  VISUALIZATION_RULES,
-  isSurfaceTreatment
+  buildCatalogOdontogramMapping,
+  isOdontogramMappingIncomplete,
+  isSurfaceTreatment,
+  resolveCatalogOdontogramType
 } from '~~/app/config/odontogramConstants'
 
 const props = defineProps<{
@@ -28,6 +31,7 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const catalog = useCatalog()
+const { symbol: currencySymbol } = useCurrency()
 
 // VAT Types
 const {
@@ -74,6 +78,9 @@ const itemName = computed({
 // Odontogram mapping
 const odontogramType = ref<string | undefined>(undefined)
 const clinicalCategory = ref<string | undefined>(undefined)
+// Stored legacy type with no safe modern equivalent (e.g. bridge_pontic). Shown
+// read-only; saving is blocked until the user picks a writable type.
+const unsupportedLegacyType = ref<string | undefined>(undefined)
 
 // Sessions
 interface SessionRow {
@@ -140,11 +147,15 @@ watch(
         is_active: newItem.is_active
       }
       if (newItem.odontogram_mapping) {
-        odontogramType.value = newItem.odontogram_mapping.odontogram_treatment_type
+        const stored = newItem.odontogram_mapping.odontogram_treatment_type
+        const resolved = resolveCatalogOdontogramType(stored)
+        odontogramType.value = resolved
+        unsupportedLegacyType.value = resolved ? undefined : stored
         clinicalCategory.value = newItem.odontogram_mapping.clinical_category
       } else {
         odontogramType.value = undefined
         clinicalCategory.value = undefined
+        unsupportedLegacyType.value = undefined
       }
       if (newItem.sessions && newItem.sessions.length > 0) {
         sessionsEnabled.value = true
@@ -180,6 +191,7 @@ watch(
       }
       odontogramType.value = undefined
       clinicalCategory.value = undefined
+      unsupportedLegacyType.value = undefined
       sessionsEnabled.value = false
       sessions.value = []
     }
@@ -213,6 +225,8 @@ const strategyOptionsVisual = computed<{ value: PricingStrategy, label: string, 
 
 const SURFACE_TIERS = ['1', '2', '3', '4', '5'] as const
 const showSurfacePrices = computed(() => formData.value.pricing_strategy === 'per_surface')
+const ROLE_PRICES = ['pillar', 'pontic'] as const
+const showRolePrices = computed(() => formData.value.pricing_strategy === 'per_role')
 
 watch(
   () => formData.value.pricing_strategy,
@@ -243,6 +257,19 @@ function setTierPrice(tier: string, value: number | string | undefined) {
   formData.value.surface_prices[tier] = Number.isFinite(n) ? n : 0
 }
 
+function getRolePrice(role: string): number | undefined {
+  const value = formData.value.pricing_config?.[role]
+  return typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : undefined
+}
+
+function setRolePrice(role: string, value: number | string | undefined) {
+  if (!formData.value.pricing_config) {
+    formData.value.pricing_config = {}
+  }
+  const amount = value === undefined || value === '' ? 0 : Number(value)
+  formData.value.pricing_config[role] = Number.isFinite(amount) ? amount : 0
+}
+
 // Duration presets
 const DURATION_PRESETS = [15, 30, 45, 60, 90] as const
 
@@ -255,7 +282,7 @@ const categoryOptions = computed(() =>
 
 const odontogramTypeOptions = computed<{ value: string | undefined, label: string }[]>(() => [
   { value: undefined, label: t('catalog.noOdontogramMapping') },
-  ...ALL_TREATMENT_TYPES.map(type => ({
+  ...CATALOG_ODONTOGRAM_TREATMENT_TYPES.map(type => ({
     value: type,
     label: t(`odontogram.treatments.${type}`, type)
   }))
@@ -270,6 +297,7 @@ const clinicalCategoryOptions = computed<{ value: string, label: string }[]>(() 
 
 watch(odontogramType, (newType) => {
   if (newType) {
+    unsupportedLegacyType.value = undefined
     const category = TREATMENT_CATEGORIES.find(c => c.treatments.includes(newType))
     if (category) {
       clinicalCategory.value = category.key
@@ -278,15 +306,10 @@ watch(odontogramType, (newType) => {
   }
 })
 
-function getVisualizationRules(treatmentType: string): string[] {
-  const rules: string[] = []
-  for (const [rule, treatments] of Object.entries(VISUALIZATION_RULES)) {
-    if (treatments.includes(treatmentType)) {
-      rules.push(rule)
-    }
-  }
-  return rules
-}
+const clinicalHasError = computed(() =>
+  !!unsupportedLegacyType.value
+  || isOdontogramMappingIncomplete(odontogramType.value, clinicalCategory.value)
+)
 
 const isValid = computed(() => {
   if (!formData.value.internal_code || !itemName.value || !formData.value.category_id) {
@@ -297,6 +320,7 @@ const isValid = computed(() => {
     if (sessions.value.some(s => !s.label || s.default_price < 0)) return false
     if (!sessionsSumMatches.value) return false
   }
+  if (clinicalHasError.value) return false
   return true
 })
 
@@ -321,13 +345,13 @@ function handleSubmit() {
     ...formData.value,
     sessions: sessionsEnabled.value ? sessionsToPayload() : []
   }
-  if (odontogramType.value && clinicalCategory.value) {
-    payload.odontogram_mapping = {
-      odontogram_treatment_type: odontogramType.value,
-      visualization_rules: getVisualizationRules(odontogramType.value),
-      visualization_config: {},
-      clinical_category: clinicalCategory.value
-    }
+  const mapping = buildCatalogOdontogramMapping(
+    odontogramType.value,
+    clinicalCategory.value,
+    props.item?.odontogram_mapping
+  )
+  if (mapping) {
+    payload.odontogram_mapping = mapping
   }
 
   if (isCreateMode.value) {
@@ -336,7 +360,11 @@ function handleSubmit() {
     if (!internal_code || !category_id || !names) return
     emit('create', { ...payload, internal_code, category_id, names })
   } else {
-    emit('save', payload)
+    if (isSystem.value) {
+      emit('save', buildSystemCommercialPayload(payload))
+    } else {
+      emit('save', payload)
+    }
   }
 }
 
@@ -432,7 +460,7 @@ function handleClose() {
               />
               {{ tab.label }}
               <span
-                v-if="(tab.id === 'general' && generalHasError) || (tab.id === 'pricing' && pricingHasError)"
+                v-if="(tab.id === 'general' && generalHasError) || (tab.id === 'pricing' && pricingHasError) || (tab.id === 'clinical' && clinicalHasError)"
                 class="w-1.5 h-1.5 rounded-full bg-danger-accent absolute top-2 right-1"
               />
             </button>
@@ -481,6 +509,7 @@ function handleClose() {
               <UFormField :label="t('catalog.name')">
                 <UInput
                   v-model="itemName"
+                  :disabled="isSystem"
                   required
                 />
               </UFormField>
@@ -488,6 +517,7 @@ function handleClose() {
               <UFormField :label="t('catalog.materialNotes')">
                 <UTextarea
                   v-model="formData.material_notes"
+                  :disabled="isSystem"
                   :rows="2"
                   :placeholder="t('catalog.materialNotesPlaceholder')"
                 />
@@ -523,7 +553,7 @@ function handleClose() {
                     min="0"
                   >
                     <template #trailing>
-                      <span class="text-muted text-sm">€</span>
+                      <span class="text-muted text-sm">{{ currencySymbol() }}</span>
                     </template>
                   </UInput>
                 </UFormField>
@@ -536,7 +566,7 @@ function handleClose() {
                     min="0"
                   >
                     <template #trailing>
-                      <span class="text-muted text-sm">€</span>
+                      <span class="text-muted text-sm">{{ currencySymbol() }}</span>
                     </template>
                   </UInput>
                 </UFormField>
@@ -619,6 +649,41 @@ function handleClose() {
                 </div>
               </div>
 
+              <!-- Bridge role prices -->
+              <div
+                v-if="showRolePrices"
+                class="rounded-lg border border-default bg-surface-muted/30 p-4"
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <UIcon
+                    name="i-lucide-link-2"
+                    class="w-4 h-4 text-primary-accent"
+                  />
+                  <h5 class="font-medium text-sm text-default dark:text-white">
+                    {{ t('catalog.pricingStrategy.per_role') }}
+                  </h5>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                  <UFormField
+                    v-for="role in ROLE_PRICES"
+                    :key="role"
+                    :label="t(`catalog.pricingStrategy.${role}`, role)"
+                  >
+                    <UInput
+                      :model-value="getRolePrice(role)"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      @update:model-value="setRolePrice(role, $event)"
+                    >
+                      <template #trailing>
+                        <span class="text-muted text-sm">{{ currencySymbol() }}</span>
+                      </template>
+                    </UInput>
+                  </UFormField>
+                </div>
+              </div>
+
               <!-- Sessions -->
               <div class="rounded-lg border border-default overflow-hidden">
                 <div class="flex items-center justify-between p-3 bg-surface-muted/30">
@@ -663,7 +728,7 @@ function handleClose() {
                         class="w-28"
                       >
                         <template #trailing>
-                          <span class="text-muted text-xs">€</span>
+                          <span class="text-muted text-xs">{{ currencySymbol() }}</span>
                         </template>
                       </UInput>
                       <UButton
@@ -689,7 +754,7 @@ function handleClose() {
                   <div class="px-3 pb-3 pt-1 border-t border-subtle">
                     <div class="flex items-center justify-between text-xs mb-1.5">
                       <span class="text-muted">
-                        {{ sessionsSum.toFixed(2) }} € / {{ (Number(formData.default_price) || 0).toFixed(2) }} €
+                        {{ sessionsSum.toFixed(2) }} {{ currencySymbol() }} / {{ (Number(formData.default_price) || 0).toFixed(2) }} {{ currencySymbol() }}
                       </span>
                       <span
                         class="flex items-center gap-1 font-medium"
@@ -853,19 +918,33 @@ function handleClose() {
                         value-key="value"
                         label-key="label"
                         :placeholder="t('catalog.selectOdontogramType')"
+                        :disabled="isSystem"
                       />
                     </UFormField>
-                    <UFormField :label="t('catalog.clinicalCategory')">
+                    <UFormField
+                      :label="t('catalog.clinicalCategory')"
+                      :error="isOdontogramMappingIncomplete(odontogramType, clinicalCategory) ? t('validation.required') : false"
+                    >
                       <USelect
                         v-model="clinicalCategory"
                         :items="clinicalCategoryOptions"
                         value-key="value"
                         label-key="label"
                         :placeholder="t('catalog.selectClinicalCategory')"
-                        :disabled="!odontogramType"
+                        :disabled="!odontogramType || isSystem"
                       />
                     </UFormField>
                   </div>
+                  <p
+                    v-if="unsupportedLegacyType"
+                    class="text-xs text-danger-accent flex items-start gap-1.5"
+                  >
+                    <UIcon
+                      name="i-lucide-alert-triangle"
+                      class="w-3.5 h-3.5 mt-0.5 shrink-0"
+                    />
+                    {{ t('catalog.odontogramLegacyTypeUnsupported', { type: unsupportedLegacyType }) }}
+                  </p>
                   <p
                     v-if="odontogramType"
                     class="text-xs text-info-accent flex items-start gap-1.5"

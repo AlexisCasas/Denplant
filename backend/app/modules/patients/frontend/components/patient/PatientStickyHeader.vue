@@ -29,6 +29,7 @@ const emit = defineEmits<{
   edit: []
   back: []
   archive: []
+  restore: []
   newAppointment: []
   newNote: []
   collect: []
@@ -87,12 +88,9 @@ const actionItems = computed(() => [
   {
     type: 'separator' as const
   },
-  {
-    label: t('patients.archive'),
-    icon: 'i-lucide-archive',
-    color: 'error' as const,
-    onSelect: () => emit('archive')
-  }
+  isArchived.value
+    ? { label: 'Desarchivar paciente', icon: 'i-lucide-archive-restore', onSelect: () => emit('restore') }
+    : { label: t('patients.archive'), icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => emit('archive') }
 ])
 </script>
 

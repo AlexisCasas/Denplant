@@ -24,6 +24,10 @@ class EventType:
     PATIENT_CREATED = "patient.created"
     PATIENT_UPDATED = "patient.updated"
     PATIENT_ARCHIVED = "patient.archived"
+    PATIENT_RESTORED = "patient.restored"
+    # Transactional cleanup event; subscribers receive the publisher's DB
+    # session and must raise to abort the whole deletion.
+    PATIENT_PERMANENT_DELETE_REQUESTED = "patient.permanent_delete_requested"
     PATIENT_MEDICAL_UPDATED = "patient.medical_updated"
 
     # Appointment events
@@ -201,6 +205,7 @@ class EventType:
     # ``treatment_plan.{plan,item}_note_created`` pair).
     CLINICAL_NOTE_ADMINISTRATIVE_CREATED = "clinical_notes.administrative_created"
     CLINICAL_NOTE_DIAGNOSIS_CREATED = "clinical_notes.diagnosis_created"
+    CLINICAL_NOTE_EVOLUTION_CREATED = "clinical_notes.evolution_created"
     CLINICAL_NOTE_TREATMENT_CREATED = "clinical_notes.treatment_created"
     CLINICAL_NOTE_PLAN_CREATED = "clinical_notes.plan_created"
     # Appointment-owner notes. Payload mirrors the other four — patient_id

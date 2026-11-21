@@ -9,7 +9,8 @@
 export const PERMISSIONS = {
   patients: {
     read: 'patients.read',
-    write: 'patients.write'
+    write: 'patients.write',
+    deletePermanent: 'patients.delete_permanent'
   },
   medicalHistory: {
     read: 'patients_clinical.medical.read',
@@ -83,6 +84,11 @@ export const PERMISSIONS = {
   clinicalNotes: {
     read: 'clinical_notes.notes.read',
     write: 'clinical_notes.notes.write'
+  },
+  prescriptions: {
+    read: 'prescriptions.read',
+    prescribe: 'prescriptions.prescribe',
+    void: 'prescriptions.void'
   },
   agents: {
     view: 'agents.view',

@@ -34,7 +34,7 @@ const toast = useToast()
 const auth = useAuth()
 const clinic = useClinic()
 const api = useApi()
-const { can } = usePermissions()
+const { can, canManageAllProfessionals } = usePermissions()
 const { isMobile } = useBreakpoint()
 const { createAppointment, updateAppointment, cancelAppointment } = useAppointments()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
@@ -111,7 +111,10 @@ const cabinetOptions = computed(() => {
 
 // Professional options
 const professionalOptions = computed(() => {
-  return professionals.value.map(prof => ({
+  const visible = canManageAllProfessionals.value
+    ? professionals.value
+    : professionals.value.filter(prof => prof.id === auth.user.value?.id)
+  return visible.map(prof => ({
     value: prof.id,
     label: `${prof.first_name} ${prof.last_name}`,
     color: getProfessionalColor(prof.id)
@@ -320,9 +323,11 @@ watch(() => props.open, async (isOpen) => {
         completed_without_appointment: false,
         completed_at: undefined,
         completed_by: undefined,
+        assigned_professional_id: t.assigned_professional_id ?? null,
         notes: undefined,
         created_at: '',
         updated_at: '',
+        sessions: t.sessions,
         treatment: {
           id: '',
           clinical_type: 'crown',
@@ -346,6 +351,11 @@ watch(() => props.open, async (isOpen) => {
               names: t.names,
               default_price: t.default_price != null ? String(t.default_price) : null
             }
+          : undefined,
+        // Lets PlannedTreatmentSelector pre-select the originating plan
+        // in edit mode instead of leaving the picker unresolved.
+        treatment_plan: t.plan_id
+          ? { id: t.plan_id, plan_number: t.plan_number ?? '', status: 'active' }
           : undefined
       }))
     } else {
@@ -375,7 +385,9 @@ watch(() => props.open, async (isOpen) => {
 
     // Set professional - use initialProfessionalId, current user if professional, or first available
     if (props.initialProfessionalId) {
-      selectedProfessionalId.value = props.initialProfessionalId
+      selectedProfessionalId.value = canManageAllProfessionals.value
+        ? props.initialProfessionalId
+        : auth.user.value?.id || ''
     } else {
       // Check if current user is a professional
       const currentUserId = auth.user.value?.id
@@ -520,7 +532,9 @@ async function handleSave() {
 
     const appointmentData: AppointmentCreate = {
       patient_id: selectedPatient.value.id,
-      professional_id: selectedProfessionalId.value,
+      professional_id: canManageAllProfessionals.value
+        ? selectedProfessionalId.value
+        : auth.user.value?.id || selectedProfessionalId.value,
       cabinet: cabinetValue,
       start_time: startTime,
       end_time: endTime,
@@ -692,6 +706,7 @@ function openPatientFile() {
                 <PlannedTreatmentSelector
                   v-model="selectedTreatments"
                   :patient-id="selectedPatient?.id"
+                  :professionals="professionals"
                 />
               </div>
             </section>
@@ -775,6 +790,7 @@ function openPatientFile() {
               </UFormField>
 
               <UFormField
+                v-if="canManageAllProfessionals"
                 :label="t('appointments.professional')"
                 required
               >

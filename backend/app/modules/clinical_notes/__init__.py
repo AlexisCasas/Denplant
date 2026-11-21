@@ -74,4 +74,8 @@ class ClinicalNotesModule(BaseModule):
         return ["notes.read", "notes.write"]
 
     def get_event_handlers(self) -> dict[str, Any]:
-        return {}
+        from app.core.events import EventType
+
+        from .deletion import on_patient_permanent_delete
+
+        return {EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete}

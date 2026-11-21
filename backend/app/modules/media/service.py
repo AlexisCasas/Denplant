@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,7 +14,7 @@ from app.core.events import EventType, event_bus
 
 from .attachment_registry import attachment_registry
 from .exif import extract_captured_at
-from .models import Document, MediaAttachment
+from .models import Document, MediaAttachment, MediaPurgeOutbox
 from .photo_taxonomy import (
     MEDIA_KIND_PHOTO,
     MEDIA_KIND_XRAY,
@@ -245,8 +245,89 @@ class DocumentService:
         documents = list(result.scalars().all())
         for doc in documents:
             doc.status = "archived"
+            doc.archived_by_patient = True
         await db.flush()
         return len(documents)
+
+    @staticmethod
+    async def restore_patient_documents(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> int:
+        """Restore lifecycle-archived documents; legacy fallback restores all archived rows."""
+        docs = list(
+            (
+                await db.execute(
+                    select(Document).where(
+                        Document.clinic_id == clinic_id, Document.patient_id == patient_id
+                    )
+                )
+            ).scalars()
+        )
+        marked = [doc for doc in docs if doc.archived_by_patient]
+        target = marked or [doc for doc in docs if doc.status == "archived"]
+        for doc in target:
+            doc.status, doc.archived_by_patient = "active", False
+        await db.flush()
+        return len(target)
+
+    @staticmethod
+    async def queue_patient_document_purge(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID
+    ) -> int:
+        docs = list(
+            (
+                await db.execute(
+                    select(Document).where(
+                        Document.clinic_id == clinic_id, Document.patient_id == patient_id
+                    )
+                )
+            ).scalars()
+        )
+        for doc in docs:
+            # Photo derivatives use deterministic sibling paths. Missing
+            # variants are harmless: the worker treats a missing object as a
+            # completed idempotent delete.
+            for path in (
+                doc.storage_path,
+                f"{doc.storage_path}.thumb.jpg",
+                f"{doc.storage_path}.medium.jpg",
+            ):
+                db.add(
+                    MediaPurgeOutbox(storage_path=path, clinic_id=clinic_id, patient_id=patient_id)
+                )
+        if docs:
+            await db.execute(delete(Document).where(Document.id.in_([doc.id for doc in docs])))
+        await db.flush()
+        return len(docs)
+
+    @staticmethod
+    async def process_purge_outbox(db: AsyncSession, *, limit: int = 100) -> int:
+        """Best-effort, idempotent post-commit storage purge worker.
+
+        A missing object is a successful terminal state. Failed operations keep
+        their row pending for a later invocation; this method is deliberately
+        not called from the hard-delete transaction.
+        """
+        rows = list(
+            (
+                await db.execute(
+                    select(MediaPurgeOutbox)
+                    .where(MediaPurgeOutbox.status.in_(("pending", "failed")))
+                    .order_by(MediaPurgeOutbox.created_at)
+                    .limit(limit)
+                )
+            ).scalars()
+        )
+        storage = get_storage_backend()
+        processed = 0
+        for row in rows:
+            row.attempts += 1
+            try:
+                await storage.delete(row.storage_path)
+                row.status, row.last_error, row.processed_at = "processed", None, datetime.now(UTC)
+                processed += 1
+            except Exception as exc:  # pragma: no cover - backend-specific failures
+                row.status, row.last_error = "failed", str(exc)[:2000]
+        await db.flush()
+        return processed
 
 
 class PhotoService:

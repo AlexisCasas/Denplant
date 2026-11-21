@@ -18,6 +18,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.core.agents import AgentContext, Tool, ToolCategory
+from app.modules.patients.access import PatientAccessPolicy
 
 from .schemas import Channel, Outcome, Priority, Reason, Status
 from .service import RecallFilters, RecallService
@@ -96,7 +97,14 @@ async def _list_due_recalls(ctx: AgentContext, params: ListDueRecallsArgs) -> di
         patient_id=params.patient_id,
     )
     items, total = await RecallService.list(
-        ctx.db, ctx.clinic_id, filters, page=1, page_size=params.limit
+        ctx.db,
+        ctx.clinic_id,
+        filters,
+        page=1,
+        page_size=params.limit,
+        patient_access_predicate=PatientAccessPolicy.predicate_for(
+            ctx.actor_role, ctx.clinic_id, ctx.actor_user_id
+        ),
     )
     return {"total": total, "recalls": [_recall_summary(r) for r in items]}
 
@@ -106,6 +114,10 @@ async def _get_recall(ctx: AgentContext, params: GetRecallArgs) -> dict:
         ctx.db, ctx.clinic_id, params.recall_id
     )
     if recall is None:
+        return {"error": "not_found"}
+    if not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, recall.patient_id
+    ):
         return {"error": "not_found"}
     data = _recall_summary(recall)
     data["reason_note"] = recall.reason_note
@@ -123,6 +135,10 @@ async def _get_recall(ctx: AgentContext, params: GetRecallArgs) -> dict:
 
 
 async def _create_recall(ctx: AgentContext, params: CreateRecallArgs) -> dict:
+    if not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, params.patient_id
+    ):
+        return {"error": "patient_not_found"}
     recall, created = await RecallService.create(
         ctx.db,
         ctx.clinic_id,
@@ -138,6 +154,11 @@ async def _create_recall(ctx: AgentContext, params: CreateRecallArgs) -> dict:
 
 
 async def _log_contact_attempt(ctx: AgentContext, params: LogContactAttemptArgs) -> dict:
+    recall = await RecallService.get(ctx.db, ctx.clinic_id, params.recall_id)
+    if recall is None or not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, recall.patient_id
+    ):
+        return {"error": "not_found"}
     result = await RecallService.log_attempt(
         ctx.db,
         ctx.clinic_id,
@@ -161,6 +182,11 @@ async def _log_contact_attempt(ctx: AgentContext, params: LogContactAttemptArgs)
 
 
 async def _snooze_recall(ctx: AgentContext, params: SnoozeRecallArgs) -> dict:
+    recall = await RecallService.get(ctx.db, ctx.clinic_id, params.recall_id)
+    if recall is None or not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, recall.patient_id
+    ):
+        return {"error": "not_found"}
     recall = await RecallService.snooze(
         ctx.db,
         ctx.clinic_id,
@@ -175,6 +201,11 @@ async def _snooze_recall(ctx: AgentContext, params: SnoozeRecallArgs) -> dict:
 
 
 async def _complete_recall(ctx: AgentContext, params: CompleteRecallArgs) -> dict:
+    recall = await RecallService.get(ctx.db, ctx.clinic_id, params.recall_id)
+    if recall is None or not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, recall.patient_id
+    ):
+        return {"error": "not_found"}
     recall = await RecallService.mark_done(
         ctx.db, ctx.clinic_id, params.recall_id, by_user=ctx.supervisor_id
     )

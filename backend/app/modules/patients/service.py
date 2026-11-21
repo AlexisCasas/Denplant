@@ -5,16 +5,18 @@ Moved from ``app.modules.clinical.service`` in Fase B.1 chunk 2.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, column, func, or_, select, table, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.events import EventType, event_bus
 from app.core.list_query import parse_sort
 
-from .models import Patient
+from .models import Patient, PatientPermanentDeletionAudit
 
 # Public field name → SQL column. Decouples the URL from internal naming
 # and prevents callers from sorting by arbitrary columns.
@@ -88,6 +90,8 @@ class PatientService:
         db: AsyncSession,
         clinic_id: UUID,
         limit: int = 8,
+        *,
+        access_predicate: ColumnElement[bool] | None = None,
     ) -> list[Patient]:
         """Patients ordered by last visit, falling back to newest created.
 
@@ -97,20 +101,28 @@ class PatientService:
         table through a raw SQL fragment. The table name is the only
         contract; agenda renames must be coordinated here.
         """
+        last_visit_conditions = [
+            _appointments_t.c.clinic_id == clinic_id,
+            _appointments_t.c.patient_id.is_not(None),
+        ]
+        if access_predicate is not None:
+            last_visit_conditions.append(Patient.id == _appointments_t.c.patient_id)
+
         last_visit_rows = (
             await db.execute(
-                text(
-                    """
-                    SELECT patient_id, MAX(start_time) AS last_visit
-                    FROM appointments
-                    WHERE clinic_id = :clinic_id
-                      AND patient_id IS NOT NULL
-                    GROUP BY patient_id
-                    ORDER BY last_visit DESC
-                    LIMIT :limit
-                    """
-                ),
-                {"clinic_id": clinic_id, "limit": limit},
+                select(
+                    _appointments_t.c.patient_id,
+                    func.max(_appointments_t.c.start_time).label("last_visit"),
+                )
+                .select_from(_appointments_t)
+                .join(Patient, Patient.id == _appointments_t.c.patient_id)
+                .where(
+                    *last_visit_conditions,
+                    *([access_predicate] if access_predicate is not None else []),
+                )
+                .group_by(_appointments_t.c.patient_id)
+                .order_by(func.max(_appointments_t.c.start_time).desc())
+                .limit(limit)
             )
         ).all()
 
@@ -122,6 +134,7 @@ class PatientService:
                 .where(
                     Patient.clinic_id == clinic_id,
                     Patient.status != "archived",
+                    *([access_predicate] if access_predicate is not None else []),
                 )
                 .order_by(Patient.created_at.desc())
                 .limit(limit)
@@ -133,6 +146,7 @@ class PatientService:
                 Patient.clinic_id == clinic_id,
                 Patient.id.in_(ordered_ids),
                 Patient.status != "archived",
+                *([access_predicate] if access_predicate is not None else []),
             )
         )
         by_id = {p.id: p for p in result.scalars().all()}
@@ -150,8 +164,10 @@ class PatientService:
         patient_ids: list[UUID] | None = None,
         city: str | None = None,
         do_not_contact: bool | None = None,
+        statuses: list[str] | None = None,
         include_archived: bool = False,
         sort: str | None = None,
+        access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[Patient], int]:
         """List patients with optional search + filters + sort.
 
@@ -169,7 +185,20 @@ class PatientService:
             return [], 0
 
         conditions = [Patient.clinic_id == clinic_id]
-        if not include_archived:
+        if access_predicate is not None:
+            conditions.append(access_predicate)
+        if statuses is not None:
+            allowed_statuses = {"active", "archived"}
+            invalid_statuses = set(statuses) - allowed_statuses
+            if invalid_statuses:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid patient status filter.",
+                )
+            if not statuses:
+                return [], 0
+            conditions.append(Patient.status.in_(statuses))
+        elif not include_archived:
             conditions.append(Patient.status != "archived")
 
         if patient_ids:
@@ -238,18 +267,24 @@ class PatientService:
         return list(result.scalars().all()), total
 
     @staticmethod
-    async def get_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> Patient | None:
-        result = await db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.clinic_id == clinic_id,
-            )
-        )
+    async def get_patient(
+        db: AsyncSession,
+        clinic_id: UUID,
+        patient_id: UUID,
+        *,
+        access_predicate: ColumnElement[bool] | None = None,
+    ) -> Patient | None:
+        conditions = [Patient.id == patient_id, Patient.clinic_id == clinic_id]
+        if access_predicate is not None:
+            conditions.append(access_predicate)
+        result = await db.execute(select(Patient).where(*conditions))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def create_patient(db: AsyncSession, clinic_id: UUID, data: dict) -> Patient:
-        patient = Patient(clinic_id=clinic_id, **data)
+    async def create_patient(
+        db: AsyncSession, clinic_id: UUID, data: dict, *, created_by_user_id: UUID | None = None
+    ) -> Patient:
+        patient = Patient(clinic_id=clinic_id, created_by_user_id=created_by_user_id, **data)
         db.add(patient)
         await db.flush()
 
@@ -283,8 +318,12 @@ class PatientService:
         return patient
 
     @staticmethod
-    async def archive_patient(db: AsyncSession, patient: Patient) -> Patient:
+    async def archive_patient(
+        db: AsyncSession, patient: Patient, *, archived_by: UUID | None = None
+    ) -> Patient:
         patient.status = "archived"
+        patient.archived_at = datetime.now(UTC)
+        patient.archived_by = archived_by
         await db.flush()
 
         await event_bus.publish(
@@ -293,3 +332,82 @@ class PatientService:
             db=db,
         )
         return patient
+
+    @staticmethod
+    async def restore_patient(db: AsyncSession, patient: Patient, *, restored_by: UUID) -> Patient:
+        if patient.status != "archived":
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Patient is not archived")
+        patient.status = "active"
+        patient.restored_at = datetime.now(UTC)
+        patient.restored_by = restored_by
+        await db.flush()
+        await event_bus.publish(
+            EventType.PATIENT_RESTORED,
+            {
+                "patient_id": str(patient.id),
+                "clinic_id": str(patient.clinic_id),
+                "restored_by": str(restored_by),
+            },
+            db=db,
+        )
+        return patient
+
+    @staticmethod
+    async def permanently_delete_patient(
+        db: AsyncSession, patient: Patient, *, deleted_by: UUID
+    ) -> None:
+        """Delete module-owned data through transactional event handlers.
+
+        The caller has already resolved the patient by ``clinic_id``.  The
+        audit insert and every subscriber share this session, so any raised
+        error rolls all database work back in ``get_db``.
+        """
+        # Fiscal records are immutable by policy.  This preflight happens
+        # before creating even the deletion audit, so a 409 changes nothing.
+        fiscal = await db.scalar(
+            text(
+                "SELECT EXISTS (SELECT 1 FROM invoices i "
+                "LEFT JOIN verifactu_records vr ON vr.invoice_id = i.id "
+                "WHERE i.patient_id = :patient_id AND i.clinic_id = :clinic_id "
+                "AND (vr.id IS NOT NULL OR i.invoice_number IS NOT NULL OR i.status <> 'draft'))"
+            ),
+            {"patient_id": patient.id, "clinic_id": patient.clinic_id},
+        )
+        if fiscal:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="El paciente posee documentos fiscales que impiden su eliminación definitiva.",
+            )
+        audit = PatientPermanentDeletionAudit(
+            old_patient_id=patient.id,
+            clinic_id=patient.clinic_id,
+            patient_name=patient.full_name,
+            deleted_by=deleted_by,
+            deleted_at=datetime.now(UTC),
+            action="patient.permanently_deleted",
+        )
+        db.add(audit)
+        await db.flush()
+        payload = {
+            "patient_id": str(patient.id),
+            "clinic_id": str(patient.clinic_id),
+            "deleted_by": str(deleted_by),
+        }
+        # A fixed phase sequence removes dependent rows before their parents;
+        # each subscriber only acts in the phase it owns.
+        for phase in (
+            "financial",
+            "notes",
+            "appointments",
+            "plans",
+            "budgets",
+            "odontogram",
+            "clinical",
+        ):
+            await event_bus.publish(
+                EventType.PATIENT_PERMANENT_DELETE_REQUESTED,
+                {**payload, "phase": phase},
+                db=db,
+            )
+        await db.delete(patient)
+        await db.flush()

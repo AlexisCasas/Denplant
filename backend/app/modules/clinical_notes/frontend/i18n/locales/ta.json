@@ -6,7 +6,8 @@
       "treatment": "சிகிச்சை",
       "treatment_plan": "திட்டம்",
       "appointment_clinical": "மருத்துவம்",
-      "appointment_administrative": "நிர்வாகம்"
+      "appointment_administrative": "நிர்வாகம்",
+      "evolution": "முன்னேற்றம்"
     },
     "appointment": {
       "addByType": "{label} குறிப்பைச் சேர்",
@@ -62,7 +63,8 @@
       "treatment": "சிகிச்சை",
       "treatmentOnTooth": "{label} (பல் {n})",
       "plan": "திட்டம்",
-      "planNamed": "திட்டம்: {label}"
+      "planNamed": "திட்டம்: {label}",
+      "appointment": "Appointment"
     },
     "actions": {
       "showMore": "மேலும் காட்டு",
@@ -119,6 +121,35 @@
       "admin_phone_call": "நோயாளி அழைப்பு: \nகாரணம்: \nஎடுக்கப்பட்ட நடவடிக்கை: \nபின்தொடர்தல்: ",
       "admin_reschedule": "மீண்டும் நேரம் கோரிக்கை: \nதற்போதைய தேதி: \nபுதிய பரிந்துரை: ",
       "general_follow_up": "கண்டுபிடிப்புகள்: \nசெய்யப்பட்ட நடைமுறை: \nநோயாளி வழிமுறைகள்: "
+    },
+    "evolution": {
+      "title": "Patient evolution",
+      "count": "{n} notes",
+      "newEvolution": "New evolution",
+      "newDiagnosisNote": "New diagnosis note",
+      "newDiagnosisNoteTooth": "New diagnosis note · tooth {n}",
+      "printPreparing": "Loading the full history…",
+      "printFailed": "The history could not be loaded for printing.",
+      "printIncomplete": "Only part of the history could be loaded; the printout is incomplete.",
+      "filtersLabel": "Note types",
+      "filterAll": "All clinical",
+      "empty": {
+        "title": "No clinical notes yet",
+        "help": "Evolution, diagnosis, treatment, plan and appointment notes appear here, newest first."
+      },
+      "print": {
+        "label": "Print evolution",
+        "documentTitle": "Patient evolution",
+        "clinic": "Clinic",
+        "patient": "Patient",
+        "document": "ID",
+        "printedOn": "Printed on",
+        "totalNotes": "{n} notes, oldest first",
+        "noNotes": "This patient has no clinical notes.",
+        "author": "Professional",
+        "attachments": "Attachments",
+        "unknownAuthor": "Unknown professional"
+      }
     }
   }
 }

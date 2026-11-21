@@ -31,7 +31,8 @@ related_permissions:
 related_paths:
   - backend/app/modules/catalog/frontend/pages/settings/catalog/index.vue
   - backend/app/modules/catalog/frontend/components/catalog/CatalogCategoriesModal.vue
-last_verified_commit: 6b3eb82
+  - backend/app/modules/catalog/frontend/components/catalog/CatalogItemModal.vue
+last_verified_commit: b2d359a8
 ---
 
 # /settings/catalog
@@ -62,3 +63,27 @@ categorías. Es la fuente de precios de presupuestos, planes y facturas.
   vía de reparación cuando una instalación se creó antes de que existiera la
   siembra automática o esta falló; la tarjeta "Primeros pasos" del panel
   enlaza aquí cuando detecta el catálogo vacío.
+
+## Pestaña Clínico: visualización en odontograma
+
+Al crear o editar un tratamiento, la pestaña **Clínico** incluye la sección
+**Visualización en Odontograma**, que vincula el tratamiento con su
+representación en el odontograma del paciente.
+
+- **Tipo de tratamiento** — elige cómo aparece el tratamiento en el
+  odontograma, o **Sin asociación** si no debe aparecer. La lista solo ofrece
+  tipos compatibles con el modelo clínico actual.
+- **Categoría clínica** — obligatoria siempre que haya un tipo de tratamiento
+  seleccionado. Mientras falte, el campo se marca como obligatorio, la pestaña
+  **Clínico** muestra un indicador de error y **Guardar** queda deshabilitado.
+  Algunos tipos (por ejemplo puentes y férulas) no rellenan la categoría
+  automáticamente, así que hay que elegirla a mano.
+- **Tratamientos antiguos** — si un tratamiento estaba asociado a un tipo
+  antiguo con una equivalencia moderna directa, el formulario lo carga con el
+  tipo equivalente ya seleccionado y, al guardar, se almacena el tipo moderno.
+- **Tipos antiguos no compatibles** — si el tipo guardado ya no tiene una
+  equivalencia segura, el formulario muestra una advertencia con su nombre y
+  **Guardar** queda deshabilitado hasta seleccionar manualmente un tipo válido.
+- **Editar sin cambiar el tipo** conserva la configuración visual propia del
+  tratamiento (por ejemplo, un color o un patrón concretos). Elegir otro tipo
+  aplica la apariencia por defecto de ese tipo.

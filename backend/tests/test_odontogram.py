@@ -442,31 +442,54 @@ async def receptionist_setup(
 async def test_receptionist_cannot_write_odontogram(
     client: AsyncClient, receptionist_setup: dict
 ) -> None:
-    """Test that receptionists cannot modify odontogram."""
+    """Test that receptionists cannot modify odontogram or its treatments."""
     patient_id = receptionist_setup["patient_id"]
     headers = receptionist_setup["headers"]
 
-    response = await client.put(
+    tooth = await client.put(
         f"/api/v1/odontogram/patients/{patient_id}/teeth/11",
         headers=headers,
         json={"general_condition": "caries"},
     )
-    assert response.status_code == 403
+    assert tooth.status_code == 403
+
+    treatment = await client.post(
+        f"/api/v1/odontogram/patients/{patient_id}/treatments",
+        headers=headers,
+        json={"catalog_item_id": str(uuid4()), "tooth_numbers": [16], "status": "planned"},
+    )
+    assert treatment.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_receptionist_cannot_read_odontogram(
+async def test_receptionist_can_read_odontogram_timeline_and_treatments(
     client: AsyncClient, receptionist_setup: dict
 ) -> None:
-    """Test that receptionists cannot read odontogram."""
+    """Receptionist gets odontogram.read + odontogram.treatments.read
+    (context for the patient/plan screens) but not write — see
+    odontogram/__init__.py's role_permissions. Was 403 before that grant;
+    the manifest change is the fix, not this assertion.
+    """
     patient_id = receptionist_setup["patient_id"]
     headers = receptionist_setup["headers"]
 
-    response = await client.get(
+    odontogram = await client.get(
         f"/api/v1/odontogram/patients/{patient_id}/odontogram",
         headers=headers,
     )
-    assert response.status_code == 403
+    assert odontogram.status_code == 200, odontogram.text
+
+    timeline = await client.get(
+        f"/api/v1/odontogram/patients/{patient_id}/odontogram/timeline",
+        headers=headers,
+    )
+    assert timeline.status_code == 200, timeline.text
+
+    treatments = await client.get(
+        f"/api/v1/odontogram/patients/{patient_id}/treatments",
+        headers=headers,
+    )
+    assert treatments.status_code == 200, treatments.text
 
 
 # ============================================================================

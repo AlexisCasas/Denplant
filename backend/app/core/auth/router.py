@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError
 from slowapi import Limiter
@@ -15,6 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.core.clinic_branding import (
+    MAX_LOGO_BYTES,
+    LogoValidationError,
+    load_logo,
+    logo_metadata,
+    remove_logo,
+    save_logo,
+)
 from app.core.events import EventType, event_bus
 from app.core.plugins import module_registry
 from app.core.schemas import ApiResponse, PaginatedApiResponse
@@ -38,6 +46,7 @@ from .permissions import (
 )
 from .schemas import (
     AuthResponse,
+    ClinicLogoMeta,
     ClinicMetadataResponse,
     ClinicMetadataUpdate,
     ClinicResponse,
@@ -399,6 +408,7 @@ async def list_users(
             email=m.user.email,
             first_name=m.user.first_name,
             last_name=m.user.last_name,
+            professional_id=m.user.professional_id,
             is_active=m.user.is_active,
             role=m.role,
             is_professional=m.is_professional,
@@ -474,6 +484,7 @@ async def create_user(
         password_hash=hash_password(data.password or secrets.token_urlsafe(32)),
         first_name=data.first_name,
         last_name=data.last_name,
+        professional_id=data.professional_id,
     )
     db.add(user)
     await db.flush()
@@ -626,6 +637,10 @@ async def update_user(
         user.first_name = data.first_name
     if data.last_name is not None:
         user.last_name = data.last_name
+    # Keep the global value on omitted updates; explicit null (including a
+    # blank value normalized by the schema) clears it intentionally.
+    if "professional_id" in data.model_fields_set:
+        user.professional_id = data.professional_id
     if data.is_active is not None:
         user.is_active = data.is_active
         # Increment token version to invalidate existing tokens when deactivating
@@ -653,6 +668,7 @@ async def update_user(
             email=user.email,
             first_name=user.first_name,
             last_name=user.last_name,
+            professional_id=user.professional_id,
             is_active=user.is_active,
             role=membership.role,
             is_professional=membership.is_professional,
@@ -813,6 +829,70 @@ async def update_clinic_metadata(
     clinic = result.scalar_one()
 
     return ApiResponse(data=ClinicMetadataResponse.model_validate(clinic))
+
+
+# --- Clinic logo (visual identity) ---------------------------------------
+#
+# The file lives in storage and ``clinic.settings.branding.logo`` holds only
+# its reference (see ``app.core.clinic_branding``). Reading needs
+# ``admin.clinic.read``; changing it needs ``admin.clinic.write``. Both act on
+# the caller's own clinic, taken from the context, never from the request.
+
+_LOGO_ERROR_STATUS = {
+    "too_large": 413,
+    "unsupported_type": 415,
+}
+
+
+@router.get("/clinic/logo")
+async def get_clinic_logo(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.read"))],
+) -> Response:
+    """The current logo image. 404 when the clinic has none."""
+    loaded = await load_logo(ctx.clinic)
+    if loaded is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No logo")
+    data, mime = loaded
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Cache-Control": "private, no-cache", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.post("/clinic/logo", response_model=ApiResponse[ClinicLogoMeta])
+async def upload_clinic_logo(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: Annotated[UploadFile, File()],
+) -> ApiResponse[ClinicLogoMeta]:
+    """Upload or replace the clinic logo (PNG, JPEG or WebP, ≤ 1 MB, ≤ 2000×2000 px)."""
+    # One byte over the limit is enough to know it is too large, without
+    # reading an arbitrarily large body into memory.
+    raw = await file.read(MAX_LOGO_BYTES + 1)
+    try:
+        await save_logo(ctx.clinic, raw)
+    except LogoValidationError as exc:
+        raise HTTPException(
+            status_code=_LOGO_ERROR_STATUS.get(exc.code, status.HTTP_400_BAD_REQUEST),
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    await db.commit()
+    return ApiResponse(data=ClinicLogoMeta(**(logo_metadata(ctx.clinic) or {})))
+
+
+@router.delete("/clinic/logo", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_clinic_logo(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Remove the clinic logo. Idempotent."""
+    await remove_logo(ctx.clinic)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

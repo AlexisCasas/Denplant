@@ -18,6 +18,7 @@ import asyncpg
 import pytest
 
 from app.config import settings
+from app.core.plugins.processor import _downgrade_target_for
 
 pytestmark = pytest.mark.alembic_roundtrip
 
@@ -68,7 +69,13 @@ def test_recalls_uninstall_roundtrip_is_branch_scoped() -> None:
     )
     baseline_other = before - RECALLS_TABLES
 
-    _alembic("downgrade", "recalls@-1")
+    # DP-33 added rec_0002 after rec_0001. A one-step downgrade only
+    # removes the new provenance columns; it does not uninstall the module.
+    # Resolve the same branch-scoped target used by the real uninstall
+    # pipeline so that future revisions cannot silently stale this test.
+    downgrade_target = _downgrade_target_for("recalls", "rec_0001")
+    assert downgrade_target == "recalls@-2"
+    _alembic("downgrade", downgrade_target)
 
     after_down = _list_tables()
     assert RECALLS_TABLES.isdisjoint(after_down), (

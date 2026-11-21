@@ -34,7 +34,7 @@ class BillingModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["*"],
+            "dentist": [],
             "hygienist": ["read"],
             "assistant": ["read", "write"],
             "receptionist": ["read", "write"],
@@ -78,6 +78,7 @@ class BillingModule(BaseModule):
         # to budget lifecycle events again.
         from app.core.events import EventType
 
+        from .deletion import on_patient_permanent_delete
         from .events import on_clinic_created, on_payment_allocated, on_payment_refunded
 
         return {
@@ -88,4 +89,5 @@ class BillingModule(BaseModule):
             EventType.PAYMENT_REFUNDED: on_payment_refunded,
             # Fresh clinic → default FAC/RECT series.
             EventType.CLINIC_CREATED: on_clinic_created,
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
         }

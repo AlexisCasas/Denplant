@@ -85,6 +85,8 @@ async def _clinic_admin_id(db_session, clinic):
 @pytest.mark.asyncio
 async def test_supervised_write_enqueues_approval(db_session, test_clinic):
     agent, session = await _setup(db_session, test_clinic)
+    actor_user_id = await _clinic_admin_id(db_session, test_clinic)
+    assert actor_user_id is not None
     ctx = AgentContext(
         agent_id=agent.id,
         session_id=session.id,
@@ -93,6 +95,8 @@ async def test_supervised_write_enqueues_approval(db_session, test_clinic):
         permissions=["*"],
         tools=tool_registry,
         db=db_session,
+        actor_user_id=actor_user_id,
+        actor_role="admin",
     )
 
     result = await tool_registry.call(ctx, "approvals_fixture.write_thing", {"target": "room"})

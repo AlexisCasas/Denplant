@@ -20,8 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
-from app.modules.patients.service import PatientService
+from app.modules.patients.access import PatientAccessPolicy
 
+from .attachment_registry import attachment_registry
+from .models import MediaAttachment
 from .schemas import (
     AttachmentCreate,
     AttachmentResponse,
@@ -40,6 +42,47 @@ from .validation import (
 )
 
 router = APIRouter()
+
+
+async def _require_patient_access(db: AsyncSession, ctx: ClinicContext, patient_id: UUID) -> None:
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+
+async def _get_accessible_document(db: AsyncSession, ctx: ClinicContext, document_id: UUID):
+    document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
+    if document is None or not await PatientAccessPolicy.can_access(db, ctx, document.patient_id):
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+async def _require_owner_access(
+    db: AsyncSession, ctx: ClinicContext, owner_type: str, owner_id: UUID
+) -> None:
+    patient_id = await attachment_registry.resolve_patient_id(
+        db, ctx.clinic_id, owner_type, owner_id
+    )
+    if patient_id is None:
+        if not attachment_registry.has(owner_type):
+            raise HTTPException(status_code=400, detail=f"Unknown owner_type: {owner_type}")
+        raise HTTPException(status_code=404, detail="Attachment owner not found")
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Attachment owner not found")
+
+
+async def _get_accessible_attachment(db: AsyncSession, ctx: ClinicContext, attachment_id: UUID):
+    from sqlalchemy import select
+
+    attachment = await db.scalar(
+        select(MediaAttachment).where(
+            MediaAttachment.id == attachment_id, MediaAttachment.clinic_id == ctx.clinic_id
+        )
+    )
+    if attachment is None:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    await _get_accessible_document(db, ctx, attachment.document_id)
+    await _require_owner_access(db, ctx, attachment.owner_type, attachment.owner_id)
+    return attachment
 
 
 # ---------------------------------------------------------------------------
@@ -84,9 +127,7 @@ async def upload_document(
     _: Annotated[None, Depends(require_permission("media.documents.write"))] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ) -> ApiResponse[DocumentResponse]:
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    await _require_patient_access(db, ctx, patient_id)
 
     validate_document_type(document_type)
     validate_file_size(file)
@@ -123,9 +164,7 @@ async def list_patient_documents(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> PaginatedApiResponse[DocumentResponse]:
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    await _require_patient_access(db, ctx, patient_id)
 
     if document_type and document_type not in DOCUMENT_TYPES:
         raise HTTPException(
@@ -180,9 +219,7 @@ async def upload_photo(
     one wraps the photo-aware path: thumbnail generation, EXIF capture
     extraction, taxonomy validation, optional pair link.
     """
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    await _require_patient_access(db, ctx, patient_id)
 
     validate_file_size(file)
     mime_type = validate_mime_type(file)
@@ -226,9 +263,7 @@ async def list_patient_photos(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=40, ge=1, le=200),
 ) -> PaginatedApiResponse[DocumentResponse]:
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    await _require_patient_access(db, ctx, patient_id)
 
     documents, total = await PhotoService.list_photos(
         db=db,
@@ -266,9 +301,7 @@ async def get_document(
     _: Annotated[None, Depends(require_permission("media.documents.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[DocumentResponse]:
-    document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = await _get_accessible_document(db, ctx, document_id)
     return ApiResponse(data=_decorate(document))
 
 
@@ -280,9 +313,7 @@ async def download_document(
     db: Annotated[AsyncSession, Depends(get_db)],
     variant: Literal["thumb", "medium", "full"] = Query(default="full"),
 ) -> Response:
-    document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = await _get_accessible_document(db, ctx, document_id)
 
     from .storage import get_storage_backend
 
@@ -325,9 +356,7 @@ async def update_document(
     _: Annotated[None, Depends(require_permission("media.documents.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[DocumentResponse]:
-    document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = await _get_accessible_document(db, ctx, document_id)
     updated = await DocumentService.update_document(
         db, document, data.model_dump(exclude_unset=True)
     )
@@ -345,9 +374,7 @@ async def patch_photo_metadata(
     _: Annotated[None, Depends(require_permission("media.documents.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[DocumentResponse]:
-    document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = await _get_accessible_document(db, ctx, document_id)
     updated = await PhotoService.update_metadata(
         db,
         document,
@@ -370,9 +397,7 @@ async def delete_document(
     _: Annotated[None, Depends(require_permission("media.documents.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = await _get_accessible_document(db, ctx, document_id)
     await DocumentService.delete_document(db, document)
 
 
@@ -392,6 +417,8 @@ async def pair_documents(
     _: Annotated[None, Depends(require_permission("media.documents.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[DocumentResponse]:
+    await _get_accessible_document(db, ctx, document_id)
+    await _get_accessible_document(db, ctx, other_id)
     a, _b = await PhotoService.pair(db, ctx.clinic_id, document_id, other_id)
     await db.refresh(a, ["uploader"])
     return ApiResponse(data=_decorate(a))
@@ -407,6 +434,7 @@ async def unpair_document(
     _: Annotated[None, Depends(require_permission("media.documents.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[DocumentResponse]:
+    await _get_accessible_document(db, ctx, document_id)
     doc = await PhotoService.unpair(db, ctx.clinic_id, document_id)
     await db.refresh(doc, ["uploader"])
     return ApiResponse(data=_decorate(doc))
@@ -428,6 +456,8 @@ async def link_attachment(
     _: Annotated[None, Depends(require_permission("media.attachments.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AttachmentResponse]:
+    await _get_accessible_document(db, ctx, data.document_id)
+    await _require_owner_access(db, ctx, data.owner_type, data.owner_id)
     attachment = await AttachmentService.link(
         db,
         clinic_id=ctx.clinic_id,
@@ -457,6 +487,7 @@ async def unlink_attachment(
     _: Annotated[None, Depends(require_permission("media.attachments.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    await _get_accessible_attachment(db, ctx, attachment_id)
     await AttachmentService.unlink(db, ctx.clinic_id, attachment_id)
 
 
@@ -471,6 +502,7 @@ async def list_attachments(
     owner_type: str = Query(...),
     owner_id: UUID = Query(...),
 ) -> ApiResponse[list[AttachmentResponse]]:
+    await _require_owner_access(db, ctx, owner_type, owner_id)
     attachments = await AttachmentService.list_by_owner(db, ctx.clinic_id, owner_type, owner_id)
     items: list[AttachmentResponse] = []
     for att in attachments:

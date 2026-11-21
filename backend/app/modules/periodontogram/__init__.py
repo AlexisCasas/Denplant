@@ -15,6 +15,7 @@ from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
 
+from .deletion import on_patient_permanent_delete
 from .events import on_odontogram_treatment_performed, on_patient_archived
 from .models import PeriodontogramSite, PeriodontogramSnapshot, PeriodontogramTooth
 from .router import router
@@ -58,4 +59,5 @@ class PeriodontogramModule(BaseModule):
         return {
             "odontogram.treatment.performed": on_odontogram_treatment_performed,
             "patient.archived": on_patient_archived,
+            "patient.permanent_delete_requested": on_patient_permanent_delete,
         }

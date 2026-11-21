@@ -14,6 +14,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.core.agents import AgentContext, Tool, ToolCategory
+from app.modules.patients.access import PatientAccessPolicy
 
 from .service import TimelineService
 
@@ -24,6 +25,11 @@ class PatientTimelineArgs(BaseModel):
 
 
 async def _get_patient_timeline(ctx: AgentContext, params: PatientTimelineArgs) -> dict:
+    assert ctx.actor_role is not None and ctx.actor_user_id is not None
+    if not await PatientAccessPolicy.can_access_for(
+        ctx.db, ctx.actor_role, ctx.clinic_id, ctx.actor_user_id, params.patient_id
+    ):
+        return {"error": "not_found"}
     entries, total = await TimelineService.get_timeline(
         ctx.db, ctx.clinic_id, params.patient_id, page=1, page_size=params.limit
     )

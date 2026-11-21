@@ -82,6 +82,7 @@ class Document(Base, TimestampMixin):
     # Audit
     uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     status: Mapped[str] = mapped_column(String(20), default="active")  # active, archived
+    archived_by_patient: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Relationships
     clinic: Mapped["Clinic"] = relationship()
@@ -152,3 +153,17 @@ class MediaAttachment(Base, TimestampMixin):
             "owner_id",
         ),
     )
+
+
+class MediaPurgeOutbox(Base, TimestampMixin):
+    """Post-commit, retryable physical-file deletion intent."""
+
+    __tablename__ = "media_purge_outbox"
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    storage_path: Mapped[str] = mapped_column(String(500), unique=True)
+    clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
+    patient_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

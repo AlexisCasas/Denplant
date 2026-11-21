@@ -34,6 +34,7 @@ const { t, locale } = useI18n()
 const toast = useToast()
 const { fetchAppointments, transition, assignCabinet } = useAppointments()
 const completionFollowup = useCompletionFollowup()
+const completionGate = useAppointmentCompletionGate()
 const { canTransition, statusColour, statusLabel } = useAppointmentStatus()
 // Manual 30-second tick — @vueuse/core is not a dependency in this repo.
 const now = ref(new Date())
@@ -294,6 +295,13 @@ async function onDrop(col: ColumnDef, e: DragEvent, cabinetName?: string) {
     if (col.id === 'in_chair' && cabinetName && cabinetName !== apt.cabinet) {
       const cabId = cabinetIdByName(cabinetName)
       if (cabId) await safeAssign(aptId, cabId)
+    }
+    // Completing an appointment linked to treatment-plan items goes
+    // through the gate instead of a direct transition — see
+    // `AppointmentCompletionGateModal.vue`.
+    if (target === 'completed' && (apt.treatments?.length ?? 0) > 0) {
+      completionGate.request(apt)
+      return
     }
     await transition(aptId, target)
     if (target === 'completed') {

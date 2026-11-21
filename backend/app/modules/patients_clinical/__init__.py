@@ -15,10 +15,14 @@ from app.core.plugins import BaseModule
 
 from .models import (
     Allergy,
+    DentalAnamnesis,
     EmergencyContact,
+    EndodonticRecord,
+    EndodonticRecordChannel,
     LegalGuardian,
     MedicalContext,
     Medication,
+    PediatricDentalAnamnesis,
     SurgicalHistory,
     SystemicDisease,
 )
@@ -60,6 +64,10 @@ class PatientsClinicalModule(BaseModule):
             SurgicalHistory,
             EmergencyContact,
             LegalGuardian,
+            DentalAnamnesis,
+            PediatricDentalAnamnesis,
+            EndodonticRecord,
+            EndodonticRecordChannel,
         ]
 
     def get_router(self) -> APIRouter:

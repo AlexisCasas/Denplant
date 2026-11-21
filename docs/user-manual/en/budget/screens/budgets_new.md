@@ -33,8 +33,10 @@ related_permissions:
   - budget.write
 related_paths:
   - backend/app/modules/budget/frontend/pages/budgets/new.vue
+  - backend/app/modules/budget/frontend/composables/useBudgetDraft.ts
+  - backend/app/modules/budget/frontend/components/budget/wizard
   - backend/app/modules/budget/router.py
-last_verified_commit: b1b82f5
+last_verified_commit: 50ec879
 ---
 
 # New budget
@@ -63,18 +65,31 @@ state on save, and the workflow continues from the
 
 > Requires `budget.write`.
 
-1. If you didn't come from a patient record, pick the patient in
-   the header.
-2. Add items from the catalog. For each line you can choose:
-   - Tooth and surfaces (FDI notation).
-   - Quantity, unit price (prefilled from the catalog), line
-     discount (percent or absolute).
-   - VAT type (prefilled from the catalog).
-3. Apply a global discount if needed.
-4. Review the totals in the sidebar.
-5. **Save**. The budget is created in `draft` and you land on the
+The form is a 3-step wizard. Nothing is saved until the last step:
+you can move back and forth without losing what you typed.
+
+1. **Budget details.** Pick the patient (document, phone and age are
+   shown when on file), the validity and the patient / internal
+   notes.
+2. **Add treatments.** Search the catalog (the *Frequent* tab lists
+   the most used) and click **+** to add a line, or use **Add
+   treatment** to set tooth, surfaces, quantity and line discount.
+   From the table you can change the quantity, edit or remove each
+   line and apply a global discount (percentage or absolute).
+3. **Review and confirm.** Check patient, treatments, notes and
+   totals, then click **Create budget**. A single `POST /budgets`
+   request is sent with the lines and the global discount; the
+   budget is created in `draft` and you land on the
    [detail](./budgets_id.md) to send it, sign it, or invoice it
    later.
+
+![1](../../../../screenshots/budget/budgets-new-step1.png)
+![2](../../../../screenshots/budget/budgets-new-step2.png)
+![3](../../../../screenshots/budget/budgets-new-step3.png)
+
+The totals in steps 2 and 3 are a preview using the same formula as
+the server; the final figures are the ones the backend computes on
+creation.
 
 ## Create from a treatment plan
 

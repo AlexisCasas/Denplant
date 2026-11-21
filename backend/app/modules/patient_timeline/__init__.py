@@ -63,7 +63,10 @@ class PatientTimelineModule(BaseModule):
 
     def get_event_handlers(self) -> dict[str, Any]:
         """Populate the timeline from other modules' events."""
+        from .deletion import on_patient_permanent_delete
+
         return {
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
             # Visits
             EventType.APPOINTMENT_SCHEDULED: events.on_appointment_scheduled,
             EventType.APPOINTMENT_CONFIRMED: events.on_appointment_confirmed,
@@ -101,9 +104,10 @@ class PatientTimelineModule(BaseModule):
             EventType.PHOTO_UPLOADED: events.on_photo_uploaded,
             EventType.PAIR_CREATED: events.on_pair_created,
             # Clinical notes (clinical_notes module — single handler covers
-            # administrative / diagnosis / treatment / treatment_plan).
+            # administrative / diagnosis / evolution / treatment / treatment_plan).
             EventType.CLINICAL_NOTE_ADMINISTRATIVE_CREATED: events.on_clinical_note_created,
             EventType.CLINICAL_NOTE_DIAGNOSIS_CREATED: events.on_clinical_note_created,
+            EventType.CLINICAL_NOTE_EVOLUTION_CREATED: events.on_clinical_note_created,
             EventType.CLINICAL_NOTE_TREATMENT_CREATED: events.on_clinical_note_created,
             EventType.CLINICAL_NOTE_PLAN_CREATED: events.on_clinical_note_created,
             EventType.AGENDA_VISIT_NOTE_UPDATED: events.on_visit_note_updated,

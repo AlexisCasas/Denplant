@@ -19,6 +19,8 @@ _This module does not publish any events._
 | Event | Handler | Mode | Effect |
 |-------|---------|------|--------|
 | `patient.archived` | `__init__.py::MediaModule._on_patient_archived` | transactional (ADR 0019) | Soft-archive the patient's documents, atomically with the archive itself. |
+| `patient.restored` | `__init__.py::MediaModule._on_patient_restored` | transactional | Restore lifecycle-archived documents; historic rows follow the documented fallback. |
+| `patient.permanent_delete_requested` | `__init__.py::MediaModule._on_patient_permanent_delete` | transactional | Queue storage purges and remove document rows before the patient row is deleted. |
 
 ## Adding a new event
 

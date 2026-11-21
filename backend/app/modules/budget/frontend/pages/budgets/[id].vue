@@ -10,6 +10,7 @@ import type { InfoItem } from '~~/app/components/shared/EntityInfoCard.vue'
 import { errorMessage } from '~~/app/utils/error'
 import PublicBudgetLinkCard from '../../components/budget/PublicBudgetLinkCard.vue'
 import BudgetSignatureCard from '../../components/budget/BudgetSignatureCard.vue'
+import AcceptInClinicModal from '../../components/clinical/modals/AcceptInClinicModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +27,7 @@ const {
   removeItem,
   sendBudget,
   acceptBudget,
+  acceptInClinic,
   rejectBudget,
   cancelBudget,
   duplicateBudget,
@@ -102,6 +104,8 @@ const isSignatureModalOpen = ref(false)
 const isSendModalOpen = ref(false)
 const isShareLinkModalOpen = ref(false)
 const isSignatureViewModalOpen = ref(false)
+const isAcceptInClinicModalOpen = ref(false)
+const isAcceptingInClinic = ref(false)
 const signatureAction = ref<'accept' | 'reject'>('accept')
 
 // Send form
@@ -232,6 +236,30 @@ async function handleSignatureSubmit() {
         : t('budget.errors.reject')),
       color: 'error'
     })
+  }
+}
+
+async function handleAcceptInClinicSubmit(payload: { signer_name: string, signature_data?: { png?: string } }) {
+  if (!currentBudget.value) return
+
+  isAcceptingInClinic.value = true
+  try {
+    await acceptInClinic(currentBudget.value.id, payload)
+    toast.add({
+      title: t('common.success'),
+      description: t('budget.messages.accepted'),
+      color: 'success'
+    })
+    isAcceptInClinicModalOpen.value = false
+    await loadBudget()
+  } catch (e) {
+    toast.add({
+      title: t('common.error'),
+      description: errorMessage(e, t('budget.errors.accept')),
+      color: 'error'
+    })
+  } finally {
+    isAcceptingInClinic.value = false
   }
 }
 
@@ -432,6 +460,20 @@ const primaryActions = computed<EntityAction[]>(() => {
       icon: 'i-lucide-check',
       color: 'success',
       onClick: () => openSignatureModal('accept')
+    })
+  }
+
+  // Dedicated, lighter-weight capture for reception recording a
+  // verbal in-clinic acceptance — gated on the granular
+  // budget.accept_in_clinic permission (not budget.write), separate
+  // from the full manual signature flow above.
+  if (canAccept(budget) && can(PERMISSIONS.budget.acceptInClinic)) {
+    actions.push({
+      key: 'acceptInClinic',
+      label: t('budget.actions.acceptInClinic'),
+      icon: 'i-lucide-clipboard-check',
+      variant: 'soft',
+      onClick: () => { isAcceptInClinicModalOpen.value = true }
     })
   }
 
@@ -1011,6 +1053,15 @@ function getItemName(item: DeepReadonly<BudgetItem>): string {
         </div>
       </template>
     </UModal>
+
+    <!-- Accept in clinic modal (reception captures verbal acceptance) -->
+    <AcceptInClinicModal
+      :open="isAcceptInClinicModalOpen"
+      :loading="isAcceptingInClinic"
+      @update:open="isAcceptInClinicModalOpen = $event"
+      @confirm="handleAcceptInClinicSubmit"
+      @cancel="isAcceptInClinicModalOpen = false"
+    />
 
     <!-- Share public link modal -->
     <UModal v-model:open="isShareLinkModalOpen">

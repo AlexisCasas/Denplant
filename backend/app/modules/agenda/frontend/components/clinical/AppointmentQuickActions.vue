@@ -26,6 +26,9 @@ const pendingNote = ref('')
 // level (`CompletionFollowupHost.vue`) so it stays consistent across
 // the dropdown path and the kanban drag-drop path.
 const completionFollowup = useCompletionFollowup()
+// "Which treatments were done" gate — same page-level hosting pattern,
+// see `AppointmentCompletionGateModal.vue`.
+const completionGate = useAppointmentCompletionGate()
 
 const transitions = computed(() => nextTransitions(props.appointment.status))
 const hasActions = computed(() => transitions.value.length > 0)
@@ -37,6 +40,13 @@ function dropdownItems() {
     color: tr.destructive ? ('error' as const) : undefined,
     onSelect: (e?: Event) => {
       e?.preventDefault?.()
+      // Completing an appointment linked to treatment-plan items goes
+      // through the gate instead of a direct transition — it decides
+      // which linked PlannedTreatmentItems get marked done.
+      if (tr.to === 'completed' && (props.appointment.treatments?.length ?? 0) > 0) {
+        completionGate.request(props.appointment)
+        return
+      }
       if (tr.destructive) {
         pendingDescriptor.value = tr
         pendingNote.value = ''

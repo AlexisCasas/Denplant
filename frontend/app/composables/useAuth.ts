@@ -1,4 +1,12 @@
-import type { User, LoginCredentials, AuthResponse, MeResponse, ApiResponse } from '~/types'
+import type { User, UserRole, LoginCredentials, AuthResponse, MeResponse, ApiResponse } from '~/types'
+
+const KNOWN_ROLES: readonly string[] = ['admin', 'dentist', 'hygienist', 'assistant', 'receptionist']
+
+/** The role of the first membership, which is the one the backend acts on. */
+function roleFromMe(me: MeResponse): UserRole | null {
+  const role = me.clinics?.[0]?.role
+  return role && KNOWN_ROLES.includes(role) ? (role as UserRole) : null
+}
 
 // Client-only module-level dedupe slot for the in-flight refresh promise.
 // Storing a Promise inside useState() leaks it into the SSR payload, which
@@ -20,6 +28,11 @@ export function useAuth() {
   // State
   const user = useState<User | null>('auth:user', () => null)
   const permissions = useState<string[]>('auth:permissions', () => [])
+  // The role of the *current clinic membership*, straight from `/auth/me`
+  // (`clinics[0].role`: the membership the backend itself uses when no
+  // clinic_id is sent). `User.role` is not it: the API never sends one.
+  // Never derive this from permissions, wildcards or `professional_id`.
+  const currentRole = useState<UserRole | null>('auth:currentRole', () => null)
   // Cookie lifetime matches refresh token; JWT expiry is enforced by the
   // backend, and a 401 triggers refresh in useApi. Matching the access
   // cookie's maxAge to the 15min JWT TTL caused premature logouts.
@@ -68,6 +81,7 @@ export function useAuth() {
     refreshToken.value = null
     user.value = null
     permissions.value = []
+    currentRole.value = null
     // SSR: skip router.push — calling it from middleware can crash the
     // response. The global auth middleware redirects to /login once it
     // sees isAuthenticated === false.
@@ -114,6 +128,7 @@ export function useAuth() {
         })
         user.value = me.data.user
         permissions.value = me.data.permissions
+        currentRole.value = roleFromMe(me.data)
         return true
       } catch {
         await logout()
@@ -147,6 +162,7 @@ export function useAuth() {
       })
       user.value = response.data.user
       permissions.value = response.data.permissions
+      currentRole.value = roleFromMe(response.data)
     } catch (error: unknown) {
       const fetchError = error as { statusCode?: number }
       // Only try refresh on 401 (expired token), not on other errors
@@ -181,12 +197,14 @@ export function useAuth() {
       refreshToken.value = null
       user.value = null
       permissions.value = []
+      currentRole.value = null
     }
   }
 
   return {
     user: readonly(user),
     permissions: readonly(permissions),
+    currentRole: readonly(currentRole),
     accessToken: readonly(accessToken),
     isAuthenticated,
     login,

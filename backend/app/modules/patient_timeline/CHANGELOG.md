@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- feat(QW4): subscribe to `clinical_notes.evolution_created` (same generic note handler); title "Nota de evolución".
+
 - fix(#184): type-check clean — guard the IntersectionObserver entry before reading `isIntersecting`.
 - docs(#183): handlers documented as own-session/payload-only — the timeline records what the payload carries and must never be able to fail the event it logs.
 - i18n: add `pt` fallback to treatment name resolution in the demo

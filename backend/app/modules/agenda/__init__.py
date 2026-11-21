@@ -89,6 +89,10 @@ class AgendaModule(BaseModule):
     def get_event_handlers(self) -> dict:
         from app.core.events import EventType
 
+        from .deletion import on_patient_permanent_delete
         from .events import on_clinic_created
 
-        return {EventType.CLINIC_CREATED: on_clinic_created}
+        return {
+            EventType.CLINIC_CREATED: on_clinic_created,
+            EventType.PATIENT_PERMANENT_DELETE_REQUESTED: on_patient_permanent_delete,
+        }

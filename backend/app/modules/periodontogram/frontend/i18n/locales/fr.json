@@ -65,7 +65,9 @@
       "furcaLP": "Furca L/P",
       "furcaLPTitle": "Furca linguale/palatine (0/I/II/III)",
       "gingivalWidth": "Largeur gingivale",
-      "siteMarkerAria": "Site {code}, sondage {depth}"
+      "siteMarkerAria": "Site {code}, sondage {depth}",
+      "sum": "Somme",
+      "sumTitle": "{code} somme : sondage + marge (lecture seule)"
     },
     "chart": {
       "ariaLabel": "Parodontogramme — arcades supérieure et inférieure"

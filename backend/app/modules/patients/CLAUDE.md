@@ -8,7 +8,7 @@ never hard-deleted.
 
 Routes mounted at `/api/v1/patients/`.
 
-- `GET    /patients`        — list (paginated); `patients.read`
+- `GET    /patients`        — list (paginated; repeated `status=active|archived` filter; omitted status defaults to active); `patients.read`
 - `GET    /patients/{id}`   — detail; `patients.read`
 - `POST   /patients`        — create; `patients.write`
 - `PUT    /patients/{id}`   — update; `patients.write`
@@ -41,6 +41,12 @@ fields stay manual.
 
 ## Events emitted
 
+- `patient.restored` — emitted after a patient archive is reverted; payload
+  includes `patient_id`, `clinic_id`, and `restored_by`.
+- `patient.permanent_delete_requested` — transactional deletion cascade;
+  payload includes `patient_id`, `clinic_id`, `deleted_by`, and lifecycle
+  phase.
+
 | Event | When | Payload keys |
 |---|---|---|
 | `patient.created` | `PatientService.create` succeeds | `patient_id`, `clinic_id` |
@@ -62,6 +68,12 @@ None.
 
 - **Soft delete only.** `DELETE /patients/{id}` flips `status` to
   archived; the row stays. Do not add a hard-delete endpoint.
+- **Archived list scope.** The list may explicitly request archived rows;
+  it uses a list-only access predicate. Detail and clinical-data endpoints
+  keep the regular active-only predicate, so archived list rows must not link
+  to those restricted detail routes. Use `status=archived` for archived rows
+  and repeat `status` for both states; the frontend canonicalizes a cleared
+  status filter to its active default.
 - **Multi-tenancy.** Every query MUST filter `Patient.clinic_id`.
   This includes future agent tools.
 - **No cross-module FKs into patients without `depends: ["patients"]`**
@@ -86,6 +98,9 @@ None.
     drives the Cobros sub-mode in the Administración tab.
   - `patient.detail.sidebar` — deprecated, kept registered for
     community modules. Renders as a section at the bottom of Resumen.
+  - `patient.clinical.evolution` — the fifth mode of `ClinicalTab`
+    (Evolución), filled by `clinical_notes`. Ctx `{ patientId,
+    readonly? }`. The tab is hidden without `clinical_notes.notes.read`.
   - `patient.diagnosis.subtabs` — optional sub-tabs rendered inside
     the *Diagnosis* mode of `ClinicalTab`, alongside the implicit
     "Odontograma" tab. Ctx `{ patientId, readonly? }`. Order

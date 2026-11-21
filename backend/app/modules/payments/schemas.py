@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PaymentMethod = Literal["cash", "card", "bank_transfer", "direct_debit", "insurance", "other"]
-AllocationTarget = Literal["budget", "on_account"]
+AllocationTarget = Literal["budget", "budget_item", "on_account"]
 RefundReason = Literal["duplicate", "overpaid", "treatment_cancelled", "dispute", "other"]
 
 
@@ -37,14 +37,23 @@ class PatientBrief(BaseModel):
 class AllocationCreate(BaseModel):
     target_type: AllocationTarget
     target_id: UUID | None = None  # required iff target_type == 'budget'
+    budget_item_id: UUID | None = None
     amount: Decimal = Field(gt=0)
 
     @model_validator(mode="after")
     def _check_target_id(self) -> "AllocationCreate":
-        if self.target_type == "budget" and self.target_id is None:
-            raise ValueError("target_id is required when target_type='budget'")
-        if self.target_type == "on_account" and self.target_id is not None:
-            raise ValueError("target_id must be null when target_type='on_account'")
+        if self.target_type == "budget" and (
+            self.target_id is None or self.budget_item_id is not None
+        ):
+            raise ValueError("budget allocations require target_id and no budget_item_id")
+        if self.target_type == "budget_item" and (
+            self.target_id is None or self.budget_item_id is None
+        ):
+            raise ValueError("budget_item allocations require target_id and budget_item_id")
+        if self.target_type == "on_account" and (
+            self.target_id is not None or self.budget_item_id is not None
+        ):
+            raise ValueError("on_account allocations cannot target a budget or budget item")
         return self
 
 
@@ -52,6 +61,7 @@ class AllocationResponse(BaseModel):
     id: UUID
     target_type: str
     target_id: UUID | None = None
+    budget_item_id: UUID | None = None
     amount: Decimal
     created_at: datetime
     created_by: UUID
@@ -64,12 +74,19 @@ class AllocationResponse(BaseModel):
         return cls(
             id=alloc.id,
             target_type=alloc.target_type,
-            target_id=alloc.budget_id if alloc.target_type == "budget" else None,
+            target_id=alloc.budget_id if alloc.target_type in ("budget", "budget_item") else None,
+            budget_item_id=alloc.budget_item_id,
             amount=alloc.amount,
             created_at=alloc.created_at,
             created_by=alloc.created_by,
             method=alloc.payment.method if alloc.payment else None,
         )
+
+
+class BudgetItemPaymentSummary(BaseModel):
+    budget_item_id: UUID
+    paid: Decimal
+    balance: Decimal
 
 
 # --- Payment -------------------------------------------------------------

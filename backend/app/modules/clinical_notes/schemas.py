@@ -15,13 +15,14 @@ from .models import (
     NOTE_TYPE_APPOINTMENT_ADMINISTRATIVE,
     NOTE_TYPE_APPOINTMENT_CLINICAL,
     NOTE_TYPE_DIAGNOSIS,
+    NOTE_TYPE_EVOLUTION,
     NOTE_TYPE_TREATMENT,
     NOTE_TYPE_TREATMENT_PLAN,
     NOTE_TYPES,
 )
 
 NOTE_TYPE_PATTERN = (
-    "^(administrative|diagnosis|treatment|treatment_plan"
+    "^(administrative|diagnosis|evolution|treatment|treatment_plan"
     "|appointment_clinical|appointment_administrative)$"
 )
 NOTE_OWNER_PATTERN = "^(patient|treatment|plan|appointment)$"
@@ -68,6 +69,7 @@ class NoteAttachmentResponse(BaseModel):
 _TYPE_OWNER_MATRIX: dict[str, str] = {
     NOTE_TYPE_ADMINISTRATIVE: NOTE_OWNER_PATIENT,
     NOTE_TYPE_DIAGNOSIS: NOTE_OWNER_PATIENT,
+    NOTE_TYPE_EVOLUTION: NOTE_OWNER_PATIENT,
     NOTE_TYPE_TREATMENT: NOTE_OWNER_TREATMENT,
     NOTE_TYPE_TREATMENT_PLAN: NOTE_OWNER_PLAN,
     NOTE_TYPE_APPOINTMENT_CLINICAL: NOTE_OWNER_APPOINTMENT,

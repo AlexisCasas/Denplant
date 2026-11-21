@@ -36,6 +36,9 @@ create appointments by dragging on free slots, move them between
 professionals and rooms, and walk them through their workflow
 (scheduled → confirmed → in-room → completed → billed).
 
+Dentists see and operate only their own appointments; administrators retain
+the cross-professional calendar and reassignment controls.
+
 ## At a glance
 
 - **Four views** — weekly, daily, and kanban on desktop; a simplified

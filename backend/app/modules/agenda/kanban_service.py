@@ -33,10 +33,12 @@ from .models import Appointment
 from .tz import get_clinic_tz
 
 
-async def _fetch_professionals(db: AsyncSession, clinic_id: UUID) -> list[tuple[UUID, str, str]]:
+async def _fetch_professionals(
+    db: AsyncSession, clinic_id: UUID, professional_ids: list[UUID] | None = None
+) -> list[tuple[UUID, str, str]]:
     """Return (id, first_name, last_name) for every active dentist /
     hygienist in the clinic."""
-    result = await db.execute(
+    stmt = (
         select(User.id, User.first_name, User.last_name)
         .join(ClinicMembership, ClinicMembership.user_id == User.id)
         .where(
@@ -45,6 +47,9 @@ async def _fetch_professionals(db: AsyncSession, clinic_id: UUID) -> list[tuple[
             User.is_active.is_(True),
         )
     )
+    if professional_ids is not None:
+        stmt = stmt.where(User.id.in_(professional_ids))
+    result = await db.execute(stmt)
     return [(r.id, r.first_name, r.last_name) for r in result.all()]
 
 
@@ -127,6 +132,7 @@ class KanbanDayService:
         db: AsyncSession,
         clinic_id: UUID,
         target_date: date,
+        professional_ids: list[UUID] | None = None,
     ) -> dict:
         now = datetime.now(UTC)
         # Day window in the clinic's timezone (issue #161) — a UTC window
@@ -140,7 +146,7 @@ class KanbanDayService:
             target_date.year, target_date.month, target_date.day, 23, 59, 59, tzinfo=tz
         )
 
-        pros = await _fetch_professionals(db, clinic_id)
+        pros = await _fetch_professionals(db, clinic_id, professional_ids)
         active = await _fetch_active_treatments(db, clinic_id, day_start, day_end)
         schedule_states = await _fetch_schedule_states(db, clinic_id, [p[0] for p in pros], now)
 

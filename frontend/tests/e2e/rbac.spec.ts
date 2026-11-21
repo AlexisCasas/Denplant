@@ -19,15 +19,16 @@ const LABELS = {
   reports: /reports|informes/i
 }
 
-test.describe('hygienist sees clinical + scheduling, no reports', () => {
+test.describe('hygienist sees clinical and scheduling-only reports', () => {
   test.use({ role: 'hygienist' })
 
   test('navigation is filtered to read-only flows', async ({ loggedIn }) => {
     const nav = loggedIn.getByRole('navigation').first()
     await expect(nav.getByRole('link', { name: LABELS.patients })).toBeVisible()
     await expect(nav.getByRole('link', { name: LABELS.schedule })).toBeVisible()
-    // Reports require reports.billing.read which hygienist lacks.
-    await expect(nav.getByRole('link', { name: LABELS.reports })).toHaveCount(0)
+    // Reports shell is allowed for scheduling.read; billing reports remain
+    // server-gated by reports.billing.read (not granted to hygienists).
+    await expect(nav.getByRole('link', { name: LABELS.reports })).toBeVisible()
   })
 })
 
@@ -42,7 +43,7 @@ test.describe('receptionist sees patients + schedule + invoices', () => {
   })
 })
 
-test.describe('dentist has full clinical access', () => {
+test.describe('dentist has clinical access but no financial administration', () => {
   test.use({ role: 'dentist' })
 
   test('nav shows every clinical flow', async ({ loggedIn }) => {
@@ -50,11 +51,12 @@ test.describe('dentist has full clinical access', () => {
     for (const label of [
       LABELS.patients,
       LABELS.schedule,
-      LABELS.plans,
-      LABELS.quotes,
-      LABELS.invoices
+      LABELS.plans
     ]) {
       await expect(nav.getByRole('link', { name: label })).toBeVisible()
     }
+    // Financial scopes are deliberately not granted to dentist role.
+    await expect(nav.getByRole('link', { name: LABELS.quotes })).toHaveCount(0)
+    await expect(nav.getByRole('link', { name: LABELS.invoices })).toHaveCount(0)
   })
 })

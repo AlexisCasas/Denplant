@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Patient, BudgetCreate } from '~~/app/types'
+import type { BudgetWizardStep } from '../../composables/useBudgetDraft'
 import { PERMISSIONS } from '~~/app/config/permissions'
 import { errorMessage } from '~~/app/utils/error'
 
@@ -27,34 +27,27 @@ if (!can(PERMISSIONS.budget.write)) {
   router.push('/budgets')
 }
 
-// Form state
-const selectedPatient = ref<Patient | null>(null)
+// Wizard state lives here so going back and forth between steps never loses data.
+const draft = useBudgetDraft()
+provideBudgetDraft(draft)
 const isCreating = ref(false)
 
-const form = reactive({
-  valid_from: new Date().toISOString().split('T')[0],
-  valid_until: '',
-  patient_notes: '',
-  internal_notes: ''
-})
-
-// Computed: can submit if patient is selected
-const canSubmit = computed(() => !!selectedPatient.value && !isCreating.value)
+function goToStep(step: BudgetWizardStep) {
+  draft.step.value = step
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 async function handleCreate() {
-  if (!selectedPatient.value) return
+  if (isCreating.value) return
+  // Re-validate everything before the one and only creation call.
+  const data = draft.buildPayload()
+  if (!data) {
+    goToStep(Object.keys(draft.dataErrors.value).length ? 1 : 2)
+    return
+  }
 
   isCreating.value = true
-
   try {
-    const data: BudgetCreate = {
-      patient_id: selectedPatient.value.id,
-      valid_from: form.valid_from,
-      valid_until: form.valid_until || undefined,
-      patient_notes: form.patient_notes || undefined,
-      internal_notes: form.internal_notes || undefined
-    }
-
     const budget = await createBudget(data)
 
     toast.add({
@@ -63,7 +56,7 @@ async function handleCreate() {
       color: 'success'
     })
 
-    // Navigate to the new budget to add items (preserve patient context)
+    // Navigate to the new budget (preserve patient context)
     const queryParams = comesFromPatient.value
       ? `?from=patient&patientId=${route.query.patient_id}`
       : ''
@@ -81,7 +74,7 @@ async function handleCreate() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto space-y-6">
+  <div class="max-w-6xl mx-auto space-y-6">
     <!-- Header -->
     <div class="flex items-center gap-4">
       <UButton
@@ -97,85 +90,30 @@ async function handleCreate() {
       </h1>
     </div>
 
-    <UCard>
-      <form
-        class="space-y-6"
-        @submit.prevent="handleCreate"
-      >
-        <!-- Patient selection -->
-        <UFormField
-          :label="t('budget.patient')"
-          required
-        >
-          <PatientVisualSelector
-            v-model="selectedPatient"
-            :placeholder="t('budget.selectPatient')"
-          />
-          <p class="text-caption text-subtle mt-1">
-            {{ t('budget.selectPatientHint') }}
-          </p>
-        </UFormField>
+    <BudgetWizardStepper
+      :step="draft.step.value"
+      @goto="goToStep"
+    />
 
-        <!-- Validity dates -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <UFormField
-            :label="t('budget.validFrom')"
-            required
-          >
-            <UInput
-              v-model="form.valid_from"
-              type="date"
-              required
-            />
-          </UFormField>
-          <UFormField :label="t('budget.validUntil')">
-            <UInput
-              v-model="form.valid_until"
-              type="date"
-            />
-            <p class="text-caption text-subtle mt-1">
-              {{ t('budget.validUntilHint') }}
-            </p>
-          </UFormField>
-        </div>
-
-        <!-- Notes -->
-        <UFormField :label="t('budget.patientNotes')">
-          <UTextarea
-            v-model="form.patient_notes"
-            :placeholder="t('budget.patientNotesPlaceholder')"
-            :rows="3"
-          />
-        </UFormField>
-
-        <UFormField :label="t('budget.internalNotes')">
-          <UTextarea
-            v-model="form.internal_notes"
-            :placeholder="t('budget.internalNotesPlaceholder')"
-            :rows="3"
-          />
-        </UFormField>
-
-        <!-- Actions -->
-        <div class="flex justify-end gap-3 pt-4 border-t border-default">
-          <UButton
-            variant="outline"
-            color="neutral"
-            @click="goBack"
-          >
-            {{ t('common.cancel') }}
-          </UButton>
-          <UButton
-            type="submit"
-            color="primary"
-            icon="i-lucide-plus"
-            :disabled="!canSubmit"
-            :loading="isCreating"
-          >
-            {{ t('budget.createAndAddItems') }}
-          </UButton>
-        </div>
-      </form>
-    </UCard>
+    <BudgetWizardStepData
+      v-if="draft.step.value === 1"
+      @next="goToStep(2)"
+      @cancel="goBack"
+    />
+    <template v-else-if="draft.step.value === 2">
+      <BudgetWizardPatientBar />
+      <BudgetWizardStepItems
+        @back="goToStep(1)"
+        @next="goToStep(3)"
+        @cancel="goBack"
+      />
+    </template>
+    <BudgetWizardStepReview
+      v-else
+      :creating="isCreating"
+      @back="goToStep(2)"
+      @create="handleCreate"
+      @cancel="goBack"
+    />
   </div>
 </template>

@@ -7,7 +7,7 @@ Supports bilingual data (English and Spanish) via LANG setting.
 """
 
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -2761,14 +2761,25 @@ def _calculate_line_totals(
     return subtotal, tax, subtotal + tax
 
 
-def _global_discount_amount(subtotal: Decimal, global_discount: dict | None) -> Decimal:
-    """Compute total discount from a {"type": percentage|absolute, "value": N} dict."""
+def _global_discount_amount(items_total: Decimal, global_discount: dict | None) -> Decimal:
+    """The global discount of a budget, in the amount the budget service stores.
+
+    ``BudgetService._recalculate_totals`` applies the global discount to the
+    **VAT-inclusive** sum of the line totals (a percentage of it, or an absolute
+    amount clamped to it) and ``total = items_total - global_discount``. The
+    seed must produce the same numbers or a demo budget would change the moment
+    it is recalculated, and would disagree with what ``pricing`` hands the
+    invoice wizard. (It used to take a percentage of the ex-VAT subtotal.)
+    """
     if not global_discount:
         return Decimal("0.00")
     value = Decimal(str(global_discount["value"]))
     if global_discount["type"] == "percentage":
-        return subtotal * value / 100
-    return value
+        amount = items_total * value / 100
+    else:
+        amount = min(value, items_total)
+    # Numeric(10,2) rounds half away from zero when the row is stored.
+    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 # =============================================================================
@@ -3121,9 +3132,12 @@ def generate_budgets_data(catalog_items_map: dict[str, dict], plans_result: dict
         if gd:
             global_discount_type = gd["type"]
             global_discount_value = Decimal(str(gd["value"]))
-        total_discount = _global_discount_amount(subtotal, gd)
         total_tax = sum((bi["line_tax"] for bi in budget_items_local), Decimal("0.00"))
-        total = subtotal - total_discount + total_tax
+        items_total = sum((bi["line_total"] for bi in budget_items_local), Decimal("0.00"))
+        # Same rule as BudgetService._recalculate_totals: the global discount
+        # comes off the VAT-inclusive items total. No line has a line discount.
+        total_discount = _global_discount_amount(items_total, gd)
+        total = items_total - total_discount
 
         b_status = budget_scenario["status"]
         accepted_via = "manual" if b_status == "accepted" else None

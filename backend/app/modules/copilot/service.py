@@ -240,6 +240,8 @@ class PendingService:
             permissions=get_role_permissions(role),
             tools=tool_registry,
             db=db,
+            actor_user_id=user_id,
+            actor_role=role,
             supervisor_id=user_id,
             guardrail_config=COPILOT_GUARDRAILS,
         )

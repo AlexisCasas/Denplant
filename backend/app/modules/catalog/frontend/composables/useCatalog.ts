@@ -13,8 +13,25 @@ import type {
   TreatmentCatalogCategoryUpdate,
   TreatmentCatalogItem,
   TreatmentCatalogItemCreate,
-  TreatmentCatalogItemUpdate
+  TreatmentCatalogItemUpdate,
+  SystemCatalogItemCommercialUpdate
 } from '~~/app/types'
+
+/** Build the strict allowlist used when saving a system-seeded item. */
+export function buildSystemCommercialPayload(
+  data: TreatmentCatalogItemUpdate
+): SystemCatalogItemCommercialUpdate {
+  return {
+    default_price: data.default_price,
+    cost_price: data.cost_price,
+    vat_type_id: data.vat_type_id,
+    surface_prices: data.surface_prices ?? undefined,
+    pricing_config: data.pricing_config ?? undefined,
+    sessions: data.sessions,
+    default_duration_minutes: data.default_duration_minutes,
+    requires_appointment: data.requires_appointment
+  }
+}
 
 /**
  * Extract the FastAPI error `detail` from a fetch error, so toasts can show
@@ -300,7 +317,8 @@ export function useCatalog() {
     try {
       const response = await api.put<ApiResponse<TreatmentCatalogItem>>(
         `/api/v1/catalog/items/${itemId}`,
-        data
+        data,
+        { silentForbidden: true }
       )
 
       toast.add({

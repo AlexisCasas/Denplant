@@ -25,6 +25,7 @@
 import { computed } from 'vue'
 import type { Furcation, PerioSite, PerioTooth, Prognosis, SiteCode } from '../types'
 import { PALATAL_SITES, VESTIBULAR_SITES } from '../types'
+import { clinicalSum } from '../utils/periodontalProfileGeometry'
 
 const props = defineProps<{
   arch: 'upper' | 'lower'
@@ -77,6 +78,16 @@ const innerSites = PALATAL_SITES
 
 function siteValue(tooth: PerioTooth, code: SiteCode): PerioSite | null {
   return tooth.sites.find(s => s.site_code === code) ?? null
+}
+
+/**
+ * The Suma cell: probing + margin, sign respected. Empty when either is
+ * missing; a real 0 is shown as "0" (so it is compared with `=== null`, never
+ * tested for truthiness). Derived on the fly and never persisted.
+ */
+function sumText(site: PerioSite | null): string {
+  const sum = clinicalSum(site?.gingival_margin_mm, site?.probing_depth_mm)
+  return sum === null ? '' : String(sum)
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +392,7 @@ function selectOnFocus(e: FocusEvent) {
           v-for="row in [
             { kind: 'site-pd', label: t('periodontogram.arch.probing') },
             { kind: 'site-gm', label: t('periodontogram.arch.margin') },
+            { kind: 'site-sum', label: t('periodontogram.arch.sum') },
             { kind: 'site-plaque', label: t('periodontogram.arch.plaque') },
             { kind: 'site-bop', label: t('periodontogram.arch.bleeding') }
           ]"
@@ -415,6 +427,12 @@ function selectOnFocus(e: FocusEvent) {
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(tooth.tooth_number, code, 'probing_depth_mm', e)"
                 >
+                <span
+                  v-else-if="row.kind === 'site-sum'"
+                  class="perio-cell-sum"
+                  :title="t('periodontogram.arch.sumTitle', { code })"
+                  :data-testid="`perio-sum-${tooth.tooth_number}-${code}`"
+                >{{ sumText(siteValue(tooth, code)) }}</span>
                 <input
                   v-else-if="row.kind === 'site-gm'"
                   type="number"
@@ -523,6 +541,7 @@ function selectOnFocus(e: FocusEvent) {
           v-for="row in [
             { kind: 'site-bop', label: t('periodontogram.arch.bleeding') },
             { kind: 'site-plaque', label: t('periodontogram.arch.plaque') },
+            { kind: 'site-sum', label: t('periodontogram.arch.sum') },
             { kind: 'site-gm', label: t('periodontogram.arch.margin') },
             { kind: 'site-pd', label: t('periodontogram.arch.probing') }
           ]"
@@ -557,6 +576,12 @@ function selectOnFocus(e: FocusEvent) {
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(tooth.tooth_number, code, 'probing_depth_mm', e)"
                 >
+                <span
+                  v-else-if="row.kind === 'site-sum'"
+                  class="perio-cell-sum"
+                  :title="t('periodontogram.arch.sumTitle', { code })"
+                  :data-testid="`perio-sum-${tooth.tooth_number}-${code}`"
+                >{{ sumText(siteValue(tooth, code)) }}</span>
                 <input
                   v-else-if="row.kind === 'site-gm'"
                   type="number"
@@ -603,6 +628,7 @@ function selectOnFocus(e: FocusEvent) {
           v-for="row in [
             { kind: 'site-pd', label: t('periodontogram.arch.probing') },
             { kind: 'site-gm', label: t('periodontogram.arch.margin') },
+            { kind: 'site-sum', label: t('periodontogram.arch.sum') },
             { kind: 'site-plaque', label: t('periodontogram.arch.plaque') },
             { kind: 'site-bop', label: t('periodontogram.arch.bleeding') }
           ]"
@@ -637,6 +663,12 @@ function selectOnFocus(e: FocusEvent) {
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(tooth.tooth_number, code, 'probing_depth_mm', e)"
                 >
+                <span
+                  v-else-if="row.kind === 'site-sum'"
+                  class="perio-cell-sum"
+                  :title="t('periodontogram.arch.sumTitle', { code })"
+                  :data-testid="`perio-sum-${tooth.tooth_number}-${code}`"
+                >{{ sumText(siteValue(tooth, code)) }}</span>
                 <input
                   v-else-if="row.kind === 'site-gm'"
                   type="number"
@@ -744,6 +776,7 @@ function selectOnFocus(e: FocusEvent) {
           v-for="row in [
             { kind: 'site-bop', label: t('periodontogram.arch.bleeding') },
             { kind: 'site-plaque', label: t('periodontogram.arch.plaque') },
+            { kind: 'site-sum', label: t('periodontogram.arch.sum') },
             { kind: 'site-gm', label: t('periodontogram.arch.margin') },
             { kind: 'site-pd', label: t('periodontogram.arch.probing') }
           ]"
@@ -778,6 +811,12 @@ function selectOnFocus(e: FocusEvent) {
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(tooth.tooth_number, code, 'probing_depth_mm', e)"
                 >
+                <span
+                  v-else-if="row.kind === 'site-sum'"
+                  class="perio-cell-sum"
+                  :title="t('periodontogram.arch.sumTitle', { code })"
+                  :data-testid="`perio-sum-${tooth.tooth_number}-${code}`"
+                >{{ sumText(siteValue(tooth, code)) }}</span>
                 <input
                   v-else-if="row.kind === 'site-gm'"
                   type="number"
@@ -1045,6 +1084,17 @@ function selectOnFocus(e: FocusEvent) {
   width: 14px;
   padding: 0;
   font-weight: 600;
+}
+
+/* Suma: a derived value, not an input — same footprint as the site cells. */
+.perio-cell-sum {
+  display: inline-block;
+  width: 14px;
+  min-height: 1em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 .perio-cell-toggle {

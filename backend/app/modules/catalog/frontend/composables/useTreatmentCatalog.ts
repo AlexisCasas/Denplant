@@ -9,9 +9,9 @@ import type { ApiResponse, OdontogramTreatment, VisualizationRuleLayer } from '~
 import {
   TREATMENT_CATEGORIES,
   TREATMENT_COLORS,
-  VISUALIZATION_RULES,
   DIAGNOSTIC_CATEGORIES,
   THERAPEUTIC_CATEGORIES,
+  getVisualizationRuleLayers,
   isSurfaceTreatment,
   type TreatmentClinicalCategory
 } from '~~/app/config/odontogramConstants'
@@ -268,15 +268,7 @@ export function useTreatmentCatalog() {
   // ============================================================================
 
   function getVisualizationRulesForType(treatmentType: string): VisualizationRuleLayer[] {
-    const layers: VisualizationRuleLayer[] = []
-    for (const [rule, treatments] of Object.entries(VISUALIZATION_RULES)) {
-      if (treatments.includes(treatmentType)) {
-        // Map legacy rule name (pattern_fill) to the new layer name (cenital_pattern).
-        const layer = rule === 'pattern_fill' ? 'cenital_pattern' : rule
-        layers.push({ layer: layer as VisualizationRuleLayer['layer'] })
-      }
-    }
-    return layers
+    return getVisualizationRuleLayers(treatmentType)
   }
 
   function getCategoryLabel(categoryKey: string, overrideLocale?: string): string {

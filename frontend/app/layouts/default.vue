@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { APP_NAME } from '~/constants/branding'
+
 const { t } = useI18n()
 const auth = useAuth()
 const clinic = useClinic()
@@ -99,21 +101,29 @@ function isActive(to: string): boolean {
         <NuxtLink
           to="/"
           class="flex items-center gap-2 overflow-hidden"
-          aria-label="DentalPin"
+          :aria-label="APP_NAME"
         >
+          <!-- Official DENPLANT logo (kit §6) needs a white plate: its
+               background isn't transparent and the surrounding sidebar
+               surface can be dark or tinted. -->
+          <span
+            v-if="!isSidebarCollapsed"
+            class="inline-flex items-center bg-white rounded-token-sm px-2 py-1 shrink-0"
+          >
+            <img
+              src="/brand/denplant-logo-original.png"
+              :alt="APP_NAME"
+              class="h-6 w-auto object-contain"
+            >
+          </span>
           <img
+            v-else
             src="/logo-icon.svg"
             alt=""
             width="32"
             height="32"
             class="shrink-0"
           >
-          <span
-            v-if="!isSidebarCollapsed"
-            class="text-h2 text-default truncate"
-          >
-            DentalPin
-          </span>
         </NuxtLink>
       </div>
 
@@ -136,7 +146,7 @@ function isActive(to: string): boolean {
           />
           <span
             v-if="!isSidebarCollapsed"
-            class="truncate"
+            class="truncate font-heading"
           >
             {{ item.label }}
           </span>
@@ -201,17 +211,16 @@ function isActive(to: string): boolean {
             <NuxtLink
               to="/"
               class="flex items-center gap-2 overflow-hidden"
-              aria-label="DentalPin"
+              :aria-label="APP_NAME"
               @click="mobileNavOpen = false"
             >
-              <img
-                src="/logo-icon.svg"
-                alt=""
-                width="32"
-                height="32"
-                class="shrink-0"
-              >
-              <span class="text-h2 text-default truncate">DentalPin</span>
+              <span class="inline-flex items-center bg-white rounded-token-sm px-2 py-1 shrink-0">
+                <img
+                  src="/brand/denplant-logo-original.png"
+                  :alt="APP_NAME"
+                  class="h-6 w-auto object-contain"
+                >
+              </span>
             </NuxtLink>
             <UButton
               variant="ghost"
@@ -240,7 +249,7 @@ function isActive(to: string): boolean {
                 :name="item.icon"
                 class="w-5 h-5 shrink-0"
               />
-              <span class="truncate">{{ item.label }}</span>
+              <span class="truncate font-heading">{{ item.label }}</span>
             </NuxtLink>
           </nav>
 

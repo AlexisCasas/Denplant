@@ -7,6 +7,7 @@ export interface User {
   first_name: string
   last_name: string
   professional_id?: string
+  role?: 'admin' | 'dentist' | 'hygienist' | 'assistant' | 'receptionist'
   is_active: boolean
   created_at: string
   updated_at: string
@@ -66,6 +67,16 @@ export interface OnboardingState {
   skipped?: Record<string, string>
 }
 
+/** What the server tells a client about the clinic logo (never its storage path). */
+export interface ClinicLogo {
+  mime_type: string | null
+  width: number | null
+  height: number | null
+  size: number | null
+  sha256: string | null
+  updated_at: string | null
+}
+
 export interface Clinic {
   id: string
   name: string
@@ -83,6 +94,8 @@ export interface Clinic {
     onboarding?: OnboardingState
   }
   cabinets: Cabinet[]
+  /** Derived from `settings.branding.logo`; `null` when the clinic has no logo. */
+  logo?: ClinicLogo | null
   created_at: string
   updated_at: string
 }
@@ -229,6 +242,10 @@ export interface AppointmentTreatmentBrief {
   plan_number?: string
   // Completion tracking
   completed_in_appointment: boolean
+  // QW-01 fix 3: lets edit-mode rehydration render "odontólogo" / "sesión"
+  // the same way CREATE mode does from PlannedTreatmentItemResponse.
+  assigned_professional_id?: string | null
+  sessions?: PlanItemSession[]
 }
 
 // Appointment types
@@ -476,6 +493,15 @@ export interface TreatmentCatalogItemBrief {
   default_price?: string | null
 }
 
+/** Historical therapeutic rendering captured with a treatment. */
+export interface TreatmentVisualizationSnapshot {
+  schema_version: 1
+  odontogram_treatment_type: string
+  visualization_rules: VisualizationRuleLayer[]
+  visualization_config: Record<string, unknown>
+  clinical_category: string
+}
+
 /** Treatment = one clinical act. Bridges, splints and multiple-veneers/crowns are
  *  a single Treatment with several TreatmentTooth entries. Globals have empty teeth. */
 export interface Treatment {
@@ -494,6 +520,7 @@ export interface Treatment {
   price_snapshot?: string | null
   duration_snapshot?: number | null
   vat_rate_snapshot?: string | null
+  visualization_snapshot?: TreatmentVisualizationSnapshot | null
   budget_item_id?: string | null
   notes?: string | null
   source_module: string
@@ -587,7 +614,7 @@ export interface ToothRecordWithTreatments extends ToothRecord {
 // the odontogram layer's <ClinicalModeToggle>.
 // ============================================================================
 
-export type ClinicalMode = 'history' | 'diagnosis' | 'plans' | 'appointments'
+export type ClinicalMode = 'history' | 'diagnosis' | 'plans' | 'appointments' | 'prescriptions' | 'evolution'
 
 // ============================================================================
 // VAT Type Types
@@ -668,14 +695,14 @@ export interface TreatmentCatalogCategoryUpdate {
 export interface OdontogramMapping {
   id: string
   odontogram_treatment_type: string
-  visualization_rules: string[]
+  visualization_rules: VisualizationRuleLayer[]
   visualization_config: Record<string, unknown>
   clinical_category: string
 }
 
 export interface OdontogramMappingCreate {
   odontogram_treatment_type: string
-  visualization_rules: string[]
+  visualization_rules: VisualizationRuleLayer[]
   visualization_config: Record<string, unknown>
   clinical_category: string
 }
@@ -782,6 +809,18 @@ export interface TreatmentCatalogItemUpdate {
   is_active?: boolean
   odontogram_mapping?: OdontogramMappingCreate
   sessions?: CatalogItemSessionInput[]
+}
+
+/** Allowed payload when editing a clinic's copy of a system catalog item. */
+export interface SystemCatalogItemCommercialUpdate {
+  default_price?: number
+  cost_price?: number
+  vat_type_id?: string
+  surface_prices?: Record<string, number>
+  pricing_config?: Record<string, number>
+  sessions?: CatalogItemSessionInput[]
+  default_duration_minutes?: number
+  requires_appointment?: boolean
 }
 
 /** Layered visualization rule. Each layer renders on top of the previous. */
@@ -2090,6 +2129,7 @@ export interface TreatmentBrief {
   catalog_item_id?: string | null
   catalog_item?: TreatmentCatalogItemBrief | null
   price_snapshot?: string | null
+  visualization_snapshot?: TreatmentVisualizationSnapshot | null
   notes?: string | null
   teeth: Array<{
     tooth_number: number
@@ -2161,13 +2201,14 @@ export interface CompleteItemRequest {
 }
 
 // Clinical notes — owned by the ``clinical_notes`` module since issue #60.
-// Polymorphic over four note_type / owner_type pairings:
-//   administrative + diagnosis → owner_type='patient'
+// Polymorphic over five note_type / owner_type pairings:
+//   administrative + diagnosis + evolution → owner_type='patient'
 //   treatment                  → owner_type='treatment' (odontogram.Treatment.id)
 //   treatment_plan             → owner_type='plan' (treatment_plans.id)
 export type NoteType
   = | 'administrative'
     | 'diagnosis'
+    | 'evolution'
     | 'treatment'
     | 'treatment_plan'
     | 'appointment_clinical'

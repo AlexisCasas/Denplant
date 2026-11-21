@@ -18,14 +18,19 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.events import EventType, event_bus
 from app.core.schemas import ApiResponse
 from app.database import get_db
-from app.modules.patients.service import PatientService
+from app.modules.patients.access import PatientAccessPolicy
 
 from .schemas import (
     AllergyCreate,
     AllergyResponse,
     AllergyUpdate,
+    DentalAnamnesisInput,
+    DentalAnamnesisResponse,
     EmergencyContactResponse,
     EmergencyContactUpsert,
+    EndodonticRecordCreate,
+    EndodonticRecordResponse,
+    EndodonticRecordUpdate,
     LegalGuardianResponse,
     LegalGuardianUpsert,
     MedicalContextResponse,
@@ -36,6 +41,8 @@ from .schemas import (
     MedicationResponse,
     MedicationUpdate,
     PatientAlertsResponse,
+    PediatricDentalAnamnesisInput,
+    PediatricDentalAnamnesisResponse,
     SurgicalHistoryCreate,
     SurgicalHistoryResponse,
     SurgicalHistoryUpdate,
@@ -48,9 +55,8 @@ from .service import PatientsClinicalService
 router = APIRouter()
 
 
-async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> None:
-    patient = await PatientService.get_patient(db, clinic_id, patient_id)
-    if patient is None:
+async def _ensure_patient(db: AsyncSession, ctx: ClinicContext, patient_id: UUID) -> None:
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
 
@@ -67,7 +73,7 @@ async def get_medical_context(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MedicalContextResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     ctx_row = await PatientsClinicalService.get_medical_context(db, patient_id)
     if ctx_row is None:
         return ApiResponse(data=MedicalContextResponse())
@@ -85,7 +91,7 @@ async def update_medical_context(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MedicalContextResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     ctx_row = await PatientsClinicalService.upsert_medical_context(
         db, ctx.clinic_id, patient_id, data.model_dump(exclude_unset=True), ctx.user_id
     )
@@ -117,7 +123,7 @@ async def list_allergies(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[AllergyResponse]]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     allergies = await PatientsClinicalService.list_allergies(db, patient_id)
     return ApiResponse(data=[AllergyResponse.model_validate(a) for a in allergies])
 
@@ -134,7 +140,7 @@ async def create_allergy(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AllergyResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     allergy = await PatientsClinicalService.create_allergy(
         db, ctx.clinic_id, patient_id, data.model_dump()
     )
@@ -155,7 +161,7 @@ async def update_allergy(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AllergyResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     allergy = await PatientsClinicalService.get_allergy(db, allergy_id)
     if allergy is None or allergy.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
@@ -178,7 +184,7 @@ async def delete_allergy(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     allergy = await PatientsClinicalService.get_allergy(db, allergy_id)
     if allergy is None or allergy.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
@@ -199,7 +205,7 @@ async def list_medications(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[MedicationResponse]]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     meds = await PatientsClinicalService.list_medications(db, patient_id)
     return ApiResponse(data=[MedicationResponse.model_validate(m) for m in meds])
 
@@ -216,7 +222,7 @@ async def create_medication(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MedicationResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     med = await PatientsClinicalService.create_medication(
         db, ctx.clinic_id, patient_id, data.model_dump()
     )
@@ -237,7 +243,7 @@ async def update_medication(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MedicationResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     med = await PatientsClinicalService.get_medication(db, medication_id)
     if med is None or med.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found")
@@ -260,7 +266,7 @@ async def delete_medication(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     med = await PatientsClinicalService.get_medication(db, medication_id)
     if med is None or med.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found")
@@ -281,7 +287,7 @@ async def list_systemic_diseases(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[SystemicDiseaseResponse]]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     rows = await PatientsClinicalService.list_systemic_diseases(db, patient_id)
     return ApiResponse(data=[SystemicDiseaseResponse.model_validate(r) for r in rows])
 
@@ -298,7 +304,7 @@ async def create_systemic_disease(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[SystemicDiseaseResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     disease = await PatientsClinicalService.create_systemic_disease(
         db, ctx.clinic_id, patient_id, data.model_dump()
     )
@@ -319,7 +325,7 @@ async def update_systemic_disease(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[SystemicDiseaseResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     disease = await PatientsClinicalService.get_systemic_disease(db, disease_id)
     if disease is None or disease.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Disease not found")
@@ -342,7 +348,7 @@ async def delete_systemic_disease(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     disease = await PatientsClinicalService.get_systemic_disease(db, disease_id)
     if disease is None or disease.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Disease not found")
@@ -363,7 +369,7 @@ async def list_surgical_history(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[SurgicalHistoryResponse]]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     rows = await PatientsClinicalService.list_surgical_history(db, patient_id)
     return ApiResponse(data=[SurgicalHistoryResponse.model_validate(r) for r in rows])
 
@@ -380,7 +386,7 @@ async def create_surgical_history(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[SurgicalHistoryResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     surgery = await PatientsClinicalService.create_surgical_history(
         db, ctx.clinic_id, patient_id, data.model_dump()
     )
@@ -401,7 +407,7 @@ async def update_surgical_history(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[SurgicalHistoryResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     surgery = await PatientsClinicalService.get_surgical_history(db, surgery_id)
     if surgery is None or surgery.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Surgery not found")
@@ -424,7 +430,7 @@ async def delete_surgical_history(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     surgery = await PatientsClinicalService.get_surgical_history(db, surgery_id)
     if surgery is None or surgery.patient_id != patient_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Surgery not found")
@@ -445,7 +451,7 @@ async def get_emergency_contact(
     _: Annotated[None, Depends(require_permission("patients_clinical.emergency.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[EmergencyContactResponse | None]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     contact = await PatientsClinicalService.get_emergency_contact(db, patient_id)
     if contact is None:
         return ApiResponse(data=None)
@@ -463,7 +469,7 @@ async def upsert_emergency_contact(
     _: Annotated[None, Depends(require_permission("patients_clinical.emergency.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[EmergencyContactResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     contact = await PatientsClinicalService.upsert_emergency_contact(
         db, ctx.clinic_id, patient_id, data.model_dump()
     )
@@ -482,7 +488,7 @@ async def delete_emergency_contact(
     _: Annotated[None, Depends(require_permission("patients_clinical.emergency.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     contact = await PatientsClinicalService.get_emergency_contact(db, patient_id)
     if contact is None:
         raise HTTPException(
@@ -505,7 +511,7 @@ async def get_legal_guardian(
     _: Annotated[None, Depends(require_permission("patients_clinical.emergency.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[LegalGuardianResponse | None]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     guardian = await PatientsClinicalService.get_legal_guardian(db, patient_id)
     if guardian is None:
         return ApiResponse(data=None)
@@ -523,7 +529,7 @@ async def upsert_legal_guardian(
     _: Annotated[None, Depends(require_permission("patients_clinical.emergency.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[LegalGuardianResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     guardian = await PatientsClinicalService.upsert_legal_guardian(
         db, ctx.clinic_id, patient_id, data.model_dump()
     )
@@ -542,7 +548,7 @@ async def delete_legal_guardian(
     _: Annotated[None, Depends(require_permission("patients_clinical.emergency.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     guardian = await PatientsClinicalService.get_legal_guardian(db, patient_id)
     if guardian is None:
         raise HTTPException(
@@ -565,7 +571,7 @@ async def get_medical_history(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MedicalHistoryResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     data = await PatientsClinicalService.build_medical_history(db, patient_id)
     return ApiResponse(data=MedicalHistoryResponse.model_validate(data))
 
@@ -581,7 +587,7 @@ async def replace_medical_history(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[MedicalHistoryResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     await PatientsClinicalService.replace_medical_history(
         db,
         ctx.clinic_id,
@@ -614,6 +620,194 @@ async def get_patient_alerts(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PatientAlertsResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     alerts = await PatientsClinicalService.compute_alerts(db, patient_id)
     return ApiResponse(data=PatientAlertsResponse(alerts=alerts))
+
+
+# --- Specialty anamneses -------------------------------------------------
+
+
+async def _ensure_professional(
+    db: AsyncSession, ctx: ClinicContext, professional_id: UUID | None
+) -> None:
+    if not await PatientsClinicalService.validate_professional(db, ctx.clinic_id, professional_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Professional must be an active professional in this clinic",
+        )
+
+
+@router.get(
+    "/patients/{patient_id}/dental-anamnesis",
+    response_model=ApiResponse[DentalAnamnesisResponse | None],
+)
+async def get_dental_anamnesis(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[DentalAnamnesisResponse | None]:
+    await _ensure_patient(db, ctx, patient_id)
+    record = await PatientsClinicalService.get_dental_anamnesis(db, ctx.clinic_id, patient_id)
+    return ApiResponse(
+        data=DentalAnamnesisResponse.model_validate(record) if record is not None else None
+    )
+
+
+@router.put(
+    "/patients/{patient_id}/dental-anamnesis",
+    response_model=ApiResponse[DentalAnamnesisResponse],
+)
+async def upsert_dental_anamnesis(
+    patient_id: UUID,
+    data: DentalAnamnesisInput,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[DentalAnamnesisResponse]:
+    await _ensure_patient(db, ctx, patient_id)
+    await _ensure_professional(db, ctx, data.professional_id)
+    record = await PatientsClinicalService.upsert_dental_anamnesis(
+        db, ctx.clinic_id, patient_id, data.model_dump(), ctx.user_id
+    )
+    await db.commit()
+    await db.refresh(record)
+    return ApiResponse(data=DentalAnamnesisResponse.model_validate(record))
+
+
+@router.get(
+    "/patients/{patient_id}/pediatric-dental-anamnesis",
+    response_model=ApiResponse[PediatricDentalAnamnesisResponse | None],
+)
+async def get_pediatric_dental_anamnesis(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PediatricDentalAnamnesisResponse | None]:
+    await _ensure_patient(db, ctx, patient_id)
+    record = await PatientsClinicalService.get_pediatric_dental_anamnesis(
+        db, ctx.clinic_id, patient_id
+    )
+    return ApiResponse(
+        data=PediatricDentalAnamnesisResponse.model_validate(record) if record is not None else None
+    )
+
+
+@router.put(
+    "/patients/{patient_id}/pediatric-dental-anamnesis",
+    response_model=ApiResponse[PediatricDentalAnamnesisResponse],
+)
+async def upsert_pediatric_dental_anamnesis(
+    patient_id: UUID,
+    data: PediatricDentalAnamnesisInput,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[PediatricDentalAnamnesisResponse]:
+    await _ensure_patient(db, ctx, patient_id)
+    await _ensure_professional(db, ctx, data.professional_id)
+    record = await PatientsClinicalService.upsert_pediatric_dental_anamnesis(
+        db, ctx.clinic_id, patient_id, data.model_dump(), ctx.user_id
+    )
+    await db.commit()
+    await db.refresh(record)
+    return ApiResponse(data=PediatricDentalAnamnesisResponse.model_validate(record))
+
+
+# --- Endodontic records -------------------------------------------------
+
+
+@router.get(
+    "/patients/{patient_id}/endodontic-records",
+    response_model=ApiResponse[list[EndodonticRecordResponse]],
+)
+async def list_endodontic_records(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[list[EndodonticRecordResponse]]:
+    await _ensure_patient(db, ctx, patient_id)
+    records = await PatientsClinicalService.list_endodontic_records(db, ctx.clinic_id, patient_id)
+    return ApiResponse(data=[EndodonticRecordResponse.model_validate(record) for record in records])
+
+
+@router.post(
+    "/patients/{patient_id}/endodontic-records",
+    response_model=ApiResponse[EndodonticRecordResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_endodontic_record(
+    patient_id: UUID,
+    data: EndodonticRecordCreate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[EndodonticRecordResponse]:
+    await _ensure_patient(db, ctx, patient_id)
+    await _ensure_professional(db, ctx, data.professional_id)
+    record = await PatientsClinicalService.create_endodontic_record(
+        db, ctx.clinic_id, patient_id, data.model_dump()
+    )
+    await db.commit()
+    record = await PatientsClinicalService.get_endodontic_record(
+        db, ctx.clinic_id, patient_id, record.id
+    )
+    assert record is not None
+    return ApiResponse(data=EndodonticRecordResponse.model_validate(record))
+
+
+@router.get(
+    "/patients/{patient_id}/endodontic-records/{record_id}",
+    response_model=ApiResponse[EndodonticRecordResponse],
+)
+async def get_endodontic_record(
+    patient_id: UUID,
+    record_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[EndodonticRecordResponse]:
+    await _ensure_patient(db, ctx, patient_id)
+    record = await PatientsClinicalService.get_endodontic_record(
+        db, ctx.clinic_id, patient_id, record_id
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Endodontic record not found"
+        )
+    return ApiResponse(data=EndodonticRecordResponse.model_validate(record))
+
+
+@router.put(
+    "/patients/{patient_id}/endodontic-records/{record_id}",
+    response_model=ApiResponse[EndodonticRecordResponse],
+)
+async def update_endodontic_record(
+    patient_id: UUID,
+    record_id: UUID,
+    data: EndodonticRecordUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[EndodonticRecordResponse]:
+    await _ensure_patient(db, ctx, patient_id)
+    record = await PatientsClinicalService.get_endodontic_record(
+        db, ctx.clinic_id, patient_id, record_id
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Endodontic record not found"
+        )
+    payload = data.model_dump(exclude_unset=True)
+    if "professional_id" in payload:
+        await _ensure_professional(db, ctx, payload["professional_id"])
+    await PatientsClinicalService.update_endodontic_record(db, record, payload)
+    await db.commit()
+    refreshed = await PatientsClinicalService.get_endodontic_record(
+        db, ctx.clinic_id, patient_id, record_id
+    )
+    assert refreshed is not None
+    return ApiResponse(data=EndodonticRecordResponse.model_validate(refreshed))

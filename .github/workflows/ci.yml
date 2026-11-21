@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Avoid concurrent full suites for superseded commits of the same PR.
+# Separate pull requests and the main branch always have separate groups.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend-lint:
     runs-on: ubuntu-latest
@@ -44,7 +50,10 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/dental_clinic_test
+      # Keep the configured development URL distinct from the disposable
+      # TEST_DATABASE_URL to preserve the test fixture's isolation guard.
+      DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/dental_clinic_ci_reserved
+      TEST_DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/dental_clinic_test
       SECRET_KEY: test-secret-key-for-ci
       ENVIRONMENT: test
       TESTING: "true"
@@ -95,6 +104,11 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/stub
+          # This step invokes pytest, so conftest's isolation guard (INFRA-01)
+          # applies. These manifest tests never touch a database — there is no
+          # Postgres service in this job — but the guard still requires an
+          # explicitly designated, disposable target.
+          TEST_DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/stub_test
           SECRET_KEY: ci-stub
           ENVIRONMENT: test
           TESTING: "true"
@@ -256,7 +270,8 @@ jobs:
     # Nuxt on the host (simpler than juggling the container's bind
     # mount + host npm), drives it with Playwright on the host. Slow
     # (~6 min). Required on main + PRs.
-    runs-on: ubuntu-latest
+    # Playwright 1.59.1 does not support ubuntu-26.04 runners.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       POSTGRES_PASSWORD: testpass

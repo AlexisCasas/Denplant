@@ -117,6 +117,8 @@ function confirmDiscard() {
           }"
           role="status"
           aria-live="polite"
+          data-testid="perio-save-state"
+          :data-save-state="saveState"
         >
           <UIcon
             :name="saveState === 'saving'

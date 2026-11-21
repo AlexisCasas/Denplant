@@ -5,8 +5,6 @@ last_verified_commit: 0000000
 
 # Odontogram — technical overview
 
-> _Scaffolded stub — replace with proper documentation when this module is next touched._
-
 Auto-discovered facts about the `odontogram` module. See the module's
 own notes at `backend/app/modules/odontogram/CLAUDE.md` for context
 the scaffold could not infer.
@@ -29,6 +27,44 @@ the scaffold could not infer.
 - `POST /api/v1/odontogram/patients/{patient_id}/treatments`
 - `PUT /api/v1/odontogram/patients/{patient_id}/teeth/{tooth_number}`
 - `PUT /api/v1/odontogram/treatments/{treatment_id}`
+
+## Therapeutic visualization snapshots
+
+`TreatmentOdontogramMapping` remains clinic-local catalog configuration. When
+the odontogram creates a treatment from a mapped catalog item, it copies the
+effective therapeutic representation into `treatments.visualization_snapshot`:
+
+```json
+{
+  "schema_version": 1,
+  "odontogram_treatment_type": "crown",
+  "visualization_rules": [{"layer": "cenital_pattern", "pattern": "diagonal_stripes", "color": "#F59E0B"}],
+  "visualization_config": {"color": "#F59E0B"},
+  "clinical_category": "restauradora"
+}
+```
+
+The value is immutable after creation. Catalog price, mapping, status and
+session changes must not alter it. `TreatmentResponse` and the nested
+`treatment_plan.TreatmentBrief` expose it as `visualization_snapshot`.
+Treatments created before migration `odo_0005`, and valid treatments without a
+catalog mapping, expose `null`; clients must preserve their existing fallback
+instead of interpreting current catalog configuration as historical truth.
+
+The Plan consumes this field through the pure
+`frontend/utils/therapeuticVisualization.ts` adapter and renders its output in
+`NtsTherapeuticLayer.vue`. Only the version-1 layers `pulp_fill`,
+`occlusal_surface`, `lateral_icon` and `cenital_pattern` are supported. A
+missing, partial or unsupported snapshot emits no therapeutic instructions, so
+the existing generic Plan marker remains visible. Cancelled plan items emit no
+therapeutic layer; pending is translucent and completed/performed is opaque.
+The base NTS geometry, MINSA findings, and clinical selection flows are not
+owned by this renderer. H2.3 composes overlays independently of API arrival:
+surfaces, pulp, coverage, lateral icons, bridge connectors, state decorators,
+then an accessible active-treatment counter. `cancelled` plan items remain in
+detail/history but are excluded from the active counter. The contextual Plan
+legend is derived from the layers, bridges, global treatments and states that
+are actually visible; it never uses the diagnostic MINSA legend.
 
 ## Frontend
 

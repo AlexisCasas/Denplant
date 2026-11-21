@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType, event_bus
-from app.modules.budget.models import Budget
+from app.modules.budget.models import Budget, BudgetItem
 
 from .models import Payment, PaymentAllocation, PaymentHistory, Refund
 
@@ -34,12 +34,14 @@ async def _validate_allocations_for_clinic(
     db: AsyncSession,
     clinic_id: UUID,
     allocations: list[dict],
+    *,
+    exclude_payment_id: UUID | None = None,
 ) -> None:
-    """Confirm every budget target exists and belongs to ``clinic_id``."""
+    """Validate targets and serialize item balances before writing."""
     budget_ids = {
         a["target_id"]
         for a in allocations
-        if a["target_type"] == "budget" and a.get("target_id") is not None
+        if a["target_type"] in ("budget", "budget_item") and a.get("target_id") is not None
     }
     if not budget_ids:
         return
@@ -55,6 +57,79 @@ async def _validate_allocations_for_clinic(
             raise PaymentWorkflowError(f"Budget {bid} not found")
         if row.clinic_id != clinic_id:
             raise PaymentWorkflowError(f"Budget {bid} belongs to another clinic")
+
+    item_specs = [a for a in allocations if a["target_type"] == "budget_item"]
+    item_ids = [a.get("budget_item_id") for a in item_specs]
+    if len(item_ids) != len(set(item_ids)):
+        raise PaymentWorkflowError("A budget item can appear only once per payment")
+    if not item_ids:
+        return
+
+    # Lock rows in stable order.  The lock spans the paid-total read and
+    # allocation insert, so concurrent collectors cannot both spend the same
+    # pending balance.
+    items = (
+        (
+            await db.execute(
+                select(BudgetItem)
+                .where(BudgetItem.id.in_(item_ids))
+                .order_by(BudgetItem.id)
+                .with_for_update()
+            )
+        )
+        .scalars()
+        .all()
+    )
+    by_id = {item.id: item for item in items}
+    for spec in item_specs:
+        item = by_id.get(spec["budget_item_id"])
+        if item is None:
+            raise PaymentWorkflowError(f"Budget item {spec['budget_item_id']} not found")
+        if item.clinic_id != clinic_id:
+            raise PaymentWorkflowError(f"Budget item {item.id} belongs to another clinic")
+        if item.budget_id != spec["target_id"]:
+            raise PaymentWorkflowError("Budget item does not belong to the requested budget")
+
+        refunded = (
+            select(
+                Refund.payment_id,
+                func.coalesce(func.sum(Refund.amount), Decimal("0")).label("amount"),
+            )
+            .group_by(Refund.payment_id)
+            .subquery()
+        )
+        paid_result = await db.execute(
+            select(
+                func.coalesce(
+                    func.sum(
+                        PaymentAllocation.amount
+                        * (
+                            (Payment.amount - func.coalesce(refunded.c.amount, Decimal("0")))
+                            / Payment.amount
+                        )
+                    ),
+                    Decimal("0"),
+                )
+            )
+            .join(Payment, Payment.id == PaymentAllocation.payment_id)
+            .outerjoin(refunded, refunded.c.payment_id == Payment.id)
+            .where(
+                PaymentAllocation.clinic_id == clinic_id,
+                PaymentAllocation.target_type == "budget_item",
+                PaymentAllocation.budget_item_id == item.id,
+                *(
+                    [PaymentAllocation.payment_id != exclude_payment_id]
+                    if exclude_payment_id
+                    else []
+                ),
+            )
+        )
+        paid = paid_result.scalar_one()
+        available = max(Decimal("0"), item.line_total - paid)
+        if Decimal(str(spec["amount"])) > available:
+            raise PaymentWorkflowError(
+                f"Allocation {spec['amount']} exceeds remaining balance {available} for budget item {item.id}"
+            )
 
 
 def _allocations_sum(allocations: list[dict]) -> Decimal:
@@ -149,7 +224,10 @@ async def record_payment(
             clinic_id=clinic_id,
             payment_id=payment.id,
             target_type=spec["target_type"],
-            budget_id=spec.get("target_id") if spec["target_type"] == "budget" else None,
+            budget_id=spec.get("target_id") if spec["target_type"] != "on_account" else None,
+            budget_item_id=spec.get("budget_item_id")
+            if spec["target_type"] == "budget_item"
+            else None,
             amount=Decimal(str(spec["amount"])),
             created_by=recorded_by,
         )
@@ -171,6 +249,9 @@ async def record_payment(
                     {
                         "target_type": spec["target_type"],
                         "target_id": str(spec["target_id"]) if spec.get("target_id") else None,
+                        "budget_item_id": str(spec["budget_item_id"])
+                        if spec.get("budget_item_id")
+                        else None,
                         "amount": str(spec["amount"]),
                     }
                     for spec in allocations
@@ -228,7 +309,10 @@ async def reallocate_payment(
     if _allocations_sum(new_allocations) != payment.amount:
         raise PaymentWorkflowError("New allocations must sum to payment.amount")
 
-    await _validate_allocations_for_clinic(db, clinic_id, new_allocations)
+    # Exclude this payment's old rows while validating its replacement.
+    await _validate_allocations_for_clinic(
+        db, clinic_id, new_allocations, exclude_payment_id=payment.id
+    )
 
     previous_state = [
         {
@@ -251,7 +335,10 @@ async def reallocate_payment(
             clinic_id=clinic_id,
             payment_id=payment.id,
             target_type=spec["target_type"],
-            budget_id=spec.get("target_id") if spec["target_type"] == "budget" else None,
+            budget_id=spec.get("target_id") if spec["target_type"] != "on_account" else None,
+            budget_item_id=spec.get("budget_item_id")
+            if spec["target_type"] == "budget_item"
+            else None,
             amount=Decimal(str(spec["amount"])),
             created_by=changed_by,
         )
@@ -271,6 +358,9 @@ async def reallocate_payment(
                     {
                         "target_type": spec["target_type"],
                         "target_id": str(spec["target_id"]) if spec.get("target_id") else None,
+                        "budget_item_id": str(spec["budget_item_id"])
+                        if spec.get("budget_item_id")
+                        else None,
                         "amount": str(spec["amount"]),
                     }
                     for spec in new_allocations
