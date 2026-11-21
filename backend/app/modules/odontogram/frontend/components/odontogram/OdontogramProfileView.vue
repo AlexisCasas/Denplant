@@ -25,6 +25,10 @@ import { useOdontogramProfile } from '../../composables/useOdontogramProfile'
 
 defineOptions({ inheritAttrs: false })
 
+// Keep the required patient ID explicit and type-safe for both renderers.
+// Other attrs and listeners still pass through unchanged.
+const props = defineProps<{ patientId: string }>()
+
 const { t } = useI18n()
 const { profile, isLoaded, ensureLoaded } = useOdontogramProfile()
 
@@ -54,12 +58,13 @@ onMounted(() => {
   <!-- The profile value doubles as the record's norm version. -->
   <NtsOdontogramShell
     v-else-if="profile === 'pe_nts_188_2022'"
-    :patient-id="($attrs.patientId as string) ?? ($attrs['patient-id'] as string)"
+    :patient-id="props.patientId"
     norm-version="pe_nts_188_2022"
   />
 
   <OdontogramChart
     v-else
     v-bind="$attrs"
+    :patient-id="props.patientId"
   />
 </template>
