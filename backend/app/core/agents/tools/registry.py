@@ -102,15 +102,18 @@ class ToolRegistry:
         5. Handler execution
         6. Audit-log write (regardless of success/failure)
         """
+        from sqlalchemy import select
+
         from app.core.agents.guardrails import GuardrailDecision
         from app.core.agents.guardrails import check as guardrails_check
         from app.core.agents.service import ApprovalService, AuditService
         from app.core.agents.tooling import jsonify
-        from app.core.auth.financial_visibility import FinancialVisibilityPolicy, strip_financial_fields
+        from app.core.auth.financial_visibility import (
+            FinancialVisibilityPolicy,
+            strip_financial_fields,
+        )
         from app.core.auth.models import ClinicMembership, User
         from app.core.auth.permissions import get_role_permissions, permission_matches
-        from sqlalchemy import select
-
         tool = self._tools.get(qualified_name)
         if tool is None:
             raise ToolRegistryError(f"Unknown tool: {qualified_name}")
