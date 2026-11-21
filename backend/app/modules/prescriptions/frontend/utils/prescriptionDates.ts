@@ -39,6 +39,12 @@ export function formatDateOnly(value: string | null | undefined, locale: string)
     return value
   }
 
+  // Date-only values on Spanish clinical documents have an unambiguous
+  // day/month/year order regardless of the runner's ICU default locale.
+  if (locale.toLowerCase() === 'es' || locale.toLowerCase().startsWith('es-')) {
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
+  }
+
   try {
     return new Intl.DateTimeFormat(locale, {
       day: '2-digit',
