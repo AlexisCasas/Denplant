@@ -37,7 +37,7 @@ function choose(medication: PrescriptionMedication): void {
     <div v-if="favorites.length" class="flex flex-wrap gap-2">
       <UButton
         v-for="medication in favorites"
-        :key="medication.favorite_id"
+        :key="medication.favorite_id ?? medication.id"
         size="xs"
         color="neutral"
         variant="soft"
