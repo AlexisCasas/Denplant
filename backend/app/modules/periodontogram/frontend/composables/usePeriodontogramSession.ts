@@ -52,7 +52,8 @@ export function usePeriodontogramSession() {
 
   function syncSaveState(): void {
     saving.value = inFlight.size > 0
-    dirty.value = pendingPayloads.size > 0 || inFlight.size > 0
+    // A failed PATCH must never be advertised as "Saved".
+    dirty.value = pendingPayloads.size > 0 || inFlight.size > 0 || lastError.value !== null
   }
 
   async function trackedSave(operation: Promise<unknown>): Promise<void> {
