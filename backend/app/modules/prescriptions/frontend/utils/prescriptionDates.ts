@@ -13,7 +13,7 @@
  * the user's own zone.
  */
 
-const DATE_ONLY = /^(\\d{4})-(\\d{2})-(\\d{2})$/
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
 
 // i18n exposes a Vue Ref in the application; unit-test doubles may provide
 // a plain object with a .value getter. Keep both call sites safe.
