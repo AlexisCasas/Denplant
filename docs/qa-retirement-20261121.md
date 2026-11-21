@@ -20,10 +20,10 @@ Estos commits existían **solo** en el VPS (no estaban en ningún remoto). Se pu
 
 | Rama | Commit | Funcionalidad | Origen | Estado |
 |---|---|---|---|---|
-| `preserve/20261121-dp33-demo-integration-prod-f58a09f` | `f58a09f` | DP-33 integrado sobre el baseline demo, incluye rediseño del presupuesto en 3 pasos y acceso a paciente archivado. **Es el commit que corre hoy en producción** | Árbol de integración DP-33 | PR Draft #27 por revisar |
-| `preserve/20261121-dp17-patient-info-integrated` | `99c0654` | Pestañas clínicas del paciente junto con el selector de dentición (DP-17) | QA `dp17qa` | PR Draft #28 por revisar |
+| `preserve/20261121-dp33-demo-integration-prod-f58a09f` | `f58a09f` | DP-33 integrado sobre el baseline demo, incluye rediseño del presupuesto en 3 pasos y acceso a paciente archivado. **Es el commit que corre hoy en producción** | Árbol de integración DP-33 | PR Draft #26 por revisar |
+| `preserve/20261121-dp17-patient-info-integrated` | `99c0654` | Pestañas clínicas del paciente junto con el selector de dentición (DP-17) | QA `dp17qa` | PR Draft #27 por revisar |
 | `preserve/20261121-dp17-dentition-selector` | `d5433e9` | Selector de dentición permanente/temporal (subconjunto de la anterior) | QA `dp17qa` | Preservación |
-| `preserve/20261121-payment-allocations-current` | `3d14d0e` | Asignación de pagos parciales por tratamiento (sobre la base actual) | QA `denplant_payment_qa` | PR Draft #26 por revisar |
+| `preserve/20261121-payment-allocations-current` | `3d14d0e` | Asignación de pagos parciales por tratamiento (sobre la base actual) | QA `denplant_payment_qa` | PR Draft #28 por revisar |
 | `preserve/20261121-payment-allocations-by-budget-item` | `1ca8e5d` | Misma funcionalidad sobre la base anterior | QA `denplant_payment_qa` | Preservación |
 | `preserve/20261121-dp33-patient-lifecycle` | `811206c` | Ciclo de vida del paciente DP-33 (versión anterior de la integración) | Auditoría DP-33 | Preservación |
 
