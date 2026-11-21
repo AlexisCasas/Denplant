@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PrescriptionMedication } from '../types/prescriptions'
 
-const props = defineProps<{
+defineProps<{
   disabled?: boolean
   favorites: PrescriptionMedication[]
   results: PrescriptionMedication[]
