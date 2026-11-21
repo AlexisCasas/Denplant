@@ -15,8 +15,8 @@ import pytest
 
 from app.core.auth.models import ClinicMembership, User
 from app.core.auth.service import create_access_token, hash_password
-from app.modules.catalog.models import TreatmentCatalogItem, TreatmentCategory, VatType
 from app.modules.agenda.models import Appointment, AppointmentTreatment
+from app.modules.catalog.models import TreatmentCatalogItem, TreatmentCategory, VatType
 from app.modules.odontogram.models import Treatment
 from app.modules.patients.models import Patient
 from app.modules.treatment_plan.models import (
