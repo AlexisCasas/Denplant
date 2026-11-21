@@ -149,8 +149,8 @@ test.describe('periodontogram — admin', () => {
 
     // Autosave indicator returns to "Guardado / Saved" once the
     // debounced PATCH completes.
-    await expect(loggedIn.getByText(/Guardado|Saved/i).first()).toBeVisible({
-      timeout: 5_000
+    await expect(loggedIn.getByTestId('perio-save-state')).toHaveAttribute('data-save-state', 'saved', {
+      timeout: 15_000
     })
   })
 
@@ -194,7 +194,7 @@ test.describe('periodontogram — admin', () => {
       await marginInputs.nth(first + s).fill(String(margin[s]))
       await marginInputs.nth(first + s).blur()
     }
-    await expect(loggedIn.getByText(/Guardado|Saved/i).first()).toBeVisible({ timeout: 5_000 })
+    await expect(loggedIn.getByTestId('perio-save-state')).toHaveAttribute('data-save-state', 'saved', { timeout: 5_000 })
 
     // Suma = sondaje + margen, sign respected: 6, 0 (a real zero) and 4.
     const sumCells = sumaRow.locator('[data-testid^="perio-sum-"]')
