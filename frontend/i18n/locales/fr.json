@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "DentalPin",
+    "name": "Denplant",
     "tagline": "Gestion de clinique dentaire"
   },
   "demo": {
@@ -14,6 +14,7 @@
   },
   "nav": {
     "dashboard": "Accueil",
+    "panel": "Tableau de bord",
     "patients": "Patients",
     "appointments": "Agenda",
     "recalls": "Rappels",
@@ -63,7 +64,7 @@
     "next": "Suivant",
     "back": "Retour",
     "submit": "Créer mon cabinet",
-    "success": "Tout est prêt ! Bienvenue sur DentalPin",
+    "success": "Tout est prêt ! Bienvenue sur Denplant",
     "firstNameRequired": "Saisissez le prénom",
     "lastNameRequired": "Saisissez le nom",
     "emailRequired": "Saisissez l'email",
@@ -148,9 +149,10 @@
     "archived": "Patient archivé",
     "notFound": "Patient introuvable",
     "archiveConfirm": "Archiver le patient {name} ?",
-    "archiveDescription": "Cette action masquera le patient des recherches. Les rendez-vous existants ne seront pas supprimés.",
+    "archiveDescription": "Le patient sera archivé et non supprimé définitivement. Les rendez-vous et l'historique seront conservés.",
     "cancel": "Annuler",
     "archive": "Archiver",
+    "archiveFor": "Archiver {name}",
     "dangerZone": {
       "title": "Zone de danger",
       "archiveHelp": "Archiver le patient pour le masquer des recherches. Les rendez-vous et l'historique sont conservés."
@@ -390,6 +392,10 @@
     "tabs": {
       "summary": "Résumé",
       "info": "Infos",
+      "information": "Informations",
+      "dentalAnamnesis": "Anamnèse dentaire",
+      "pediatricDentalAnamnesis": "Anamnèse odontopédiatrique",
+      "endodontics": "Endodontie",
       "clinical": "Clinique",
       "odontogram": "Odontogramme",
       "administration": "Administration",
@@ -402,6 +408,44 @@
       "documents": "Documents",
       "gallery": "Galerie"
     },
+    "dentalAnamnesis": {
+      "doctor": "Docteur", "selectDoctor": "Sélectionner un professionnel", "consultationReason": "Motif de consultation",
+      "currentIllness": "MALADIE ACTUELLE", "illnessDuration": "Durée de la maladie", "mainSymptoms": "Principaux signes et symptômes", "chronologicalNarrative": "Récit chronologique", "biologicalFunctions": "Fonctions biologiques",
+      "history": "ANTÉCÉDENTS", "familyHistory": "Antécédents familiaux", "personalHistory": "Antécédents personnels", "haveYouHad": "Avez-vous ou avez-vous eu ?",
+      "highBloodPressure": "Hypertension artérielle", "lowBloodPressure": "Hypotension artérielle", "hepatitis": "Hépatite", "gastritis": "Gastrite", "ulcers": "Ulcères", "hiv": "VIH", "diabetes": "Diabète", "asthma": "Asthme", "smoker": "Fumez-vous ?", "additionalComment": "Commentaire supplémentaire",
+      "dentalHistory": "ANTÉCÉDENTS DENTAIRES / COMPLÉMENTAIRES", "bloodDiseases": "Maladies du sang", "heartProblems": "Problèmes cardiaques", "otherDisease": "Souffrez-vous d'une autre maladie ?", "brushingFrequency": "Combien de fois par jour vous brossez-vous les dents ?", "bleedingGums": "Vos gencives saignent-elles ?", "abnormalExtractionBleeding": "Avez-vous eu des saignements anormaux après une extraction ?", "bruxism": "Grincez-vous ou serrez-vous les dents ?", "mouthDiscomfort": "Autres gênes dans la bouche", "allergies": "Allergies", "recentMajorSurgery": "Avez-vous subi une opération importante ces dernières années ?", "permanentMedication": "Prenez-vous des médicaments de façon permanente ?", "detail": "Détail",
+      "clinicalExam": "EXAMEN CLINIQUE", "vitalSigns": "Signes vitaux", "bloodPressure": "TA", "pulse": "Pouls", "heartRate": "FC", "respiratoryRate": "FR", "temperature": "Température", "extraoralExam": "Examen extra-oral", "intraoralExam": "Examen intra-oral", "auxiliaryExamResults": "Résultat des examens auxiliaires", "observations": "Observations",
+      "no": "Non", "yes": "Oui", "save": "Enregistrer", "saveUnavailable": "L'enregistrement sera bientôt disponible.",
+      "placeholders": {
+        "consultationReason": "Ex. Douleur à la molaire inférieure droite", "illnessDuration": "Ex. 3 jours", "mainSymptoms": "Ex. Douleur à la mastication, sensibilité au froid", "chronologicalNarrative": "Ex. A commencé il y a 3 jours et a augmenté progressivement", "biologicalFunctions": "Ex. Sommeil préservé, appétit normal", "familyHistory": "Ex. Mère avec hypertension", "personalHistory": "Ex. Sans antécédents notables", "additionalComment": "Ex. Information complémentaire pertinente", "brushingFrequency": "Ex. 3 fois par jour", "bloodDiseases": "Ex. Anémie", "heartProblems": "Ex. Arythmie", "otherDisease": "Ex. Hypothyroïdie", "mouthDiscomfort": "Ex. Sensibilité dentaire", "allergies": "Ex. Pénicilline", "recentMajorSurgery": "Ex. Appendicectomie en 2021", "permanentMedication": "Ex. Losartan 50 mg", "extraoralExam": "Ex. Aucune altération visible", "intraoralExam": "Ex. Gencive enflammée dans la zone postérieure", "auxiliaryExamResults": "Ex. Radiographie panoramique sans résultat notable", "observations": "Ex. Le patient signale de l'anxiété pendant les procédures"
+      }
+    },
+    "pediatricDentalAnamnesis": {
+      "doctor": "Docteur", "selectDoctor": "Sélectionner un professionnel", "consultationReason": "Motif de consultation", "motherName": "Nom de la mère", "fatherName": "Nom du père", "siblingsCount": "Nombre de frères et sœurs", "birthOrder": "Ordre de naissance",
+      "currentIllness": "MALADIE ACTUELLE", "diseaseType": "Type de maladie", "chronologicalNarrative": "Récit chronologique",
+      "prenatalHistory": "ANTÉCÉDENTS PRÉNATAUX", "maternalDiseases": "Maladies maternelles", "pregnancyComplications": "Y a-t-il eu des complications pendant la grossesse ?", "prematureBaby": "Le bébé était-il prématuré ?", "birthWeight": "Poids à la naissance", "comment": "Commentaire",
+      "postnatalHistory": "ANTÉCÉDENTS POSTNATAUX", "birthProblems": "Problèmes lors de l'accouchement ?", "pacifierUse": "Utilisation de tétine ?", "bottleUse": "Utilisation du biberon ?", "thumbSucking": "L'enfant suce-t-il/suçait-il son doigt ?", "medicationOrTherapy": "L'enfant prend-il un médicament ou suit-il une thérapie ?", "allergiesOrIntolerances": "L'enfant est-il allergique ou intolérant à quelque chose ?", "brushesBeforeSleep": "L'enfant se brosse-t-il les dents avant de dormir ?", "openMouthOrSnores": "L'enfant dort-il la bouche ouverte ou ronfle-t-il ?", "detail": "Détail", "additionalComment": "Commentaire supplémentaire",
+      "feedingAndHygiene": "HABITUDES ALIMENTAIRES / HYGIÈNE", "sweetsConsumption": "Combien de sucreries l'enfant mange-t-il ?", "timesPerDay": "Fois par jour", "daysPerWeek": "jours/semaine", "milkType": "Quel type de lait reçoit le bébé ?", "dentalHygiene": "Comment lavez-vous les dents du bébé ou de l'enfant ?", "dailyDiet": "Décrivez une journée de repas de votre bébé/enfant à partir du petit-déjeuner.", "parentingStyle": "Vous considérez-vous comme un parent autoritaire, coopératif, insouciant ou surprotecteur ?",
+      "finalSection": "ÉVALUATION FINALE", "oralHabits": "Habitudes orales", "brushingTechnique": "Technique de brossage", "clinicalExam": "Examen clinique", "observations": "Observations", "no": "Non", "yes": "Oui", "save": "Enregistrer", "saveUnavailable": "L'enregistrement sera bientôt disponible."
+    },
+    "endodonticForm": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "yes": "Yes", "no": "No", "save": "Save", "saveUnavailable": "Saving will be available soon.",
+      "priorEndodonticTreatment": "Previous endodontic treatment?", "painHistory": "Pain history", "additionalNote": "Additional note", "toothNumber": "Tooth no.",
+      "clinicalExam": "CLINICAL EXAMINATION", "anatomicalCrown": "Anatomical crown", "caries": "Caries", "restoration": "Restoration", "bruxism": "Bruxism", "fracture": "Fracture", "fractureWithPulpExposure": "Fracture with pulp exposure",
+      "inflammationPresent": "Inflammation present", "fistulas": "Fistulas", "gingivitis": "Gingivitis", "pockets": "Pockets", "calculus": "Calculus", "specify": "Specify", "mobility": "Mobility", "probing": "Probing",
+      "painCharacteristics": "Pain characteristics", "spontaneous": "Spontaneous", "provoked": "Provoked", "cold": "Cold", "heat": "Heat", "chewing": "Chewing", "nocturnal": "Nocturnal", "air": "Air", "sweet": "Sweet", "acidic": "Acidic", "radiated": "Radiated", "diffuse": "Diffuse", "stabbing": "Stabbing", "continuous": "Continuous", "intermittent": "Intermittent", "sporadic": "Sporadic",
+      "percussionPain": "Pain on percussion", "palpationPain": "Pain on palpation", "horizontal": "Horizontal", "vertical": "Vertical", "vestibular": "Vestibular", "lingualPalatal": "Lingual/Palatal", "additionalClinicalNote": "Additional clinical examination note",
+      "vitalityTest": "VITALITY TEST", "test": "Test", "result": "Yes/No", "duration": "Duration", "intensity": "Intensity", "selectUnavailable": "No options defined",
+      "radiographicExam": "RADIOGRAPHIC EXAMINATION", "pulpChamber": "Pulp chamber", "open": "Open", "closed": "Closed", "wide": "Wide", "narrow": "Narrow", "pulpStones": "Pulp stones", "canals": "Canal(s)", "singleCanal": "Single", "twoCanals": "2 canals", "threeCanals": "3 canals", "fourCanals": "4 canals", "straight": "Straight", "curved": "Curved", "previouslyTreated": "Previously treated", "openApex": "Open apex",
+      "furcationLesion": "Furcation lesion", "apicalLesion": "Apical lesion", "lateralLesion": "Lateral lesion", "endoPerioLesion": "Endo-perio lesion", "dwarfRoots": "Dwarf roots", "rootFracture": "Root fracture", "calcification": "Calcification", "periodontalLigament": "Periodontal ligament", "resorption": "Resorption", "additionalRadiographicNote": "Additional radiographic note",
+      "presumptivePulpalDiagnosis": "PRESUMPTIVE PULPAL DIAGNOSIS", "normalPulp": "Normal pulp", "reversiblePulpitis": "Reversible pulpitis", "symptomaticIrreversiblePulpitis": "Symptomatic irreversible pulpitis", "asymptomaticIrreversiblePulpitis": "Asymptomatic irreversible pulpitis", "pulpNecrosis": "Pulp necrosis", "diagnosisPreviouslyTreated": "Previously treated", "previouslyInitiated": "Previously initiated",
+      "periapicalDiagnosis": "PERIAPICAL DIAGNOSIS", "healthyApicalTissues": "Healthy apical tissues", "acuteApicalPeriodontitis": "Acute apical periodontitis (symptomatic)", "chronicApicalPeriodontitis": "Chronic apical periodontitis (asymptomatic)", "acuteApicalAbscess": "Acute apical abscess (without fistula)", "chronicApicalAbscess": "Chronic apical abscess (with fistula)", "condensingOsteitis": "Condensing osteitis",
+      "definitiveDiagnosis": "DEFINITIVE DIAGNOSIS", "irreversiblePulpitis": "Irreversible pulpitis", "necroticPulp": "Necrotic pulp",
+      "indicatedTreatment": "INDICATED TREATMENT", "biopulpectomy": "Biopulpectomy", "apicoectomy": "Apicoectomy", "necropulpectomy": "Necropulpectomy", "hemisection": "Hemisection", "retreatment": "Retreatment", "radicectomy": "Radicectomy", "whitening": "Whitening", "extraction": "Extraction",
+      "clinicalData": "CLINICAL DATA", "identification": "Identification", "canal": "Canal", "workingLength": "Working length (mm)", "referencePoint": "Reference point", "initialFile": "Initial file", "finalApicalFile": "Final apical file", "cementType": "Cement type", "masterGuttaPerchaCone": "Master gutta-percha cone", "single": "Single", "palatalLingual": "Palatal/Lingual", "mesiolingual": "Mesiolingual", "mesiobuccal": "Mesiobuccal", "distal": "Distal", "distobuccal": "Distobuccal", "distolingual": "Distolingual",
+      "finalSection": "FINAL SECTION", "operativeAccidents": "Operative accidents", "postEndodonticRestoration": "Indicated post-endodontic restoration", "post": "Post", "amalgamResin": "Amalgam/Resin", "crown": "Crown", "other": "Other", "prognosis": "Prognosis", "favorable": "Favorable", "unfavorable": "Unfavorable", "reserved": "Reserved"
+    },
+    "anamneses": { "loadError": "Impossible de charger le formulaire clinique.", "saveError": "Impossible d’enregistrer le formulaire clinique. Vos données ont été conservées.", "dentalSaved": "Anamnèse dentaire enregistrée avec succès.", "pediatricSaved": "Anamnèse odontopédiatrique enregistrée avec succès.", "endodonticSaved": "Fiche d’endodontie enregistrée avec succès." },
     "historyPlaceholder": "Notes cliniques disponibles dans une future version",
     "noAppointments": "Ce patient n'a aucun rendez-vous",
     "scheduleAppointment": "Programmer un rendez-vous",
@@ -454,6 +498,295 @@
   },
   "odontogram": {
     "title": "Odontogramme",
+    "profile": {
+      "label": "Format d'odontogramme",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Pérou"
+      },
+      "updateError": "Impossible de changer le format d'odontogramme",
+      "nts": {
+        "title": "Odontogramme MINSA Pérou",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnostic",
+        "evolution": "Évolution",
+        "discharge": "Sortie",
+        "other": "Autre"
+      },
+      "chart": {
+        "title": "Odontogramme",
+        "tooth": "Dent {fdi}",
+        "deciduousTooth": "Dent temporaire {fdi}",
+        "permanentDentition": "Denture permanente",
+        "deciduousDentition": "Denture temporaire",
+        "permanentUpper": "Permanente supérieure",
+        "deciduousUpper": "Temporaire supérieure",
+        "deciduousLower": "Temporaire inférieure",
+        "permanentLower": "Permanente inférieure",
+        "upper": "Supérieure",
+        "lower": "Inférieure",
+        "readonly": "Lecture seule",
+        "noRecord": "Structure du formulaire officiel. Elle ne correspond à aucun enregistrement clinique.",
+        "findingsPending": "{count} constatation(s) non entièrement dessinée(s)",
+        "findingsPendingHint": "Leurs marques nécessitent des primitives de dessin prévues pour une phase ultérieure. Toutes restent dans la liste ci-dessous.",
+        "findingRendererPending": "Tracé des constatations à venir",
+        "siglasHidden": "{count} sigle(s) ne tiennent pas dans leur case",
+        "siglasHiddenHint": "La case affiche « +n » lorsqu'il n'y a plus de place. Rien n'est retiré du dossier ; la liste complète est ci-dessous."
+      },
+      "editor": {
+        "findings": "Constatations",
+        "noFindings": "Aucune constatation enregistrée.",
+        "newFinding": "Nouvelle constatation",
+        "editFinding": "Modifier la constatation",
+        "addFinding": "Ajouter la constatation",
+        "saveFinding": "Enregistrer",
+        "confirmFinding": "Confirmer la constatation",
+        "removeFinding": "Retirer la constatation",
+        "removeExplanation": "La constatation est retirée de ce brouillon. L'enregistrement conserve sa piste d'audit.",
+        "partialTitle": "Modification partiellement appliquée",
+        "partialBody": "Les attributs ont été enregistrés, mais pas les cibles. Vérifiez les cibles de la constatation : l'enregistrement a déjà changé et n'est pas annulé automatiquement.",
+        "refreshFailedTitle": "La constatation a été enregistrée, mais la vue n'a pas pu être actualisée",
+        "refreshFailedBody": "La modification est déjà sur le serveur. Ne la renvoyez pas : réessayez l'actualisation.",
+        "refreshRetry": "Réessayer l'actualisation",
+        "refreshing": "Actualisation",
+        "edit": "Modifier",
+        "searchFindings": "Rechercher une constatation",
+        "noMatches": "Aucune constatation ne correspond.",
+        "targets": "Cible",
+        "selectedTeeth": "Dents sélectionnées",
+        "selectedArches": "Arcades",
+        "anchors": "Références",
+        "rangeSpan": "Étendue",
+        "toothCount": "{count} dent(s)",
+        "roles": "Rôles des dents",
+        "noRole": "Aucun rôle",
+        "pickSubject": "Choisir les dents",
+        "pickAnchor": "Choisir les références",
+        "changeSelection": "Modifier la sélection",
+        "changeReferences": "Modifier les références",
+        "doneSelecting": "Terminer la sélection",
+        "retargetSubjectHint": "Sélectionnez les dents sur l'odontogramme. La sélection précédente est remplacée et rien n'est enregistré avant d'appuyer sur Enregistrer.",
+        "retargetAnchorHint": "Sélectionnez les dents voisines qui situent la constatation. Rien n'est enregistré avant d'appuyer sur Enregistrer.",
+        "rolesOptional": "Rôle clinique des dents (facultatif)",
+        "rolesOptionalHint": "À attribuer uniquement lorsque cela s'applique.",
+        "unnumberedSubject": "Cette dent n'a pas de numéro FDI : elle est située par ses voisines.",
+        "unnumberedBetween": "Entre {teeth}",
+        "pendingReview": "À revoir",
+        "unknownRule": "Cette version ne reconnaît pas la règle de cette constatation.",
+        "unknownRuleShort": "Règle inconnue",
+        "attributeRequired": "Cette donnée est obligatoire.",
+        "needsClinicalReview": "Le catalogue signale cette donnée comme en attente de revue clinique.",
+        "specificationRequired": "Cette constatation exige une Especificación avant de finaliser l'odontogramme.",
+        "specificationAdvisory": "Le catalogue suggère de consigner un détail supplémentaire dans Especificaciones.",
+        "pick": {
+          "tooth": "Sélectionnez {count} dent(s) sur l'odontogramme.",
+          "surface": "Sélectionnez la dent puis indiquez les faces.",
+          "pair": "Sélectionnez les deux dents sur l'odontogramme.",
+          "range": "Sélectionnez la première et la dernière dent de l'étendue.",
+          "archOne": "Sélectionnez l'arcade traitée.",
+          "archOneOrBoth": "Sélectionnez une arcade ou les deux.",
+          "unnumbered": "Sélectionnez les {count} dents voisines qui situent la constatation."
+        },
+        "problem": {
+          "subjectCount": "{expected} dent(s) requise(s) ; {count} sélectionnée(s).",
+          "rangeRequired": "Sélectionnez l'étendue de dents.",
+          "duplicateTooth": "Une dent est sélectionnée deux fois.",
+          "anchorCount": "{expected} référence(s) requise(s) ; {count} sélectionnée(s).",
+          "anchorDistinct": "Les références doivent être des dents distinctes.",
+          "archRequired": "Sélectionnez une arcade.",
+          "archExactlyOne": "Cette règle couvre exactement une arcade.",
+          "archOneOrBoth": "Cette règle couvre une arcade ou les deux.",
+          "roleMin": "Le rôle {role} exige au moins {min} dent(s).",
+          "roleMax": "Le rôle {role} admet au plus {max} dent(s)."
+        },
+        "a11y": {
+          "select": "Sélectionner {tooth}",
+          "selected": "{tooth}, sélectionnée",
+          "anchorSelected": "{tooth}, sélectionnée comme référence",
+          "register": "Enregistrer un résultat sur {tooth}"
+        }
+      },
+      "status": {
+        "draft": "Brouillon",
+        "finalized": "Finalisé",
+        "discarded": "Abandonné",
+        "superseded": "Corrigé"
+      },
+      "field": {
+        "stage": "Étape",
+        "stageLabel": "Nom de l'étape",
+        "finalizedAt": "Finalisé le",
+        "openedAt": "Ouvert le",
+        "recordedBy": "Enregistré par",
+        "findings": "Constatations",
+        "discardReason": "Motif",
+        "continueReason": "Motif de la poursuite",
+        "discardedAt": "Abandonné le",
+        "normVersion": "Version normative"
+      },
+      "actions": {
+        "createDraft": "Créer un brouillon",
+        "finalize": "Finaliser",
+        "discardDraft": "Abandonner le brouillon",
+        "continue": "Poursuivre le diagnostic"
+      },
+      "current": {
+        "title": "Enregistrement en vigueur"
+      },
+      "draft": {
+        "title": "Brouillon en cours"
+      },
+      "history": {
+        "title": "Historique des enregistrements",
+        "returnToCurrent": "Revenir à l'odontogramme actuel",
+        "viewing": "À l'écran",
+        "viewingTitle": "Vous consultez un odontogramme de l'historique",
+        "viewingBody": "Affiché tel qu'il a été enregistré, selon la version normative qui lui correspond. Il ne peut pas être modifié.",
+        "superseded": "Remplacé",
+        "empty": "Aucun enregistrement antérieur.",
+        "loadFailedTitle": "Impossible d'ouvrir cet odontogramme",
+        "catalogFailedTitle": "Impossible de charger la version normative de cet odontogramme",
+        "catalogFailedBody": "Cet enregistrement a été réalisé selon la version {version}, qui n'est pas disponible. Rien n'est dessiné : le lire selon une autre version montrerait des observations que l'enregistrement ne contient pas.",
+        "isCurrent": "Odontogramme actuel"
+      },
+      "empty": {
+        "title": "Aucun odontogramme MINSA enregistré pour ce patient."
+      },
+      "create": {
+        "hint": "L'étape est une métadonnée du dossier ; la norme n'impose pas d'ensemble fixe."
+      },
+      "discard": {
+        "explanation": "Le brouillon est abandonné et n'est plus modifiable. Il n'est pas supprimé : il reste enregistré avec son motif."
+      },
+      "continue": {
+        "explanation": "Une nouvelle version modifiable sera créée à partir du diagnostic actuel. Le diagnostic finalisé restera inchangé dans l'historique."
+      },
+      "entry": {
+        "title": "Enregistrer un résultat — Dent {fdi}",
+        "hint": "Choisissez le résultat ; la dent sera sélectionnée."
+      },
+      "planReference": {
+        "title": "Résultats du diagnostic",
+        "lastDiagnosis": "Dernier diagnostic : {date}",
+        "location": "Localisation",
+        "noDiagnosis": "Aucun diagnostic finalisé pour l'instant.",
+        "noFindings": "Le diagnostic en vigueur n'enregistre aucun résultat.",
+        "errorTitle": "Impossible de charger les résultats",
+        "error": "Le plan reste disponible. Réessayez pour voir la référence du diagnostic."
+      },
+      "carriedForward": {
+        "title": "{count} constatation(s) reportée(s) à revoir",
+        "hint": "Elles proviennent d'un enregistrement antérieur. Confirmez-les une à une dans la liste avant de finaliser."
+      },
+      "conflict": {
+        "title": "L'odontogramme a changé dans une autre session",
+        "version": "Les informations ont été actualisées ; vérifiez-les avant de réessayer.",
+        "draft": "Un brouillon est déjà ouvert pour ce patient.",
+        "state": "L'enregistrement a déjà été finalisé, abandonné ou remplacé dans une autre session. Les informations ont été actualisées."
+      },
+      "error": {
+        "loadTitle": "Impossible de charger l'odontogramme MINSA",
+        "clinicalTitle": "L'opération n'a pas pu aboutir",
+        "normUnavailableTitle": "Version normative indisponible",
+        "normUnavailable": "Cette version normative n'est pas disponible dans cette installation."
+      },
+      "specifications": {
+        "title": "Spécifications",
+        "add": "Ajouter une spécification",
+        "edit": "Modifier la spécification",
+        "remove": "Retirer la spécification",
+        "removeExplanation": "L'entrée n'apparaît plus sur l'odontogramme. Le dossier conserve sa piste d'audit.",
+        "textLabel": "Texte de la spécification",
+        "emptyDraft": "Aucune spécification pour l'instant. Utilisez « Ajouter une spécification » pour consigner ce qui ne tient pas dans les cases.",
+        "emptyFinalized": "Aucune spécification.",
+        "readonly": "Ce dossier est finalisé : les spécifications sont en lecture seule.",
+        "linkedTeeth": "Concerne la/les dent(s) {teeth}",
+        "linkedFinding": "Liée à une observation de ce dossier",
+        "linkedUnknown": "Liée à une observation non chargée",
+        "overflowTitle": "Certaines informations ne tiennent pas visuellement dans une ou plusieurs cases",
+        "overflowBody": "Les observations restent enregistrées et figurent dans la liste. Si vous devez les détailler, vous pouvez les écrire ici, dans Spécifications."
+      },
+      "observations": {
+        "title": "Observations",
+        "label": "Observations",
+        "hint": "Constatations cliniques que la nomenclature de l'odontogramme ne prévoit pas.",
+        "empty": "Aucune observation.",
+        "readonly": "Ce dossier est finalisé : les observations sont en lecture seule."
+      },
+      "text": {
+        "refreshFailedTitle": "Vos modifications ont été enregistrées, mais l'affichage n'a pas pu être actualisé",
+        "refreshFailedBody": "Le dossier sur le serveur contient déjà les modifications. Relisez-le pour les voir ; rien ne sera renvoyé."
+      },
+      "unsaved": {
+        "title": "Des modifications ne sont pas enregistrées",
+        "body": "Si vous continuez, le texte saisi et non enregistré sera perdu.",
+        "stay": "Continuer à modifier",
+        "discard": "Abandonner et continuer",
+        "leavePage": "L'odontogramme comporte des modifications non enregistrées. Quitter quand même ?"
+      },
+      "print": {
+        "title": "Odontogramme",
+        "unavailable": "Impossible de composer le document : la version normative de cet enregistrement n'est pas disponible.",
+        "patient": "Patient",
+        "document": "Document",
+        "date": "Date",
+        "specifications": "Spécifications",
+        "observations": "Observations",
+        "emptySpecifications": "Aucune spécification enregistrée.",
+        "emptyObservations": "Aucune observation enregistrée.",
+        "incompleteFindings": "Constatations non représentées intégralement",
+        "systemNote": "Note générée par DenPlant. Ne fait pas partie du graphique normatif.",
+        "unsupportedCopy": "{target} : {label} — enregistré, non représenté sur le graphique.",
+        "partialCopy": "{target} : {label} — représentation graphique partielle.",
+        "professional": "Professionnel responsable",
+        "registeredBy": "Enregistré par",
+        "role": "Rôle",
+        "professionalId": "N° d'ordre / identifiant professionnel",
+        "technical": "Données techniques de l'enregistrement",
+        "recordId": "Enregistrement",
+        "normVersion": "Version normative",
+        "status": "Statut",
+        "contentFingerprint": "Empreinte du contenu",
+        "fingerprintUnavailable": "Non disponible pour cet état.",
+        "print": "Imprimer",
+        "printDraft": "Imprimer le brouillon",
+        "printDiscarded": "Imprimer l'enregistrement abandonné",
+        "prepare": "Préparer l'impression",
+        "prepareHint": "La boîte de dialogue du navigateur contrôle ces options. Vérifiez-les avant d'imprimer.",
+        "paper": "Papier : A4",
+        "orientation": "Orientation : portrait",
+        "scale": "Échelle : 100 %",
+        "color": "Imprimez en couleur",
+        "colorHint": "Le rouge et le bleu distinguent l'état clinique de chaque constatation.",
+        "doNotFit": "N'utilisez pas « Ajuster à la page » : cela réduit le graphique sous la taille minimale de couronne exigée par la norme.",
+        "openPrintDialog": "Ouvrir la boîte de dialogue d'impression",
+        "cancel": "Annuler",
+        "blockedTitle": "Impression pas encore possible",
+        "dirtyBlocked": "Enregistrez ou abandonnez vos modifications avant d'imprimer. La feuille est composée à partir de l'enregistrement sauvegardé.",
+        "writingBlocked": "Une modification est en cours. Attendez la fin avant d'imprimer.",
+        "refreshBlocked": "Actualisez l'enregistrement avant d'imprimer : la modification a été enregistrée, mais n'a pas pu être relue.",
+        "conflictBlocked": "Une autre session a modifié cet odontogramme. Consultez l'avis avant d'imprimer.",
+        "loadingBlocked": "Chargement de l'enregistrement. Attendez la fin avant d'imprimer.",
+        "unsafePrint": "L'odontogramme ne peut pas être imprimé dans cet état. Revenez à l'application, enregistrez ou actualisez l'enregistrement, puis réessayez.",
+        "draftQualification": "BROUILLON",
+        "draftNotFinal": "Ce n'est pas l'enregistrement définitif.",
+        "pendingCarriedForward": "Ce brouillon contient {count} constatation(s) reportée(s) en attente de révision.",
+        "discardedQualification": "ABANDONNÉ",
+        "discardedHint": "Cet enregistrement a été abandonné et n'est pas l'odontogramme en vigueur.",
+        "discardReason": "Motif de l'abandon",
+        "supersededQualification": "ENREGISTREMENT REMPLACÉ",
+        "supersededHint": "Un enregistrement postérieur existe pour ce patient.",
+        "incompleteWarning": "Cet enregistrement contient des constatations que DenPlant ne représente pas intégralement sur le graphique.",
+        "incompleteNote": "La feuille imprimée comporte une note du système qui les identifie.",
+        "partialCount": "Représentation partielle : {count}",
+        "unsupportedCount": "Non représenté sur le graphique : {count}",
+        "additionalDetailsHint": "Si vous devez consigner un détail clinique supplémentaire, utilisez les Spécifications le cas échéant."
+      }
+    },
     "tooth": "Dent",
     "globals": {
       "category": "Bouche complète",
@@ -700,7 +1033,9 @@
       "history": "Historique",
       "diagnosis": "Diagnostic",
       "plans": "Plans de traitement",
-      "appointments": "Rendez-vous"
+      "appointments": "Rendez-vous",
+      "prescriptions": "Ordonnances",
+      "evolution": "Évolution"
     },
     "history": {
       "stateAt": "État au",
@@ -718,7 +1053,8 @@
       "continuePlan": "Continuer le plan « {name} »",
       "selectPlan": "Sélectionner un plan",
       "continue": "Continuer",
-      "odontogramTab": "Odontogramme"
+      "odontogramTab": "Odontogramme",
+      "addNote": "Ajouter une note"
     },
     "plans": {
       "title": "Plans de traitement",
@@ -852,6 +1188,19 @@
     "followup": {
       "title": "Actions post-rendez-vous"
     },
+    "completionGate": {
+      "title": "Quels traitements ont été réalisés ?",
+      "description": "Cochez les traitements du plan réalisés lors de ce rendez-vous. Ceux non cochés resteront en attente dans le plan.",
+      "evolutionLabel": "Évolution clinique",
+      "evolutionPlaceholder": "Décrivez ce qui a été fait lors de cette visite (facultatif)"
+    },
+    "noActivePlans": "Aucun plan de traitement en cours.",
+    "noPendingTreatmentsInPlan": "Ce plan n'a aucun traitement en attente.",
+    "selectPlan": "Plan de traitement",
+    "pendingTreatments": "Traitements en attente",
+    "historicalTreatments": "Traitements déjà associés à ce rendez-vous",
+    "historicalTreatmentBadge": "Terminé",
+    "sessionN": "Séance {n}",
     "created": "Rendez-vous créé",
     "saved": "Rendez-vous enregistré",
     "updated": "Rendez-vous mis à jour",
@@ -912,6 +1261,7 @@
     "selectPendingTreatment": "Sélectionner un traitement en attente",
     "emptyDay": "Aucun rendez-vous pour ce jour",
     "noPatient": "Aucun patient",
+    "labels": { "title": "Étiquettes", "field": "Étiquette", "none": "Sans étiquette", "new": "Nouvelle étiquette", "edit": "Modifier l’étiquette", "name": "Nom", "color": "Couleur", "preview": "Aperçu", "saved": "Étiquette enregistrée", "saveError": "Impossible d’enregistrer l’étiquette", "deactivated": "Étiquette désactivée", "deactivate": "Désactiver l’étiquette", "inactive": "Inactive", "empty": "Aucune étiquette", "loadSuggested": "Charger les étiquettes suggérées", "suggestedConfirm": "Charger les étiquettes suggérées manquantes ? Les étiquettes existantes ne seront pas modifiées.", "suggestedResult": "Créées : {created}. Existantes : {existing}. Erreurs : {errors}." },
     "freeSlots": {
       "byProfessional": "Professionnel",
       "byCabinet": "Cabinet",
@@ -935,7 +1285,7 @@
       "afternoon": "Bon après-midi",
       "evening": "Bonsoir"
     },
-    "welcome": "Bienvenue sur DentalPin",
+    "welcome": "Bienvenue sur Denplant",
     "welcomeMessage": "Commencez par créer votre premier patient.",
     "quickActions": {
       "newAppointment": "Nouveau rendez-vous",
@@ -1108,6 +1458,8 @@
     "youTag": "(vous)",
     "userActive": "Utilisateur actif",
     "isProfessional": "Exerce comme professionnel",
+    "professionalRegistration": "Numéro d'inscription professionnelle",
+    "professionalRegistrationHelp": "Le numéro d'inscription professionnelle du dentiste.",
     "isProfessionalHelp": "Apparaît dans l'agenda, a des horaires et peut se voir attribuer des traitements. Un administrateur peut aussi exercer.",
     "userInactiveNote": "(Ne peut pas se connecter)",
     "saveChanges": "Enregistrer les modifications",
@@ -1227,16 +1579,40 @@
       "copy": "Copier le lien",
       "copied": "Lien copié",
       "whatsapp": "Envoyer par WhatsApp",
-      "shareText": "Bonjour {name}, voici votre accès à DentalPin. Ouvrez-le et choisissez votre mot de passe : {url}",
+      "shareText": "Bonjour {name}, voici votre accès à Denplant. Ouvrez-le et choisissez votre mot de passe : {url}",
       "secretNote": "À traiter comme un mot de passe : toute personne ayant le lien peut se connecter à ce compte.",
       "passwordOptionalHelp": "Laissez vide pour générer un lien d'accès à envoyer par WhatsApp ou e-mail.",
       "passwordOptionalPlaceholder": "Facultatif",
       "createAndLink": "Créer et générer le lien",
       "rowAction": "Lien d'accès",
       "setPasswordTitle": "Choisissez votre mot de passe",
-      "setPasswordSubtitle": "Vous êtes invité sur DentalPin. Créez votre mot de passe pour vous connecter.",
+      "setPasswordSubtitle": "Vous êtes invité sur Denplant. Créez votre mot de passe pour vous connecter.",
       "setPasswordSubmit": "Enregistrer et se connecter",
       "invalidToken": "Ce lien est invalide ou déjà utilisé. Demandez-en un nouveau à l'administrateur de votre cabinet."
+    },
+    "logo": {
+      "title": "Identité visuelle",
+      "description": "Le logo du cabinet apparaît sur les devis et sur les documents générés à partir de maintenant.",
+      "none": "Aucun logo",
+      "alt": "Logo du cabinet",
+      "upload": "Téléverser le logo",
+      "replace": "Remplacer le logo",
+      "remove": "Supprimer le logo",
+      "confirmRemove": "Oui, supprimer",
+      "recommended": "Taille recommandée : {width}×{height} px (environ 2,5:1), fond transparent pour un PNG.",
+      "formats": "PNG, JPEG ou WebP · {mb} Mo maximum · {max}×{max} px maximum. Le SVG n'est pas accepté.",
+      "pdfBox": "Dans le PDF, il est imprimé dans un cadre de 50×20 mm, sans déformation.",
+      "signedNote": "Les devis déjà signés conservent le logo avec lequel ils ont été signés.",
+      "saved": "Logo mis à jour",
+      "removed": "Logo supprimé",
+      "errors": {
+        "type": "Le fichier doit être une image PNG, JPEG ou WebP.",
+        "size": "Le fichier dépasse {mb} Mo.",
+        "empty": "Le fichier est vide.",
+        "dimensions": "L'image dépasse {max}×{max} px.",
+        "animated": "Les images animées ne sont pas acceptées.",
+        "unreadable": "Impossible de lire l'image. Essayez un autre fichier."
+      }
     }
   },
   "selector": {
@@ -1535,6 +1911,7 @@
     "clinicalCategory": "Catégorie clinique",
     "noOdontogramMapping": "Aucune association",
     "odontogramMappingHint": "Les caractéristiques du traitement seront automatiquement ajustées en fonction du type sélectionné.",
+    "odontogramLegacyTypeUnsupported": "L'ancien type \"{type}\" n'est plus pris en charge. Sélectionnez un type de traitement valide avant d'enregistrer.",
     "selectCategory": "Sélectionner une catégorie...",
     "selectVatType": "Sélectionner un type de TVA...",
     "selectScope": "Sélectionner un périmètre...",

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from app.core.agents import AgentContext, Tool, ToolCategory
 
+from .access import PatientAccessPolicy
 from .service import PatientService
 
 
@@ -61,14 +62,30 @@ def _summary(patient) -> dict:
 
 
 async def _search_patients(ctx: AgentContext, params: SearchPatientsArgs) -> dict:
+    assert ctx.actor_role is not None and ctx.actor_user_id is not None
     items, total = await PatientService.list_patients(
-        ctx.db, ctx.clinic_id, search=params.query, page=1, page_size=params.limit
+        ctx.db,
+        ctx.clinic_id,
+        search=params.query,
+        page=1,
+        page_size=params.limit,
+        access_predicate=PatientAccessPolicy.predicate_for(
+            ctx.actor_role, ctx.clinic_id, ctx.actor_user_id
+        ),
     )
     return {"total": total, "patients": [_summary(p) for p in items]}
 
 
 async def _get_patient(ctx: AgentContext, params: GetPatientArgs) -> dict:
-    patient = await PatientService.get_patient(ctx.db, ctx.clinic_id, params.patient_id)
+    assert ctx.actor_role is not None and ctx.actor_user_id is not None
+    patient = await PatientService.get_patient(
+        ctx.db,
+        ctx.clinic_id,
+        params.patient_id,
+        access_predicate=PatientAccessPolicy.predicate_for(
+            ctx.actor_role, ctx.clinic_id, ctx.actor_user_id
+        ),
+    )
     if patient is None:
         return {"error": "not_found"}
     data = _summary(patient)
@@ -78,14 +95,26 @@ async def _get_patient(ctx: AgentContext, params: GetPatientArgs) -> dict:
 
 
 async def _create_patient(ctx: AgentContext, params: CreatePatientArgs) -> dict:
+    assert ctx.actor_user_id is not None
     patient = await PatientService.create_patient(
-        ctx.db, ctx.clinic_id, params.model_dump(exclude_none=True)
+        ctx.db,
+        ctx.clinic_id,
+        params.model_dump(exclude_none=True),
+        created_by_user_id=ctx.actor_user_id,
     )
     return {"id": patient.id, "full_name": f"{patient.first_name} {patient.last_name}"}
 
 
 async def _update_patient(ctx: AgentContext, params: UpdatePatientArgs) -> dict:
-    patient = await PatientService.get_patient(ctx.db, ctx.clinic_id, params.patient_id)
+    assert ctx.actor_role is not None and ctx.actor_user_id is not None
+    patient = await PatientService.get_patient(
+        ctx.db,
+        ctx.clinic_id,
+        params.patient_id,
+        access_predicate=PatientAccessPolicy.predicate_for(
+            ctx.actor_role, ctx.clinic_id, ctx.actor_user_id
+        ),
+    )
     if patient is None:
         return {"error": "not_found"}
     data = params.model_dump(exclude_none=True)

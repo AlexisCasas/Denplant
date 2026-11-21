@@ -154,6 +154,107 @@ test.describe('periodontogram — admin', () => {
     })
   })
 
+  test('margin 3|-5|2, probing 3|5|2 → Suma 6|0|4, persisted across a reload', async ({ loggedIn }) => {
+    const patientId = await getPatientId(loggedIn)
+    await discardDraftIfAny(loggedIn, patientId)
+    await ensureDraftExists(loggedIn, patientId)
+    await navigateToPerioTab(loggedIn, patientId)
+
+    const region = loggedIn.getByRole('region', { name: /Periodonto/i })
+
+    // The first (upper vestibular) zone: Sondaje, Margen and Suma rows.
+    const zone = region.locator('tr.perio-row-vestibular').first()
+    await expect(zone).toBeVisible({ timeout: 10_000 })
+    const sondajeRow = region.locator('tr.perio-row-vestibular', { hasText: /Sondaje|Probing/i }).first()
+    const margenRow = region.locator('tr.perio-row-vestibular', { hasText: /Margen|Margin/i }).first()
+    const sumaRow = region.locator('tr.perio-row-vestibular')
+      .filter({ has: loggedIn.locator('[data-testid^="perio-sum-"]') })
+      .first()
+
+    // Three inputs per tooth, in column order. Absent teeth are disabled; the
+    // first enabled input is the first site of the first measurable tooth.
+    const probingInputs = sondajeRow.locator('input[type="number"]')
+    const total = await probingInputs.count()
+    let first = -1
+    for (let i = 0; i < total; i++) {
+      if (await probingInputs.nth(i).isEnabled()) {
+        first = i
+        break
+      }
+    }
+    expect(first, 'a tooth that can be measured').toBeGreaterThanOrEqual(0)
+    expect(first % 3).toBe(0)
+
+    const marginInputs = margenRow.locator('input[type="number"]')
+    const margin = [3, -5, 2]
+    const probing = [3, 5, 2]
+    for (let s = 0; s < 3; s++) {
+      await probingInputs.nth(first + s).fill(String(probing[s]))
+      await probingInputs.nth(first + s).blur()
+      await marginInputs.nth(first + s).fill(String(margin[s]))
+      await marginInputs.nth(first + s).blur()
+    }
+    await expect(loggedIn.getByText(/Guardado|Saved/i).first()).toBeVisible({ timeout: 5_000 })
+
+    // Suma = sondaje + margen, sign respected: 6, 0 (a real zero) and 4.
+    const sumCells = sumaRow.locator('[data-testid^="perio-sum-"]')
+    const sumTexts = async () => [
+      (await sumCells.nth(first).textContent())?.trim(),
+      (await sumCells.nth(first + 1).textContent())?.trim(),
+      (await sumCells.nth(first + 2).textContent())?.trim()
+    ]
+    expect(await sumTexts()).toEqual(['6', '0', '4'])
+
+    const testId = await sumCells.nth(first).getAttribute('data-testid')
+    const toothNumber = testId!.split('-')[2]!
+
+    // The profile strip: one probing path for the tooth, three dots, and only
+    // the 5 mm site is red. The line itself stays neutral.
+    const probingDots = region.locator(`[data-testid="perio-strip-dot-probing"][data-tooth="${toothNumber}"]`)
+    await expect(probingDots).toHaveCount(3)
+    await expect(
+      region.locator(`[data-testid="perio-strip-dot-probing"][data-tooth="${toothNumber}"][data-alert="true"]`)
+    ).toHaveCount(1)
+    await expect(
+      region.locator(`[data-testid="perio-strip-path-probing"][data-tooth="${toothNumber}"]`)
+    ).toHaveCount(1)
+    await expect(
+      region.locator(`[data-testid="perio-strip-dot-margin"][data-tooth="${toothNumber}"]`)
+    ).toHaveCount(3)
+
+    // Reload: everything comes back from the server, identical.
+    await navigateToPerioTab(loggedIn, patientId)
+    const region2 = loggedIn.getByRole('region', { name: /Periodonto/i })
+    const sondaje2 = region2.locator('tr.perio-row-vestibular', { hasText: /Sondaje|Probing/i }).first()
+    const margen2 = region2.locator('tr.perio-row-vestibular', { hasText: /Margen|Margin/i }).first()
+    const suma2 = region2.locator('tr.perio-row-vestibular')
+      .filter({ has: loggedIn.locator('[data-testid^="perio-sum-"]') })
+      .first()
+
+    for (let s = 0; s < 3; s++) {
+      await expect(sondaje2.locator('input[type="number"]').nth(first + s)).toHaveValue(String(probing[s]))
+      await expect(margen2.locator('input[type="number"]').nth(first + s)).toHaveValue(String(margin[s]))
+    }
+    await expect(suma2.locator('[data-testid^="perio-sum-"]').nth(first)).toHaveText('6')
+    await expect(suma2.locator('[data-testid^="perio-sum-"]').nth(first + 1)).toHaveText('0')
+    await expect(suma2.locator('[data-testid^="perio-sum-"]').nth(first + 2)).toHaveText('4')
+    await expect(
+      region2.locator(`[data-testid="perio-strip-dot-probing"][data-tooth="${toothNumber}"][data-alert="true"]`)
+    ).toHaveCount(1)
+
+    // Clearing a value breaks the line: probing 3 | (empty) | 2 is two dots and
+    // no path, and the Suma of the emptied site is blank.
+    await sondaje2.locator('input[type="number"]').nth(first + 1).fill('')
+    await sondaje2.locator('input[type="number"]').nth(first + 1).blur()
+    await expect(
+      region2.locator(`[data-testid="perio-strip-path-probing"][data-tooth="${toothNumber}"]`)
+    ).toHaveCount(0)
+    await expect(
+      region2.locator(`[data-testid="perio-strip-dot-probing"][data-tooth="${toothNumber}"]`)
+    ).toHaveCount(2)
+    await expect(suma2.locator('[data-testid^="perio-sum-"]').nth(first + 1)).toHaveText('')
+  })
+
   test('close session freezes the snapshot and timeline updates', async ({ loggedIn }) => {
     const patientId = await getPatientId(loggedIn)
     await discardDraftIfAny(loggedIn, patientId)

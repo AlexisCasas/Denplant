@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.patients.access import PatientAccessPolicy
 
 from .gateway import NotificationGateway
 from .schemas import (
@@ -279,6 +280,8 @@ async def list_email_logs(
 
     Can be filtered by patient, status, or template.
     """
+    if patient_id is not None and not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Patient not found")
     logs, total = await NotificationService.list_logs(
         db,
         ctx.clinic_id,
@@ -287,6 +290,7 @@ async def list_email_logs(
         patient_id=patient_id,
         status=status,
         template_key=template_key,
+        patient_access_predicate=PatientAccessPolicy.predicate(ctx),
     )
     return PaginatedApiResponse(
         data=[EmailLogResponse.model_validate(log) for log in logs],
@@ -332,6 +336,8 @@ async def send_notification(
         patient = result.scalar_one_or_none()
         if not patient:
             raise HTTPException(status_code=404, detail="Patient not found")
+        if not await PatientAccessPolicy.can_access(db, ctx, patient.id):
+            raise HTTPException(status_code=404, detail="Patient not found")
         if not patient.email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -376,6 +382,10 @@ async def send_notification(
         appointment = result.scalar_one_or_none()
         if not appointment:
             raise HTTPException(status_code=404, detail="Appointment not found")
+        if appointment.patient_id and not await PatientAccessPolicy.can_access(
+            db, ctx, appointment.patient_id
+        ):
+            raise HTTPException(status_code=404, detail="Appointment not found")
 
         context["appointment_date"] = appointment.start_time.strftime("%d/%m/%Y")
         context["appointment_time"] = appointment.start_time.strftime("%H:%M")
@@ -415,6 +425,8 @@ async def send_notification(
         )
         budget = result.scalar_one_or_none()
         if not budget:
+            raise HTTPException(status_code=404, detail="Budget not found")
+        if not await PatientAccessPolicy.can_access(db, ctx, budget.patient_id):
             raise HTTPException(status_code=404, detail="Budget not found")
 
         context["budget_number"] = budget.budget_number
@@ -517,6 +529,8 @@ async def get_conversation(
     channel: str | None = Query(default=None, max_length=20),
 ) -> ApiResponse[list[ConversationMessageResponse]]:
     """Return a patient's message thread (inbound + outbound), oldest first."""
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Patient not found")
     messages = await NotificationService.list_conversation(
         db, ctx.clinic_id, patient_id, channel=channel
     )
@@ -536,6 +550,8 @@ async def reply_to_conversation(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ConversationMessageResponse]:
     """Send a free-form reply to the patient (within the 24h session window)."""
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Patient not found")
     msg = await NotificationGateway.enqueue(
         db,
         ctx.clinic_id,

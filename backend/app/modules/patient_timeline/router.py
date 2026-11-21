@@ -10,6 +10,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse
 from app.database import get_db
 from app.modules.patients.service import PatientService
+from app.modules.patients.access import PatientAccessPolicy
 
 from .schemas import TimelineResponse
 from .service import TimelineService
@@ -31,7 +32,9 @@ async def get_patient_timeline(
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse[TimelineResponse]:
     """Paginated timeline for a patient, optionally filtered by category."""
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    patient = await PatientService.get_patient(
+        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+    )
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

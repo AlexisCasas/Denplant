@@ -14,14 +14,18 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useModuleSlots } from '~~/app/composables/useModuleSlots'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   patientId: string
   readonly?: boolean
-}>()
+  /** Whether "Añadir nota" (which leads to Evolución) is offered. */
+  canAddNote?: boolean
+  patientDateOfBirth?: string | null
+}>(), { canAddNote: true })
 
 const emit = defineEmits<{
   'create-plan': []
   'continue-plan': [planId: string]
+  'add-note': [toothNumber: number | null]
 }>()
 
 interface DiagnosisSubtabCtx {
@@ -76,8 +80,11 @@ watch(activeKey, (value) => {
     v-if="subtabs.length === 0"
     :patient-id="patientId"
     :readonly="readonly"
+    :can-add-note="canAddNote"
+    :patient-date-of-birth="patientDateOfBirth"
     @create-plan="emit('create-plan')"
     @continue-plan="(planId) => emit('continue-plan', planId)"
+    @add-note="(tooth) => emit('add-note', tooth)"
   />
 
   <div
@@ -95,8 +102,11 @@ watch(activeKey, (value) => {
       <DiagnosisMode
         :patient-id="patientId"
         :readonly="readonly"
+        :can-add-note="canAddNote"
+        :patient-date-of-birth="patientDateOfBirth"
         @create-plan="emit('create-plan')"
         @continue-plan="(planId) => emit('continue-plan', planId)"
+        @add-note="(tooth) => emit('add-note', tooth)"
       />
     </div>
 

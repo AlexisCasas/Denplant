@@ -49,7 +49,7 @@ class PaymentsModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["record.read", "record.write", "record.refund", "reports.read"],
+            "dentist": [],
             # Clinical-only roles don't see payment reports — they touch the
             # ledger from the patient screen, not from the dashboards.
             "hygienist": ["record.read"],

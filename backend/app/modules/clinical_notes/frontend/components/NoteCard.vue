@@ -14,6 +14,7 @@ import type {
   NoteAttachment,
   NoteType
 } from '~~/app/types'
+import { contextLabel } from '../utils/evolutionNotes'
 
 const props = defineProps<{
   noteId: string
@@ -27,6 +28,12 @@ const props = defineProps<{
   canEdit?: boolean
   /** Highlight the card (e.g. when matching the current selected tooth). */
   highlight?: boolean
+  /** Show the date and time written out instead of "3 days ago". */
+  absoluteDate?: boolean
+  /** Never truncate the body behind "show more". */
+  alwaysExpanded?: boolean
+  /** Name the appointment a note was written in. Off by default. */
+  showAppointmentContext?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -42,7 +49,7 @@ const meta = computed(() => metaFor(props.noteType))
 const expanded = ref(false)
 const TRUNCATE_AT = 280
 
-const isLong = computed(() => (props.body || '').length > TRUNCATE_AT)
+const isLong = computed(() => !props.alwaysExpanded && (props.body || '').length > TRUNCATE_AT)
 const visibleBody = computed(() => {
   if (!isLong.value || expanded.value) return props.body
   return `${props.body.slice(0, TRUNCATE_AT)}…`
@@ -173,28 +180,9 @@ function openLightbox(att: NoteAttachment) {
   lightboxOpen.value = true
 }
 
-const linkedLabel = computed(() => {
-  const linked = props.linked
-  if (!linked) return null
-  if (linked.kind === 'patient' && linked.tooth_number) {
-    return t('clinicalNotes.linked.tooth', { n: linked.tooth_number })
-  }
-  if (linked.kind === 'treatment') {
-    if (linked.tooth_number && linked.label) {
-      return t('clinicalNotes.linked.treatmentOnTooth', {
-        label: linked.label,
-        n: linked.tooth_number
-      })
-    }
-    return linked.label || t('clinicalNotes.linked.treatment')
-  }
-  if (linked.kind === 'plan') {
-    return linked.label
-      ? t('clinicalNotes.linked.planNamed', { label: linked.label })
-      : t('clinicalNotes.linked.plan')
-  }
-  return null
-})
+const linkedLabel = computed(() =>
+  contextLabel(props.linked, t, { appointment: props.showAppointmentContext })
+)
 </script>
 
 <template>
@@ -239,7 +227,7 @@ const linkedLabel = computed(() => {
           class="text-caption text-subtle"
           :title="formatAbsolute(createdAt)"
         >
-          {{ formatRelative(createdAt) }}
+          {{ absoluteDate ? formatAbsolute(createdAt) : formatRelative(createdAt) }}
         </span>
       </div>
       <div
@@ -351,6 +339,9 @@ const linkedLabel = computed(() => {
 .note-card--administrative,
 .note-card--appointment_administrative {
   border-left: 3px solid var(--color-neutral, #94a3b8);
+}
+.note-card--evolution {
+  border-left: 3px solid var(--color-primary-accent, #0ea5e9);
 }
 .note-card--diagnosis,
 .note-card--appointment_clinical {

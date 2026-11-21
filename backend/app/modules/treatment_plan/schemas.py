@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.odontogram.schemas import TreatmentVisualizationSnapshot
+
 # ---------------------------------------------------------------------------
 # Nested brief schemas
 # ---------------------------------------------------------------------------
@@ -66,6 +68,7 @@ class TreatmentBrief(BaseModel):
     catalog_item_id: UUID | None = None
     catalog_item: CatalogItemBrief | None = None
     price_snapshot: Decimal | None = None
+    visualization_snapshot: TreatmentVisualizationSnapshot | None = None
     notes: str | None = None
     teeth: list[TreatmentToothBrief] = Field(default_factory=list)
 

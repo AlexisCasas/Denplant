@@ -1,0 +1,164 @@
+{
+  "prescriptions": {
+    "title": "Histórico de recetas",
+    "total": "Total: {count}",
+    "loading": "Cargando recetas…",
+    "empty": "Aún no hay recetas registradas.",
+    "columns": {
+      "date": "Fecha",
+      "number": "Número",
+      "prescriber": "Odontólogo",
+      "items": "Medicamentos",
+      "status": "Estado",
+      "actions": "Acciones"
+    },
+    "status": {
+      "issued": "Emitida",
+      "voided": "Anulada"
+    },
+    "actions": {
+      "view": "Ver",
+      "print": "Imprimir",
+      "retry": "Reintentar",
+      "close": "Cerrar",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "new": "Nueva receta",
+      "void": "Anular receta",
+      "cancel": "Cancelar"
+    },
+    "aria": {
+      "view": "Ver la receta {number}",
+      "print": "Imprimir la receta {number}",
+      "void": "Anular la receta {number}"
+    },
+    "pagination": {
+      "label": "Paginación de recetas",
+      "pageOf": "Página {page} de {pages}"
+    },
+    "error": {
+      "list": "No se pudieron cargar las recetas.",
+      "detail": "No se pudo cargar la receta.",
+      "pdf": "No se pudo abrir el PDF de la receta."
+    },
+    "pdf": {
+      "downloaded": "El navegador bloqueó la ventana emergente; el PDF se ha descargado."
+    },
+    "detail": {
+      "title": "Receta {number}",
+      "description": "Detalle de solo lectura de la receta emitida.",
+      "receipt": "Receta",
+      "number": "Número",
+      "status": "Estado",
+      "issueDate": "Fecha de emisión",
+      "validUntil": "Vigencia hasta",
+      "patient": "Paciente",
+      "name": "Nombre",
+      "document": "Documento",
+      "birthDate": "Fecha de nacimiento",
+      "prescriber": "Odontólogo",
+      "professionalId": "Colegiatura",
+      "medications": "Medicamentos",
+      "strength": "Concentración",
+      "form": "Forma farmacéutica",
+      "commercialName": "Nombre comercial",
+      "presentation": "Presentación",
+      "dose": "Dosis",
+      "route": "Vía",
+      "frequency": "Frecuencia",
+      "duration": "Duración",
+      "quantity": "Cantidad",
+      "instructions": "Indicaciones",
+      "voided": {
+        "title": "Receta anulada",
+        "reason": "Motivo",
+        "at": "Anulada el"
+      }
+    },
+    "create": {
+      "title": "Nueva receta",
+      "description": "Complete los datos de la receta. Una vez emitida ya no podrá editarse.",
+      "header": {
+        "patient": "Paciente",
+        "prescriber": "Odontólogo",
+        "professionalId": "Colegiatura",
+        "clinic": "Clínica"
+      },
+      "validUntil": "Vigencia hasta",
+      "validUntilHint": "Último día en que la receta es válida.",
+      "medications": "Medicamentos",
+      "medication": "Medicamento {n}",
+      "addMedication": "Añadir medicamento",
+      "removeMedication": "Eliminar medicamento {n}",
+      "maxItems": "Se alcanzó el máximo de {max} medicamentos.",
+      "required": "Obligatorio",
+      "requiredNote": "Los campos con * son obligatorios.",
+      "counter": "{count}/{max}",
+      "issue": "Emitir receta",
+      "summary": "Revise los campos marcados.",
+      "success": "Receta {number} emitida.",
+      "fields": {
+        "activeIngredient": "Principio activo (DCI)",
+        "commercialName": "Nombre comercial",
+        "strength": "Concentración",
+        "pharmaceuticalForm": "Forma farmacéutica",
+        "presentation": "Presentación",
+        "dose": "Dosis",
+        "route": "Vía",
+        "frequency": "Frecuencia",
+        "duration": "Duración",
+        "totalQuantity": "Cantidad total",
+        "instructions": "Indicaciones"
+      },
+      "validation": {
+        "required": "Este campo es obligatorio.",
+        "tooLong": "Máximo {max} caracteres.",
+        "validUntilRequired": "Indique hasta qué fecha es válida la receta.",
+        "validUntilInvalid": "La fecha no es válida."
+      },
+      "notices": {
+        "noProfessionalId": "Tu colegiatura no está registrada. Contacta al administrador.",
+        "dobRequired": "Complete la fecha de nacimiento del paciente antes de emitir una receta."
+      },
+      "confirm": {
+        "title": "Confirmar emisión",
+        "text": "Al emitir la receta ya no podrá editarse. Si necesita corregirla deberá anularla y emitir una nueva.",
+        "back": "Volver"
+      },
+      "discard": {
+        "title": "¿Descartar la receta?",
+        "text": "Se perderán los cambios.",
+        "keep": "Seguir editando",
+        "confirm": "Descartar"
+      },
+      "errors": {
+        "prescriber_not_eligible": "Solo un odontólogo puede emitir recetas.",
+        "prescriber_professional_id_required": "Tu colegiatura no está registrada. Contacta al administrador.",
+        "patient_date_of_birth_required": "Complete la fecha de nacimiento del paciente antes de emitir una receta.",
+        "patient_date_of_birth_invalid": "La fecha de nacimiento del paciente no es válida.",
+        "clinic_timezone_invalid": "La clínica no tiene una zona horaria válida. Contacte al administrador.",
+        "valid_until_before_issue_date": "La vigencia no puede terminar antes del día de emisión.",
+        "patient_not_found": "No se encontró al paciente.",
+        "request_validation": "Revise los campos de la receta.",
+        "generic": "No se pudo emitir la receta. Inténtelo de nuevo."
+      }
+    },
+    "void": {
+      "title": "Anular receta",
+      "description": "Anular la receta {number}.",
+      "warning": "La anulación no se puede revertir.",
+      "reason": "Motivo de anulación",
+      "reasonRequired": "Indique el motivo de la anulación.",
+      "confirm": "Anular receta",
+      "success": "Receta {number} anulada.",
+      "errors": {
+        "void_not_allowed": "Solo el odontólogo que emitió la receta o un administrador puede anularla.",
+        "prescription_state_conflict": "Esta receta ya fue anulada.",
+        "void_reason_required": "Indique el motivo de la anulación.",
+        "prescription_not_found": "La receta ya no existe o no está disponible.",
+        "request_validation": "Revise el motivo de la anulación.",
+        "generic": "No se pudo anular la receta. Inténtelo de nuevo."
+      }
+    }
+  }
+}

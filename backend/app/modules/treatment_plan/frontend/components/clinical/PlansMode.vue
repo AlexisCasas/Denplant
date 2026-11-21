@@ -15,6 +15,7 @@ const props = defineProps<{
   patientId: string
   initialPlanId?: string | null
   readonly?: boolean
+  patientDateOfBirth?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -167,7 +168,7 @@ watch(() => props.initialPlanId, (newId) => {
       v-if="view === 'list'"
       v-model:page="currentPage"
       :plans="plans"
-      :patient-id="patientId"
+          :patient-id="patientId"
       :loading="loading"
       :total="total"
       :total-pages="totalPages"
@@ -184,6 +185,7 @@ watch(() => props.initialPlanId, (newId) => {
       v-else-if="selectedPlan"
       :plan="selectedPlan"
       :patient-id="patientId"
+      :patient-date-of-birth="patientDateOfBirth"
       :readonly="readonly"
       @updated="handlePlanUpdated"
       @activate="loadPatientPlans()"

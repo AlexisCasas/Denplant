@@ -27,6 +27,23 @@ the scaffold could not infer.
 
 _This module ships no Nuxt pages._
 
+## Evolución tab (QW4)
+
+The patient's Clinical tab has a fifth mode, **Evolución**, filled by this module
+through the `patient.clinical.evolution` slot (`EvolutionNotesView.vue`).
+
+- **Data:** `GET /patients/{id}/recent` with `types=evolution|diagnosis|treatment|treatment_plan|appointment_clinical`
+  (never the administrative types). 20 per page on screen; `limit=100` when printing.
+- **Writing:** "+ Nueva evolución" creates `note_type='evolution'`, `owner_type='patient'`,
+  no tooth. From Diagnóstico, "Añadir nota" deep-links with
+  `?clinicalMode=evolution&newNote=diagnosis&tooth=<FDI>` to open a diagnosis note bound
+  to that tooth; the parameters are removed once read.
+- **Printing:** "Imprimir evolución" loads every page, de-duplicates by id, stops if the
+  cursor does not advance (and says the printout is incomplete), sorts oldest first and
+  calls `window.print()`. Attachments print as name + type. CSS: `.evolution-print-root`.
+- **Gap:** legacy `AppointmentTreatment.notes` (agenda) are not part of the feed.
+- **Migration:** `cn_0005` (CHECK constraints only).
+
 ## Permissions
 
 `notes.read`, `notes.write`

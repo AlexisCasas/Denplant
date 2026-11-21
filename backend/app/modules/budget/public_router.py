@@ -412,6 +412,12 @@ async def download_public_signed_budget_pdf(
 
     from .models import BudgetAccessLog, BudgetSignature
     from .pdf import BudgetPDFService
+    from .signed_pdf import (
+        SOURCE_REGENERATED,
+        SOURCE_STORED,
+        SignedPdfIntegrityError,
+        load_signed_pdf,
+    )
 
     sig_q = (
         _select(BudgetSignature)
@@ -430,29 +436,35 @@ async def download_public_signed_budget_pdf(
         db, budget.clinic_id, budget.id, include_items=True
     )
 
-    from sqlalchemy import text as _text
+    # The whole entity, never a column subset: a partial clinic is how the
+    # currency once went missing from this document.
+    from app.core.auth.models import Clinic
 
-    clinic_row = (
-        await db.execute(
-            _text(
-                "SELECT id, name, address, phone, email, settings, tax_id, legal_name "
-                "FROM clinics WHERE id = :id"
-            ),
-            {"id": budget.clinic_id},
-        )
-    ).first()
+    clinic = await db.get(Clinic, budget.clinic_id)
     clinic_settings = (
-        clinic_row.settings if clinic_row and isinstance(clinic_row.settings, dict) else {}
+        clinic.settings if clinic and isinstance(clinic.settings, dict) else {}
     ) or {}
     locale = str(clinic_settings.get("communication_language") or "es")
 
-    pdf_bytes = await BudgetPDFService.generate_pdf(
-        full_budget,
-        clinic_row,
-        is_preview=False,
-        locale=locale,
-        signature=signature,
-    )
+    # The signed document is the file stored at acceptance; a legacy signature
+    # (no stored file) is rendered on the fly and the response says so.
+    try:
+        pdf_bytes = await load_signed_pdf(signature)
+    except SignedPdfIntegrityError as exc:
+        logger.error("Signed PDF integrity failure: %s", exc)
+        raise HTTPException(
+            status_code=500, detail="The signed document failed its integrity check"
+        ) from exc
+    source = SOURCE_STORED
+    if pdf_bytes is None:
+        source = SOURCE_REGENERATED
+        pdf_bytes = await BudgetPDFService.generate_pdf(
+            full_budget,
+            clinic,
+            is_preview=False,
+            locale=locale,
+            signature=signature,
+        )
 
     db.add(
         BudgetAccessLog(
@@ -471,6 +483,7 @@ async def download_public_signed_budget_pdf(
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "private, no-store",
+            "X-Document-Source": source,
         },
     )
 

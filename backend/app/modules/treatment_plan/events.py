@@ -54,16 +54,37 @@ async def _resolve_treatment_category_key(db: AsyncSession, treatment_id: UUID) 
 async def on_appointment_completed(data: dict[str, Any], *, db: AsyncSession) -> None:
     """Handle appointment completed event.
 
-    When an appointment is completed, mark associated planned treatments as
-    completed. Transactional: it reads ``completed_in_appointment`` flags the
-    publisher has only flushed — a second session saw the pre-visit values and
-    closed nothing (issue #183).
+    When an appointment is completed, advance the linked PlannedTreatmentItems
+    through the session mechanism — ``complete_item`` (the same "advance next
+    pending session" shim other ungated callers use), not a direct status
+    flip. That fixes two gaps a direct flip had: the underlying odontogram
+    Treatment never got marked performed, and multi-session items never
+    emitted ``item_session_completed`` (so payments never booked the visit).
+
+    Deliberately **not gated** on the plan being ``active``
+    (``require_active_plan=False``, see ``complete_session``) — this handler
+    records a clinical fact that already happened, same as the
+    odontogram-first path. A single item's session-completion failing (no
+    pending sessions left, e.g. a race with a manual completion) is logged
+    and skipped rather than raised, so it can't roll back the appointment's
+    own transition or the other items in this loop.
+
+    Transactional: it reads ``completed_in_appointment`` flags the publisher
+    has only flushed — a second session saw the pre-visit values and closed
+    nothing (issue #183).
     """
     appointment_id = data.get("appointment_id")
     clinic_id = data.get("clinic_id")
+    changed_by = data.get("changed_by")
 
     if not appointment_id or not clinic_id:
         logger.warning("on_appointment_completed: missing appointment_id or clinic_id")
+        return
+    if not changed_by:
+        logger.warning(
+            "on_appointment_completed: missing changed_by, skipping item completion for %s",
+            appointment_id,
+        )
         return
 
     # Import here to avoid circular imports
@@ -79,6 +100,7 @@ async def on_appointment_completed(data: dict[str, Any], *, db: AsyncSession) ->
     )
     completed_treatments = result.scalars().all()
 
+    processed = 0
     for apt_treatment in completed_treatments:
         # Find planned item that references this treatment
         if not apt_treatment.planned_treatment_item_id:
@@ -93,30 +115,28 @@ async def on_appointment_completed(data: dict[str, Any], *, db: AsyncSession) ->
         if not item or item.status == "completed":
             continue
 
-        item.status = "completed"
-        item.completed_without_appointment = False
+        try:
+            await TreatmentPlanService.complete_item(
+                db,
+                UUID(clinic_id),
+                item.treatment_plan_id,
+                item.id,
+                UUID(changed_by),
+                completed_without_appointment=False,
+                require_active_plan=False,
+            )
+        except ValueError:
+            logger.warning(
+                "on_appointment_completed: could not advance item %s (plan %s) — "
+                "no pending session, or session/plan mismatch",
+                item.id,
+                item.treatment_plan_id,
+                exc_info=True,
+            )
+            continue
+        processed += 1
 
-        category_key = await _resolve_treatment_category_key(db, item.treatment_id)
-        await event_bus.publish(
-            "treatment_plan.treatment_completed",
-            {
-                "plan_id": str(item.treatment_plan_id),
-                "item_id": str(item.id),
-                "treatment_id": str(item.treatment_id),
-                "clinic_id": clinic_id,
-                "patient_id": data.get("patient_id"),
-                "triggered_by": "appointment_completed",
-                "treatment_category_key": category_key,
-            },
-            db=db,
-        )
-
-        # Check if plan should auto-complete
-        await TreatmentPlanService._check_and_complete_plan(
-            db, UUID(clinic_id), item.treatment_plan_id
-        )
-
-    logger.info("Processed appointment completion for %d treatments", len(completed_treatments))
+    logger.info("Processed appointment completion for %d treatments", processed)
 
 
 async def on_budget_accepted(data: dict[str, Any], *, db: AsyncSession) -> None:

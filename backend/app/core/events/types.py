@@ -201,6 +201,7 @@ class EventType:
     # ``treatment_plan.{plan,item}_note_created`` pair).
     CLINICAL_NOTE_ADMINISTRATIVE_CREATED = "clinical_notes.administrative_created"
     CLINICAL_NOTE_DIAGNOSIS_CREATED = "clinical_notes.diagnosis_created"
+    CLINICAL_NOTE_EVOLUTION_CREATED = "clinical_notes.evolution_created"
     CLINICAL_NOTE_TREATMENT_CREATED = "clinical_notes.treatment_created"
     CLINICAL_NOTE_PLAN_CREATED = "clinical_notes.plan_created"
     # Appointment-owner notes. Payload mirrors the other four — patient_id

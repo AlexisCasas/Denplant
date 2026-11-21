@@ -65,7 +65,9 @@
       "furcaLP": "வேர் பிரிவு L/P",
       "furcaLPTitle": "நாக்குப்புறம்/அண்ணப்புறம் வேர் பிரிவு (0/I/II/III)",
       "gingivalWidth": "ஈறு அகலம்",
-      "siteMarkerAria": "{code} இடம், ஆய்வுக் கருவி ஆழம் {depth}"
+      "siteMarkerAria": "{code} இடம், ஆய்வுக் கருவி ஆழம் {depth}",
+      "sum": "Sum",
+      "sumTitle": "{code} sum: probing + margin (read only)"
     },
     "chart": {
       "ariaLabel": "பல் சுற்றுத்திசு வரைபடம் — மேல் மற்றும் கீழ் வளைவுகள்"

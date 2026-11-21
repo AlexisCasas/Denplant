@@ -10,11 +10,13 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.agents.context import AgentContext, AgentMode
 from app.core.agents.models import Agent, AgentSession
 from app.core.agents.tools.registry import tool_registry
+from app.core.auth.models import ClinicMembership
 from app.modules.patients.service import PatientService
 
 
@@ -29,19 +31,45 @@ async def _agent_session(db: AsyncSession, clinic_id) -> tuple:
 
 
 async def _ctx(
-    db: AsyncSession, clinic_id, permissions: list[str], supervisor_id=None
+    db: AsyncSession,
+    clinic_id,
+    permissions: list[str],
+    supervisor_id=None,
+    *,
+    actor_role: str = "admin",
 ) -> AgentContext:
     from app.modules.copilot.bridge import COPILOT_GUARDRAILS
 
     agent, session = await _agent_session(db, clinic_id)
+    membership = await db.scalar(
+        select(ClinicMembership).where(ClinicMembership.clinic_id == clinic_id)
+    )
+    if membership is None:
+        # Cross-clinic tests need a genuine actor in the target clinic too;
+        # otherwise they exercise fail-closed instead of service scoping.
+        source_membership = await db.scalar(select(ClinicMembership).limit(1))
+        assert source_membership is not None
+        membership = ClinicMembership(
+            id=uuid4(),
+            user_id=source_membership.user_id,
+            clinic_id=clinic_id,
+            role=actor_role,
+        )
+        db.add(membership)
+        await db.flush()
+    else:
+        membership.role = actor_role
+        await db.flush()
     return AgentContext(
         agent_id=agent.id,
         session_id=session.id,
         clinic_id=clinic_id,
         mode=AgentMode.AUTONOMOUS,
-        permissions=permissions,
+        permissions=permissions,  # Deliberately stale: registry must replace this from membership.
         tools=tool_registry,
         db=db,
+        actor_user_id=membership.user_id if membership else None,
+        actor_role=membership.role if membership else None,
         supervisor_id=supervisor_id,
         # Same policy the copilot bridge runs with: inline confirmation
         # replaces the approval queue (rate limits + denylist stay).
@@ -98,7 +126,7 @@ async def test_create_then_search_patient(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_create_patient_denied_without_write(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["patients.read"])  # read only
+    ctx = await _ctx(db_session, test_clinic.id, ["patients.read"], actor_role="hygienist")
     res = await tool_registry.call(
         ctx, "patients.create_patient", {"first_name": "Ana", "last_name": "Ruiz"}
     )
@@ -169,7 +197,7 @@ async def test_patient_timeline_empty(db_session, test_clinic) -> None:
         ctx, "patient_timeline.get_patient_timeline", {"patient_id": str(uuid4())}
     )
     assert res.ok
-    assert res.data["total"] == 0
+    assert res.data == {"error": "not_found"}
 
 
 def test_financial_tools_registered() -> None:
@@ -220,7 +248,7 @@ async def test_payments_summary_is_collection_axis_only(db_session, test_clinic)
 
 @pytest.mark.asyncio
 async def test_financial_denied_without_permission(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["patients.read"])  # no reports perm
+    ctx = await _ctx(db_session, test_clinic.id, ["patients.read"], actor_role="hygienist")
     res = await tool_registry.call(
         ctx, "reports.billing_report", {"date_from": "2025-01-01", "date_to": "2025-12-31"}
     )
@@ -275,7 +303,9 @@ async def test_find_free_slots_runs(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_find_free_slots_needs_agenda_permission(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["schedules.availability.read"])  # missing agenda
+    ctx = await _ctx(
+        db_session, test_clinic.id, ["schedules.availability.read"], actor_role="no_access"
+    )
     res = await tool_registry.call(
         ctx, "schedules.find_free_slots", {"professional_id": str(uuid4())}
     )
@@ -485,7 +515,9 @@ async def test_reschedule_is_clinic_scoped(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_reschedule_denied_without_write(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["agenda.appointments.read"])
+    ctx = await _ctx(
+        db_session, test_clinic.id, ["agenda.appointments.read"], actor_role="no_access"
+    )
     res = await tool_registry.call(
         ctx,
         "agenda.reschedule_appointment",
@@ -524,7 +556,7 @@ async def test_update_patient_contact(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_update_patient_denied_without_write(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["patients.read"])
+    ctx = await _ctx(db_session, test_clinic.id, ["patients.read"], actor_role="hygienist")
     res = await tool_registry.call(
         ctx, "patients.update_patient", {"patient_id": str(uuid4()), "phone": "+34600000000"}
     )
@@ -653,7 +685,7 @@ async def test_recall_attempt_snooze_complete(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_recall_write_denied_without_permission(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["recalls.read"])
+    ctx = await _ctx(db_session, test_clinic.id, ["recalls.read"], actor_role="no_access")
     res = await tool_registry.call(
         ctx,
         "recalls.create_recall",
@@ -846,7 +878,7 @@ async def test_record_payment_and_history(db_session, test_clinic) -> None:
 
 @pytest.mark.asyncio
 async def test_record_payment_denied_without_write(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["payments.record.read"])
+    ctx = await _ctx(db_session, test_clinic.id, ["payments.record.read"], actor_role="hygienist")
     res = await tool_registry.call(
         ctx,
         "payments.record_payment",
@@ -894,7 +926,9 @@ def test_free_text_tools_excluded_under_redaction() -> None:
 
 @pytest.mark.asyncio
 async def test_book_appointment_denied_without_write(db_session, test_clinic) -> None:
-    ctx = await _ctx(db_session, test_clinic.id, ["agenda.appointments.read"])  # no write
+    ctx = await _ctx(
+        db_session, test_clinic.id, ["agenda.appointments.read"], actor_role="no_access"
+    )
     res = await tool_registry.call(
         ctx,
         "agenda.book_appointment",

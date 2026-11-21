@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- feat(security): dentists are now scoped to appointments assigned to them,
+  including list/detail/mutations, appointment children and agenda tools.
+
+- Require dentist patient access before creating an appointment, preventing
+  appointment creation from granting access to an arbitrary patient.
+
+- fix(security): dentist appointment responses no longer contain treatment prices.
+
 - fix(#184): type-check clean. `useAppointments`/`useHomeAgenda` expose their lists with `shallowReadonly` (the deep `readonly()` view forced `DeepReadonly<Appointment>` through every child prop); the mobile day summary/timeline called `t()` with a 3-arg (key, fallback, params) form vue-i18n does not have — the keys exist in every locale, so params only; `getCabinetColor` accepts the nullable cabinet; the modal no longer sends a `media` field `PlannedTreatmentItem` does not have.
 - fix(#183): appointment events are published with `db=` so recalls, treatment_plan and notifications react inside the request's transaction (ADR 0019).
 - feat(onboarding): subscribe to `clinic.created` — create one default cabinet for a new clinic.

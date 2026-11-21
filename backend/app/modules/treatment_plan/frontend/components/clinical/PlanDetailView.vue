@@ -17,6 +17,7 @@ import ReopenPlanModal from './modals/ReopenPlanModal.vue'
 import ClosePlanModal from './modals/ClosePlanModal.vue'
 import ReactivatePlanModal from './modals/ReactivatePlanModal.vue'
 import ContactLogModal from './modals/ContactLogModal.vue'
+import NtsPlanOdontogramChart from './NtsPlanOdontogramChart.vue'
 import { itemEffectivePrice } from '../../composables/useTreatmentPlans'
 
 const props = withDefaults(defineProps<{
@@ -25,6 +26,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   /** Standalone mode: show patient link */
   standalone?: boolean
+  patientDateOfBirth?: string | null
 }>(), {
   standalone: false
 })
@@ -38,6 +40,14 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const toast = useToast()
+// The plan follows the same clinic/user preference as diagnosis.  It waits
+// for the preference before choosing a renderer, so it never flashes the
+// legacy chart for a MINSA clinic.
+const { profile: odontogramProfile, isLoaded: isOdontogramProfileLoaded, ensureLoaded: ensureOdontogramProfileLoaded } = useOdontogramProfile()
+
+onMounted(() => {
+  void ensureOdontogramProfileLoaded()
+})
 
 const {
   completeItem,
@@ -612,9 +622,27 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           </div>
         </template>
 
+        <NtsPlanOdontogramChart
+          v-if="isOdontogramProfileLoaded && odontogramProfile === 'pe_nts_188_2022'"
+          ref="odontogramRef"
+          :items="plan.items"
+          :patient-id="patientId"
+          :date-of-birth="patientDateOfBirth"
+          :plan-id="plan.id"
+          :plan-title="plan.title || plan.plan_number"
+          :readonly="effectiveReadonly"
+          :highlighted-teeth="highlightedTeeth"
+          :highlighted-global-ids="highlightedGlobalIds"
+          @tooth-select="hoveredToothNumber = $event"
+          @tooth-hover="hoveredToothNumber = $event"
+          @global-hover="hoveredGlobalTreatmentId = $event"
+          @treatments-changed="emit('updated')"
+        />
         <OdontogramChart
+          v-else-if="isOdontogramProfileLoaded"
           ref="odontogramRef"
           :patient-id="patientId"
+          :date-of-birth="patientDateOfBirth"
           :mode="effectiveReadonly ? 'view-only' : 'planning'"
           :plan-id="plan.id"
           :plan-title="plan.title || plan.plan_number"
@@ -624,10 +652,19 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
           @global-hover="hoveredGlobalTreatmentId = $event"
           @treatments-changed="emit('updated')"
         />
+        <USkeleton
+          v-else
+          class="h-80"
+        />
       </UCard>
 
       <!-- Right column: Treatment list + clinical notes, stacked and auto-height. -->
       <div class="min-[960px]:col-span-2 flex flex-col gap-4 self-start">
+        <!-- Read-only reference to the diagnosis in force. Owned by the
+             odontogram layer: it decides for itself whether to render
+             (MINSA profile, odontogram.read) and its failures stay inside it. -->
+        <NtsCurrentFindingsPanel :patient-id="patientId" />
+
         <UCard
           class="plan-list-card"
           :class="{ 'plan-list-pulse': listPulse }"

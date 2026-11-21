@@ -10,11 +10,13 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.auth.models import ClinicMembership
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.modules.odontogram.models import Treatment
+from app.modules.patients.access import PatientAccessPolicy
 from app.modules.patients.models import Patient
 
 from .models import PlannedTreatmentItem, PlannedTreatmentItemSession, TreatmentPlan
@@ -224,6 +226,7 @@ class TreatmentPlanService:
         page_size: int = 20,
         patient_id: UUID | None = None,
         status: str | list[str] | None = None,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[TreatmentPlan], int]:
         """List treatment plans with pagination and filters."""
         page_size = min(max(page_size, 1), 100)
@@ -238,6 +241,8 @@ class TreatmentPlanService:
 
         if patient_id:
             base_where.append(TreatmentPlan.patient_id == patient_id)
+        if patient_access_predicate is not None:
+            base_where.append(TreatmentPlan.patient.has(patient_access_predicate))
 
         if status:
             statuses = [status] if isinstance(status, str) else list(status)
@@ -856,6 +861,7 @@ class TreatmentPlanService:
         user_id: UUID,
         completed_without_appointment: bool = False,
         notes: str | None = None,
+        require_active_plan: bool = True,
     ) -> PlannedTreatmentItem | None:
         """Mark one session of a plan item as completed.
 
@@ -864,17 +870,26 @@ class TreatmentPlanService:
         session, the parent item is finalized: status flips to
         ``completed``, the Treatment is performed, and the existing
         ``treatment_plan.treatment_completed`` audit/recall path runs.
+
+        ``require_active_plan`` gates the money-booking risk from issue
+        #167 (completing before acceptance books catalog, not quoted,
+        prices) for callers reached through an explicit user action on
+        the plan/session UI. The odontogram-first and appointment-completed
+        paths pass ``False`` — they record a clinical fact that already
+        happened and must not fail the appointment just because the
+        linked plan hasn't been through budget acceptance yet.
         """
         item = await TreatmentPlanService._load_item_with_sessions(db, clinic_id, plan_id, item_id)
         if not item:
             return None
 
-        # Money is booked on completion, so the plan must be past quote
-        # acceptance: sessions are repriced to the accepted budget only
-        # then. Odontogram-first / appointment paths are not gated here.
-        plan = await db.get(TreatmentPlan, plan_id)
-        if not plan or plan.status != "active":
-            raise ValueError("Plan must be active to complete treatments")
+        if require_active_plan:
+            # Money is booked on completion, so the plan must be past quote
+            # acceptance: sessions are repriced to the accepted budget only
+            # then.
+            plan = await db.get(TreatmentPlan, plan_id)
+            if not plan or plan.status != "active":
+                raise ValueError("Plan must be active to complete treatments")
 
         session = next((s for s in item.sessions if s.id == session_id), None)
         if not session:
@@ -1025,6 +1040,7 @@ class TreatmentPlanService:
         user_id: UUID,
         completed_without_appointment: bool = True,
         notes: str | None = None,
+        require_active_plan: bool = True,
     ) -> PlannedTreatmentItem | None:
         """Back-compat shim: complete the next pending session of an item.
 
@@ -1032,6 +1048,14 @@ class TreatmentPlanService:
         For single-session items this behaves like the legacy flow. For
         multi-session items it advances one session per call — callers
         targeting a specific session should use ``complete_session``.
+
+        Also the entry point for the appointment-completed path: a visit
+        executes at most one session's worth of work per item, so
+        "advance the next pending session" is the correct, unambiguous
+        reading of "which session did this appointment do" without
+        needing a session_id on ``AppointmentTreatment``.
+        ``require_active_plan=False`` for that caller — see
+        ``complete_session``.
         """
         item = await TreatmentPlanService._load_item_with_sessions(db, clinic_id, plan_id, item_id)
         if not item:
@@ -1055,6 +1079,7 @@ class TreatmentPlanService:
             user_id=user_id,
             completed_without_appointment=completed_without_appointment,
             notes=notes,
+            require_active_plan=require_active_plan,
         )
 
     @staticmethod
@@ -1313,6 +1338,8 @@ class TreatmentPlanService:
         db: AsyncSession,
         clinic_id: UUID,
         tab: str,
+        role: str,
+        user_id: UUID,
         page: int = 1,
         page_size: int = 20,
         doctor_id: UUID | None = None,
@@ -1360,6 +1387,10 @@ class TreatmentPlanService:
             raise ValueError(f"Unknown pipeline tab '{tab}'")
 
         params: dict[str, object] = {"clinic_id": clinic_id}
+        patient_scope_where, patient_scope_params = PatientAccessPolicy.sql_predicate(
+            role, patient_alias="pat", user_id=user_id
+        )
+        params.update(patient_scope_params)
         extra_where = ""
         if doctor_id is not None:
             extra_where += " AND p.assigned_professional_id = :doctor_id"
@@ -1457,6 +1488,7 @@ class TreatmentPlanService:
               AND p.deleted_at IS NULL
               AND ({tab_where})
               {extra_where}
+              {patient_scope_where}
         """
 
         # ----- count + page ---------------------------------------------

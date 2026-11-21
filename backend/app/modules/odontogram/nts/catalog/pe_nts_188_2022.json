@@ -1,0 +1,1045 @@
+{
+  "norm_version": "pe_nts_188_2022",
+  "norm_label": "NTS N.° 188-MINSA/DGIESP-2022",
+  "country": "PE",
+  "expected_rule_count": 38,
+  "pending_decisions": [
+    "NTS-04: when does a digital finding become 'registrado'? The norm forbids altering a registered finding (5.6) but defines no draft/finalized workflow, no electronic signature, and no procedure for correcting a material error.",
+    "NTS-04: does 6.1.30 (arch_cardinality one_or_both) persist as one bi-arch finding or two related findings? The norm does not say.",
+    "NTS-04: multi-segment ranges (6.1.31) need target groups; the grouping model is not designed here.",
+    "NTS-04: the six clinician_defined_shape rules need a geometry channel per finding; no shape storage is designed here.",
+    "Clinical review: rotation_sense (6.1.13), mobility_degree (6.1.19) and dde_type=FLUOROSIS (6.1.5) have no closed vocabulary in the norm."
+  ],
+  "global_rules": [
+    {
+      "key": "fdi_two_digit",
+      "title": "Numeración FDI (Sistema Dígito Dos)",
+      "summary": "Tooth numbering uses the two-digit FDI system accepted by the FDI and the WHO.",
+      "source": { "page": 5, "section": "5.4" }
+    },
+    {
+      "key": "finding_not_procedure",
+      "title": "Sólo hallazgos observados, no procedimientos planificados",
+      "summary": "The odontogram records only observed clinical findings. Procedures to be performed under the treatment plan belong to the Ficha Odonto-Estomatológica, not to the chart.",
+      "source": { "page": 5, "section": "5.8" }
+    },
+    {
+      "key": "registered_finding_is_unalterable",
+      "title": "Inalterabilidad del hallazgo registrado",
+      "summary": "Every registered clinical finding is unalterable: no amendments, no crossing out. The norm does not define when a digital finding becomes registered.",
+      "source": { "page": 5, "section": "5.6" }
+    },
+    {
+      "key": "new_odontogram_on_new_findings_or_reentry",
+      "title": "Nuevo odontograma ante nuevos hallazgos o reingreso",
+      "summary": "A new odontogram is produced when new findings appear, when the treatment plan ends, on judicial/personal request, and when the patient re-enters after the plan is completed.",
+      "source": { "page": 5, "section": "5.10, 5.11" }
+    },
+    {
+      "key": "red_blue_only",
+      "title": "Semántica de color: sólo rojo y azul",
+      "summary": "Blue marks a finding in good state or a non-pathological characteristic; red marks a bad state, a temporary one, or a pathological characteristic. No other colour may be used for findings.",
+      "source": { "page": 5, "section": "5.12, 5.13" }
+    },
+    {
+      "key": "especificaciones_item",
+      "title": "Ítem Especificaciones",
+      "summary": "Holds findings or additional clinical characteristics that cannot be recorded in the boxes (e.g. crown metal colour, temporary crown material, fluorosis classification).",
+      "source": { "page": 5, "section": "5.14" }
+    },
+    {
+      "key": "observaciones_item",
+      "title": "Ítem Observaciones",
+      "summary": "Describes findings not contemplated by the nomenclature.",
+      "source": { "page": 5, "section": "5.15" }
+    },
+    {
+      "key": "chart_printed_black",
+      "title": "Gráfico impreso en negro",
+      "summary": "The chart itself is unique and printed in black, minimum 0.5 cm squares with the root proportional. Red and blue belong exclusively to the findings.",
+      "source": { "page": 5, "section": "5.17" }
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "6.1.1",
+      "ordinal": 1,
+      "official_name": "Aparato ortodóntico fijo",
+      "scope": "range",
+      "range_grouping": "single_segment",
+      "attributes": [
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          {
+            "kind": "symbol",
+            "params": { "shape": "square_with_cross", "at": "apex_level" },
+            "target_selector": "range_endpoints"
+          },
+          { "kind": "connector", "params": { "style": "straight_line", "at": "apex_level" } }
+        ]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
+      "source": { "page": 6, "section": "6.1.1" },
+      "notes": "Exactly two endpoints ('uniendo ambos cuadrados'): one continuous span."
+    },
+    {
+      "rule_id": "6.1.2",
+      "ordinal": 2,
+      "official_name": "Aparato ortodóntico removible",
+      "scope": "arch",
+      "arch_cardinality": "one",
+      "attributes": [
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [{ "kind": "line", "params": { "style": "zigzag", "at": "apex_level" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
+      "source": { "page": 6, "section": "6.1.2" }
+    },
+    {
+      "rule_id": "6.1.3",
+      "ordinal": 3,
+      "official_name": "Corona",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "crown_type",
+          "kind": "enum",
+          "is_sigla": true,
+          "values": [
+            { "code": "CM", "name": "Corona metálica" },
+            { "code": "CF", "name": "Corona fenestrada" },
+            { "code": "CMC", "name": "Corona metal cerámica" },
+            { "code": "CV", "name": "Corona veneer" },
+            { "code": "CLM", "name": "Corona libre de metal" }
+          ]
+        },
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "symbol", "params": { "shape": "square_bordering_crown" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "crown_type" }
+        ]
+      },
+      "specification_requirement": {
+        "code": "crown_metal_colour",
+        "label": "Color del metal de la corona (dorada o plateada), o cualquier característica clínica adicional del hallazgo",
+        "required": false,
+        "status": "needs_clinical_review",
+        "notes": "§6.1.3 states it at rule level - 'En el ítem especificaciones del odontograma se registra el color del metal de la corona, dorada o plateada, o cualquier característica clínica adicional del hallazgo clínico' - and never says which crown_type values make it mandatory. CLM is metal-free, so a blanket obligation would be wrong. Non-blocking until a clinical reading closes which variants require it."
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
+      "source": { "page": 7, "section": "6.1.3" },
+      "notes": "The norm calls these 'tipo de corona', not material. Metal colour (dorada/plateada) is routed to Especificaciones, so it is deliberately not an attribute."
+    },
+    {
+      "rule_id": "6.1.4",
+      "ordinal": 4,
+      "official_name": "Corona temporal",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "CT", "name": "Corona temporal" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [
+          { "kind": "symbol", "params": { "shape": "square_bordering_crown" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
+        ]
+      },
+      "specification_requirement": {
+        "code": "temporary_crown_material",
+        "label": "Característica o material utilizado, así como cualquier característica adicional",
+        "required": true
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
+      "source": { "page": 7, "section": "6.1.4" },
+      "notes": "Always red (temporary by definition). The material used is routed to Especificaciones, so it is not an attribute here. §6.1.4 (p.7) words the square as 'que encierre la corona' where §6.1.3 (p.6) says 'bordeando la corona'; the two figures draw the same rectangle on the crown, so both use one shape token."
+    },
+    {
+      "rule_id": "6.1.5",
+      "ordinal": 5,
+      "official_name": "Defectos de desarrollo del esmalte (DDE)",
+      "scope": "surface",
+      "attributes": [
+        {
+          "name": "dde_type",
+          "kind": "enum",
+          "is_sigla": true,
+          "status": "needs_clinical_review",
+          "notes": "FLUOROSIS is not a closed code: the norm sends it to Especificaciones together with the classification used.",
+          "values": [
+            { "code": "O", "name": "Opacidades del esmalte" },
+            { "code": "PE", "name": "Pigmentación del esmalte" },
+            {
+              "code": "FLUOROSIS",
+              "name": "Fluorosis",
+              "specification_requirement": {
+                "code": "fluorosis_classification",
+                "label": "Clasificación de fluorosis utilizada",
+                "required": true
+              },
+              "status": "needs_clinical_review",
+              "notes": "Detailed in Especificaciones with the classification used; the norm defines no code vocabulary."
+            }
+          ]
+        },
+        {
+          "name": "surfaces",
+          "kind": "enum_multi",
+          "is_sigla": false,
+          "values": [
+            { "code": "M", "name": "Mesial" },
+            { "code": "D", "name": "Distal" },
+            { "code": "O", "name": "Oclusal/Incisal" },
+            { "code": "V", "name": "Vestibular" },
+            { "code": "L", "name": "Lingual/Palatina" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "dde_type" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "status": "needs_clinical_review",
+      "source": { "page": 8, "section": "6.1.5" },
+      "notes": "§6.1.5 (p.7-8) places the siglas 'en el recuadro correspondiente ... del hallazgo clínico identificado en la(s) superficie(s) dentaria(s)': the affected surfaces are clinical data the norm asks for, but the only drawing act is writing the siglas in the box. Nothing is drawn on the crown, so geometry mode is 'none' while the surfaces attribute stays part of the clinical contract."
+    },
+    {
+      "rule_id": "6.1.6",
+      "ordinal": 6,
+      "official_name": "Diastema",
+      "scope": "pair",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "symbol", "params": { "shape": "inverted_parenthesis", "at": "between_teeth" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["interproximal"] },
+      "source": { "page": 8, "section": "6.1.6" }
+    },
+    {
+      "rule_id": "6.1.7",
+      "ordinal": 7,
+      "official_name": "Edéntulo total superior / inferior",
+      "scope": "arch",
+      "arch_cardinality": "one_or_both",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "line", "params": { "style": "straight_horizontal", "at": "over_crowns" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 8, "section": "6.1.7" }
+    },
+    {
+      "rule_id": "6.1.8",
+      "ordinal": 8,
+      "official_name": "Espigo - muñón",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "line", "params": { "style": "straight_vertical", "at": "root" } },
+          { "kind": "symbol", "params": { "shape": "square", "at": "crown" } }
+        ]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["root_area", "crown_area"] },
+      "source": { "page": 9, "section": "6.1.8" },
+      "notes": "Recorded only when the espigo-muñón is clinically observed."
+    },
+    {
+      "rule_id": "6.1.9",
+      "ordinal": 9,
+      "official_name": "Fosas y fisuras profundas",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "FFP", "name": "Fosas y fisuras profundas" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 9, "section": "6.1.9" }
+    },
+    {
+      "rule_id": "6.1.10",
+      "ordinal": 10,
+      "official_name": "Fractura dental",
+      "scope": "tooth",
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [{ "kind": "line", "params": { "style": "fracture_trace" } }]
+      },
+      "geometry_input": {
+        "mode": "clinician_defined_shape",
+        "constraints": ["crown_area", "root_area"]
+      },
+      "source": { "page": 9, "section": "6.1.10" },
+      "notes": "Drawn over crown and/or root 'según sea el caso'."
+    },
+    {
+      "rule_id": "6.1.11",
+      "ordinal": 11,
+      "official_name": "Fusión",
+      "scope": "pair",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "symbol", "params": { "shape": "two_intersecting_circles", "at": "tooth_numbers" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 10, "section": "6.1.11" }
+    },
+    {
+      "rule_id": "6.1.12",
+      "ordinal": 12,
+      "official_name": "Geminación",
+      "scope": "tooth",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "symbol", "params": { "shape": "circle", "at": "tooth_number" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 10, "section": "6.1.12" }
+    },
+    {
+      "rule_id": "6.1.13",
+      "ordinal": 13,
+      "official_name": "Giroversión",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "rotation_sense",
+          "kind": "free_text",
+          "is_sigla": false,
+          "status": "needs_clinical_review",
+          "notes": "The arrow follows 'el sentido de la giroversión' — an observed datum — but the norm enumerates no values."
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "arrow", "params": { "style": "curved", "at": "occlusal_zone" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "status": "needs_clinical_review",
+      "source": { "page": 10, "section": "6.1.13" }
+    },
+    {
+      "rule_id": "6.1.14",
+      "ordinal": 14,
+      "official_name": "Impactación",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "I", "name": "Impactación" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 11, "section": "6.1.14" },
+      "notes": "Recorded only if the tooth or part of it is observed in the mouth."
+    },
+    {
+      "rule_id": "6.1.15",
+      "ordinal": 15,
+      "official_name": "Implante dental",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "IMP", "name": "Implante dental" }]
+        },
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 11, "section": "6.1.15", "document_label": "6.115" },
+      "notes": "Recorded only when the implant is clinically observed. The PDF prints the heading as '6.115'."
+    },
+    {
+      "rule_id": "6.1.16",
+      "ordinal": 16,
+      "official_name": "Lesión de caries dental",
+      "scope": "surface",
+      "attributes": [
+        {
+          "name": "caries_type",
+          "kind": "enum",
+          "is_sigla": true,
+          "values": [
+            { "code": "MB", "name": "Mancha blanca" },
+            { "code": "CE", "name": "Lesión de caries dental a nivel del esmalte" },
+            { "code": "CD", "name": "Lesión de caries dental a nivel de la dentina" },
+            { "code": "CDP", "name": "Lesión de caries dental a nivel de la dentina con compromiso de la pulpa" }
+          ]
+        },
+        {
+          "name": "surfaces",
+          "kind": "enum_multi",
+          "is_sigla": false,
+          "values": [
+            { "code": "M", "name": "Mesial" },
+            { "code": "D", "name": "Distal" },
+            { "code": "O", "name": "Oclusal/Incisal" },
+            { "code": "V", "name": "Vestibular" },
+            { "code": "L", "name": "Lingual/Palatina" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [
+          { "kind": "shape_fill", "params": { "fill": "solid" }, "regions_from": "surfaces" },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "caries_type" }
+        ]
+      },
+      "geometry_input": {
+        "mode": "clinician_defined_shape",
+        "constraints": ["surface_regions"]
+      },
+      "source": { "page": 11, "section": "6.1.16" },
+      "notes": "The norm calls these 'siglas del hallazgo clínico identificado', not grades: MB is a lesion type while CE/CD/CDP are depths."
+    },
+    {
+      "rule_id": "6.1.17",
+      "ordinal": 17,
+      "official_name": "Macrodoncia",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "MAC", "name": "Macrodoncia" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 12, "section": "6.1.17" }
+    },
+    {
+      "rule_id": "6.1.18",
+      "ordinal": 18,
+      "official_name": "Microdoncia",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "MIC", "name": "Microdoncia" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 12, "section": "6.1.18" }
+    },
+    {
+      "rule_id": "6.1.19",
+      "ordinal": 19,
+      "official_name": "Movilidad patológica",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "M", "name": "Movilidad patológica" }]
+        },
+        {
+          "name": "mobility_degree",
+          "kind": "integer",
+          "is_sigla": false,
+          "status": "needs_clinical_review",
+          "notes": "Written as an arabic numeral after the M, but the norm defines neither the scale nor its bounds."
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla", "suffix_from": "mobility_degree" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "status": "needs_clinical_review",
+      "source": { "page": 12, "section": "6.1.19" },
+      "notes": "Sigla 'M' also used by 6.1.28 with a different meaning; they differ by colour and the numeric suffix."
+    },
+    {
+      "rule_id": "6.1.20",
+      "ordinal": 20,
+      "official_name": "Pieza dentaria ausente",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "absence_type",
+          "kind": "enum",
+          "is_sigla": true,
+          "values": [
+            { "code": "DNE", "name": "Diente no erupcionado" },
+            { "code": "DEX", "name": "Diente ausente por extracción debido a experiencia de lesiones de caries dental" },
+            { "code": "DAO", "name": "Diente ausente por otras razones no relacionadas a caries dental" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [
+          { "kind": "symbol", "params": { "shape": "x_cross" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "absence_type" }
+        ]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 13, "section": "6.1.20" },
+      "notes": "DEX and DAO encode aetiology; the distinction cannot be inferred from a plain 'missing tooth'."
+    },
+    {
+      "rule_id": "6.1.21",
+      "ordinal": 21,
+      "official_name": "Pieza dentaria en clavija",
+      "scope": "tooth",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "symbol", "params": { "shape": "triangle", "at": "near_roots" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["root_area"] },
+      "source": { "page": 13, "section": "6.1.21" }
+    },
+    {
+      "rule_id": "6.1.22",
+      "ordinal": 22,
+      "official_name": "Pieza dentaria ectópica",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "E", "name": "Pieza dentaria ectópica" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 13, "section": "6.1.22" }
+    },
+    {
+      "rule_id": "6.1.23",
+      "ordinal": 23,
+      "official_name": "Pieza dentaria en erupción",
+      "scope": "tooth",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "arrow", "params": { "style": "zigzag", "at": "on_figure", "toward": "occlusal_plane" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 14, "section": "6.1.23", "document_label": "5.2.23" },
+      "notes": "The PDF prints the heading as '5.2.23'; the logical id is 6.1.23."
+    },
+    {
+      "rule_id": "6.1.24",
+      "ordinal": 24,
+      "official_name": "Pieza dentaria extruida",
+      "scope": "tooth",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "arrow", "params": { "style": "straight_vertical", "at": "outside_occlusal", "toward": "outward" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 14, "section": "6.1.24" },
+      "notes": "Arrow sense is fixed by the rule and the FDI quadrant: renderer-derived, never a clinician input."
+    },
+    {
+      "rule_id": "6.1.25",
+      "ordinal": 25,
+      "official_name": "Pieza dentaria intruida",
+      "scope": "tooth",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "arrow", "params": { "style": "straight_vertical", "at": "outside_occlusal", "toward": "incisal_occlusal" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 14, "section": "6.1.25" },
+      "notes": "Arrow sense is fixed by the rule and the FDI quadrant: renderer-derived, never a clinician input."
+    },
+    {
+      "rule_id": "6.1.26",
+      "ordinal": 26,
+      "official_name": "Pieza dentaria supernumeraria",
+      "scope": "tooth",
+      "target_identity": "unnumbered",
+      "anchor": { "kind": "interproximal", "cardinality": 2, "role": "spatial_reference_only" },
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "S", "name": "Pieza dentaria supernumeraria" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "symbol", "params": { "shape": "circle_enclosing_sigla", "at": "between_apices" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["interproximal"] },
+      "source": { "page": 15, "section": "6.1.26" },
+      "notes": "The two adjacent teeth are spatial anchors only: the subject is the supernumerary tooth, which has no FDI cell. Sigla 'S' is also used by 6.1.35."
+    },
+    {
+      "rule_id": "6.1.27",
+      "ordinal": 27,
+      "official_name": "Pulpotomía",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "PP", "name": "Pulpotomía" }]
+        },
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "shape_fill", "params": { "at": "coronal_pulp" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
+        ]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["crown_area"] },
+      "source": { "page": 15, "section": "6.1.27" }
+    },
+    {
+      "rule_id": "6.1.28",
+      "ordinal": 28,
+      "official_name": "Posición anormal dentaria",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "abnormal_position",
+          "kind": "enum",
+          "is_sigla": true,
+          "values": [
+            { "code": "M", "name": "Mesializado" },
+            { "code": "D", "name": "Distalizado" },
+            { "code": "V", "name": "Vestibularizado" },
+            { "code": "P", "name": "Palatinizado" },
+            { "code": "L", "name": "Lingualizado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "abnormal_position" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 15, "section": "6.1.28" },
+      "notes": "Positions, not a direction vector. Sigla 'M' is also used by 6.1.19 with a different meaning."
+    },
+    {
+      "rule_id": "6.1.29",
+      "ordinal": 29,
+      "official_name": "Prótesis dental parcial fija",
+      "scope": "range",
+      "range_grouping": "single_segment",
+      "attributes": [
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "target_roles": [
+        {
+          "code": "pilar",
+          "name": "Pilar",
+          "applies_to": "subject",
+          "status": "needs_clinical_review",
+          "notes": "§6.1.29 mandates 'una línea recta horizontal ... con líneas verticales sobre los pilares', so a pilar is a marked target inside the span, not a datum of the finding. The norm states no cardinality and does not say which teeth of the span may be pilares, so min_count/max_count stay unset; the figure happens to mark both endpoints of a 13-23 span."
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "line", "params": { "style": "straight_horizontal", "meaning": "bridge_extension", "at": "apex_level" } },
+          { "kind": "connector", "params": { "style": "vertical_marks", "at": "apex_level" }, "role": "pilar" }
+        ]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
+      "source": { "page": 16, "section": "6.1.29" },
+      "notes": "One continuous span; two bridges are two occurrences, not one occurrence with two segments."
+    },
+    {
+      "rule_id": "6.1.30",
+      "ordinal": 30,
+      "official_name": "Prótesis dental completa superior / inferior",
+      "scope": "arch",
+      "arch_cardinality": "one_or_both",
+      "attributes": [
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [{ "kind": "line", "params": { "style": "two_parallel_horizontal", "at": "apex_level" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
+      "source": { "page": 16, "section": "6.1.30" },
+      "notes": "'ya sea el maxilar superior y/o el maxilar inferior' — whether that persists as one bi-arch finding or two is an NTS-04 decision."
+    },
+    {
+      "rule_id": "6.1.31",
+      "ordinal": 31,
+      "official_name": "Prótesis dental parcial removible",
+      "scope": "range",
+      "range_grouping": "multi_segment",
+      "attributes": [
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [{ "kind": "line", "params": { "style": "two_parallel_horizontal", "at": "apex_level" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["apex_level"] },
+      "source": { "page": 16, "section": "6.1.31" },
+      "notes": "The norm's own figure draws two disjoint segments for a single appliance, so one occurrence may cover several non-contiguous stretches."
+    },
+    {
+      "rule_id": "6.1.32",
+      "ordinal": 32,
+      "official_name": "Remanente radicular",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "RR", "name": "Remanente radicular" }]
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [{ "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }]
+      },
+      "geometry_input": { "mode": "none" },
+      "source": { "page": 17, "section": "6.1.32" }
+    },
+    {
+      "rule_id": "6.1.33",
+      "ordinal": 33,
+      "official_name": "Restauración definitiva",
+      "scope": "surface",
+      "attributes": [
+        {
+          "name": "restoration_material",
+          "kind": "enum",
+          "is_sigla": true,
+          "notes": "The norm calls the whole set 'siglas del material empleado', although IM/IE/C are restoration types rather than materials. Kept as the norm words it.",
+          "values": [
+            { "code": "AM", "name": "Amalgama dental" },
+            { "code": "R", "name": "Resina" },
+            { "code": "IV", "name": "Ionómero de vidrio" },
+            { "code": "IM", "name": "Incrustación metálica" },
+            { "code": "IE", "name": "Incrustación estética" },
+            { "code": "C", "name": "Carilla" }
+          ]
+        },
+        {
+          "name": "surfaces",
+          "kind": "enum_multi",
+          "is_sigla": false,
+          "values": [
+            { "code": "M", "name": "Mesial" },
+            { "code": "D", "name": "Distal" },
+            { "code": "O", "name": "Oclusal/Incisal" },
+            { "code": "V", "name": "Vestibular" },
+            { "code": "L", "name": "Lingual/Palatina" }
+          ]
+        },
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "shape_fill", "params": { "fill": "solid" }, "regions_from": "surfaces" },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "restoration_material" }
+        ]
+      },
+      "geometry_input": {
+        "mode": "clinician_defined_shape",
+        "constraints": ["surface_regions"]
+      },
+      "source": { "page": 17, "section": "6.1.33" }
+    },
+    {
+      "rule_id": "6.1.34",
+      "ordinal": 34,
+      "official_name": "Restauración temporal",
+      "scope": "surface",
+      "attributes": [
+        {
+          "name": "surfaces",
+          "kind": "enum_multi",
+          "is_sigla": false,
+          "values": [
+            { "code": "M", "name": "Mesial" },
+            { "code": "D", "name": "Distal" },
+            { "code": "O", "name": "Oclusal/Incisal" },
+            { "code": "V", "name": "Vestibular" },
+            { "code": "L", "name": "Lingual/Palatina" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [{ "kind": "outline", "params": { "style": "contour" }, "regions_from": "surfaces" }]
+      },
+      "geometry_input": {
+        "mode": "clinician_defined_shape",
+        "constraints": ["surface_regions"]
+      },
+      "source": { "page": 17, "section": "6.1.34" }
+    },
+    {
+      "rule_id": "6.1.35",
+      "ordinal": 35,
+      "official_name": "Sellantes",
+      "scope": "surface",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "S", "name": "Sellante" }]
+        },
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "line", "params": { "style": "sealant_path" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
+        ]
+      },
+      "geometry_input": {
+        "mode": "clinician_defined_shape",
+        "constraints": ["fissure_anatomy"]
+      },
+      "related_rules": [
+        {
+          "rule_id": "6.1.16",
+          "relation": "companion_when_present",
+          "notes": "If a carious lesion is identified, 6.1.16's siglas must be added as well."
+        }
+      ],
+      "source": { "page": 18, "section": "6.1.35" },
+      "notes": "Sigla 'S' is also used by 6.1.26 with a different meaning."
+    },
+    {
+      "rule_id": "6.1.36",
+      "ordinal": 36,
+      "official_name": "Superficie desgastada",
+      "scope": "surface",
+      "attributes": [
+        {
+          "name": "sigla",
+          "kind": "fixed",
+          "is_sigla": true,
+          "values": [{ "code": "DES", "name": "Superficie desgastada" }]
+        },
+        {
+          "name": "surfaces",
+          "kind": "enum_multi",
+          "is_sigla": false,
+          "values": [
+            { "code": "M", "name": "Mesial" },
+            { "code": "D", "name": "Distal" },
+            { "code": "O", "name": "Oclusal/Incisal" },
+            { "code": "V", "name": "Vestibular" },
+            { "code": "L", "name": "Lingual/Palatina" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "bad_temporary_or_pathological",
+        "marks": [
+          { "kind": "shape_fill", "params": { "fill": "solid" }, "regions_from": "surfaces" },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "sigla" }
+        ]
+      },
+      "geometry_input": {
+        "mode": "clinician_defined_shape",
+        "constraints": ["surface_regions"]
+      },
+      "source": { "page": 18, "section": "6.1.36" }
+    },
+    {
+      "rule_id": "6.1.37",
+      "ordinal": 37,
+      "official_name": "Tratamiento de conducto",
+      "scope": "tooth",
+      "attributes": [
+        {
+          "name": "endodontic_treatment_type",
+          "kind": "enum",
+          "is_sigla": true,
+          "values": [
+            { "code": "TC", "name": "Tratamiento de conductos" },
+            { "code": "PC", "name": "Pulpectomía" }
+          ]
+        },
+        {
+          "name": "condition_state",
+          "kind": "enum",
+          "is_sigla": false,
+          "values": [
+            { "code": "good", "name": "Buen estado" },
+            { "code": "bad", "name": "Mal estado" }
+          ]
+        }
+      ],
+      "render": {
+        "color_semantics": "condition_dependent",
+        "marks": [
+          { "kind": "line", "params": { "style": "straight_vertical", "at": "root" } },
+          { "kind": "box_siglas", "params": { "case": "uppercase" }, "text_from": "endodontic_treatment_type" }
+        ]
+      },
+      "geometry_input": { "mode": "standard_geometry", "constraints": ["root_area"] },
+      "source": { "page": 18, "section": "6.1.37" },
+      "notes": "Recorded only when gutta-percha cones and/or pulp chamber/root canal obturation are clinically observed."
+    },
+    {
+      "rule_id": "6.1.38",
+      "ordinal": 38,
+      "official_name": "Transposición dentaria",
+      "scope": "pair",
+      "render": {
+        "color_semantics": "good_or_non_pathological",
+        "marks": [{ "kind": "arrow", "params": { "style": "two_crossed_curved", "at": "tooth_numbers" } }]
+      },
+      "geometry_input": { "mode": "standard_geometry" },
+      "source": { "page": 19, "section": "6.1.38" }
+    }
+  ]
+}

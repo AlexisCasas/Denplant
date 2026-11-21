@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "DentalPin",
+    "name": "Denplant",
     "tagline": "பல் மருத்துவமனை மேலாண்மை"
   },
   "demo": {
@@ -14,6 +14,7 @@
   },
   "nav": {
     "dashboard": "முகப்பு",
+    "panel": "டாஷ்போர்டு",
     "patients": "நோயாளிகள்",
     "appointments": "அட்டவணை",
     "recalls": "நினைவூட்டல்கள்",
@@ -63,7 +64,7 @@
     "next": "அடுத்து",
     "back": "பின்",
     "submit": "எனது கிளினிக்கை உருவாக்கு",
-    "success": "அனைத்தும் தயார்! DentalPin-க்கு வரவேற்கிறோம்",
+    "success": "அனைத்தும் தயார்! Denplant-க்கு வரவேற்கிறோம்",
     "firstNameRequired": "முதல் பெயரை உள்ளிடவும்",
     "lastNameRequired": "கடைசி பெயரை உள்ளிடவும்",
     "emailRequired": "மின்னஞ்சலை உள்ளிடவும்",
@@ -148,9 +149,10 @@
     "archived": "நோயாளி காப்பகப்படுத்தப்பட்டார்",
     "notFound": "நோயாளி கிடைக்கவில்லை",
     "archiveConfirm": "{name} நோயாளியை காப்பகப்படுத்தவா?",
-    "archiveDescription": "இந்தச் செயல் நோயாளியைத் தேடல்களில் இருந்து மறைக்கும். ஏற்கனவே உள்ள சந்திப்புகள் நீக்கப்படாது.",
+    "archiveDescription": "நோயாளி காப்பகப்படுத்தப்படுவார்; நிரந்தரமாக நீக்கப்படமாட்டார். சந்திப்புகளும் வரலாறும் பாதுகாக்கப்படும்.",
     "cancel": "ரத்துசெய்",
     "archive": "காப்பகப்படுத்து",
+    "archiveFor": "{name} ஐக் காப்பகப்படுத்து",
     "dangerZone": {
       "title": "அபாய மண்டலம்",
       "archiveHelp": "நோயாளியைத் தேடல்களில் இருந்து மறைக்க காப்பகப்படுத்தவும். சந்திப்புகளும் வரலாறும் பாதுகாக்கப்படும்."
@@ -390,6 +392,10 @@
     "tabs": {
       "summary": "சுருக்கம்",
       "info": "தகவல்",
+      "information": "தகவல்",
+      "dentalAnamnesis": "பல் மருத்துவ வரலாறு",
+      "pediatricDentalAnamnesis": "குழந்தைப் பல் மருத்துவ வரலாறு",
+      "endodontics": "எண்டோடான்டிக்ஸ்",
       "clinical": "மருத்துவம்",
       "odontogram": "பல் வரைபடம்",
       "administration": "நிர்வாகம்",
@@ -402,6 +408,44 @@
       "documents": "ஆவணங்கள்",
       "gallery": "படத்தொகுப்பு"
     },
+    "dentalAnamnesis": {
+      "doctor": "மருத்துவர்", "selectDoctor": "நிபுணரைத் தேர்ந்தெடுக்கவும்", "consultationReason": "ஆலோசனைக்கான காரணம்",
+      "currentIllness": "தற்போதைய நோய்", "illnessDuration": "நோயின் காலம்", "mainSymptoms": "முக்கிய அறிகுறிகள்", "chronologicalNarrative": "காலவரிசை விவரம்", "biologicalFunctions": "உயிரியல் செயல்பாடுகள்",
+      "history": "மருத்துவ வரலாறு", "familyHistory": "குடும்ப வரலாறு", "personalHistory": "தனிப்பட்ட வரலாறு", "haveYouHad": "உங்களுக்கு உள்ளதா அல்லது இருந்ததா?",
+      "highBloodPressure": "உயர் இரத்த அழுத்தம்", "lowBloodPressure": "குறைந்த இரத்த அழுத்தம்", "hepatitis": "கல்லீரல் அழற்சி", "gastritis": "இரைப்பை அழற்சி", "ulcers": "புண்கள்", "hiv": "HIV", "diabetes": "நீரிழிவு", "asthma": "ஆஸ்துமா", "smoker": "புகைபிடிக்கிறீர்களா?", "additionalComment": "கூடுதல் கருத்து",
+      "dentalHistory": "பல் / கூடுதல் வரலாறு", "bloodDiseases": "இரத்த நோய்கள்", "heartProblems": "இதய பிரச்சினைகள்", "otherDisease": "வேறு ஏதேனும் நோய் உள்ளதா?", "brushingFrequency": "ஒரு நாளில் எத்தனை முறை பற்களைத் துலக்குகிறீர்கள்?", "bleedingGums": "ஈறுகளில் இரத்தம் வருகிறதா?", "abnormalExtractionBleeding": "பல் அகற்றிய பிறகு அசாதாரண இரத்தப்போக்கு ஏற்பட்டதா?", "bruxism": "பற்களை அரைக்கிறீர்களா அல்லது இறுக்குகிறீர்களா?", "mouthDiscomfort": "வாயில் பிற அசௌகரியங்கள்", "allergies": "ஒவ்வாமைகள்", "recentMajorSurgery": "சமீப ஆண்டுகளில் பெரிய அறுவை சிகிச்சை செய்துள்ளீர்களா?", "permanentMedication": "நிரந்தரமாக ஏதேனும் மருந்து எடுத்துக்கொள்கிறீர்களா?", "detail": "விவரம்",
+      "clinicalExam": "மருத்துவ பரிசோதனை", "vitalSigns": "முக்கிய உடல் அறிகுறிகள்", "bloodPressure": "BP", "pulse": "நாடித்துடிப்பு", "heartRate": "HR", "respiratoryRate": "RR", "temperature": "வெப்பநிலை", "extraoralExam": "வாய்க்கு வெளியேயான பரிசோதனை", "intraoralExam": "வாய்க்குள்ளான பரிசோதனை", "auxiliaryExamResults": "துணை பரிசோதனை முடிவுகள்", "observations": "குறிப்புகள்",
+      "no": "இல்லை", "yes": "ஆம்", "save": "சேமிக்கவும்", "saveUnavailable": "சேமித்தல் விரைவில் கிடைக்கும்.",
+      "placeholders": {
+        "consultationReason": "எ.கா. கீழ் வலது கடைவாய்ப்பல்லில் வலி", "illnessDuration": "எ.கா. 3 நாட்கள்", "mainSymptoms": "எ.கா. மெல்லும்போது வலி, குளிர் உணர்திறன்", "chronologicalNarrative": "எ.கா. 3 நாட்களுக்கு முன் தொடங்கி படிப்படியாக அதிகரித்தது", "biologicalFunctions": "எ.கா. தூக்கம் சரியாக உள்ளது, பசி இயல்பாக உள்ளது", "familyHistory": "எ.கா. தாய்க்கு உயர் இரத்த அழுத்தம்", "personalHistory": "எ.கா. குறிப்பிடத்தக்க வரலாறு இல்லை", "additionalComment": "எ.கா. தொடர்புடைய கூடுதல் தகவல்", "brushingFrequency": "எ.கா. ஒரு நாளில் 3 முறை", "bloodDiseases": "எ.கா. இரத்த சோகை", "heartProblems": "எ.கா. இதயத் துடிப்பு ஒழுங்கின்மை", "otherDisease": "எ.கா. தைராய்டு குறைபாடு", "mouthDiscomfort": "எ.கா. பல் உணர்திறன்", "allergies": "எ.கா. பெனிசிலின்", "recentMajorSurgery": "எ.கா. 2021 இல் குடல்வால் அறுவை சிகிச்சை", "permanentMedication": "எ.கா. லோசார்டன் 50 mg", "extraoralExam": "எ.கா. வெளிப்படையான மாற்றங்கள் இல்லை", "intraoralExam": "எ.கா. பின்புறப் பகுதியில் ஈறு வீக்கம்", "auxiliaryExamResults": "எ.கா. குறிப்பிடத்தக்க கண்டறிதல்கள் இல்லாத பனோரமிக் எக்ஸ்ரே", "observations": "எ.கா. செயல்முறைகளின் போது நோயாளி பதட்டத்தை தெரிவிக்கிறார்"
+      }
+    },
+    "pediatricDentalAnamnesis": {
+      "doctor": "மருத்துவர்", "selectDoctor": "நிபுணரைத் தேர்ந்தெடுக்கவும்", "consultationReason": "ஆலோசனைக்கான காரணம்", "motherName": "தாயின் பெயர்", "fatherName": "தந்தையின் பெயர்", "siblingsCount": "உடன்பிறப்புகளின் எண்ணிக்கை", "birthOrder": "பிறப்பு வரிசை",
+      "currentIllness": "தற்போதைய நோய்", "diseaseType": "நோயின் வகை", "chronologicalNarrative": "காலவரிசை விவரம்",
+      "prenatalHistory": "கர்ப்பகால வரலாறு", "maternalDiseases": "தாயின் நோய்கள்", "pregnancyComplications": "கர்ப்பகாலத்தில் சிக்கல்கள் இருந்ததா?", "prematureBaby": "குழந்தை குறைமாதத்தில் பிறந்ததா?", "birthWeight": "பிறப்பு எடை", "comment": "கருத்து",
+      "postnatalHistory": "பிறப்புக்குப் பிந்தைய வரலாறு", "birthProblems": "பிரசவத்தில் பிரச்சினைகள் இருந்ததா?", "pacifierUse": "சூப்பி பயன்படுத்துகிறதா?", "bottleUse": "பாட்டில் பயன்படுத்துகிறதா?", "thumbSucking": "விரல் சூப்புகிறதா/சூப்பியதா?", "medicationOrTherapy": "மருந்து அல்லது சிகிச்சை எடுக்கிறதா?", "allergiesOrIntolerances": "எதற்காவது ஒவ்வாமை அல்லது சகிப்புத்தன்மையின்மை உள்ளதா?", "brushesBeforeSleep": "தூங்குவதற்கு முன் பல் துலக்குகிறதா?", "openMouthOrSnores": "வாய் திறந்து தூங்குகிறதா அல்லது குறட்டை விடுகிறதா?", "detail": "விவரம்", "additionalComment": "கூடுதல் கருத்து",
+      "feedingAndHygiene": "உணவுப் பழக்கங்கள் / சுகாதாரம்", "sweetsConsumption": "எவ்வளவு இனிப்பு சாப்பிடுகிறது?", "timesPerDay": "ஒரு நாளுக்கு முறை", "daysPerWeek": "நாட்கள்/வாரம்", "milkType": "குழந்தை எந்த வகை பால் பெறுகிறது?", "dentalHygiene": "குழந்தையின் பற்களை எப்படித் துலக்குகிறீர்கள்?", "dailyDiet": "காலை உணவிலிருந்து உங்கள் குழந்தையின் ஒரு நாள் உணவை விவரிக்கவும்.", "parentingStyle": "உங்களை அதிகாரமான, ஒத்துழைக்கும், கவலையற்ற அல்லது அதிக பாதுகாப்பான பெற்றோராகக் கருதுகிறீர்களா?",
+      "finalSection": "இறுதி மதிப்பீடு", "oralHabits": "வாய்ப் பழக்கங்கள்", "brushingTechnique": "பல் துலக்கும் நுட்பம்", "clinicalExam": "மருத்துவ பரிசோதனை", "observations": "குறிப்புகள்", "no": "இல்லை", "yes": "ஆம்", "save": "சேமிக்கவும்", "saveUnavailable": "சேமித்தல் விரைவில் கிடைக்கும்."
+    },
+    "endodonticForm": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "yes": "Yes", "no": "No", "save": "Save", "saveUnavailable": "Saving will be available soon.",
+      "priorEndodonticTreatment": "Previous endodontic treatment?", "painHistory": "Pain history", "additionalNote": "Additional note", "toothNumber": "Tooth no.",
+      "clinicalExam": "CLINICAL EXAMINATION", "anatomicalCrown": "Anatomical crown", "caries": "Caries", "restoration": "Restoration", "bruxism": "Bruxism", "fracture": "Fracture", "fractureWithPulpExposure": "Fracture with pulp exposure",
+      "inflammationPresent": "Inflammation present", "fistulas": "Fistulas", "gingivitis": "Gingivitis", "pockets": "Pockets", "calculus": "Calculus", "specify": "Specify", "mobility": "Mobility", "probing": "Probing",
+      "painCharacteristics": "Pain characteristics", "spontaneous": "Spontaneous", "provoked": "Provoked", "cold": "Cold", "heat": "Heat", "chewing": "Chewing", "nocturnal": "Nocturnal", "air": "Air", "sweet": "Sweet", "acidic": "Acidic", "radiated": "Radiated", "diffuse": "Diffuse", "stabbing": "Stabbing", "continuous": "Continuous", "intermittent": "Intermittent", "sporadic": "Sporadic",
+      "percussionPain": "Pain on percussion", "palpationPain": "Pain on palpation", "horizontal": "Horizontal", "vertical": "Vertical", "vestibular": "Vestibular", "lingualPalatal": "Lingual/Palatal", "additionalClinicalNote": "Additional clinical examination note",
+      "vitalityTest": "VITALITY TEST", "test": "Test", "result": "Yes/No", "duration": "Duration", "intensity": "Intensity", "selectUnavailable": "No options defined",
+      "radiographicExam": "RADIOGRAPHIC EXAMINATION", "pulpChamber": "Pulp chamber", "open": "Open", "closed": "Closed", "wide": "Wide", "narrow": "Narrow", "pulpStones": "Pulp stones", "canals": "Canal(s)", "singleCanal": "Single", "twoCanals": "2 canals", "threeCanals": "3 canals", "fourCanals": "4 canals", "straight": "Straight", "curved": "Curved", "previouslyTreated": "Previously treated", "openApex": "Open apex",
+      "furcationLesion": "Furcation lesion", "apicalLesion": "Apical lesion", "lateralLesion": "Lateral lesion", "endoPerioLesion": "Endo-perio lesion", "dwarfRoots": "Dwarf roots", "rootFracture": "Root fracture", "calcification": "Calcification", "periodontalLigament": "Periodontal ligament", "resorption": "Resorption", "additionalRadiographicNote": "Additional radiographic note",
+      "presumptivePulpalDiagnosis": "PRESUMPTIVE PULPAL DIAGNOSIS", "normalPulp": "Normal pulp", "reversiblePulpitis": "Reversible pulpitis", "symptomaticIrreversiblePulpitis": "Symptomatic irreversible pulpitis", "asymptomaticIrreversiblePulpitis": "Asymptomatic irreversible pulpitis", "pulpNecrosis": "Pulp necrosis", "diagnosisPreviouslyTreated": "Previously treated", "previouslyInitiated": "Previously initiated",
+      "periapicalDiagnosis": "PERIAPICAL DIAGNOSIS", "healthyApicalTissues": "Healthy apical tissues", "acuteApicalPeriodontitis": "Acute apical periodontitis (symptomatic)", "chronicApicalPeriodontitis": "Chronic apical periodontitis (asymptomatic)", "acuteApicalAbscess": "Acute apical abscess (without fistula)", "chronicApicalAbscess": "Chronic apical abscess (with fistula)", "condensingOsteitis": "Condensing osteitis",
+      "definitiveDiagnosis": "DEFINITIVE DIAGNOSIS", "irreversiblePulpitis": "Irreversible pulpitis", "necroticPulp": "Necrotic pulp",
+      "indicatedTreatment": "INDICATED TREATMENT", "biopulpectomy": "Biopulpectomy", "apicoectomy": "Apicoectomy", "necropulpectomy": "Necropulpectomy", "hemisection": "Hemisection", "retreatment": "Retreatment", "radicectomy": "Radicectomy", "whitening": "Whitening", "extraction": "Extraction",
+      "clinicalData": "CLINICAL DATA", "identification": "Identification", "canal": "Canal", "workingLength": "Working length (mm)", "referencePoint": "Reference point", "initialFile": "Initial file", "finalApicalFile": "Final apical file", "cementType": "Cement type", "masterGuttaPerchaCone": "Master gutta-percha cone", "single": "Single", "palatalLingual": "Palatal/Lingual", "mesiolingual": "Mesiolingual", "mesiobuccal": "Mesiobuccal", "distal": "Distal", "distobuccal": "Distobuccal", "distolingual": "Distolingual",
+      "finalSection": "FINAL SECTION", "operativeAccidents": "Operative accidents", "postEndodonticRestoration": "Indicated post-endodontic restoration", "post": "Post", "amalgamResin": "Amalgam/Resin", "crown": "Crown", "other": "Other", "prognosis": "Prognosis", "favorable": "Favorable", "unfavorable": "Unfavorable", "reserved": "Reserved"
+    },
+    "anamneses": { "loadError": "மருத்துவப் படிவத்தை ஏற்ற முடியவில்லை.", "saveError": "மருத்துவப் படிவத்தைச் சேமிக்க முடியவில்லை. உங்கள் தரவு பாதுகாக்கப்பட்டது.", "dentalSaved": "பல் மருத்துவ வரலாறு வெற்றிகரமாகச் சேமிக்கப்பட்டது.", "pediatricSaved": "குழந்தைப் பல் மருத்துவ வரலாறு வெற்றிகரமாகச் சேமிக்கப்பட்டது.", "endodonticSaved": "எண்டோடான்டிக்ஸ் பதிவு வெற்றிகரமாகச் சேமிக்கப்பட்டது." },
     "historyPlaceholder": "மருத்துவக் குறிப்புகள் எதிர்கால பதிப்பில் கிடைக்கும்",
     "noAppointments": "இந்த நோயாளிக்கு சந்திப்புகள் எதுவும் இல்லை",
     "scheduleAppointment": "சந்திப்பை திட்டமிடு",
@@ -454,6 +498,295 @@
   },
   "odontogram": {
     "title": "பல் வரைபடம்",
+    "profile": {
+      "label": "பல் வரைபட வடிவம்",
+      "options": {
+        "original": "அசல்",
+        "pe_nts_188_2022": "MINSA பெரு"
+      },
+      "updateError": "பல் வரைபட வடிவத்தை மாற்ற முடியவில்லை",
+      "nts": {
+        "title": "MINSA பெரு பல் வரைபடம்",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "நோயறிதல்",
+        "evolution": "முன்னேற்றம்",
+        "discharge": "விடுவிப்பு",
+        "other": "பிற"
+      },
+      "chart": {
+        "title": "பல் வரைபடம்",
+        "tooth": "பல் {fdi}",
+        "deciduousTooth": "பால் பல் {fdi}",
+        "permanentDentition": "நிரந்தரப் பல் வரிசை",
+        "deciduousDentition": "பால் பல் வரிசை",
+        "permanentUpper": "நிரந்தர மேல்",
+        "deciduousUpper": "பால் மேல்",
+        "deciduousLower": "பால் கீழ்",
+        "permanentLower": "நிரந்தர கீழ்",
+        "upper": "மேல்",
+        "lower": "கீழ்",
+        "readonly": "படிக்க மட்டும்",
+        "noRecord": "அதிகாரப்பூர்வ படிவத்தின் அமைப்பு. இது எந்த மருத்துவப் பதிவையும் குறிக்கவில்லை.",
+        "findingsPending": "{count} கண்டறிதல்(கள்) முழுமையாக வரையப்படவில்லை",
+        "findingsPendingHint": "அவற்றின் குறியீடுகளுக்குப் பிந்தைய கட்டத்தில் வரும் வரைதல் கூறுகள் தேவை. அனைத்தும் கீழுள்ள பட்டியலில் உள்ளன.",
+        "findingRendererPending": "கண்டறிதல் வரைதல் நிலுவையில்",
+        "siglasHidden": "{count} சுருக்கெழுத்து(கள்) பெட்டியில் அடங்கவில்லை",
+        "siglasHiddenHint": "இடம் இல்லாத இடத்தில் பெட்டி «+n» எனக் காட்டும். பதிவிலிருந்து எதுவும் நீக்கப்படவில்லை; முழுப் பட்டியல் கீழே உள்ளது."
+      },
+      "editor": {
+        "findings": "கண்டறிதல்கள்",
+        "noFindings": "கண்டறிதல்கள் எதுவும் பதிவு செய்யப்படவில்லை.",
+        "newFinding": "புதிய கண்டறிதல்",
+        "editFinding": "கண்டறிதலைத் திருத்து",
+        "addFinding": "கண்டறிதலைச் சேர்",
+        "saveFinding": "கண்டறிதலைச் சேமி",
+        "confirmFinding": "கண்டறிதலை உறுதிப்படுத்து",
+        "removeFinding": "கண்டறிதலை விலக்கு",
+        "removeExplanation": "கண்டறிதல் இந்த வரைவிலிருந்து விலக்கப்படுகிறது. பதிவு அதன் தணிக்கைத் தடத்தைத் தக்கவைக்கிறது.",
+        "partialTitle": "திருத்தம் பகுதியளவில் பயன்படுத்தப்பட்டது",
+        "partialBody": "பண்புகள் சேமிக்கப்பட்டன, ஆனால் இலக்குகள் சேமிக்கப்படவில்லை. கண்டறிதலின் இலக்குகளை மதிப்பாய்வு செய்யவும்: பதிவு ஏற்கனவே மாறிவிட்டது, தானாகவே மீட்கப்படாது.",
+        "refreshFailedTitle": "கண்டறிதல் சேமிக்கப்பட்டது, ஆனால் காட்சியைப் புதுப்பிக்க முடியவில்லை",
+        "refreshFailedBody": "மாற்றம் ஏற்கனவே சேவையகத்தில் உள்ளது. மீண்டும் அனுப்ப வேண்டாம் — புதுப்பிப்பை மீண்டும் முயலவும்.",
+        "refreshRetry": "புதுப்பிப்பை மீண்டும் முயல்",
+        "refreshing": "புதுப்பிக்கிறது",
+        "edit": "திருத்து",
+        "searchFindings": "கண்டறிதலைத் தேடு",
+        "noMatches": "தேடலுக்குப் பொருந்தும் கண்டறிதல் இல்லை.",
+        "targets": "இலக்கு",
+        "selectedTeeth": "தேர்ந்தெடுக்கப்பட்ட பற்கள்",
+        "selectedArches": "வளைவுகள்",
+        "anchors": "குறிப்புகள்",
+        "rangeSpan": "வரம்பு",
+        "toothCount": "{count} பல்",
+        "roles": "பற்களின் பங்குகள்",
+        "noRole": "பங்கு இல்லை",
+        "pickSubject": "பற்களைத் தேர்வு செய்",
+        "pickAnchor": "குறிப்புகளைத் தேர்வு செய்",
+        "changeSelection": "தேர்வை மாற்று",
+        "changeReferences": "குறிப்புகளை மாற்று",
+        "doneSelecting": "தேர்வை முடி",
+        "retargetSubjectHint": "பல்வரைபடத்தில் பற்களைத் தேர்ந்தெடுக்கவும். முந்தைய தேர்வு மாற்றப்படுகிறது; சேமி என்பதை அழுத்தும் வரை எதுவும் சேமிக்கப்படாது.",
+        "retargetAnchorHint": "கண்டறிதலை இடம் குறிக்கும் அண்டைப் பற்களைத் தேர்ந்தெடுக்கவும். சேமி என்பதை அழுத்தும் வரை எதுவும் சேமிக்கப்படாது.",
+        "rolesOptional": "பற்களின் மருத்துவப் பங்கு (விருப்பத்தேர்வு)",
+        "rolesOptionalHint": "பொருந்தும்போது மட்டும் ஒதுக்கவும்.",
+        "unnumberedSubject": "இந்தப் பல்லுக்கு FDI எண் இல்லை: அண்டைப் பற்களால் இடம் குறிக்கப்படுகிறது.",
+        "unnumberedBetween": "{teeth} இடையே",
+        "pendingReview": "மதிப்பாய்வு நிலுவையில்",
+        "unknownRule": "இந்தப் பதிப்பு இந்தக் கண்டறிதலின் விதியை அறியவில்லை.",
+        "unknownRuleShort": "அறியப்படாத விதி",
+        "attributeRequired": "இந்தத் தரவு கட்டாயமானது.",
+        "needsClinicalReview": "இந்தத் தரவு மருத்துவ மதிப்பாய்வுக்குக் காத்திருப்பதாகப் பட்டியல் குறிக்கிறது.",
+        "specificationRequired": "பல்வரைபடத்தை இறுதி செய்வதற்கு முன் இந்தக் கண்டறிதலுக்கு ஒரு விவரக்குறிப்பு தேவை.",
+        "specificationAdvisory": "விவரக்குறிப்புகளில் கூடுதல் தகவலைப் பதிவு செய்யப் பட்டியல் பரிந்துரைக்கிறது.",
+        "pick": {
+          "tooth": "பல்வரைபடத்தில் {count} பல்லைத் தேர்ந்தெடுக்கவும்.",
+          "surface": "பல்லைத் தேர்ந்தெடுத்து அதன் மேற்பரப்புகளைக் குறிக்கவும்.",
+          "pair": "பல்வரைபடத்தில் இரண்டு பற்களையும் தேர்ந்தெடுக்கவும்.",
+          "range": "வரம்பின் முதல் மற்றும் கடைசிப் பல்லைத் தேர்ந்தெடுக்கவும்.",
+          "archOne": "சிகிச்சையில் உள்ள வளைவைத் தேர்ந்தெடுக்கவும்.",
+          "archOneOrBoth": "ஒரு வளைவையோ இரண்டையுமோ தேர்ந்தெடுக்கவும்.",
+          "unnumbered": "கண்டறிதலை இடம் குறிக்கும் {count} அண்டைப் பற்களைத் தேர்ந்தெடுக்கவும்."
+        },
+        "problem": {
+          "subjectCount": "{expected} பல் தேவை; {count} தேர்ந்தெடுக்கப்பட்டுள்ளது.",
+          "rangeRequired": "பற்களின் வரம்பைத் தேர்ந்தெடுக்கவும்.",
+          "duplicateTooth": "ஒரு பல் இருமுறை தேர்ந்தெடுக்கப்பட்டுள்ளது.",
+          "anchorCount": "{expected} குறிப்பு தேவை; {count} தேர்ந்தெடுக்கப்பட்டுள்ளது.",
+          "anchorDistinct": "குறிப்புகள் வெவ்வேறு பற்களாக இருக்க வேண்டும்.",
+          "archRequired": "ஒரு வளைவைத் தேர்ந்தெடுக்கவும்.",
+          "archExactlyOne": "இந்த விதி சரியாக ஒரு வளைவை உள்ளடக்கும்.",
+          "archOneOrBoth": "இந்த விதி ஒரு வளைவையோ இரண்டையுமோ உள்ளடக்கும்.",
+          "roleMin": "{role} பங்குக்கு குறைந்தது {min} பல் தேவை.",
+          "roleMax": "{role} பங்கு அதிகபட்சம் {max} பல்லை அனுமதிக்கும்."
+        },
+        "a11y": {
+          "select": "{tooth} தேர்ந்தெடு",
+          "selected": "{tooth}, தேர்ந்தெடுக்கப்பட்டது",
+          "anchorSelected": "{tooth}, குறிப்பாகத் தேர்ந்தெடுக்கப்பட்டது",
+          "register": "{tooth} இல் கண்டறிதலைப் பதிவு செய்"
+        }
+      },
+      "status": {
+        "draft": "வரைவு",
+        "finalized": "இறுதி செய்யப்பட்டது",
+        "discarded": "நிராகரிக்கப்பட்டது",
+        "superseded": "திருத்தப்பட்டது"
+      },
+      "field": {
+        "stage": "நிலை",
+        "stageLabel": "நிலையின் பெயர்",
+        "finalizedAt": "இறுதி செய்த நாள்",
+        "openedAt": "திறந்த நாள்",
+        "recordedBy": "பதிவு செய்தவர்",
+        "findings": "கண்டறிதல்கள்",
+        "discardReason": "காரணம்",
+        "continueReason": "தொடர்வதற்கான காரணம்",
+        "discardedAt": "நீக்கப்பட்ட நாள்",
+        "normVersion": "தரநிலை பதிப்பு"
+      },
+      "actions": {
+        "createDraft": "வரைவை உருவாக்கு",
+        "finalize": "இறுதி செய்",
+        "discardDraft": "வரைவை நிராகரி",
+        "continue": "நோயறிதலைத் தொடரவும்"
+      },
+      "current": {
+        "title": "நடப்புப் பதிவு"
+      },
+      "draft": {
+        "title": "திருத்தத்தில் உள்ள வரைவு"
+      },
+      "history": {
+        "title": "பதிவு வரலாறு",
+        "returnToCurrent": "தற்போதைய ஒடோன்டோகிராமுக்குத் திரும்பு",
+        "viewing": "திரையில்",
+        "viewingTitle": "வரலாற்றிலிருந்து ஒரு ஒடோன்டோகிராம் பார்க்கிறீர்கள்",
+        "viewingBody": "பதிவு செய்யப்பட்டபடியே, அதற்குரிய தரநிலை பதிப்பின்படி காட்டப்படுகிறது. இதை மாற்ற முடியாது.",
+        "superseded": "மாற்றப்பட்டது",
+        "empty": "முந்தைய பதிவுகள் இல்லை.",
+        "loadFailedTitle": "இந்த ஒடோன்டோகிராமைத் திறக்க முடியவில்லை",
+        "catalogFailedTitle": "இந்த ஒடோன்டோகிராமின் தரநிலை பதிப்பை ஏற்ற முடியவில்லை",
+        "catalogFailedBody": "இந்தப் பதிவு {version} பதிப்பில் செய்யப்பட்டது; அது கிடைக்கவில்லை. எதுவும் வரையப்படவில்லை: வேறு பதிப்பில் படிப்பது பதிவில் இல்லாத கண்டறிதல்களைக் காட்டும்.",
+        "isCurrent": "தற்போதைய ஒடோன்டோகிராம்"
+      },
+      "empty": {
+        "title": "இந்த நோயாளிக்கு MINSA பல் வரைபடம் எதுவும் பதிவு செய்யப்படவில்லை."
+      },
+      "create": {
+        "hint": "நிலை என்பது பதிவின் மேல்தரவு; விதிமுறை நிலையான தொகுப்பைக் கோரவில்லை."
+      },
+      "discard": {
+        "explanation": "வரைவு நிராகரிக்கப்பட்டு திருத்த முடியாததாகிறது. அது நீக்கப்படுவதில்லை: அதன் காரணத்துடன் பதிவில் இருக்கும்."
+      },
+      "continue": {
+        "explanation": "தற்போதைய நோயறிதலிலிருந்து புதிய திருத்தக்கூடிய பதிப்பு உருவாக்கப்படும். இறுதி செய்யப்பட்ட நோயறிதல் வரலாற்றில் மாற்றமின்றி இருக்கும்."
+      },
+      "entry": {
+        "title": "கண்டறிதலைப் பதிவு செய் — பல் {fdi}",
+        "hint": "கண்டறிதலைத் தேர்ந்தெடுக்கவும்; பல் தேர்ந்தெடுக்கப்படும்."
+      },
+      "planReference": {
+        "title": "நோயறிதல் கண்டறிதல்கள்",
+        "lastDiagnosis": "சமீபத்திய நோயறிதல்: {date}",
+        "location": "இடம்",
+        "noDiagnosis": "இறுதி செய்யப்பட்ட நோயறிதல் இன்னும் இல்லை.",
+        "noFindings": "தற்போதைய நோயறிதலில் கண்டறிதல்கள் எதுவும் பதிவாகவில்லை.",
+        "errorTitle": "கண்டறிதல்களை ஏற்ற முடியவில்லை",
+        "error": "திட்டம் தொடர்ந்து கிடைக்கும். நோயறிதல் குறிப்பைக் காண மீண்டும் முயலவும்."
+      },
+      "carriedForward": {
+        "title": "மதிப்பாய்வு செய்யப்படாத {count} முன்கொணரப்பட்ட கண்டறிதல்கள்",
+        "hint": "இவை முந்தைய பதிவிலிருந்து நகலெடுக்கப்பட்டவை. இறுதி செய்வதற்கு முன் ஒவ்வொன்றையும் பட்டியலில் உறுதிப்படுத்தவும்."
+      },
+      "conflict": {
+        "title": "மற்றொரு அமர்வில் பல் வரைபடம் மாறியது",
+        "version": "தகவல் புதுப்பிக்கப்பட்டது; மீண்டும் முயல்வதற்கு முன் அதைச் சரிபார்க்கவும்.",
+        "draft": "இந்த நோயாளிக்கு ஏற்கனவே ஒரு வரைவு திறந்துள்ளது.",
+        "state": "இந்தப் பதிவு ஏற்கனவே இறுதி செய்யப்பட்டது, நிராகரிக்கப்பட்டது அல்லது மற்றொரு அமர்வில் மாற்றப்பட்டது. தகவல் புதுப்பிக்கப்பட்டது."
+      },
+      "error": {
+        "loadTitle": "MINSA பல் வரைபடத்தை ஏற்ற முடியவில்லை",
+        "clinicalTitle": "செயல்பாட்டை முடிக்க முடியவில்லை",
+        "normUnavailableTitle": "விதிமுறை பதிப்பு கிடைக்கவில்லை",
+        "normUnavailable": "இந்த நிறுவலில் இந்த விதிமுறை பதிப்பு கிடைக்கவில்லை."
+      },
+      "specifications": {
+        "title": "விவரக் குறிப்புகள்",
+        "add": "விவரக் குறிப்பைச் சேர்",
+        "edit": "விவரக் குறிப்பைத் திருத்து",
+        "remove": "விவரக் குறிப்பை நீக்கு",
+        "removeExplanation": "இந்த பதிவு ஒடோன்டோகிராமில் தோன்றாது. பதிவு தன் தணிக்கைத் தடம் வைத்திருக்கும்.",
+        "textLabel": "விவரக் குறிப்பு உரை",
+        "emptyDraft": "இன்னும் விவரக் குறிப்புகள் இல்லை. கட்டங்களில் இடம்பிடிக்காதவற்றைப் பதிவ சேர்க்கவும்.",
+        "emptyFinalized": "விவரக் குறிப்புகள் இல்லை.",
+        "readonly": "இந்தப் பதிவு இறுதிச்வைக்கப்பட்டது: விவரக் குறிப்புகள் படிக்க மட்டும்.",
+        "linkedTeeth": "பல்(கள்) {teeth} குறித்தது",
+        "linkedFinding": "இந்தப் பதிவின் ஒரு கண்டறிதலுடன் இணைக்கப்பட்டது",
+        "linkedUnknown": "விளக்கப்படாத ஒரு கண்டறிதலுடன் இணைக்கப்பட்டது",
+        "overflowTitle": "ஒன்று அல்லது பல கட்டங்களில் சில தகவல்கள் காட்சியளவில் இடம்பிடிக்கவில்லை",
+        "overflowBody": "கண்டறிதல்கள் தொடர்ந்தும் பதிவில் உள்ளன, பட்டியலில் தோன்றுகின்றன. விரிவாக குறிப்பிட வேண்டுமெனில், இங்கே விவரக் குறிப்புகளில் எழுதலாம்."
+      },
+      "observations": {
+        "title": "கவனிப்புகள்",
+        "label": "கவனிப்புகள்",
+        "hint": "ஒடோன்டோகிராமின் பெயர்ப்பட்டியல் உள்ளடக்கப்படாத மருத்துவக் கண்டறிதல்கள்.",
+        "empty": "கவனிப்புகள் இல்லை.",
+        "readonly": "இந்தப் பதிவு இறுதிச்வைக்கப்பட்டது: கவனிப்புகள் படிக்க மட்டும்."
+      },
+      "text": {
+        "refreshFailedTitle": "மாற்றங்கள் சேமிக்கப்பட்டன, ஆனால் காட்சியைப் புதுப்பிக்க முடியவில்லை",
+        "refreshFailedBody": "சேவையகத்தில் உள்ள பதிவில் ஏற்கனவே மாற்றங்கள் உள்ளன. அவற்றைக் காண மீண்டும் படிக்கவும்; எதுவும் மீண்டும் அனுப்பப்படாது."
+      },
+      "unsaved": {
+        "title": "சேமிக்கப்படாத மாற்றங்கள் உள்ளன",
+        "body": "தொடர்ந்தால், நீங்கள் எழுதி சேமிக்காத உரை இழக்கப்படும்.",
+        "stay": "தொடர்ந்து திருத்து",
+        "discard": "நீக்கிவிட்டுத் தொடர்",
+        "leavePage": "ஒடோன்டோகிராமில் சேமிக்கப்படாத மாற்றங்கள் உள்ளன. ஏனும் வெளியேறவா?"
+      },
+      "print": {
+        "title": "பல் வரைபடம்",
+        "unavailable": "ஆவணத்தை உருவாக்க முடியவில்லை: இந்தப் பதிவின் தரநிலை பதிப்பு கிடைக்கவில்லை.",
+        "patient": "நோயாளி",
+        "document": "அடையாள ஆவணம்",
+        "date": "தேதி",
+        "specifications": "விவரக் குறிப்புகள்",
+        "observations": "கவனிப்புகள்",
+        "emptySpecifications": "விவரக் குறிப்புகள் எதுவும் பதிவு செய்யப்படவில்லை.",
+        "emptyObservations": "கவனிப்புகள் எதுவும் பதிவு செய்யப்படவில்லை.",
+        "incompleteFindings": "முழுமையாகக் குறிக்கப்படாத கண்டறிதல்கள்",
+        "systemNote": "DenPlant உருவாக்கிய குறிப்பு. இது தரநிலை வரைபடத்தின் பகுதி அல்ல.",
+        "unsupportedCopy": "{target}: {label} — பதிவு செய்யப்பட்டது, வரைபடத்தில் குறிக்கப்படவில்லை.",
+        "partialCopy": "{target}: {label} — வரைபடத்தில் பகுதியளவு குறிக்கப்பட்டது.",
+        "professional": "பொறுப்பான மருத்துவர்",
+        "registeredBy": "பதிவு செய்தவர்",
+        "role": "பணி",
+        "professionalId": "பதிவு எண் / தொழில்முறை அடையாளம்",
+        "technical": "பதிவின் தொழில்நுட்பத் தரவு",
+        "recordId": "பதிவு",
+        "normVersion": "தரநிலை பதிப்பு",
+        "status": "நிலை",
+        "contentFingerprint": "உள்ளடக்க அடையாளம்",
+        "fingerprintUnavailable": "இந்த நிலைக்குக் கிடைக்கவில்லை.",
+        "print": "அச்சிடு",
+        "printDraft": "வரைவை அச்சிடு",
+        "printDiscarded": "நிராகரிக்கப்பட்ட பதிவை அச்சிடு",
+        "prepare": "அச்சிடலுக்குத் தயார் செய்",
+        "prepareHint": "இந்த விருப்பங்களை உலாவியின் உரையாடல் கட்டுப்படுத்துகிறது. அச்சிடுவதற்கு முன் அவற்றை உறுதிப்படுத்தவும்.",
+        "paper": "தாள்: A4",
+        "orientation": "திசை: செங்குத்து",
+        "scale": "அளவு: 100 %",
+        "color": "வண்ணத்தில் அச்சிடவும்",
+        "colorHint": "சிவப்பும் நீலமும் ஒவ்வொரு கண்டறிதலின் மருத்துவ நிலையை வேறுபடுத்துகின்றன.",
+        "doNotFit": "«பக்கத்திற்கு ஏற்ப» பயன்படுத்த வேண்டாம்: அது வரைபடத்தை தரநிலை கோரும் குறைந்தபட்ச கிரீட அளவுக்கும் கீழே சுருக்குகிறது.",
+        "openPrintDialog": "அச்சு உரையாடலைத் திற",
+        "cancel": "ரத்து செய்",
+        "blockedTitle": "இன்னும் அச்சிட முடியாது",
+        "dirtyBlocked": "அச்சிடுவதற்கு முன் மாற்றங்களைச் சேமிக்கவும் அல்லது நிராகரிக்கவும். சேமிக்கப்பட்ட பதிவிலிருந்தே தாள் உருவாக்கப்படுகிறது.",
+        "writingBlocked": "ஒரு மாற்றம் நடைபெறுகிறது. அது முடியும் வரை காத்திருக்கவும்.",
+        "refreshBlocked": "அச்சிடுவதற்கு முன் பதிவைப் புதுப்பிக்கவும்: மாற்றம் சேமிக்கப்பட்டது, ஆனால் மீண்டும் படிக்க முடியவில்லை.",
+        "conflictBlocked": "மற்றொரு அமர்வு இந்தப் பல் வரைபடத்தை மாற்றியுள்ளது. அச்சிடுவதற்கு முன் அறிவிப்பைப் பார்க்கவும்.",
+        "loadingBlocked": "பதிவு ஏற்றப்படுகிறது. முடியும் வரை காத்திருக்கவும்.",
+        "unsafePrint": "இந்த நிலையில் பல் வரைபடத்தை அச்சிட முடியாது. பயன்பாட்டிற்குத் திரும்பி, பதிவைச் சேமிக்கவும் அல்லது புதுப்பிக்கவும், பின்னர் மீண்டும் முயலவும்.",
+        "draftQualification": "வரைவு",
+        "draftNotFinal": "இது இறுதிப் பதிவு அல்ல.",
+        "pendingCarriedForward": "இந்த வரைவில் மறுஆய்வுக்குக் காத்திருக்கும் {count} முன்கொணர்ந்த கண்டறிதல்(கள்) உள்ளன.",
+        "discardedQualification": "நிராகரிக்கப்பட்டது",
+        "discardedHint": "இந்தப் பதிவு நிராகரிக்கப்பட்டது; இது நடப்பில் உள்ள பல் வரைபடம் அல்ல.",
+        "discardReason": "நிராகரிப்புக்கான காரணம்",
+        "supersededQualification": "மாற்றப்பட்ட பதிவு",
+        "supersededHint": "இந்த நோயாளிக்குப் பிந்தைய பதிவு ஒன்று உள்ளது.",
+        "incompleteWarning": "இந்தப் பதிவில் DenPlant வரைபடத்தில் முழுமையாகக் குறிக்காத கண்டறிதல்கள் உள்ளன.",
+        "incompleteNote": "அச்சிடப்பட்ட தாளில் அவற்றை அடையாளம் காட்டும் கணினிக் குறிப்பு உள்ளது.",
+        "partialCount": "பகுதியளவு குறிக்கப்பட்டது: {count}",
+        "unsupportedCount": "வரைபடத்தில் குறிக்கப்படவில்லை: {count}",
+        "additionalDetailsHint": "கூடுதல் மருத்துவ விவரம் பதிவு செய்ய வேண்டுமானால், பொருந்தும்போது விவரக் குறிப்புகளைப் பயன்படுத்தவும்."
+      }
+    },
     "tooth": "பல்",
     "globals": {
       "category": "முழு வாய்",
@@ -700,7 +1033,9 @@
       "history": "வரலாறு",
       "diagnosis": "நோய் கண்டறிதல்",
       "plans": "சிகிச்சை திட்டங்கள்",
-      "appointments": "சந்திப்புகள்"
+      "appointments": "சந்திப்புகள்",
+      "prescriptions": "மருந்துச்சீட்டுகள்",
+      "evolution": "முன்னேற்றம்"
     },
     "history": {
       "stateAt": "நிலை",
@@ -718,7 +1053,8 @@
       "continuePlan": "\"{name}\" திட்டத்தைத் தொடரவும்",
       "selectPlan": "திட்டத்தைத் தேர்ந்தெடுக்கவும்",
       "continue": "தொடரவும்",
-      "odontogramTab": "பல் வரைபடம்"
+      "odontogramTab": "பல் வரைபடம்",
+      "addNote": "குறிப்பு சேர்"
     },
     "plans": {
       "title": "சிகிச்சை திட்டங்கள்",
@@ -852,6 +1188,19 @@
     "followup": {
       "title": "சந்திப்புக்குப் பிந்தைய செயல்கள்"
     },
+    "completionGate": {
+      "title": "எந்த சிகிச்சைகள் செய்யப்பட்டன?",
+      "description": "இந்த சந்திப்பில் முடிக்கப்பட்ட திட்டச் சிகிச்சைகளைத் தேர்ந்தெடுக்கவும். தேர்ந்தெடுக்கப்படாதவை திட்டத்தில் நிலுவையில் இருக்கும்.",
+      "evolutionLabel": "மருத்துவ முன்னேற்றம்",
+      "evolutionPlaceholder": "இந்த வருகையில் செய்யப்பட்டதை விவரிக்கவும் (விருப்பத்தேர்வு)"
+    },
+    "noActivePlans": "செயலில் உள்ள சிகிச்சைத் திட்டங்கள் இல்லை.",
+    "noPendingTreatmentsInPlan": "இந்தத் திட்டத்தில் நிலுவையிலான சிகிச்சைகள் இல்லை.",
+    "selectPlan": "சிகிச்சைத் திட்டம்",
+    "pendingTreatments": "நிலுவையிலான சிகிச்சைகள்",
+    "historicalTreatments": "இந்த அப்பாயின்ட்மென்டுடன் ஏற்கனவே இணைக்கப்பட்ட சிகிச்சைகள்",
+    "historicalTreatmentBadge": "முடிக்கப்பட்டது",
+    "sessionN": "அமர்வு {n}",
     "created": "சந்திப்பு உருவாக்கப்பட்டது",
     "saved": "சந்திப்பு சேமிக்கப்பட்டது",
     "updated": "சந்திப்பு புதுப்பிக்கப்பட்டது",
@@ -912,6 +1261,7 @@
     "selectPendingTreatment": "நிலுவையிலுள்ள சிகிச்சையைத் தேர்ந்தெடுக்கவும்",
     "emptyDay": "இந்த நாளுக்கு சந்திப்புகள் இல்லை",
     "noPatient": "நோயாளி இல்லை",
+    "labels": { "title": "குறிச்சொற்கள்", "field": "குறிச்சொல்", "none": "குறிச்சொல் இல்லை", "new": "புதிய குறிச்சொல்", "edit": "குறிச்சொல்லைத் திருத்து", "name": "பெயர்", "color": "நிறம்", "preview": "முன்னோட்டம்", "saved": "குறிச்சொல் சேமிக்கப்பட்டது", "saveError": "குறிச்சொல்லைச் சேமிக்க முடியவில்லை", "deactivated": "குறிச்சொல் முடக்கப்பட்டது", "deactivate": "குறிச்சொல்லை முடக்கு", "inactive": "செயலற்றது", "empty": "குறிச்சொற்கள் இல்லை", "loadSuggested": "பரிந்துரைக்கப்பட்ட குறிச்சொற்களை ஏற்று", "suggestedConfirm": "விடுபட்ட பரிந்துரைக்கப்பட்ட குறிச்சொற்களை ஏற்றவா? ஏற்கனவே உள்ளவை மாற்றப்படாது.", "suggestedResult": "உருவாக்கப்பட்டவை: {created}. உள்ளவை: {existing}. பிழைகள்: {errors}." },
     "freeSlots": {
       "byProfessional": "நிபுணர்",
       "byCabinet": "அறை",
@@ -935,7 +1285,7 @@
       "afternoon": "மதிய வணக்கம்",
       "evening": "மாலை வணக்கம்"
     },
-    "welcome": "DentalPin-க்கு வரவேற்கிறோம்",
+    "welcome": "Denplant-க்கு வரவேற்கிறோம்",
     "welcomeMessage": "உங்கள் முதல் நோயாளியை உருவாக்குவதன் மூலம் தொடங்குங்கள்.",
     "quickActions": {
       "newAppointment": "புதிய சந்திப்பு",
@@ -1108,6 +1458,8 @@
     "youTag": "(நீங்கள்)",
     "userActive": "பயனர் செயலில் உள்ளார்",
     "isProfessional": "நிபுணராகப் பணிபுரிகிறார்",
+    "professionalRegistration": "தொழில்முறை பதிவு எண்",
+    "professionalRegistrationHelp": "பல் மருத்துவரின் தொழில்முறை பதிவு எண்.",
     "isProfessionalHelp": "அட்டவணையில் காட்டப்படுவார், பணி நேரங்கள் உள்ளன, சிகிச்சைகள் ஒதுக்கப்படலாம். ஒரு நிர்வாகியும் நிபுணராகப் பணியாற்றலாம்.",
     "userInactiveNote": "(உள்நுழைய முடியாது)",
     "saveChanges": "மாற்றங்களைச் சேமி",
@@ -1227,16 +1579,40 @@
       "copy": "இணைப்பை நகலெடு",
       "copied": "இணைப்பு நகலெடுக்கப்பட்டது",
       "whatsapp": "WhatsApp மூலம் அனுப்பு",
-      "shareText": "வணக்கம் {name}, இதோ உங்கள் DentalPin அணுகல். திறந்து உங்கள் கடவுச்சொல்லைத் தேர்ந்தெடுக்கவும்: {url}",
+      "shareText": "வணக்கம் {name}, இதோ உங்கள் Denplant அணுகல். திறந்து உங்கள் கடவுச்சொல்லைத் தேர்ந்தெடுக்கவும்: {url}",
       "secretNote": "கடவுச்சொல் போலக் கருதுங்கள்: இணைப்பு உள்ள எவரும் இந்தக் கணக்கில் உள்நுழையலாம்.",
       "passwordOptionalHelp": "WhatsApp அல்லது மின்னஞ்சல் மூலம் அனுப்பக்கூடிய அணுகல் இணைப்பை உருவாக்க காலியாக விடவும்.",
       "passwordOptionalPlaceholder": "விருப்பத்தேர்வு",
       "createAndLink": "உருவாக்கி இணைப்பை உருவாக்கு",
       "rowAction": "அணுகல் இணைப்பு",
       "setPasswordTitle": "உங்கள் கடவுச்சொல்லைத் தேர்ந்தெடுக்கவும்",
-      "setPasswordSubtitle": "DentalPin-க்கு அழைக்கப்பட்டுள்ளீர்கள். உள்நுழைய உங்கள் கடவுச்சொல்லை உருவாக்கவும்.",
+      "setPasswordSubtitle": "Denplant-க்கு அழைக்கப்பட்டுள்ளீர்கள். உள்நுழைய உங்கள் கடவுச்சொல்லை உருவாக்கவும்.",
       "setPasswordSubmit": "சேமித்து உள்நுழை",
       "invalidToken": "இந்த இணைப்பு செல்லாதது அல்லது ஏற்கனவே பயன்படுத்தப்பட்டது. உங்கள் கிளினிக் நிர்வாகியிடம் புதியதைக் கேளுங்கள்."
+    },
+    "logo": {
+      "title": "Visual identity",
+      "description": "The clinic logo appears on budgets and on documents generated from now on.",
+      "none": "No logo",
+      "alt": "Clinic logo",
+      "upload": "Upload logo",
+      "replace": "Replace logo",
+      "remove": "Remove logo",
+      "confirmRemove": "Yes, remove",
+      "recommended": "Recommended size: {width}×{height} px (about 2.5:1), with a transparent background for PNG.",
+      "formats": "PNG, JPEG or WebP · up to {mb} MB · up to {max}×{max} px. SVG is not accepted.",
+      "pdfBox": "On the PDF it is printed inside a 50×20 mm box, never stretched.",
+      "signedNote": "Budgets that are already signed keep the logo they were signed with.",
+      "saved": "Logo updated",
+      "removed": "Logo removed",
+      "errors": {
+        "type": "The file must be a PNG, JPEG or WebP image.",
+        "size": "The file is larger than {mb} MB.",
+        "empty": "The file is empty.",
+        "dimensions": "The image is larger than {max}×{max} px.",
+        "animated": "Animated images are not accepted.",
+        "unreadable": "The image could not be read. Try another file."
+      }
     }
   },
   "selector": {
@@ -1535,6 +1911,7 @@
     "clinicalCategory": "மருத்துவ வகை",
     "noOdontogramMapping": "தொடர்பு இல்லை",
     "odontogramMappingHint": "தேர்ந்தெடுக்கப்பட்ட வகையின் அடிப்படையில் சிகிச்சை சிறப்பியல்புகள் தானாகச் சரிசெய்யப்படும்.",
+    "odontogramLegacyTypeUnsupported": "பழைய வகை \"{type}\" இனி ஆதரிக்கப்படவில்லை. சேமிப்பதற்கு முன் சரியான சிகிச்சை வகையைத் தேர்ந்தெடுக்கவும்.",
     "selectCategory": "வகையைத் தேர்ந்தெடுக்கவும்...",
     "selectVatType": "VAT வகையைத் தேர்ந்தெடுக்கவும்...",
     "selectScope": "வரம்பைத் தேர்ந்தெடுக்கவும்...",

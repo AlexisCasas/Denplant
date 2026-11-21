@@ -257,6 +257,21 @@ export function useBudgets() {
     return response.data
   }
 
+  async function acceptInClinic(
+    id: string,
+    data: { signer_name: string, signature_data?: { png?: string } }
+  ): Promise<Budget> {
+    const response = await api.post<ApiResponse<Budget>>(
+      `/api/v1/budget/budgets/${id}/accept-in-clinic`,
+      data
+    )
+
+    // Update local state
+    updateBudgetStatus(id, response.data.status)
+
+    return response.data
+  }
+
   async function rejectBudget(id: string, data: BudgetRejectRequest = {}): Promise<Budget> {
     const response = await api.post<ApiResponse<Budget>>(
       `/api/v1/budget/budgets/${id}/reject`,
@@ -467,6 +482,7 @@ export function useBudgets() {
     // Workflow
     sendBudget,
     acceptBudget,
+    acceptInClinic,
     rejectBudget,
     cancelBudget,
     duplicateBudget,

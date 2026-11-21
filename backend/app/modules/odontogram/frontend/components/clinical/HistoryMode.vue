@@ -12,6 +12,7 @@ import type { OdontogramHistoryEntry } from '~~/app/types'
 
 const props = defineProps<{
   patientId: string
+  dateOfBirth?: string | null
 }>()
 
 const { t } = useI18n()
@@ -182,6 +183,7 @@ async function onHistoryExpanded(expanded: boolean) {
 
           <OdontogramChart
             :patient-id="patientId"
+            :date-of-birth="dateOfBirth"
             mode="view-only"
           />
         </UCard>

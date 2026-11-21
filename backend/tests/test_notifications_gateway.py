@@ -259,7 +259,13 @@ async def test_send_notification_tool_enqueues(db_session, test_patient):
     from app.modules.notifications.tools import SendNotificationArgs, _send_notification
 
     await _email_template(db_session, test_patient.clinic_id)
-    ctx = SimpleNamespace(db=db_session, clinic_id=test_patient.clinic_id, supervisor_id=None)
+    ctx = SimpleNamespace(
+        db=db_session,
+        clinic_id=test_patient.clinic_id,
+        supervisor_id=None,
+        actor_role="admin",
+        actor_user_id=None,
+    )
     result = await _send_notification(
         ctx,
         SendNotificationArgs(

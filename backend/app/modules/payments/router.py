@@ -16,7 +16,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.dependencies import (
+    ClinicContext,
+    get_clinic_context,
+    require_financial_visibility,
+    require_permission,
+)
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
@@ -53,7 +58,7 @@ from .workflow import (
     refund_payment,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_financial_visibility)])
 
 
 def _bad_request(exc: Exception) -> HTTPException:

@@ -1,8 +1,20 @@
 <script setup lang="ts">
+import { PERMISSIONS } from '~~/app/config/permissions'
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const toast = useToast()
+const { can } = usePermissions()
+const api = useApi()
+
+// The odontogram chart embedded in PlanDetailView is gated on
+// odontogram.write specifically (not treatment_plan.plans.write) —
+// mirrors patients/frontend/pages/patients/[id].vue's ClinicalTab
+// wiring so a role with plan-write but no odontogram-write (e.g.
+// receptionist) can't get an editable chart just by landing on this
+// standalone route instead of the patient ficha's Plans tab.
+const odontogramReadonly = computed(() => !can(PERMISSIONS.odontogram.write))
 
 const {
   currentPlan,
@@ -22,6 +34,21 @@ watch(planId, async (newId) => {
 })
 
 const patientId = computed(() => currentPlan.value?.patient_id || '')
+const patientDateOfBirth = ref<string | null>(null)
+
+async function fetchPatientDateOfBirth() {
+  if (!patientId.value) { patientDateOfBirth.value = null; return }
+  try {
+    const response = await api.get<{ data?: { date_of_birth?: string | null } }>(`/api/v1/patients/${patientId.value}/extended`)
+    patientDateOfBirth.value = response.data?.date_of_birth ?? null
+  } catch {
+    // The selector has a safe permanent fallback when the identity endpoint is
+    // unavailable; plan data and clinical records are never blocked by it.
+    patientDateOfBirth.value = null
+  }
+}
+
+watch(patientId, () => { void fetchPatientDateOfBirth() }, { immediate: true })
 
 async function handleUpdated() {
   await fetchPlan(planId.value)
@@ -96,6 +123,8 @@ function handleCancelled() {
       v-else
       :plan="currentPlan"
       :patient-id="patientId"
+      :patient-date-of-birth="patientDateOfBirth"
+      :readonly="odontogramReadonly"
       standalone
       @updated="handleUpdated"
       @generate-budget="handleGenerateBudget"

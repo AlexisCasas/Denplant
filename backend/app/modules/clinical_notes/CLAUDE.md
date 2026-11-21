@@ -17,7 +17,7 @@ Routes mounted at `/api/v1/clinical_notes/`.
 - `DELETE /notes/{id}`                             — soft delete; author or admin
 - `GET    /attachments?owner_type=…&owner_id=…`    — read-only proxy; new
   callers should use `/api/v1/media/attachments` directly
-- `GET    /patients/{id}/recent`                   — Summary-tab feed (filterable)
+- `GET    /patients/{id}/recent`                   — Summary-tab feed and the Evolución tab (filter by `types`, page by `before`, `limit` ≤ 100)
 - `GET    /patients/{id}/by-plan`                  — plan→treatment grouped feed
 - `GET    /treatment-plans/{id}/merged`            — plan + treatment + visit notes for one plan
 - `GET    /note-templates`                         — static template catalog
@@ -28,6 +28,7 @@ Routes mounted at `/api/v1/clinical_notes/`.
 |------------------------------|---------------|----------------------------------------|----------------|
 | administrative               | patient       | patients.id                            | always NULL    |
 | diagnosis                    | patient       | patients.id                            | optional       |
+| evolution                    | patient       | patients.id                            | always NULL    |
 | treatment                    | treatment     | treatments.id (odontogram)             | always NULL    |
 | treatment_plan               | plan          | treatment_plans.id (treatment_plan)    | always NULL    |
 | appointment_clinical         | appointment   | appointments.id (agenda)               | always NULL    |
@@ -57,7 +58,8 @@ Backend reads cross-module models for two reasons:
 
 UI integrations are slot-based. Host modules expose slot points and
 `clinical_notes/frontend/plugins/slots.client.ts` registers components
-into them. Hosts (``patients``, ``odontogram``, ``treatment_plan``)
+into them. `patient.clinical.evolution` (rendered by `patients`' `ClinicalTab`
+in its fifth mode) is filled by `EvolutionNotesView.vue`. Hosts (``patients``, ``odontogram``, ``treatment_plan``)
 never import this module.
 
 ## Permissions
@@ -73,6 +75,7 @@ read/write notes (administrative notes are reception-friendly).
 |---|---|
 | `clinical_notes.administrative_created` | administrative note created |
 | `clinical_notes.diagnosis_created`      | diagnosis note created      |
+| `clinical_notes.evolution_created`      | evolution note created      |
 | `clinical_notes.treatment_created`      | treatment note created      |
 | `clinical_notes.plan_created`           | treatment_plan note created |
 | `clinical_notes.appointment_clinical_created`       | clinical note on an appointment |
@@ -109,7 +112,28 @@ None.
 - **Slot points are stable contracts.** ``patient.summary.feed``,
   ``odontogram.diagnosis.sidebar``, ``odontogram.condition.actions``
   must stay populated even if you refactor — patient_timeline / agenda
-  / patients UIs depend on them through the slot registry.
+  / patients UIs depend on them through the slot registry. The one
+  exception in kind: ``DiagnosisMode`` **no longer renders**
+  ``odontogram.diagnosis.sidebar`` (the notes moved to Evolución and the
+  chart took the width). The registration of ``DiagnosisNotesSidebar`` is
+  kept on purpose; retire it only when nothing else depends on the slot.
+- **`evolution` is not a diagnosis.** It is the patient's longitudinal
+  clinical entry (Clinical tab → Evolución): patient-owned, never tooth-bound
+  (the DB CHECK and the schema both refuse a tooth). A tooth-bound note is a
+  `diagnosis` note — the "Añadir nota" button in Diagnóstico deep-links to
+  `?clinicalMode=evolution&newNote=diagnosis&tooth=<FDI>` for exactly that.
+- **Evolución is the clinical history, not every note.** It requests
+  `evolution`, `diagnosis`, `treatment`, `treatment_plan` and
+  `appointment_clinical`, never the two administrative types.
+- **Known gap: visit notes.** The legacy `AppointmentTreatment.notes`
+  (agenda) are **not** in `/patients/{id}/recent` and therefore not in
+  Evolución or its printout. `appointment_clinical` notes are. Closing the gap
+  needs a change in agenda/the feed and was deliberately left out of QW4.
+- **Printing the history** loads every page of `/recent` (`limit=100`,
+  de-duplicated by id, cursor-guarded) and prints through the browser
+  (`window.print()`, so "Save as PDF" works). Attachments print as name +
+  type, never thumbnails. Its CSS is its own (`.evolution-print-root`) and
+  does not touch the odontogram's `.nts-print-root` rules.
 
 ## Related ADRs
 

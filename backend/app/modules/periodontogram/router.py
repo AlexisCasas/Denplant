@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
-from app.modules.patients.models import Patient
+from app.modules.patients.access import PatientAccessPolicy
 
 from .schemas import (
     IndicesResponse,
@@ -39,14 +39,9 @@ from .service import PeriodontogramService
 router = APIRouter()
 
 
-async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> None:
+async def _ensure_patient(db: AsyncSession, ctx: ClinicContext, patient_id: UUID) -> None:
     """Mirror the odontogram pattern: 404 if patient is missing/archived."""
-    stmt = select(Patient).where(
-        Patient.id == patient_id,
-        Patient.clinic_id == clinic_id,
-        Patient.status != "archived",
-    )
-    if (await db.execute(stmt)).scalar_one_or_none() is None:
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
 
@@ -99,7 +94,7 @@ async def list_patient_snapshots(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
 ) -> PaginatedApiResponse[SnapshotSummary]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     items, total = await PeriodontogramService.list_snapshots(
         db, ctx.clinic_id, patient_id, page, page_size
     )
@@ -121,7 +116,7 @@ async def get_patient_timeline(
     _: Annotated[None, Depends(require_permission("periodontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TimelineResponse]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     rows = await PeriodontogramService.get_timeline(db, ctx.clinic_id, patient_id)
     draft = await PeriodontogramService.get_active_draft(db, ctx.clinic_id, patient_id)
     return ApiResponse(
@@ -142,7 +137,7 @@ async def get_patient_draft(
     _: Annotated[None, Depends(require_permission("periodontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[SnapshotDetail | None]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     draft = await PeriodontogramService.get_active_draft(db, ctx.clinic_id, patient_id)
     if draft is None:
         return ApiResponse(data=None)
@@ -160,7 +155,7 @@ async def open_patient_draft(
     _: Annotated[None, Depends(require_permission("periodontogram.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[SnapshotDetail]:
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx, patient_id)
     snap, _created = await PeriodontogramService.get_or_create_draft(
         db, ctx.clinic_id, patient_id, ctx.user_id
     )
