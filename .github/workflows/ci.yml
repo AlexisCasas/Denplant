@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Avoid concurrent full suites for superseded commits of the same PR.
+# Separate pull requests and the main branch always have separate groups.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend-lint:
     runs-on: ubuntu-latest
