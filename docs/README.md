@@ -42,5 +42,6 @@ Adding any other `.md` at this root is a CI failure (see `scripts/check_docs_lay
 
 ## See also
 
+- [Cierre operativo Denplant QA — 2026-11-21](./workflows/denplant-qa-retirement-20261121.md) — limpieza controlada A/B, código preservado, integración PR #30, CI 10/10, Copilot desinstalado y aceptación documentada de excepción de procedencia frontend.
 - Root [`CLAUDE.md`](../CLAUDE.md) — Documentation policy section restates the routing table for AI agents.
 - [`technical/creating-modules.md`](./technical/creating-modules.md) — module author's guide.
