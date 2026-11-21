@@ -1748,12 +1748,16 @@ function layoutBoxes(instructions: readonly NtsRenderInstruction[]): NtsBoxOverf
   for (const [fdi, texts] of byTooth) {
     // Everything fits: one per line.
     if (texts.length <= BOX_CAPACITY) {
-      texts.forEach((text, index) => { text.line = index })
+      texts.forEach((text, index) => {
+        text.line = index
+      })
       continue
     }
     // It does not: show the first and give the count of the rest, so the
     // reader can see there is more rather than being shown a silent subset.
-    texts.forEach((text, index) => { text.line = index === 0 ? 0 : null })
+    texts.forEach((text, index) => {
+      text.line = index === 0 ? 0 : null
+    })
     overflows.push({
       fdi,
       box: texts[0]!.box,
