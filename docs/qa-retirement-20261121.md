@@ -104,3 +104,30 @@ Antes de un eventual retiro: comprobar ausencia de consumidores y datos únicos,
 - PR Draft [#27](https://github.com/AlexisCasas/Denplant/pull/27) (DP-17) y [#28](https://github.com/AlexisCasas/Denplant/pull/28) (pagos) siguen pendientes de evaluación.
 
 **Alcance de esta bitácora:** hechos y cifras informados por la ejecución de Claude Code en la VPS. La actualización documental en GitHub no implica una nueva ejecución ni comprobación independiente del host.
+
+
+## 9. Integración de baseline productivo en `main` (2026-11-21)
+
+**Cierre de integración de código — PR #30.** Este apartado actualiza el riesgo de trazabilidad descrito en la sección 8, que refleja la situación previa al merge.
+
+| Campo | Evidencia |
+|---|---|
+| PR de integración | [#30](https://github.com/AlexisCasas/Denplant/pull/30) — merged |
+| Commit original de producción preservado | `f58a09f5672baa203865ff8ba382babfaf813ccf` |
+| Commit correctivo validado | `46ee55a5ecc50bd4b1f560cab46afd908574b6ca` |
+| Validación previa | [GitHub Actions #44932807930](https://github.com/AlexisCasas/Denplant/actions/runs/44932807930): 10/10 PASS |
+| Commit merge a `main` | `e41307742d235c2eb95bac878d4af32fe926d122` |
+| PR original de preservación | [#26](https://github.com/AlexisCasas/Denplant/pull/26), marcado merged automáticamente al quedar su SHA en `main` |
+| CI de `main` posterior al merge | [#44938682765](https://github.com/AlexisCasas/Denplant/actions/runs/44938682765), iniciado; resultado final pendiente en el momento de esta anotación |
+
+El merge se realizó mediante commit de merge, con condición de SHA esperado. GitHub verificó `main=e41307742d235c2eb95bac878d4af32fe926d122` y PR #30 fusionado. La línea preservada es ancestro de `main`, aunque `main` incorpora correcciones posteriores, de modo que **no representa los mismos binarios desplegados**.
+
+### Límites de la verificación
+
+- En GitHub solo se verificaron workflows `CI`, `Release` e `Images health`. El workflow `Release` se activa por etiquetas `v*` o manualmente, no por un push normal a `main`. No se corroboraron automatizaciones externas.
+- **No se realizó deploy, reinicio, cambio de base de datos ni migración en VPS desde esta integración.** No se puede afirmar que la producción actual haya sido auditada después del merge.
+- **Gate pendiente de solo lectura en VPS:** cotejar imágenes Docker reales/digests y provenance con commits `f58a09f` (backend) y `f10b358` (frontend), y comprobar revisiones Alembic aplicadas. Los nombres de etiquetas por sí solos no prueban el origen.
+- **Gate operativo pendiente:** CI de `main` al completar la ejecución posterior al merge, más observación de salud y confirmación de ausencia de autodeploy externo.
+- Los PR [#27](https://github.com/AlexisCasas/Denplant/pull/27) y [#28](https://github.com/AlexisCasas/Denplant/pull/28), los cuatro volúmenes QA antiguos y directorios C permanecen como actividades separadas, no incluidas en el merge.
+
+**Estado:** `PR30_MERGE=PASS`; `MAIN_CI=RUNNING` al documentar; `VPS_PROVENANCE=UNVERIFIED`. No equiparar merge exitoso con cierre de la auditoría operativa.
