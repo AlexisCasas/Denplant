@@ -7,7 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.dependencies import (
+    ClinicContext,
+    get_clinic_context,
+    require_financial_visibility,
+    require_permission,
+)
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
@@ -51,6 +56,7 @@ router = APIRouter(tags=["reports"])
 async def get_billing_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -67,6 +73,7 @@ async def get_billing_summary(
 async def get_overdue_invoices(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=200, ge=1, le=1000),
 ) -> ApiResponse[list[OverdueInvoice]]:
@@ -83,6 +90,7 @@ async def get_overdue_invoices(
 async def get_by_payment_method(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -102,6 +110,7 @@ async def get_by_payment_method(
 async def get_by_professional(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -118,6 +127,7 @@ async def get_by_professional(
 async def get_vat_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -134,6 +144,7 @@ async def get_vat_summary(
 async def get_numbering_gaps(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[NumberingGap]]:
     """Find gaps in invoice numbering.
@@ -154,6 +165,7 @@ async def get_numbering_gaps(
 async def get_budget_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -170,6 +182,7 @@ async def get_budget_summary(
 async def get_budgets_by_professional(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -183,6 +196,7 @@ async def get_budgets_by_professional(
 async def get_budgets_by_treatment(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),
@@ -197,6 +211,7 @@ async def get_budgets_by_treatment(
 async def get_budgets_by_status(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
+    __: Annotated[None, Depends(require_financial_visibility)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: date = Query(..., description="Start date for the report period"),
     date_to: date = Query(..., description="End date for the report period"),

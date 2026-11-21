@@ -17,6 +17,7 @@
  */
 import type { PatientExtended, ApiResponse } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
+import { canArchivePatient, canStartPatientArchive, requestPatientArchive } from '../../utils/patientList'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -155,6 +156,7 @@ const tabs = computed(() => {
 // Permissions used by Datos tab + edit modals.
 const canEditMedicalHistory = computed(() => can(PERMISSIONS.medicalHistory.write))
 const canEditPatient = computed(() => can(PERMISSIONS.patients.write))
+const canArchive = computed(() => canArchivePatient(patient.value, can(PERMISSIONS.patients.write)))
 
 // Section edit modals state
 type SectionType = 'demographics' | 'emergency' | 'guardian' | 'billing' | 'medical'
@@ -211,10 +213,11 @@ const summaryCards = computed(() =>
 const isArchiveModalOpen = ref(false)
 
 async function archivePatient() {
+  if (!canStartPatientArchive(patient.value, can(PERMISSIONS.patients.write), isSubmitting.value)) return
   isSubmitting.value = true
 
   try {
-    await api.del(`/api/v1/patients/${patientId}`)
+    await requestPatientArchive(api, patientId)
 
     toast.add({
       title: t('common.success'),
@@ -319,6 +322,7 @@ function collect() {
       <!-- Persistent header — stays visible across all tabs. -->
       <PatientStickyHeader
         :patient="patient"
+        :can-archive="canArchive"
         @back="goBack"
         @edit="openEditPatient"
         @new-appointment="newAppointment"
@@ -428,7 +432,10 @@ function collect() {
               />
 
               <!-- Danger zone -->
-              <div class="alert-surface-danger rounded-token-lg px-4 py-3 flex items-center justify-between gap-4">
+              <div
+                v-if="canArchive"
+                class="alert-surface-danger rounded-token-lg px-4 py-3 flex items-center justify-between gap-4"
+              >
                 <div class="min-w-0">
                   <div class="text-ui">
                     {{ t('patients.dangerZone.title') }}
@@ -508,7 +515,10 @@ function collect() {
     />
 
     <!-- Archive confirmation modal -->
-    <UModal v-model:open="isArchiveModalOpen">
+    <UModal
+      v-if="patient && canArchive"
+      v-model:open="isArchiveModalOpen"
+    >
       <template #content>
         <UCard>
           <template #header>

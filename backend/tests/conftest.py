@@ -12,6 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.config import settings
+from tests import db_isolation
+
+# Database isolation (INFRA-01): redirect every consumer — fixtures, the
+# shared `app.database` engine and the event handlers that write through it —
+# at the dedicated test database, BEFORE `app.database` is imported below.
+# Aborts instead of falling back to DATABASE_URL; see tests/db_isolation.py.
+os.environ["DATABASE_URL"] = db_isolation.redirect_to_test_database(settings)
 
 # Import all models so SQLAlchemy can configure relationships
 from app.core.auth.models import Clinic, ClinicMembership, User  # noqa: F401
@@ -52,6 +59,13 @@ from app.modules.odontogram.models import (  # noqa: F401
     ToothRecord,
     Treatment,
     TreatmentTooth,
+)
+from app.modules.odontogram.nts.models import (  # noqa: F401
+    NtsFinding,
+    NtsFindingTarget,
+    NtsOdontogramRecord,
+    NtsRecordAuditEvent,
+    NtsRecordSpecification,
 )
 from app.modules.patients.models import Patient  # noqa: F401
 from app.modules.payments.models import (  # noqa: F401
@@ -94,10 +108,6 @@ from app.modules.verifactu.models import (  # noqa: F401
 # the installed ones; conftest is the one place that explicitly wants all).
 mount_modules(app, register_discovered())
 
-# Use the DATABASE_URL directly - CI already provides the test database URL
-# For local development, ensure DATABASE_URL points to test database
-TEST_DATABASE_URL = settings.DATABASE_URL
-
 
 @pytest_asyncio.fixture(autouse=True)
 async def _dispose_app_engine() -> AsyncGenerator[None, None]:
@@ -118,7 +128,15 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     # Create a new engine for each test to avoid connection conflicts
     # NullPool: with one engine per test, pooled idle connections pile up
     # across ~800 tests and CI Postgres hits max_connections (100).
-    test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
+    # Defensive: catches any path that hands this fixture a URL without going
+    # through `resolve_test_database_url` (INFRA-01).
+    db_isolation.assert_safe_to_destroy(
+        db_isolation.TEST_DATABASE_URL, db_isolation.DEV_DATABASE_URL
+    )
+
+    test_engine = create_async_engine(
+        db_isolation.TEST_DATABASE_URL, echo=False, poolclass=NullPool
+    )
     test_session_maker = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -129,6 +147,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with test_session_maker() as session:
         yield session
 
+    db_isolation.assert_safe_to_destroy(
+        db_isolation.TEST_DATABASE_URL, db_isolation.DEV_DATABASE_URL
+    )
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- fix(DP-05): expose the existing soft-archive action from the patient list
+  for users with `patients.write`, guard it by patient status, and send
+  explicit `status` filters so active and archived lists remain distinct.
+  Archived list rows retain clinic/dentist scope but do not link to detail,
+  whose existing access policy intentionally remains active-only.
+
+- feat(QW4): the Clinical tab has a fifth mode, **Evolución** (Diagnóstico | Planes | Citas | Histórico | Evolución), rendered through the new `patient.clinical.evolution` slot — `patients` never imports the component that fills it. Hidden without `clinical_notes.notes.read`. `?clinicalMode=` is validated against one shared list (`~~/app/utils/clinicalModes`), and `DiagnosisModeContainer` forwards the new `add-note` event.
+
+- Add dentist patient visibility based on server-side creator ownership or a
+  non-cancelled appointment assignment, without backfilling historical rows.
+
 - fix(#184): type-check clean. `PatientUpdate`/`PatientExtendedUpdate` are declared explicitly with `| null` (an explicit `null` clears the field — the section edit modal already relied on it); `ClinicalMode` moves to the shared types (the tab imported it from another module's `.vue`); the visit summary renders the treatment's localized `names` (`.name` never existed); the Administration → Budgets tab shows the linked plan number via `plan_number_snapshot` (the old `treatment_plan_id` check never rendered); `UAvatar :ui.text` is `fallback` in Nuxt UI v4.
 - fix(#183): `patient.created` / `patient.archived` are published with `db=` so the notifications, recalls and media handlers see the row and roll back with it (ADR 0019).
 - feat(onboarding): optional getting-started rule `first-patient` — suggests creating the first patient.

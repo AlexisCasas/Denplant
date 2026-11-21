@@ -24,6 +24,12 @@ const META: Record<NoteType, NoteTypeMeta> = {
     labelKey: 'clinicalNotes.types.diagnosis',
     templateCategory: 'diagnosis'
   },
+  evolution: {
+    color: 'primary',
+    icon: 'i-lucide-notebook-pen',
+    labelKey: 'clinicalNotes.types.evolution',
+    templateCategory: 'general'
+  },
   treatment: {
     color: 'success',
     icon: 'i-lucide-syringe',
@@ -53,6 +59,7 @@ const META: Record<NoteType, NoteTypeMeta> = {
 const ALL_TYPES: NoteType[] = [
   'administrative',
   'diagnosis',
+  'evolution',
   'treatment',
   'treatment_plan',
   'appointment_clinical',

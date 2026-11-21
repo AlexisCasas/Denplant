@@ -2,24 +2,37 @@
 /**
  * SEPA-style sulcus profile strip.
  *
- * Plots two polylines across a row of teeth — gingival margin (calm
- * blue) and probing depth = pocket bottom (calm red) — over a backdrop
- * of horizontal millimetre gridlines so the dentist can read pocket
- * depths as heights, not just numbers.
+ * Plots two independent series across a row of teeth — Margen (gingival
+ * margin, calm blue) and Sondaje (probing depth) — over a backdrop of
+ * horizontal millimetre gridlines so the dentist can read them as heights,
+ * not just numbers. Each series is measured from the baseline (the 0 mm line,
+ * the CEJ) on its own; the sum of the two is a number in the Suma row, not a
+ * line here.
  *
- * The strip is a flat SVG positioned next to a tooth row, in the
- * direction of the rendered root (the periodontal pocket lives in the
- * root area). Baseline = CEJ ≈ where the gum line of the existing
- * tooth silhouettes lands. Depth grows away from the teeth.
+ * The strip is a flat SVG positioned next to a tooth row, in the direction of
+ * the rendered root (the periodontal pocket lives in the root area).
+ * Baseline = CEJ ≈ where the gum line of the tooth silhouettes lands.
+ * `direction` says which way a positive value runs: `depth-up` strips sit
+ * above their tooth row, `depth-down` strips below it.
  *
- * Sites without a recorded probing depth are skipped from the
- * polylines — drawing a line at "0" would imply a measurement that
- * wasn't taken. The indices banner anchors the denominator to total
- * present sites separately.
+ * Every number is computed by `periodontalProfileGeometry` — this component
+ * only draws it. A tooth is never joined to its neighbour, an unmeasured site
+ * (null) ends the line it interrupts, and a 0 is a real point on the baseline.
+ * A probing depth of 4 mm or more is a red dot; the line stays neutral, since
+ * what is pathological is the site that was measured, not the stretch between
+ * two sites.
  */
 import { computed } from 'vue'
 import type { PerioTooth, SiteCode } from '../types'
 import { PALATAL_SITES, VESTIBULAR_SITES } from '../types'
+import {
+  PROFILE_GEOMETRY,
+  buildMetricSegments,
+  segmentPath,
+  stripHeight,
+  valueToY
+} from '../utils/periodontalProfileGeometry'
+import { isPathologicalProbing } from '../composables/usePerioHeatmap'
 
 const props = defineProps<{
   teeth: PerioTooth[]
@@ -31,110 +44,60 @@ const props = defineProps<{
    *                placed below its tooth row).
    */
   direction: 'depth-up' | 'depth-down'
-  columnWidth?: number
 }>()
 
-const COL_W = props.columnWidth ?? 60
-// 4 px/mm → strip is 60 px tall for the 15 mm probing range. Matches
-// the ~60 px root area visible on the larger `h-20` tooth silhouette,
-// so the gridlines + lines paint cleanly across the rendered root.
-const MM_PX = 4
-const MAX_MM = 15
-const STRIP_H = MAX_MM * MM_PX
+const STRIP_H = stripHeight()
+const MM_MAX = PROFILE_GEOMETRY.maxMm
 
 const sites = computed<readonly SiteCode[]>(() =>
   props.face === 'vestibular' ? VESTIBULAR_SITES : PALATAL_SITES
 )
 
-const stripWidth = computed(() => props.teeth.length * COL_W)
+const stripWidth = computed(() => props.teeth.length * PROFILE_GEOMETRY.colWidth)
 
-function depthToY(mm: number): number {
-  // Clamp so a stray big value can't escape the strip area.
-  const clamped = Math.max(-3, Math.min(MAX_MM, mm))
-  return props.direction === 'depth-up'
-    ? STRIP_H - clamped * MM_PX
-    : clamped * MM_PX
-}
-
-function siteX(toothIdx: number, siteIdx: number): number {
-  // Three sites per tooth, evenly spaced across the column at 20/50/80%.
-  // The middle site sits over the centre of the tooth silhouette.
-  const offsets = [0.2, 0.5, 0.8] as const
-  return toothIdx * COL_W + COL_W * (offsets[siteIdx] ?? 0.5)
-}
-
-interface PathPoint { x: number, y: number }
-
-function buildPath(
-  getMm: (toothIdx: number, siteIdx: number) => number | null | undefined
-): string {
-  const pts: PathPoint[] = []
-  props.teeth.forEach((_, ti) => {
-    sites.value.forEach((_code, si) => {
-      const mm = getMm(ti, si)
-      if (mm == null) return
-      pts.push({ x: siteX(ti, si), y: depthToY(mm) })
-    })
-  })
-  if (pts.length === 0) return ''
-  return pts.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ')
-}
-
-function siteAt(ti: number, si: number) {
-  return props.teeth[ti]?.sites.find(s => s.site_code === sites.value[si])
-}
-
-const gmPath = computed(() =>
-  buildPath((ti, si) => siteAt(ti, si)?.gingival_margin_mm ?? null)
+const marginSegments = computed(() =>
+  buildMetricSegments(props.teeth, sites.value, 'margin', props.direction)
+)
+const probingSegments = computed(() =>
+  buildMetricSegments(props.teeth, sites.value, 'probing', props.direction)
 )
 
-const pdPath = computed(() =>
-  buildPath((ti, si) => {
-    const s = siteAt(ti, si)
-    if (s?.probing_depth_mm == null) return null
-    return (s.gingival_margin_mm ?? 0) + s.probing_depth_mm
+/** One entry per drawable line: a segment of two or more points. */
+function lines(segments: ReturnType<typeof buildMetricSegments>) {
+  return segments.flatMap((segment, index) => {
+    const d = segmentPath(segment)
+    return d === null ? [] : [{ key: `${segment.toothNumber}-${index}`, tooth: segment.toothNumber, d }]
   })
-)
+}
 
-// Pocket band — closed shape between GM (top) and PD (bottom) lines.
-// Only drawn over the contiguous run of sites where both values exist.
-const bandPath = computed(() => {
-  const gm: PathPoint[] = []
-  const pd: PathPoint[] = []
-  props.teeth.forEach((_, ti) => {
-    sites.value.forEach((_code, si) => {
-      const s = siteAt(ti, si)
-      if (s?.probing_depth_mm == null) return
-      const gmMm = s.gingival_margin_mm ?? 0
-      const pdMm = gmMm + s.probing_depth_mm
-      gm.push({ x: siteX(ti, si), y: depthToY(gmMm) })
-      pd.push({ x: siteX(ti, si), y: depthToY(pdMm) })
-    })
-  })
-  if (gm.length < 2) return ''
-  const forward = gm.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ')
-  const back = pd.slice().reverse().map(p => `L ${p.x},${p.y}`).join(' ')
-  return `${forward} ${back} Z`
-})
+const marginLines = computed(() => lines(marginSegments.value))
+const probingLines = computed(() => lines(probingSegments.value))
+const marginDots = computed(() => marginSegments.value.flatMap(s => s.points))
+const probingDots = computed(() => probingSegments.value.flatMap(s => s.points))
 
 const gridlines = computed(() => {
   const out: Array<{ y: number, mm: number }> = []
   // Include 0 mm (CEJ) — the first millimetre line must pass through
-  // the gum line so the dentist can read pocket depth directly off
-  // the gridline, without a separate red gum curve on the tooth.
-  for (let m = 0; m <= MAX_MM; m++) out.push({ y: depthToY(m), mm: m })
+  // the gum line so the dentist can read depth directly off the gridline,
+  // without a separate red gum curve on the tooth.
+  for (let m = 0; m <= MM_MAX; m++) out.push({ y: valueToY(m, props.direction), mm: m })
   return out
 })
 </script>
 
 <template>
+  <!-- `overflow: visible`: a margin can be negative (down to -5 mm), which
+       lies on the far side of the 0 mm baseline, outside the 0…15 mm domain
+       the viewBox covers. The default would clip it. -->
   <svg
     :viewBox="`0 0 ${stripWidth} ${STRIP_H}`"
     :width="stripWidth"
     :height="STRIP_H"
     class="perio-profile-strip block"
+    style="overflow: visible"
     preserveAspectRatio="none"
     aria-hidden="true"
+    :data-direction="direction"
   >
     <!-- Millimetre gridlines: hairline gray, bolder at 0/5/10/15.
          The 0 mm line is the CEJ — it doubles as the gum line that
@@ -152,35 +115,63 @@ const gridlines = computed(() => {
       />
     </g>
 
-    <!-- Pocket band — soft red fill between the two lines. -->
-    <path
-      v-if="bandPath"
-      :d="bandPath"
-      fill="var(--perio-pocket-band)"
-      style="opacity: var(--perio-pocket-band-opacity)"
-    />
+    <!-- Margen (calm sky): one path per run of sites of one tooth. -->
+    <g data-series="margin">
+      <path
+        v-for="line in marginLines"
+        :key="`gm-${line.key}`"
+        :d="line.d"
+        :data-tooth="line.tooth"
+        data-testid="perio-strip-path-margin"
+        fill="none"
+        stroke="var(--perio-gm-stroke)"
+        stroke-width="1.4"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+      <circle
+        v-for="p in marginDots"
+        :key="`gm-dot-${p.toothNumber}-${p.siteCode}`"
+        :cx="p.x"
+        :cy="p.y"
+        r="1.8"
+        fill="var(--perio-gm-stroke)"
+        :data-tooth="p.toothNumber"
+        :data-site="p.siteCode"
+        :data-mm="p.mm"
+        data-testid="perio-strip-dot-margin"
+      />
+    </g>
 
-    <!-- Gingival margin (calm sky) -->
-    <path
-      v-if="gmPath"
-      :d="gmPath"
-      fill="none"
-      stroke="var(--perio-gm-stroke)"
-      stroke-width="1.4"
-      stroke-linejoin="round"
-      stroke-linecap="round"
-    />
-
-    <!-- Probing depth — pocket bottom (calm red) -->
-    <path
-      v-if="pdPath"
-      :d="pdPath"
-      fill="none"
-      stroke="var(--perio-pd-stroke)"
-      stroke-width="1.4"
-      stroke-linejoin="round"
-      stroke-linecap="round"
-    />
+    <!-- Sondaje: a neutral line, with a red dot only on the sites whose
+         probing depth is 4 mm or more. -->
+    <g data-series="probing">
+      <path
+        v-for="line in probingLines"
+        :key="`pd-${line.key}`"
+        :d="line.d"
+        :data-tooth="line.tooth"
+        data-testid="perio-strip-path-probing"
+        fill="none"
+        stroke="var(--color-text-muted)"
+        stroke-width="1.4"
+        stroke-linejoin="round"
+        stroke-linecap="round"
+      />
+      <circle
+        v-for="p in probingDots"
+        :key="`pd-dot-${p.toothNumber}-${p.siteCode}`"
+        :cx="p.x"
+        :cy="p.y"
+        r="2"
+        :fill="isPathologicalProbing(p.mm) ? 'var(--perio-pd-stroke)' : 'var(--color-text-muted)'"
+        :data-tooth="p.toothNumber"
+        :data-site="p.siteCode"
+        :data-mm="p.mm"
+        :data-alert="isPathologicalProbing(p.mm) ? 'true' : 'false'"
+        data-testid="perio-strip-dot-probing"
+      />
+    </g>
   </svg>
 </template>
 

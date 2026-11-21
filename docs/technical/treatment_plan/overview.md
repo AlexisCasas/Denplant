@@ -41,6 +41,22 @@ the scaffold could not infer.
 - `backend/app/modules/treatment_plan/frontend/pages/treatment-plans/[id].vue` → `/treatment-plans/[id]`
 - `backend/app/modules/treatment_plan/frontend/pages/treatment-plans/new.vue` → `/treatment-plans/new`
 
+### MINSA plan odontogram (H1)
+
+`PlanDetailView.vue` reads the odontogram profile owned by the `odontogram`
+module. Only for `pe_nts_188_2022` it mounts
+`NtsPlanOdontogramChart.vue`; every other profile keeps the legacy
+`OdontogramChart.vue` behaviour. The plan renderer imports the structural
+NTS rows, cells, and chart geometry from `odontogram` (an allowed declared
+dependency), but has its own therapeutic SVG overlay. It must never use
+`NtsFindingLayer`: plan treatments are not MINSA findings.
+
+The H1 overlay projects persisted plan-item treatment data only (tooth,
+surface, role, scope, state and `clinical_type`). Arch/full-mouth and
+toothless treatments remain in the plan list. Catalog visualization rules are
+not part of a persisted treatment snapshot, so catalog-driven historical
+symbols are intentionally deferred to H2.
+
 ## Permissions
 
 `plans.read`, `plans.write`, `plans.confirm`, `plans.close`, `plans.reactivate`

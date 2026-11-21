@@ -15,6 +15,7 @@ from app.core.events import EventType, event_bus
 from .models import Budget, BudgetAccessLog, BudgetSignature
 from .pricing import allocate_global_discount, net_line_amount
 from .service import BudgetHistoryService
+from .signed_pdf import store_signed_pdf, strip_client_reference
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,31 @@ class BudgetWorkflowService:
         return budget
 
     @staticmethod
+    async def _store_signed_document(
+        db: AsyncSession, budget: Budget, signature: BudgetSignature
+    ) -> None:
+        """Render the signed PDF with the clinic's *current* identity and store it."""
+        from app.core.auth.models import Clinic
+
+        from .pdf import BudgetPDFService
+        from .service import BudgetService
+
+        clinic = await db.get(Clinic, budget.clinic_id)
+        hydrated = await BudgetService.get_budget(
+            db, budget.clinic_id, budget.id, include_items=True
+        )
+        if clinic is None or hydrated is None:
+            raise BudgetWorkflowError("Budget or clinic not found while storing the signed PDF")
+
+        settings = clinic.settings if isinstance(clinic.settings, dict) else {}
+        locale = str(settings.get("communication_language") or "es")
+        pdf_bytes = await BudgetPDFService.generate_pdf(
+            hydrated, clinic, is_preview=False, locale=locale, signature=signature
+        )
+        await store_signed_pdf(signature, pdf_bytes)
+        await db.flush()
+
+    @staticmethod
     async def accept_budget(
         db: AsyncSession,
         budget: Budget,
@@ -214,7 +240,9 @@ class BudgetWorkflowService:
             signed_by_email=signature_data.get("signed_by_email"),
             relationship_to_patient=signature_data.get("relationship_to_patient", "patient"),
             signature_method=signature_data.get("signature_method", "click_accept"),
-            signature_data=signature_data.get("signature_data"),
+            # ``signature_data`` can come from the client; a ``signed_pdf``
+            # reference in it would be forged, so it never survives.
+            signature_data=strip_client_reference(signature_data.get("signature_data")),
             ip_address=ip_address,
             user_agent=user_agent,
             signed_at=datetime.now(UTC),
@@ -246,54 +274,19 @@ class BudgetWorkflowService:
 
         await db.flush()
 
-        # Render the signed PDF once and persist its SHA-256 hash on
-        # the signature row. Lets compliance tooling later detect any
-        # tampering with stored / re-rendered PDFs. Best-effort:
-        # WeasyPrint failures (e.g. missing system fonts in dev) must
-        # not block the acceptance — log and continue.
+        # Render the signed PDF ONCE, store its bytes and record its SHA-256 and
+        # location on the signature (see ``signed_pdf``). From here on the
+        # signed document is that stored file, so a later change of logo, name
+        # or template cannot alter it. Best-effort: a render failure (missing
+        # system fonts in dev, say) must not undo an acceptance the patient
+        # already made — it is logged loudly and the signature is left without
+        # a stored PDF, i.e. it behaves like a legacy one.
         try:
-            from .pdf import BudgetPDFService
-
-            clinic_row = await db.execute(
-                text(
-                    "SELECT id, name, address, phone, email, settings, "
-                    "tax_id, legal_name FROM clinics WHERE id = :id"
-                ),
-                {"id": budget.clinic_id},
-            )
-            clinic = clinic_row.first()
-            if clinic is not None:
-                clinic_settings = (
-                    clinic.settings if isinstance(clinic.settings, dict) else {}
-                ) or {}
-                locale = str(clinic_settings.get("communication_language") or "es")
-                # Re-fetch budget with items eagerly loaded for the PDF.
-                from sqlalchemy.orm import selectinload
-
-                from .models import Budget as _Budget
-
-                hydrated = (
-                    await db.execute(
-                        select(_Budget)
-                        .options(selectinload(_Budget.items))
-                        .where(_Budget.id == budget.id)
-                    )
-                ).scalar_one_or_none()
-                if hydrated is not None:
-                    pdf_bytes = await BudgetPDFService.generate_pdf(
-                        hydrated,
-                        clinic,  # type: ignore[arg-type]
-                        is_preview=False,
-                        locale=locale,
-                        signature=signature,
-                    )
-                    signature.document_hash = BudgetPDFService.generate_pdf_hash(pdf_bytes)
-                    await db.flush()
-        except Exception as exc:
-            logger.warning(
-                "Could not compute document_hash for budget %s: %s",
+            await BudgetWorkflowService._store_signed_document(db, budget, signature)
+        except Exception:
+            logger.exception(
+                "Could not store the signed PDF for budget %s; the signature has no document hash",
                 budget.id,
-                exc,
             )
 
         plan_id = await BudgetWorkflowService._lookup_plan_id(db, budget.id)

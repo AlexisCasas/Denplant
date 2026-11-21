@@ -54,16 +54,37 @@ async def _resolve_treatment_category_key(db: AsyncSession, treatment_id: UUID) 
 async def on_appointment_completed(data: dict[str, Any], *, db: AsyncSession) -> None:
     """Handle appointment completed event.
 
-    When an appointment is completed, mark associated planned treatments as
-    completed. Transactional: it reads ``completed_in_appointment`` flags the
-    publisher has only flushed — a second session saw the pre-visit values and
-    closed nothing (issue #183).
+    When an appointment is completed, advance the linked PlannedTreatmentItems
+    through the session mechanism — ``complete_item`` (the same "advance next
+    pending session" shim other ungated callers use), not a direct status
+    flip. That fixes two gaps a direct flip had: the underlying odontogram
+    Treatment never got marked performed, and multi-session items never
+    emitted ``item_session_completed`` (so payments never booked the visit).
+
+    Deliberately **not gated** on the plan being ``active``
+    (``require_active_plan=False``, see ``complete_session``) — this handler
+    records a clinical fact that already happened, same as the
+    odontogram-first path. A single item's session-completion failing (no
+    pending sessions left, e.g. a race with a manual completion) is logged
+    and skipped rather than raised, so it can't roll back the appointment's
+    own transition or the other items in this loop.
+
+    Transactional: it reads ``completed_in_appointment`` flags the publisher
+    has only flushed — a second session saw the pre-visit values and closed
+    nothing (issue #183).
     """
     appointment_id = data.get("appointment_id")
     clinic_id = data.get("clinic_id")
+    changed_by = data.get("changed_by")
 
     if not appointment_id or not clinic_id:
         logger.warning("on_appointment_completed: missing appointment_id or clinic_id")
+        return
+    if not changed_by:
+        logger.warning(
+            "on_appointment_completed: missing changed_by, skipping item completion for %s",
+            appointment_id,
+        )
         return
 
     # Import here to avoid circular imports
@@ -79,6 +100,7 @@ async def on_appointment_completed(data: dict[str, Any], *, db: AsyncSession) ->
     )
     completed_treatments = result.scalars().all()
 
+    processed = 0
     for apt_treatment in completed_treatments:
         # Find planned item that references this treatment
         if not apt_treatment.planned_treatment_item_id:
@@ -93,30 +115,28 @@ async def on_appointment_completed(data: dict[str, Any], *, db: AsyncSession) ->
         if not item or item.status == "completed":
             continue
 
-        item.status = "completed"
-        item.completed_without_appointment = False
+        try:
+            await TreatmentPlanService.complete_item(
+                db,
+                UUID(clinic_id),
+                item.treatment_plan_id,
+                item.id,
+                UUID(changed_by),
+                completed_without_appointment=False,
+                require_active_plan=False,
+            )
+        except ValueError:
+            logger.warning(
+                "on_appointment_completed: could not advance item %s (plan %s) — "
+                "no pending session, or session/plan mismatch",
+                item.id,
+                item.treatment_plan_id,
+                exc_info=True,
+            )
+            continue
+        processed += 1
 
-        category_key = await _resolve_treatment_category_key(db, item.treatment_id)
-        await event_bus.publish(
-            "treatment_plan.treatment_completed",
-            {
-                "plan_id": str(item.treatment_plan_id),
-                "item_id": str(item.id),
-                "treatment_id": str(item.treatment_id),
-                "clinic_id": clinic_id,
-                "patient_id": data.get("patient_id"),
-                "triggered_by": "appointment_completed",
-                "treatment_category_key": category_key,
-            },
-            db=db,
-        )
-
-        # Check if plan should auto-complete
-        await TreatmentPlanService._check_and_complete_plan(
-            db, UUID(clinic_id), item.treatment_plan_id
-        )
-
-    logger.info("Processed appointment completion for %d treatments", len(completed_treatments))
+    logger.info("Processed appointment completion for %d treatments", processed)
 
 
 async def on_budget_accepted(data: dict[str, Any], *, db: AsyncSession) -> None:
@@ -309,3 +329,70 @@ async def on_treatment_performed(data: dict[str, Any], *, db: AsyncSession) -> N
 
     await TreatmentPlanService._check_and_complete_plan(db, UUID(clinic_id), item.treatment_plan_id)
     logger.info("Marked planned item %s as completed from odontogram", item.id)
+
+
+async def on_treatment_delete_requested(data: dict[str, Any], *, db: AsyncSession) -> None:
+    """Veto the soft delete of a treatment that a Plan still owns (ADR 0023).
+
+    Runs inside the odontogram request's transaction, before ``deleted_at`` is
+    written. Any ``PlannedTreatmentItem`` (any plan, any status — closed plans
+    keep their items as history) protects the treatment. The plan lifecycle
+    itself releases treatments through
+    ``TreatmentService.delete_after_plan_release`` and never reaches this
+    handler; ``remove_item`` deletes the item first, so it passes.
+
+    Raising is the contract: the exception propagates to the publisher and
+    rolls the request back. The module name is appended to ``cleared_by`` only
+    when the treatment is NOT linked, which is how the publisher knows a guard
+    actually ran.
+    """
+    from app.modules.odontogram.service import TreatmentDeletionBlockedError
+
+    clinic_id = UUID(str(data["clinic_id"]))
+    treatment_id = UUID(str(data["treatment_id"]))
+    item = (
+        await db.execute(
+            select(PlannedTreatmentItem.id, PlannedTreatmentItem.treatment_plan_id)
+            .where(
+                PlannedTreatmentItem.treatment_id == treatment_id,
+                PlannedTreatmentItem.clinic_id == clinic_id,
+            )
+            .limit(1)
+        )
+    ).first()
+    if item is not None:
+        raise TreatmentDeletionBlockedError(
+            "Treatment belongs to a treatment plan; remove it from the plan instead"
+        )
+    data.setdefault("cleared_by", []).append("treatment_plan")
+
+
+async def on_treatment_surfaces_update_requested(data: dict[str, Any], *, db: AsyncSession) -> None:
+    """Veto a surfaces edit on a treatment a Plan owns (ADR 0023).
+
+    Same contract as ``on_treatment_delete_requested``: transactional, read-only,
+    raises to refuse, appends ``treatment_plan`` to ``cleared_by`` only when the
+    treatment has no ``PlannedTreatmentItem`` in ANY plan or status (closed and
+    archived plans keep their items as history, and their sessions and budget
+    line were priced from the surfaces at association time).
+    """
+    from app.modules.odontogram.service import TreatmentSurfacesEditBlockedError
+
+    clinic_id = UUID(str(data["clinic_id"]))
+    treatment_id = UUID(str(data["treatment_id"]))
+    item_id = (
+        await db.execute(
+            select(PlannedTreatmentItem.id)
+            .where(
+                PlannedTreatmentItem.treatment_id == treatment_id,
+                PlannedTreatmentItem.clinic_id == clinic_id,
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if item_id is not None:
+        raise TreatmentSurfacesEditBlockedError(
+            "Treatment belongs to a treatment plan; its surfaces can no longer be edited",
+            "linked_to_plan",
+        )
+    data.setdefault("cleared_by", []).append("treatment_plan")

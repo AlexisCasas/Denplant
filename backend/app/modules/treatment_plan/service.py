@@ -8,13 +8,16 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.auth.models import ClinicMembership
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.modules.odontogram.models import Treatment
+from app.modules.patients.access import PatientAccessPolicy
 from app.modules.patients.models import Patient
 
 from .models import PlannedTreatmentItem, PlannedTreatmentItemSession, TreatmentPlan
@@ -165,6 +168,63 @@ class PlanLockedError(ValueError):
     """Raised when a mutation is attempted on a plan locked by an active budget."""
 
 
+class TreatmentAlreadyPlannedError(ValueError):
+    """Raised when a Treatment is already linked to a *different* plan.
+
+    ``uq_planned_item_treatment`` allows a Treatment to back at most one
+    plan item across the whole clinic, so this is a conflict (409), not a
+    validation error (400). Re-adding it to the *same* plan is not an error
+    at all: ``add_item`` answers idempotently.
+    """
+
+
+async def _find_item_by_treatment(
+    db: AsyncSession, clinic_id: UUID, treatment_id: UUID
+) -> PlannedTreatmentItem | None:
+    """Return the plan item (if any) that already owns ``treatment_id``.
+
+    ``UNIQUE(treatment_id)`` guarantees at most one row.
+    """
+    result = await db.execute(
+        select(PlannedTreatmentItem).where(
+            PlannedTreatmentItem.treatment_id == treatment_id,
+            PlannedTreatmentItem.clinic_id == clinic_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _load_item_for_response(db: AsyncSession, item_id: UUID) -> PlannedTreatmentItem:
+    """Re-fetch an item with the relations ``PlannedTreatmentItemResponse`` reads.
+
+    ``populate_existing`` makes the idempotent path return what is really
+    stored even if the session already holds a stale copy of the item.
+    """
+    reloaded = await db.execute(
+        select(PlannedTreatmentItem)
+        .options(
+            selectinload(PlannedTreatmentItem.treatment).selectinload(Treatment.teeth),
+            selectinload(PlannedTreatmentItem.treatment).selectinload(Treatment.catalog_item),
+            selectinload(PlannedTreatmentItem.sessions),
+        )
+        .where(PlannedTreatmentItem.id == item_id)
+        .execution_options(populate_existing=True)
+    )
+    return reloaded.scalar_one()
+
+
+async def _resolve_existing_item(
+    db: AsyncSession, existing: PlannedTreatmentItem, plan_id: UUID
+) -> PlannedTreatmentItem:
+    """Idempotent answer for a Treatment that already has a plan item.
+
+    Same plan → the stored item, untouched. Another plan → conflict.
+    """
+    if existing.treatment_plan_id != plan_id:
+        raise TreatmentAlreadyPlannedError("Treatment is already linked to another plan")
+    return await _load_item_for_response(db, existing.id)
+
+
 def _is_plan_locked(plan: TreatmentPlan) -> bool:
     """A plan is locked once its budget has been sent to the patient.
 
@@ -224,6 +284,7 @@ class TreatmentPlanService:
         page_size: int = 20,
         patient_id: UUID | None = None,
         status: str | list[str] | None = None,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[TreatmentPlan], int]:
         """List treatment plans with pagination and filters."""
         page_size = min(max(page_size, 1), 100)
@@ -238,6 +299,8 @@ class TreatmentPlanService:
 
         if patient_id:
             base_where.append(TreatmentPlan.patient_id == patient_id)
+        if patient_access_predicate is not None:
+            base_where.append(TreatmentPlan.patient.has(patient_access_predicate))
 
         if status:
             statuses = [status] if isinstance(status, str) else list(status)
@@ -511,7 +574,12 @@ class TreatmentPlanService:
 
             treatment = await db.get(Treatment, treatment_id)
             if treatment and treatment.deleted_at is None and treatment.status == "planned":
-                await TreatmentService.delete(db, clinic_id, treatment_id, user_id)
+                # Plan items stay as history here, so the delete-clearance guard
+                # (which protects linked treatments) must not apply: this IS the
+                # plan releasing its own hold.
+                await TreatmentService.delete_after_plan_release(
+                    db, clinic_id, treatment_id, user_id
+                )
 
     # -------------------------------------------------------------------------
     # Item Operations
@@ -523,8 +591,27 @@ class TreatmentPlanService:
         clinic_id: UUID,
         plan_id: UUID,
         data: dict,
-    ) -> PlannedTreatmentItem:
-        """Add a Treatment to the plan as a new item."""
+    ) -> tuple[PlannedTreatmentItem, bool]:
+        """Link a Treatment to the plan as an item — idempotently.
+
+        Returns ``(item, created)``. ``created`` is ``False`` when the
+        Treatment was already an item of *this* plan: the stored item comes
+        back untouched and nothing else happens (no sessions, no
+        ``treatment_added`` event, no budget line, no reorder, no change of
+        doctor). The router maps ``created`` to 201 / 200.
+
+        Order of checks matters: plan status and lock are evaluated first,
+        so a closed/terminal or locked plan never answers "success" for a
+        repeat — only an editable plan does.
+
+        Concurrency: the ``Treatment`` row is locked ``FOR UPDATE`` before
+        the existence check, so two simultaneous requests for the same
+        Treatment serialize here; the loser blocks until the winner commits
+        and then finds the item (READ COMMITTED re-reads on the next
+        statement). ``UNIQUE(treatment_id)`` stays as the last barrier and
+        an ``IntegrityError`` is recovered inside a SAVEPOINT so the outer
+        transaction is never left aborted.
+        """
         plan = await TreatmentPlanService.get(db, clinic_id, plan_id)
         if not plan:
             raise ValueError("Treatment plan not found")
@@ -542,8 +629,17 @@ class TreatmentPlanService:
         if treatment_id is None:
             raise ValueError("treatment_id is required")
 
-        # Validate the Treatment exists for this clinic/patient.
-        treatment = await db.get(Treatment, treatment_id)
+        # Validate the Treatment exists for this clinic/patient. The row is
+        # locked FOR UPDATE: it is the serialization point for concurrent
+        # attempts to link the same Treatment. ``populate_existing`` so a
+        # cached copy cannot mask a concurrent soft-delete.
+        locked = await db.execute(
+            select(Treatment)
+            .where(Treatment.id == treatment_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        treatment = locked.scalar_one_or_none()
         if (
             not treatment
             or treatment.clinic_id != clinic_id
@@ -551,6 +647,12 @@ class TreatmentPlanService:
             or treatment.deleted_at is not None
         ):
             raise ValueError("Invalid treatment for this plan")
+
+        # Idempotency / ownership. Evaluated after the lock so a concurrent
+        # winner's committed item is visible here.
+        existing = await _find_item_by_treatment(db, clinic_id, treatment_id)
+        if existing is not None:
+            return await _resolve_existing_item(db, existing, plan_id), False
 
         sequence_order = data.get("sequence_order")
         if sequence_order is None:
@@ -579,8 +681,21 @@ class TreatmentPlanService:
             notes=data.get("notes"),
             assigned_professional_id=assigned_professional_id,
         )
-        db.add(item)
-        await db.flush()
+        # SAVEPOINT: if UNIQUE(treatment_id) still fires (the row lock above
+        # should make that unreachable), only this nested block is rolled
+        # back. Querying after an IntegrityError on the *outer* transaction
+        # would hit "current transaction is aborted" on PostgreSQL.
+        try:
+            async with db.begin_nested():
+                db.add(item)
+                await db.flush()
+        except IntegrityError as exc:
+            if "uq_planned_item_treatment" not in str(exc.orig):
+                raise
+            existing = await _find_item_by_treatment(db, clinic_id, treatment_id)
+            if existing is None:
+                raise
+            return await _resolve_existing_item(db, existing, plan_id), False
 
         # Pre-load the catalog template before snapshotting sessions.
         from app.modules.catalog.models import TreatmentCatalogItem
@@ -600,16 +715,7 @@ class TreatmentPlanService:
         await db.flush()
 
         # Re-fetch with eager-loaded treatment.teeth / .catalog_item for the response.
-        reloaded = await db.execute(
-            select(PlannedTreatmentItem)
-            .options(
-                selectinload(PlannedTreatmentItem.treatment).selectinload(Treatment.teeth),
-                selectinload(PlannedTreatmentItem.treatment).selectinload(Treatment.catalog_item),
-                selectinload(PlannedTreatmentItem.sessions),
-            )
-            .where(PlannedTreatmentItem.id == item.id)
-        )
-        item = reloaded.scalar_one()
+        item = await _load_item_for_response(db, item.id)
 
         # Snapshot payload — see ADR 0003. The budget module subscribes
         # without importing treatment_plan/odontogram models.
@@ -644,7 +750,7 @@ class TreatmentPlanService:
             db=db,
         )
 
-        return item
+        return item, True
 
     @staticmethod
     async def update_item(
@@ -856,6 +962,7 @@ class TreatmentPlanService:
         user_id: UUID,
         completed_without_appointment: bool = False,
         notes: str | None = None,
+        require_active_plan: bool = True,
     ) -> PlannedTreatmentItem | None:
         """Mark one session of a plan item as completed.
 
@@ -864,17 +971,26 @@ class TreatmentPlanService:
         session, the parent item is finalized: status flips to
         ``completed``, the Treatment is performed, and the existing
         ``treatment_plan.treatment_completed`` audit/recall path runs.
+
+        ``require_active_plan`` gates the money-booking risk from issue
+        #167 (completing before acceptance books catalog, not quoted,
+        prices) for callers reached through an explicit user action on
+        the plan/session UI. The odontogram-first and appointment-completed
+        paths pass ``False`` — they record a clinical fact that already
+        happened and must not fail the appointment just because the
+        linked plan hasn't been through budget acceptance yet.
         """
         item = await TreatmentPlanService._load_item_with_sessions(db, clinic_id, plan_id, item_id)
         if not item:
             return None
 
-        # Money is booked on completion, so the plan must be past quote
-        # acceptance: sessions are repriced to the accepted budget only
-        # then. Odontogram-first / appointment paths are not gated here.
-        plan = await db.get(TreatmentPlan, plan_id)
-        if not plan or plan.status != "active":
-            raise ValueError("Plan must be active to complete treatments")
+        if require_active_plan:
+            # Money is booked on completion, so the plan must be past quote
+            # acceptance: sessions are repriced to the accepted budget only
+            # then.
+            plan = await db.get(TreatmentPlan, plan_id)
+            if not plan or plan.status != "active":
+                raise ValueError("Plan must be active to complete treatments")
 
         session = next((s for s in item.sessions if s.id == session_id), None)
         if not session:
@@ -1025,6 +1141,7 @@ class TreatmentPlanService:
         user_id: UUID,
         completed_without_appointment: bool = True,
         notes: str | None = None,
+        require_active_plan: bool = True,
     ) -> PlannedTreatmentItem | None:
         """Back-compat shim: complete the next pending session of an item.
 
@@ -1032,6 +1149,14 @@ class TreatmentPlanService:
         For single-session items this behaves like the legacy flow. For
         multi-session items it advances one session per call — callers
         targeting a specific session should use ``complete_session``.
+
+        Also the entry point for the appointment-completed path: a visit
+        executes at most one session's worth of work per item, so
+        "advance the next pending session" is the correct, unambiguous
+        reading of "which session did this appointment do" without
+        needing a session_id on ``AppointmentTreatment``.
+        ``require_active_plan=False`` for that caller — see
+        ``complete_session``.
         """
         item = await TreatmentPlanService._load_item_with_sessions(db, clinic_id, plan_id, item_id)
         if not item:
@@ -1055,6 +1180,7 @@ class TreatmentPlanService:
             user_id=user_id,
             completed_without_appointment=completed_without_appointment,
             notes=notes,
+            require_active_plan=require_active_plan,
         )
 
     @staticmethod
@@ -1313,6 +1439,8 @@ class TreatmentPlanService:
         db: AsyncSession,
         clinic_id: UUID,
         tab: str,
+        role: str,
+        user_id: UUID,
         page: int = 1,
         page_size: int = 20,
         doctor_id: UUID | None = None,
@@ -1360,6 +1488,10 @@ class TreatmentPlanService:
             raise ValueError(f"Unknown pipeline tab '{tab}'")
 
         params: dict[str, object] = {"clinic_id": clinic_id}
+        patient_scope_where, patient_scope_params = PatientAccessPolicy.sql_predicate(
+            role, patient_alias="pat", user_id=user_id
+        )
+        params.update(patient_scope_params)
         extra_where = ""
         if doctor_id is not None:
             extra_where += " AND p.assigned_professional_id = :doctor_id"
@@ -1457,6 +1589,7 @@ class TreatmentPlanService:
               AND p.deleted_at IS NULL
               AND ({tab_where})
               {extra_where}
+              {patient_scope_where}
         """
 
         # ----- count + page ---------------------------------------------

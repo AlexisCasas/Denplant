@@ -140,6 +140,15 @@ class EventType:
     ODONTOGRAM_TREATMENT_STATUS_CHANGED = "odontogram.treatment.status_changed"
     ODONTOGRAM_TREATMENT_PERFORMED = "odontogram.treatment.performed"
     ODONTOGRAM_TREATMENT_DELETED = "odontogram.treatment.deleted"
+    # Vetoable (ADR 0023): published with ``db`` BEFORE the soft delete; a
+    # transactional subscriber may raise to refuse it.
+    ODONTOGRAM_TREATMENT_DELETE_REQUESTED = "odontogram.treatment.delete_requested"
+
+    # Vetoable (ADR 0023): published with ``db`` BEFORE the surfaces of a
+    # treatment are rewritten; owners of a link (plan, budget) may raise to refuse.
+    ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED = (
+        "odontogram.treatment.surfaces_update_requested"
+    )
 
     # Document / media events
     DOCUMENT_UPLOADED = "document.uploaded"
@@ -201,6 +210,7 @@ class EventType:
     # ``treatment_plan.{plan,item}_note_created`` pair).
     CLINICAL_NOTE_ADMINISTRATIVE_CREATED = "clinical_notes.administrative_created"
     CLINICAL_NOTE_DIAGNOSIS_CREATED = "clinical_notes.diagnosis_created"
+    CLINICAL_NOTE_EVOLUTION_CREATED = "clinical_notes.evolution_created"
     CLINICAL_NOTE_TREATMENT_CREATED = "clinical_notes.treatment_created"
     CLINICAL_NOTE_PLAN_CREATED = "clinical_notes.plan_created"
     # Appointment-owner notes. Payload mirrors the other four — patient_id

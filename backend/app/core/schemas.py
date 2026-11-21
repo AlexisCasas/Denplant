@@ -25,8 +25,15 @@ class PaginatedApiResponse(BaseModel, Generic[T]):
 
 
 class ErrorResponse(BaseModel):
-    """Standard error response."""
+    """Standard error response.
+
+    ``code`` is optional and machine-readable: it lets a client tell two
+    failures with the same status apart (for example a stale version from a
+    duplicate draft, both 409) without parsing prose. Handlers that do not
+    set one leave it null, so existing responses keep their shape.
+    """
 
     data: None = None
     message: str
     errors: list[str] = []
+    code: str | None = None

@@ -64,7 +64,7 @@ async def _clinic_locale(db: AsyncSession, clinic_id: UUID) -> str:
 
 async def _clinic_name(db: AsyncSession, clinic_id: UUID) -> str:
     name = await db.scalar(text("SELECT name FROM clinics WHERE id = :id"), {"id": clinic_id})
-    return name or "DentalPin"
+    return name or "Denplant"
 
 
 async def _clinic_tz(db: AsyncSession, clinic_id: UUID) -> ZoneInfo:
@@ -111,6 +111,8 @@ async def _digest_context(
         permissions=get_role_permissions(role),
         tools=tool_registry,
         db=db,
+        actor_user_id=user.id,
+        actor_role=role,
         supervisor_id=user.id,
         guardrail_config=COPILOT_GUARDRAILS,
     )

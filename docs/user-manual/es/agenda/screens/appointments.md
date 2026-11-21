@@ -36,6 +36,9 @@ semana o el día, las creas arrastrando sobre un hueco libre, las
 mueves a otro profesional o gabinete y las haces avanzar por su
 flujo (programada → confirmada → en sala → completada → cobrada).
 
+Los dentistas solo ven y operan sus propias citas; los administradores
+mantienen el calendario interprofesional y los controles de reasignación.
+
 ## De un vistazo
 
 - **Cuatro vistas** — semana, día y kanban en escritorio, y una vista

@@ -6,7 +6,24 @@ from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
 
-from .models import OdontogramHistory, ToothRecord, Treatment, TreatmentTooth
+from .models import (
+    OdontogramHistory,
+    OdontogramUserPreference,
+    ToothRecord,
+    Treatment,
+    TreatmentTooth,
+)
+
+# NTS clinical records (ADR 0021). Imported here so the classes register on
+# `Base.metadata` when the plugin loader imports this package — persistence
+# foundation only; no router, no service, no endpoints yet.
+from .nts.models import (
+    NtsFinding,
+    NtsFindingTarget,
+    NtsOdontogramRecord,
+    NtsRecordAuditEvent,
+    NtsRecordSpecification,
+)
 from .router import router
 
 logger = logging.getLogger(__name__)
@@ -31,7 +48,7 @@ class OdontogramModule(BaseModule):
             "dentist": ["*"],
             "hygienist": ["read", "write"],
             "assistant": ["read"],
-            "receptionist": [],
+            "receptionist": ["read", "treatments.read"],
         },
         "frontend": {
             "layer_path": "frontend",
@@ -39,7 +56,18 @@ class OdontogramModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [ToothRecord, OdontogramHistory, Treatment, TreatmentTooth]
+        return [
+            ToothRecord,
+            OdontogramHistory,
+            Treatment,
+            TreatmentTooth,
+            OdontogramUserPreference,
+            NtsOdontogramRecord,
+            NtsFinding,
+            NtsFindingTarget,
+            NtsRecordSpecification,
+            NtsRecordAuditEvent,
+        ]
 
     def get_router(self) -> APIRouter:
         return router

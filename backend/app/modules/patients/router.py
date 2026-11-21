@@ -17,6 +17,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .access import PatientAccessPolicy
 from .schemas import (
     PatientCreate,
     PatientExtendedResponse,
@@ -37,7 +38,12 @@ async def get_recent_patients(
     limit: int = Query(default=8, ge=1, le=20),
 ) -> ApiResponse[list[PatientResponse]]:
     """Get recent patients (by last visit or creation date)."""
-    patients = await PatientService.get_recent_patients(db, ctx.clinic_id, limit)
+    patients = await PatientService.get_recent_patients(
+        db,
+        ctx.clinic_id,
+        limit,
+        access_predicate=PatientAccessPolicy.predicate(ctx),
+    )
     return ApiResponse(data=[PatientResponse.model_validate(p) for p in patients])
 
 
@@ -52,6 +58,7 @@ async def list_patients(
     patient_ids: list[UUID] | None = Query(default=None),
     city: str | None = Query(default=None, max_length=100),
     do_not_contact: bool | None = Query(default=None),
+    statuses: list[str] | None = Query(default=None, alias="status"),
     include_archived: bool = Query(default=False),
     sort: str | None = Query(default=None, max_length=50),
 ) -> PaginatedApiResponse[PatientResponse]:
@@ -61,6 +68,9 @@ async def list_patients(
     filters such as "with debt > 0" (resolved server-side by the
     payments module, then passed in here).
     """
+    include_archived_for_scope = include_archived or (
+        statuses is not None and "archived" in statuses
+    )
     patients, total = await PatientService.list_patients(
         db,
         ctx.clinic_id,
@@ -70,8 +80,13 @@ async def list_patients(
         patient_ids=patient_ids,
         city=city,
         do_not_contact=do_not_contact,
+        statuses=statuses,
         include_archived=include_archived,
         sort=sort,
+        access_predicate=PatientAccessPolicy.list_predicate(
+            ctx,
+            include_archived=include_archived_for_scope,
+        ),
     )
     return PaginatedApiResponse(
         data=[PatientResponse.model_validate(p) for p in patients],
@@ -94,7 +109,7 @@ async def create_patient(
 ) -> ApiResponse[PatientResponse]:
     """Create a new patient."""
     patient = await PatientService.create_patient(
-        db, ctx.clinic_id, data.model_dump(exclude_unset=True)
+        db, ctx.clinic_id, data.model_dump(exclude_unset=True), created_by_user_id=ctx.user_id
     )
     return ApiResponse(data=PatientResponse.model_validate(patient))
 
@@ -107,7 +122,9 @@ async def get_patient(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PatientResponse]:
     """Get a patient by ID."""
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    patient = await PatientService.get_patient(
+        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+    )
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -125,7 +142,9 @@ async def update_patient(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PatientResponse]:
     """Update a patient."""
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    patient = await PatientService.get_patient(
+        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+    )
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -143,7 +162,9 @@ async def delete_patient(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Soft delete (archive) a patient."""
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    patient = await PatientService.get_patient(
+        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+    )
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -163,7 +184,9 @@ async def get_patient_extended(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PatientExtendedResponse]:
     """Get patient with extended identity/demographics info."""
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    patient = await PatientService.get_patient(
+        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+    )
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -181,7 +204,9 @@ async def update_patient_extended(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PatientExtendedResponse]:
     """Update patient with extended demographic fields."""
-    patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
+    patient = await PatientService.get_patient(
+        db, ctx.clinic_id, patient_id, access_predicate=PatientAccessPolicy.predicate(ctx)
+    )
     if not patient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

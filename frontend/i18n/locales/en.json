@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "DentalPin",
+    "name": "Denplant",
     "tagline": "Dental clinic management"
   },
   "demo": {
@@ -14,6 +14,7 @@
   },
   "nav": {
     "dashboard": "Home",
+    "panel": "Dashboard",
     "patients": "Patients",
     "appointments": "Schedule",
     "recalls": "Recalls",
@@ -63,7 +64,7 @@
     "next": "Next",
     "back": "Back",
     "submit": "Create my clinic",
-    "success": "All set! Welcome to DentalPin",
+    "success": "All set! Welcome to Denplant",
     "firstNameRequired": "Enter the first name",
     "lastNameRequired": "Enter the last name",
     "emailRequired": "Enter the email",
@@ -148,9 +149,10 @@
     "archived": "Patient archived",
     "notFound": "Patient not found",
     "archiveConfirm": "Archive patient {name}?",
-    "archiveDescription": "This action will hide the patient from searches. Existing appointments will not be deleted.",
+    "archiveDescription": "The patient will be archived, not permanently deleted. Appointments and history will be preserved.",
     "cancel": "Cancel",
     "archive": "Archive",
+    "archiveFor": "Archive {name}",
     "dangerZone": {
       "title": "Danger zone",
       "archiveHelp": "Archive the patient to hide them from searches. Appointments and history are preserved."
@@ -454,6 +456,295 @@
   },
   "odontogram": {
     "title": "Dental Chart",
+    "profile": {
+      "label": "Chart format",
+      "options": {
+        "original": "Original",
+        "pe_nts_188_2022": "MINSA Peru"
+      },
+      "updateError": "Could not change the chart format",
+      "nts": {
+        "title": "MINSA Peru dental chart",
+        "norm": "NTS N.° 188-MINSA/DGIESP-2022"
+      }
+    },
+    "nts": {
+      "stage": {
+        "diagnosis": "Diagnosis",
+        "evolution": "Evolution",
+        "discharge": "Discharge",
+        "other": "Other"
+      },
+      "chart": {
+        "title": "Odontogram",
+        "tooth": "Tooth {fdi}",
+        "deciduousTooth": "Deciduous tooth {fdi}",
+        "permanentDentition": "Permanent dentition",
+        "deciduousDentition": "Deciduous dentition",
+        "permanentUpper": "Permanent upper",
+        "deciduousUpper": "Deciduous upper",
+        "deciduousLower": "Deciduous lower",
+        "permanentLower": "Permanent lower",
+        "upper": "Upper",
+        "lower": "Lower",
+        "readonly": "Read-only",
+        "noRecord": "Structure of the official form. It stands for no clinical record.",
+        "findingsPending": "{count} finding(s) not fully drawn",
+        "findingsPendingHint": "Their marks need drawing primitives that arrive in a later phase. Every finding stays on the list below.",
+        "findingRendererPending": "Finding rendering pending",
+        "siglasHidden": "{count} sigla(s) do not fit their box",
+        "siglasHiddenHint": "The box shows \"+n\" where there is no room. Nothing is removed from the record; the full list is below."
+      },
+      "editor": {
+        "findings": "Findings",
+        "noFindings": "No findings recorded.",
+        "newFinding": "New finding",
+        "editFinding": "Edit finding",
+        "addFinding": "Add finding",
+        "saveFinding": "Save finding",
+        "confirmFinding": "Confirm finding",
+        "removeFinding": "Withdraw finding",
+        "removeExplanation": "The finding is withdrawn from this draft. The record keeps its audit trail.",
+        "partialTitle": "Edit partially applied",
+        "partialBody": "The attributes were saved but the targets were not. Review the finding's targets: the record has already changed and is not undone automatically.",
+        "refreshFailedTitle": "The finding was saved, but the view could not be refreshed",
+        "refreshFailedBody": "The change is already on the server. Do not send it again — retry the refresh.",
+        "refreshRetry": "Retry refresh",
+        "refreshing": "Refreshing",
+        "edit": "Edit",
+        "searchFindings": "Search findings",
+        "noMatches": "No finding matches the search.",
+        "targets": "Target",
+        "selectedTeeth": "Selected teeth",
+        "selectedArches": "Arches",
+        "anchors": "References",
+        "rangeSpan": "Range",
+        "toothCount": "{count} tooth/teeth",
+        "roles": "Tooth roles",
+        "noRole": "No role",
+        "pickSubject": "Pick teeth",
+        "pickAnchor": "Pick references",
+        "changeSelection": "Change selection",
+        "changeReferences": "Change references",
+        "doneSelecting": "Done selecting",
+        "retargetSubjectHint": "Pick the teeth on the odontogram. The previous selection is replaced and nothing is saved until you press Save.",
+        "retargetAnchorHint": "Pick the neighbouring teeth that locate the finding. Nothing is saved until you press Save.",
+        "rolesOptional": "Clinical role of the teeth (optional)",
+        "rolesOptionalHint": "Assign only where it applies.",
+        "unnumberedSubject": "This tooth has no FDI number: it is located by its neighbours.",
+        "unnumberedBetween": "Between {teeth}",
+        "pendingReview": "Awaiting review",
+        "unknownRule": "This build does not recognise this finding's rule.",
+        "unknownRuleShort": "Unknown rule",
+        "attributeRequired": "This value is required.",
+        "needsClinicalReview": "The catalog flags this value as awaiting clinical review.",
+        "specificationRequired": "This finding needs an Especificaciones entry before the odontogram can be finalized.",
+        "specificationAdvisory": "The catalog suggests recording further detail in Especificaciones.",
+        "pick": {
+          "tooth": "Select {count} tooth/teeth on the odontogram.",
+          "surface": "Select the tooth on the odontogram and mark its surfaces.",
+          "pair": "Select the two teeth on the odontogram.",
+          "range": "Select the first and last tooth of the range.",
+          "archOne": "Select the arch under treatment.",
+          "archOneOrBoth": "Select one arch or both.",
+          "unnumbered": "Select the {count} neighbouring teeth that locate the finding."
+        },
+        "problem": {
+          "subjectCount": "{expected} tooth/teeth required; {count} selected.",
+          "rangeRequired": "Select the range of teeth.",
+          "duplicateTooth": "A tooth is selected twice.",
+          "anchorCount": "{expected} reference(s) required; {count} selected.",
+          "anchorDistinct": "References must be distinct teeth.",
+          "archRequired": "Select an arch.",
+          "archExactlyOne": "This rule covers exactly one arch.",
+          "archOneOrBoth": "This rule covers one arch or both.",
+          "roleMin": "Role {role} needs at least {min} tooth/teeth.",
+          "roleMax": "Role {role} allows at most {max} tooth/teeth."
+        },
+        "a11y": {
+          "select": "Select {tooth}",
+          "selected": "{tooth}, selected",
+          "anchorSelected": "{tooth}, selected as a reference",
+          "register": "Record a finding on {tooth}"
+        }
+      },
+      "status": {
+        "draft": "Draft",
+        "finalized": "Finalized",
+        "discarded": "Discarded",
+        "superseded": "Corrected"
+      },
+      "field": {
+        "stage": "Stage",
+        "stageLabel": "Stage name",
+        "finalizedAt": "Finalized on",
+        "openedAt": "Opened on",
+        "recordedBy": "Recorded by",
+        "findings": "Findings",
+        "discardReason": "Reason",
+        "continueReason": "Reason for continuing",
+        "discardedAt": "Discarded on",
+        "normVersion": "Norm version"
+      },
+      "actions": {
+        "createDraft": "Create draft",
+        "finalize": "Finalize",
+        "discardDraft": "Discard draft",
+        "continue": "Continue diagnosis"
+      },
+      "current": {
+        "title": "Record in force"
+      },
+      "draft": {
+        "title": "Draft in progress"
+      },
+      "history": {
+        "title": "Record history",
+        "returnToCurrent": "Back to the current odontogram",
+        "viewing": "On screen",
+        "viewingTitle": "You are viewing an odontogram from the history",
+        "viewingBody": "Shown as it was recorded, under the norm version it belongs to. It cannot be changed.",
+        "superseded": "Superseded",
+        "empty": "No earlier records.",
+        "loadFailedTitle": "This odontogram could not be opened",
+        "catalogFailedTitle": "The norm version of this odontogram could not be loaded",
+        "catalogFailedBody": "This record was made under version {version}, which is unavailable. Nothing is drawn: reading it under another version would show findings the record does not contain.",
+        "isCurrent": "Current odontogram"
+      },
+      "empty": {
+        "title": "No MINSA odontogram has been recorded for this patient."
+      },
+      "create": {
+        "hint": "The stage is record metadata; the norm does not require a fixed set."
+      },
+      "discard": {
+        "explanation": "The draft is discarded and can no longer be edited. It is not deleted: it stays on record with its reason."
+      },
+      "continue": {
+        "explanation": "A new editable version will be created from the current diagnosis. The finalized diagnosis will remain unchanged in the history."
+      },
+      "entry": {
+        "title": "Record finding — Tooth {fdi}",
+        "hint": "Choose the finding; the tooth will be selected."
+      },
+      "planReference": {
+        "title": "Diagnosis findings",
+        "lastDiagnosis": "Latest diagnosis: {date}",
+        "location": "Location",
+        "noDiagnosis": "There is no finalized diagnosis yet.",
+        "noFindings": "The current diagnosis records no findings.",
+        "errorTitle": "Findings could not be loaded",
+        "error": "The plan is still available. Retry to see the diagnosis reference."
+      },
+      "carriedForward": {
+        "title": "{count} carried-forward finding(s) awaiting review",
+        "hint": "They were copied from an earlier record. Confirm each one in the findings list before finalizing."
+      },
+      "conflict": {
+        "title": "The odontogram changed in another session",
+        "version": "The information was refreshed; review it before trying again.",
+        "draft": "A draft is already open for this patient.",
+        "state": "The record was already finalized, discarded or replaced in another session. The information was refreshed."
+      },
+      "error": {
+        "loadTitle": "Could not load the MINSA odontogram",
+        "clinicalTitle": "The operation could not be completed",
+        "normUnavailableTitle": "Norm version unavailable",
+        "normUnavailable": "This norm version is not available in this installation."
+      },
+      "specifications": {
+        "title": "Specifications",
+        "add": "Add specification",
+        "edit": "Edit specification",
+        "remove": "Remove specification",
+        "removeExplanation": "The entry stops appearing on the odontogram. The record keeps its audit trail.",
+        "textLabel": "Specification text",
+        "emptyDraft": "No specifications yet. Use “Add specification” to record what does not fit in the boxes.",
+        "emptyFinalized": "No specifications.",
+        "readonly": "This record is finalized: specifications are shown read-only.",
+        "linkedTeeth": "About tooth/teeth {teeth}",
+        "linkedFinding": "Linked to a finding on this record",
+        "linkedUnknown": "Linked to a finding that is not loaded",
+        "overflowTitle": "Some information does not fit visually in one or more boxes",
+        "overflowBody": "The findings are still recorded and appear in the list. If you need to spell them out, you can write them here under Specifications."
+      },
+      "observations": {
+        "title": "Observations",
+        "label": "Observations",
+        "hint": "Clinical findings the odontogram's nomenclature does not cover.",
+        "empty": "No observations.",
+        "readonly": "This record is finalized: observations are shown read-only."
+      },
+      "text": {
+        "refreshFailedTitle": "Your changes were saved, but the view could not be refreshed",
+        "refreshFailedBody": "The record on the server already contains the changes. Re-read it to see them; nothing will be sent again."
+      },
+      "unsaved": {
+        "title": "You have unsaved changes",
+        "body": "If you continue, the text you wrote and did not save will be lost.",
+        "stay": "Keep editing",
+        "discard": "Discard and continue",
+        "leavePage": "The odontogram has unsaved changes. Leave anyway?"
+      },
+      "print": {
+        "title": "Odontogram",
+        "unavailable": "This document cannot be composed: the norm version of this record is unavailable.",
+        "patient": "Patient",
+        "document": "Document",
+        "date": "Date",
+        "specifications": "Specifications",
+        "observations": "Observations",
+        "emptySpecifications": "No specifications recorded.",
+        "emptyObservations": "No observations recorded.",
+        "incompleteFindings": "Findings not fully represented",
+        "systemNote": "Note generated by DenPlant. Not part of the normative chart.",
+        "unsupportedCopy": "{target}: {label} — recorded, not represented on the chart.",
+        "partialCopy": "{target}: {label} — partially represented on the chart.",
+        "professional": "Responsible professional",
+        "registeredBy": "Recorded by",
+        "role": "Role",
+        "professionalId": "Licence / professional ID",
+        "technical": "Record technical data",
+        "recordId": "Record",
+        "normVersion": "Norm version",
+        "status": "Status",
+        "contentFingerprint": "Content fingerprint",
+        "fingerprintUnavailable": "Not available for this state.",
+        "print": "Print",
+        "printDraft": "Print draft",
+        "printDiscarded": "Print discarded record",
+        "prepare": "Prepare printing",
+        "prepareHint": "The browser's own dialog controls these options. Confirm them before printing.",
+        "paper": "Paper: A4",
+        "orientation": "Orientation: portrait",
+        "scale": "Scale: 100%",
+        "color": "Print in colour",
+        "colorHint": "Red and blue are what tell each finding's clinical state apart.",
+        "doNotFit": "Do not use “Fit to page”: it shrinks the chart below the minimum crown size the norm requires.",
+        "openPrintDialog": "Open print dialog",
+        "cancel": "Cancel",
+        "blockedTitle": "Not ready to print yet",
+        "dirtyBlocked": "Save or discard your changes before printing. The sheet is composed from the saved record.",
+        "writingBlocked": "A change is in flight. Wait for it to finish before printing.",
+        "refreshBlocked": "Refresh the record before printing: the change was saved, but it could not be read back.",
+        "conflictBlocked": "Another session changed this odontogram. Review the notice before printing.",
+        "loadingBlocked": "Loading the record. Wait for it to finish before printing.",
+        "unsafePrint": "The odontogram cannot be printed in this state. Return to the application, save or refresh the record, and try again.",
+        "draftQualification": "DRAFT",
+        "draftNotFinal": "This is not the definitive record.",
+        "pendingCarriedForward": "This draft contains {count} carried-forward finding(s) awaiting review.",
+        "discardedQualification": "DISCARDED",
+        "discardedHint": "This record was discarded and is not the odontogram in force.",
+        "discardReason": "Reason for discarding",
+        "supersededQualification": "SUPERSEDED RECORD",
+        "supersededHint": "A later record exists for this patient.",
+        "incompleteWarning": "This record contains findings DenPlant does not fully represent on the chart.",
+        "incompleteNote": "The printed sheet carries a system note identifying them.",
+        "partialCount": "Partially represented: {count}",
+        "unsupportedCount": "Not represented on the chart: {count}",
+        "additionalDetailsHint": "If you need to record further clinical detail, use Specifications where appropriate."
+      }
+    },
     "tooth": "Tooth",
     "globals": {
       "category": "Whole mouth",
@@ -615,6 +906,18 @@
     "selectSurfaces": "Select Surfaces",
     "selectedSurfaces": "Selected surfaces",
     "surfacesSelected": "surface(s) selected",
+    "surfacesLockedInPlan": "Surfaces cannot be edited in the Plan context.",
+    "surfacesLockedPrefix": "Could not save. Surfaces cannot be changed:",
+    "surfacesLocked": {
+      "not_planned": "the treatment is no longer planned.",
+      "not_single_tooth": "they are only editable on single-tooth treatments.",
+      "type_without_surfaces": "this treatment type does not use surfaces.",
+      "no_surfaces": "select at least one surface before saving.",
+      "linked_to_plan": "it belongs to a treatment Plan; remove it from the Plan and create it again.",
+      "linked_to_budget": "it is linked to a budget.",
+      "price_snapshot_drift": "the catalog price changed since it was created; create the treatment again.",
+      "locked": "the edit is not safe."
+    },
     "instructions": {
       "selectTreatment": "Select a treatment to apply",
       "clickTooth": "Click on the tooth to apply"
@@ -700,7 +1003,9 @@
       "history": "History",
       "diagnosis": "Diagnosis",
       "plans": "Treatment plans",
-      "appointments": "Appointments"
+      "appointments": "Appointments",
+      "prescriptions": "Prescriptions",
+      "evolution": "Evolution"
     },
     "history": {
       "stateAt": "State at",
@@ -718,7 +1023,8 @@
       "continuePlan": "Continue Plan \"{name}\"",
       "selectPlan": "Select plan",
       "continue": "Continue",
-      "odontogramTab": "Odontogram"
+      "odontogramTab": "Odontogram",
+      "addNote": "Add note"
     },
     "plans": {
       "title": "Treatment Plans",
@@ -852,6 +1158,19 @@
     "followup": {
       "title": "Post-appointment actions"
     },
+    "completionGate": {
+      "title": "Which treatments were done?",
+      "description": "Check off the plan treatments that were completed at this appointment. Anything left unchecked stays pending on the plan.",
+      "evolutionLabel": "Clinical evolution",
+      "evolutionPlaceholder": "Describe what was done at this visit (optional)"
+    },
+    "noActivePlans": "No active treatment plans.",
+    "noPendingTreatmentsInPlan": "This plan has no pending treatments.",
+    "selectPlan": "Treatment plan",
+    "pendingTreatments": "Pending treatments",
+    "historicalTreatments": "Treatments already linked to this appointment",
+    "historicalTreatmentBadge": "Completed",
+    "sessionN": "Session {n}",
     "created": "Appointment created",
     "saved": "Appointment saved",
     "updated": "Appointment updated",
@@ -912,6 +1231,7 @@
     "selectPendingTreatment": "Select pending treatment",
     "emptyDay": "No appointments for this day",
     "noPatient": "No patient",
+    "labels": { "title": "Labels", "field": "Label", "none": "No label", "new": "New label", "edit": "Edit label", "name": "Name", "color": "Color", "preview": "Preview", "saved": "Label saved", "saveError": "Could not save label", "deactivated": "Label deactivated", "deactivate": "Deactivate label", "inactive": "Inactive", "empty": "No labels", "loadSuggested": "Load suggested labels", "suggestedConfirm": "Load the missing suggested labels? Existing labels will not be changed.", "suggestedResult": "Created: {created}. Existing: {existing}. Errors: {errors}." },
     "freeSlots": {
       "byProfessional": "Professional",
       "byCabinet": "Cabinet",
@@ -926,7 +1246,8 @@
       "noFreeSlots": "No free slots today",
       "clinicClosed": "Clinic closed",
       "professionalOff": "Off-duty",
-      "onBreak": "On break"
+      "onBreak": "On break",
+      "occupied": "Occupied"
     }
   },
   "dashboard": {
@@ -935,7 +1256,7 @@
       "afternoon": "Good afternoon",
       "evening": "Good evening"
     },
-    "welcome": "Welcome to DentalPin",
+    "welcome": "Welcome to Denplant",
     "welcomeMessage": "Start by creating your first patient.",
     "quickActions": {
       "newAppointment": "New appointment",
@@ -1108,6 +1429,8 @@
     "youTag": "(you)",
     "userActive": "User active",
     "isProfessional": "Practises as a professional",
+    "professionalRegistration": "Professional registration number",
+    "professionalRegistrationHelp": "The dentist's professional registration number.",
     "isProfessionalHelp": "Appears in the agenda, has working hours and can be assigned treatments. An administrator can also practise.",
     "userInactiveNote": "(Cannot log in)",
     "saveChanges": "Save Changes",
@@ -1227,16 +1550,40 @@
       "copy": "Copy link",
       "copied": "Link copied",
       "whatsapp": "Send via WhatsApp",
-      "shareText": "Hi {name}, here is your DentalPin access. Open it and choose your password: {url}",
+      "shareText": "Hi {name}, here is your Denplant access. Open it and choose your password: {url}",
       "secretNote": "Treat it like a password: anyone with the link can sign in to this account.",
       "passwordOptionalHelp": "Leave empty to generate an access link you can send by WhatsApp or email.",
       "passwordOptionalPlaceholder": "Optional",
       "createAndLink": "Create and generate link",
       "rowAction": "Access link",
       "setPasswordTitle": "Choose your password",
-      "setPasswordSubtitle": "You've been invited to DentalPin. Create your password to sign in.",
+      "setPasswordSubtitle": "You've been invited to Denplant. Create your password to sign in.",
       "setPasswordSubmit": "Save and sign in",
       "invalidToken": "This link is invalid or already used. Ask your clinic administrator for a new one."
+    },
+    "logo": {
+      "title": "Visual identity",
+      "description": "The clinic logo appears on budgets and on documents generated from now on.",
+      "none": "No logo",
+      "alt": "Clinic logo",
+      "upload": "Upload logo",
+      "replace": "Replace logo",
+      "remove": "Remove logo",
+      "confirmRemove": "Yes, remove",
+      "recommended": "Recommended size: {width}×{height} px (about 2.5:1), with a transparent background for PNG.",
+      "formats": "PNG, JPEG or WebP · up to {mb} MB · up to {max}×{max} px. SVG is not accepted.",
+      "pdfBox": "On the PDF it is printed inside a 50×20 mm box, never stretched.",
+      "signedNote": "Budgets that are already signed keep the logo they were signed with.",
+      "saved": "Logo updated",
+      "removed": "Logo removed",
+      "errors": {
+        "type": "The file must be a PNG, JPEG or WebP image.",
+        "size": "The file is larger than {mb} MB.",
+        "empty": "The file is empty.",
+        "dimensions": "The image is larger than {max}×{max} px.",
+        "animated": "Animated images are not accepted.",
+        "unreadable": "The image could not be read. Try another file."
+      }
     }
   },
   "selector": {
@@ -1535,6 +1882,7 @@
     "clinicalCategory": "Clinical category",
     "noOdontogramMapping": "No association",
     "odontogramMappingHint": "Treatment characteristics will be automatically adjusted based on the selected type.",
+    "odontogramLegacyTypeUnsupported": "The legacy type \"{type}\" is no longer supported. Select a valid treatment type before saving.",
     "selectCategory": "Select category...",
     "selectVatType": "Select VAT type...",
     "selectScope": "Select scope...",

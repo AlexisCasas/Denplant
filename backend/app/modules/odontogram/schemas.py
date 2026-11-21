@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -200,6 +200,18 @@ class TreatmentToothResponse(BaseModel):
     surfaces: list[str] | None = None
 
 
+class TreatmentVisualizationSnapshot(BaseModel):
+    """Immutable therapeutic rendering contract captured at treatment creation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    odontogram_treatment_type: str = Field(min_length=1, max_length=30)
+    visualization_rules: list[dict[str, Any]] = Field(default_factory=list)
+    visualization_config: dict[str, Any] = Field(default_factory=dict)
+    clinical_category: str = Field(min_length=1, max_length=20)
+
+
 class TreatmentResponse(BaseModel):
     """Response schema for a Treatment including its teeth members."""
 
@@ -223,6 +235,7 @@ class TreatmentResponse(BaseModel):
     price_snapshot: Decimal | None = None
     duration_snapshot: int | None = None
     vat_rate_snapshot: Decimal | None = None
+    visualization_snapshot: TreatmentVisualizationSnapshot | None = None
 
     budget_item_id: UUID | None = None
     notes: str | None = None
@@ -379,8 +392,11 @@ class TreatmentUpdate(BaseModel):
     """Update a Treatment header.
 
     `surfaces` replaces the surfaces on every TreatmentTooth of this treatment
-    (useful for single-tooth surface treatments like fillings) and triggers a
-    recompute of price_snapshot/duration_snapshot from the catalog item.
+    only when its set effectively changes. The service authorizes that change
+    only for eligible planned single-tooth surface treatments; Plan/Budget
+    links, a performed status and price-snapshot drift can refuse it. Only a
+    ``per_surface`` catalog item can update ``price_snapshot``. Duration, VAT
+    and visualization snapshots remain frozen.
     """
 
     status: Literal["planned", "performed"] | None = None
@@ -473,6 +489,31 @@ class TimelineDateEntry(BaseModel):
 class TimelineResponse(BaseModel):
     dates: list[TimelineDateEntry] = Field(default_factory=list)
     total: int = Field(default=0)
+
+
+# ----------------------------------------------------------------------------
+# Odontogram profile preference schemas
+# ----------------------------------------------------------------------------
+
+
+class OdontogramPreferenceResponse(BaseModel):
+    """Effective odontogram profile for the current user + clinic."""
+
+    profile: str = Field(
+        ...,
+        description="Active odontogram profile: 'original' or 'pe_nts_188_2022'",
+    )
+
+
+class OdontogramPreferenceUpdate(BaseModel):
+    """Body for ``PUT /preferences``.
+
+    ``clinic_id`` / ``user_id`` are deliberately absent: both are derived
+    from the authenticated clinic context, so a caller can only ever change
+    their own preference.
+    """
+
+    profile: Literal["original", "pe_nts_188_2022"]
 
 
 OdontogramResponse.model_rebuild()

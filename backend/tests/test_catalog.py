@@ -1,13 +1,18 @@
 """Tests for the catalog module."""
 
+from decimal import Decimal
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
-from app.modules.catalog.models import VatType
+from app.modules.catalog.models import TreatmentCatalogItem, TreatmentCategory, VatType
+from app.modules.catalog.pricing import compute_price_snapshot
+from app.modules.catalog.service import _normalize_catalog_jsonb_prices
 
 
 @pytest.fixture
@@ -397,6 +402,315 @@ async def test_update_catalog_item(
     data = response.json()["data"]
     assert data["names"]["es"] == "Actualizado"
     assert float(data["default_price"]) == 75.00
+
+
+@pytest.mark.asyncio
+async def test_catalog_item_per_surface_prices_are_jsonb_safe_on_create_and_read(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict, db_session: AsyncSession
+):
+    """Per-surface Decimal prices persist through JSONB and remain priceable."""
+    category_id = await _create_catalog_category(client, auth_headers, "surface_jsonb_create")
+
+    response = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "SURFACE-JSONB-CREATE",
+            "names": {"es": "Composite"},
+            "default_price": 50.00,
+            "pricing_strategy": "per_surface",
+            "surface_prices": {"1": 50.00, "2": 80.00},
+            "treatment_scope": "tooth",
+            "requires_surfaces": True,
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    item_id = response.json()["data"]["id"]
+    assert Decimal(str(response.json()["data"]["surface_prices"]["1"])) == Decimal("50.00")
+    assert Decimal(str(response.json()["data"]["surface_prices"]["2"])) == Decimal("80.00")
+
+    persisted = await db_session.get(TreatmentCatalogItem, item_id)
+    assert persisted is not None
+    assert Decimal(str(persisted.surface_prices["1"])) == Decimal("50.00")
+    assert Decimal(str(persisted.surface_prices["2"])) == Decimal("80.00")
+    assert compute_price_snapshot(
+        persisted, [SimpleNamespace(surfaces=["M", "O"], role=None)]
+    ) == Decimal("80.00")
+
+
+@pytest.mark.asyncio
+async def test_catalog_item_per_surface_prices_are_jsonb_safe_on_update(
+    client: AsyncClient, auth_headers: dict, catalog_clinic_setup: dict, db_session: AsyncSession
+):
+    """Updating a normal item keeps precise per-surface prices JSONB-safe."""
+    category_id = await _create_catalog_category(client, auth_headers, "surface_jsonb_update")
+    create = await client.post(
+        "/api/v1/catalog/items",
+        json={
+            "category_id": category_id,
+            "internal_code": "SURFACE-JSONB-UPDATE",
+            "names": {"es": "Composite"},
+            "default_price": 50.00,
+            "pricing_strategy": "per_surface",
+            "surface_prices": {"1": 50.00},
+            "treatment_scope": "tooth",
+        },
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    item_id = create.json()["data"]["id"]
+
+    update = await client.put(
+        f"/api/v1/catalog/items/{item_id}",
+        json={"surface_prices": {"1": 50.005, "2": 80.125}},
+        headers=auth_headers,
+    )
+
+    assert update.status_code == 200
+    assert Decimal(str(update.json()["data"]["surface_prices"]["1"])) == Decimal("50.005")
+    assert Decimal(str(update.json()["data"]["surface_prices"]["2"])) == Decimal("80.125")
+    persisted = await db_session.get(TreatmentCatalogItem, item_id)
+    assert Decimal(str(persisted.surface_prices["1"])) == Decimal("50.005")
+    assert Decimal(str(persisted.surface_prices["2"])) == Decimal("80.125")
+
+
+def test_catalog_jsonb_price_normalization_preserves_decimal_precision():
+    """Nested Decimal prices become exact JSON-compatible values only in JSONB fields."""
+    data = {
+        "surface_prices": {"1": Decimal("50.005")},
+        "pricing_config": {"abutment": {"amount": Decimal("80.125")}},
+        "default_price": Decimal("99.99"),
+    }
+
+    _normalize_catalog_jsonb_prices(data)
+
+    assert data["surface_prices"] == {"1": "50.005"}
+    assert data["pricing_config"] == {"abutment": {"amount": "80.125"}}
+    assert data["default_price"] == Decimal("99.99")
+
+
+async def _system_item(
+    db_session: AsyncSession, catalog_clinic_setup: dict, *, strategy: str = "flat"
+) -> TreatmentCatalogItem:
+    """Create a clinic-local stock item with a protected clinical identity."""
+    category = TreatmentCategory(
+        id=uuid4(),
+        clinic_id=catalog_clinic_setup["clinic_id"],
+        key=f"system-{uuid4().hex[:8]}",
+        names={"es": "Sistema"},
+        is_system=True,
+    )
+    item = TreatmentCatalogItem(
+        id=uuid4(),
+        clinic_id=catalog_clinic_setup["clinic_id"],
+        category_id=category.id,
+        internal_code=f"SYS-{uuid4().hex[:8]}",
+        names={"es": "Revisión"},
+        default_price=90,
+        cost_price=30,
+        vat_type_id=catalog_clinic_setup["vat_exempt_id"],
+        pricing_strategy=strategy,
+        treatment_scope="tooth",
+        is_system=True,
+    )
+    db_session.add_all([category, item])
+    await db_session.commit()
+    return item
+
+
+@pytest.mark.asyncio
+async def test_system_item_allows_only_commercial_updates(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    catalog_clinic_setup: dict,
+):
+    item = await _system_item(db_session, catalog_clinic_setup)
+
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}",
+        headers=auth_headers,
+        json={
+            "default_price": 120,
+            "cost_price": 45,
+            "vat_type_id": catalog_clinic_setup["vat_reduced_id"],
+            "default_duration_minutes": 45,
+            "requires_appointment": False,
+            "sessions": [],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    assert data["internal_code"] == item.internal_code
+    assert data["category_id"] == str(item.category_id)
+    assert float(data["default_price"]) == 120
+    assert float(data["cost_price"]) == 45
+    assert data["vat_type_id"] == catalog_clinic_setup["vat_reduced_id"]
+    assert data["default_duration_minutes"] == 45
+    assert data["requires_appointment"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"internal_code": "MUTATED"},
+        {"default_price": 100, "treatment_scope": "global_mouth"},
+        {"pricing_strategy": "per_tooth"},
+        {"default_price": None},
+        {"unknown": "mass-assignment"},
+    ],
+)
+async def test_system_item_rejects_protected_or_invalid_payloads(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    catalog_clinic_setup: dict,
+    payload: dict,
+):
+    item = await _system_item(db_session, catalog_clinic_setup)
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}", headers=auth_headers, json=payload
+    )
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_system_item_rejects_foreign_or_inactive_vat_and_incompatible_pricing(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    catalog_clinic_setup: dict,
+):
+    item = await _system_item(db_session, catalog_clinic_setup)
+    other_clinic = Clinic(id=uuid4(), name="Other", tax_id="B12345678")
+    foreign_vat = VatType(id=uuid4(), clinic_id=other_clinic.id, names={"es": "Otro"}, rate=0)
+    inactive_vat = VatType(
+        id=uuid4(),
+        clinic_id=catalog_clinic_setup["clinic_id"],
+        names={"es": "Inactivo"},
+        rate=0,
+        is_active=False,
+    )
+    db_session.add_all([other_clinic, foreign_vat, inactive_vat])
+    await db_session.commit()
+
+    for payload in (
+        {"vat_type_id": str(foreign_vat.id)},
+        {"vat_type_id": str(inactive_vat.id)},
+        {"surface_prices": {"1": 90}},
+        {"pricing_config": {"pillar": 90}},
+    ):
+        response = await client.put(
+            f"/api/v1/catalog/items/{item.id}", headers=auth_headers, json=payload
+        )
+        assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_system_item_is_invisible_from_another_clinic_and_cannot_be_deleted(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    catalog_clinic_setup: dict,
+):
+    item = await _system_item(db_session, catalog_clinic_setup)
+    other_clinic = Clinic(id=uuid4(), name="Other Clinic", tax_id="B87654320")
+    db_session.add_all(
+        [
+            other_clinic,
+            ClinicMembership(
+                id=uuid4(),
+                user_id=catalog_clinic_setup["user_id"],
+                clinic_id=other_clinic.id,
+                role="admin",
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    foreign_context = {"clinic_id": str(other_clinic.id)}
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}",
+        headers=auth_headers,
+        params=foreign_context,
+        json={"default_price": 120},
+    )
+    assert response.status_code == 404, response.text
+
+    response = await client.delete(f"/api/v1/catalog/items/{item.id}", headers=auth_headers)
+    assert response.status_code == 403, response.text
+
+
+@pytest.mark.asyncio
+async def test_system_item_commercial_update_still_requires_catalog_write_permission(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    catalog_clinic_setup: dict,
+):
+    item = await _system_item(db_session, catalog_clinic_setup)
+    membership = await db_session.scalar(
+        select(ClinicMembership).where(
+            ClinicMembership.user_id == catalog_clinic_setup["user_id"],
+            ClinicMembership.clinic_id == catalog_clinic_setup["clinic_id"],
+        )
+    )
+    assert membership is not None
+    membership.role = "dentist"  # Catalog users without write remain read-only.
+    await db_session.commit()
+
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}",
+        headers=auth_headers,
+        json={"default_price": 120},
+    )
+    assert response.status_code == 403, response.text
+
+
+@pytest.mark.asyncio
+async def test_system_item_per_surface_sessions_preserve_omitted_template_and_replace_empty(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    catalog_clinic_setup: dict,
+):
+    item = await _system_item(db_session, catalog_clinic_setup, strategy="per_surface")
+    valid = {
+        "default_price": 100,
+        "surface_prices": {"1": 100, "2": 150},
+        "sessions": [
+            {"labels": {"es": "Parte 1"}, "default_price": 40},
+            {"labels": {"es": "Parte 2"}, "default_price": 60},
+        ],
+    }
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}", headers=auth_headers, json=valid
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()["data"]["sessions"]) == 2
+
+    # Omission preserves the template; [] intentionally replaces it.
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}", headers=auth_headers, json={"default_price": 110}
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()["data"]["sessions"]) == 2
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}", headers=auth_headers, json={"sessions": []}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["sessions"] == []
+
+    response = await client.put(
+        f"/api/v1/catalog/items/{item.id}",
+        headers=auth_headers,
+        json={"sessions": [{"labels": {"es": "Incorrecta"}, "default_price": 20}]},
+    )
+    assert response.status_code == 422, response.text
 
 
 @pytest.mark.asyncio

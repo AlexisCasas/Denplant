@@ -16,13 +16,19 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.dependencies import (
+    ClinicContext,
+    get_clinic_context,
+    require_financial_visibility,
+    require_permission,
+)
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
 from .schemas import (
     AgingBuckets,
     AllocationResponse,
+    BudgetItemPaymentSummary,
     BudgetIdsRequest,
     BudgetSummariesByIds,
     FilterIdsResponse,
@@ -53,7 +59,7 @@ from .workflow import (
     refund_payment,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_financial_visibility)])
 
 
 def _bad_request(exc: Exception) -> HTTPException:
@@ -258,6 +264,23 @@ async def allocations_for_budget(
 ) -> ApiResponse[list[AllocationResponse]]:
     rows = await PaymentReadService.get_allocations_for_budget(db, ctx.clinic_id, budget_id)
     return ApiResponse(data=[AllocationResponse.from_model(r) for r in rows])
+
+
+@router.get(
+    "/budgets/{budget_id}/item-summaries",
+    response_model=ApiResponse[list[BudgetItemPaymentSummary]],
+)
+async def item_summaries_for_budget(
+    budget_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("payments.record.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[list[BudgetItemPaymentSummary]]:
+    rows = await PaymentReadService.item_summaries_for_budget(db, ctx.clinic_id, budget_id)
+    return ApiResponse(
+        data=[BudgetItemPaymentSummary(budget_item_id=item_id, paid=paid, balance=balance)
+              for item_id, (paid, balance) in rows.items()]
+    )
 
 
 # --- Cross-module summary + filter endpoints --------------------------

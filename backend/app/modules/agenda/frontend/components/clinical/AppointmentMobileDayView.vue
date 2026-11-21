@@ -27,6 +27,8 @@ interface ProfessionalWithColor extends Professional {
 
 const props = defineProps<{
   appointments: readonly Appointment[]
+  /** Full period data, kept separate from display-only label filtering. */
+  allAppointments?: readonly Appointment[]
   professionals: ProfessionalWithColor[]
   cabinets: Cabinet[]
   currentDate: Date
@@ -212,7 +214,9 @@ const bounds = computed<DayBounds>(() => {
 
 // ---- Free-slot engine -------------------------------------------
 
-const appointmentsRef = computed(() => props.appointments)
+// Availability must always subtract every existing reservation, even if a
+// label filter hides its card from the timeline.
+const appointmentsRef = computed(() => props.allAppointments ?? props.appointments)
 
 const { entries, summary } = useFreeSlots({
   appointments: appointmentsRef,
@@ -293,6 +297,7 @@ function createNow() {
 }
 
 const hasAnyEntry = computed(() => entries.value.length > 0)
+const visibleAppointmentIds = computed(() => props.appointments.map(appointment => appointment.id))
 </script>
 
 <template>
@@ -324,6 +329,7 @@ const hasAnyEntry = computed(() => entries.value.length > 0)
           @click="shiftDay(1)"
         />
       </div>
+      <slot name="legend" />
 
       <!-- 7-day strip -->
       <div class="grid grid-cols-7 gap-1 px-2 pb-2">
@@ -421,6 +427,7 @@ const hasAnyEntry = computed(() => entries.value.length > 0)
       <AppointmentMobileTimeline
         v-else
         :entries="entries"
+        :visible-appointment-ids="visibleAppointmentIds"
         :professionals="professionals"
         :highlighted-appointment-id="highlightedAppointmentId"
         @appointment-click="emit('appointment-click', $event)"

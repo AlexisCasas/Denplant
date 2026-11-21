@@ -11,6 +11,7 @@ import type { Appointment, Professional } from '~~/app/types'
 import type { TimelineEntry, FreeSlotEntry, BusyEntry, BlockedEntry } from '../../composables/useFreeSlots'
 import { formatDuration } from '../../composables/useFreeSlots'
 import { parseWallClock } from '~~/app/utils/wallClock'
+import { labelTextColor } from '../../utils/appointmentLabels'
 
 interface ProfessionalWithColor extends Professional {
   color: string
@@ -18,6 +19,7 @@ interface ProfessionalWithColor extends Professional {
 
 const props = defineProps<{
   entries: TimelineEntry[]
+  visibleAppointmentIds?: readonly string[]
   professionals: ProfessionalWithColor[]
   highlightedAppointmentId?: string | null
 }>()
@@ -38,6 +40,10 @@ function isBusy(e: TimelineEntry): e is BusyEntry {
 }
 function isBlocked(e: TimelineEntry): e is BlockedEntry {
   return e.type === 'blocked'
+}
+
+function isVisibleBusy(e: BusyEntry): boolean {
+  return !props.visibleAppointmentIds || props.visibleAppointmentIds.includes(e.appointment.id)
 }
 
 function formatTime(d: Date): string {
@@ -109,7 +115,7 @@ function entryKey(e: TimelineEntry, i: number): string {
     >
       <!-- Busy appointment -->
       <button
-        v-if="isBusy(entry)"
+        v-if="isBusy(entry) && isVisibleBusy(entry)"
         type="button"
         class="w-full flex items-start gap-3 px-3 py-3 text-left hover:bg-surface-muted transition-colors min-h-[60px]"
         :class="{ 'bg-[var(--color-primary-soft)]/30': entry.appointment.id === highlightedAppointmentId }"
@@ -125,7 +131,7 @@ function entryKey(e: TimelineEntry, i: number): string {
         </div>
         <span
           class="w-1 self-stretch rounded-full shrink-0"
-          :style="{ backgroundColor: professionalFor(entry.appointment.professional_id)?.color || 'var(--color-primary)' }"
+          :style="{ backgroundColor: entry.appointment.appointment_label?.color || professionalFor(entry.appointment.professional_id)?.color || 'var(--color-primary)' }"
         />
         <div class="flex-1 min-w-0 flex flex-col gap-1">
           <div class="flex items-center gap-2 min-w-0">
@@ -140,6 +146,11 @@ function entryKey(e: TimelineEntry, i: number): string {
             />
           </div>
           <div class="flex items-center gap-2 flex-wrap text-caption text-subtle">
+            <span
+              v-if="entry.appointment.appointment_label"
+              class="inline-flex max-w-full truncate rounded px-1.5 py-0.5"
+              :style="{ backgroundColor: entry.appointment.appointment_label.color, color: labelTextColor(entry.appointment.appointment_label.color) }"
+            >{{ entry.appointment.appointment_label.name }}</span>
             <span
               v-if="professionalFor(entry.appointment.professional_id)"
               class="inline-flex items-center gap-1"
@@ -176,6 +187,22 @@ function entryKey(e: TimelineEntry, i: number): string {
           {{ statusLabel(entry.appointment.status) }}
         </UBadge>
       </button>
+
+      <!-- A filtered reservation stays operationally busy but never exposes
+           patient or appointment data, and cannot be opened. -->
+      <div
+        v-else-if="isBusy(entry)"
+        class="w-full flex items-start gap-3 px-3 py-3 text-left bg-surface-muted/40 min-h-[60px]"
+        role="status"
+        :aria-label="`${formatTime(entry.start)}–${formatTime(entry.end)} ${t('appointments.freeSlots.occupied')}`"
+      >
+        <div class="flex flex-col items-end shrink-0 w-14 pt-0.5">
+          <span class="text-ui font-medium text-default tnum">{{ formatTime(entry.start) }}</span>
+          <span class="text-caption text-subtle tnum">{{ formatTime(entry.end) }}</span>
+        </div>
+        <span class="w-1 self-stretch rounded-full shrink-0 bg-neutral-400" aria-hidden="true" />
+        <span class="text-ui text-muted">{{ t('appointments.freeSlots.occupied') }}</span>
+      </div>
 
       <!-- Free slot — qualifying (prominent, tappable) -->
       <button

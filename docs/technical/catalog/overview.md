@@ -34,6 +34,15 @@ the scaffold could not infer.
 - `PUT /api/v1/catalog/items/{item_id}`
 - `PUT /api/v1/catalog/vat-types/{vat_type_id}`
 
+## System treatment commercial configuration
+
+Stock treatments are seeded as independent rows for each clinic, not shared
+global rows. `PUT /api/v1/catalog/items/{item_id}` keeps their clinical
+identity immutable but allows a clinic to set `default_price`, `cost_price`,
+an active clinic-owned VAT type, compatible pricing data, session templates,
+duration and appointment requirement. Other fields are rejected. Existing
+treatments, plans and session rows retain their price/duration/VAT snapshots.
+
 ## Frontend
 
 - `backend/app/modules/catalog/frontend/pages/settings/catalog/index.vue` → `/settings/catalog`

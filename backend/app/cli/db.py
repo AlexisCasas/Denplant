@@ -62,9 +62,8 @@ def _cmd_upgrade(args: argparse.Namespace) -> int:
     if args.dry_run:
         return 0
 
-    from alembic.config import Config
-
     from alembic import command
+    from alembic.config import Config
 
     cfg = Config(str(alembic_cfg_path()))
     for target in targets:

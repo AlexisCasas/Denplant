@@ -20,6 +20,7 @@ defineProps<Props>()
 
 const wrapperClass
   = 'block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] rounded-token-md'
+const actionWrapperClass = 'relative block rounded-token-md'
 const rowClass
   = 'hidden md:flex items-center gap-[var(--density-gap,0.75rem)] px-2 py-2 -mx-2 rounded-token-md transition-colors min-h-[var(--density-row-height,44px)] hover:bg-surface-muted'
 const cardClass
@@ -28,7 +29,7 @@ const cardClass
 
 <template>
   <NuxtLink
-    v-if="to"
+    v-if="to && !$slots.actions"
     :to="to"
     :class="wrapperClass"
   >
@@ -43,7 +44,7 @@ const cardClass
   </NuxtLink>
 
   <div
-    v-else
+    v-else-if="!$slots.actions"
     :class="wrapperClass"
   >
     <div :class="rowClass">
@@ -53,6 +54,46 @@ const cardClass
       <slot name="card">
         <slot name="row" />
       </slot>
+    </div>
+  </div>
+
+  <div
+    v-else
+    :class="actionWrapperClass"
+  >
+    <NuxtLink
+      v-if="to"
+      :to="to"
+      :class="wrapperClass"
+    >
+      <div :class="[rowClass, 'pr-10']">
+        <slot name="row" />
+      </div>
+      <div :class="[cardClass, 'pr-10']">
+        <slot name="card">
+          <slot name="row" />
+        </slot>
+      </div>
+    </NuxtLink>
+
+    <div
+      v-else
+      class="block"
+    >
+      <div :class="[rowClass, 'pr-10']">
+        <slot name="row" />
+      </div>
+      <div :class="[cardClass, 'pr-10']">
+        <slot name="card">
+          <slot name="row" />
+        </slot>
+      </div>
+    </div>
+
+    <div
+      class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center"
+    >
+      <slot name="actions" />
     </div>
   </div>
 </template>

@@ -8,9 +8,10 @@ import { test, expect } from './_fixtures'
  */
 
 const ADMIN_ROUTES = [
-  // Home renders a time-of-day greeting ("Good morning, X" / "Buenos días, X")
-  // or a welcome empty state when no module registers dashboard slots.
-  { path: '/', selector: /home|inicio|dashboard|panel|good (morning|afternoon|evening)|buen(os días|as tardes|as noches)|welcome|bienvenid/i },
+  // Home resolves to Agenda for an admin with the module active.
+  { path: '/', selector: /schedule|agenda|appointment|cita/i },
+  // The former home dashboard remains available at its explicit route.
+  { path: '/dashboard', selector: /home|inicio|dashboard|panel|good (morning|afternoon|evening)|buen(os días|as tardes|as noches)|welcome|bienvenid/i },
   { path: '/patients', selector: /patients|pacientes/i },
   { path: '/appointments', selector: /schedule|agenda|appointment|cita/i },
   { path: '/treatment-plans', selector: /plans|planes|treatment/i },

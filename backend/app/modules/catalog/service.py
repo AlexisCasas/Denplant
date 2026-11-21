@@ -19,8 +19,30 @@ from .models import (
 SESSION_SUM_TOLERANCE = Decimal("0.01")
 
 
+def _jsonb_decimal_safe(value: object) -> object:
+    """Convert Decimal values in catalog JSONB payloads without losing precision."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _jsonb_decimal_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_jsonb_decimal_safe(item) for item in value]
+    return value
+
+
+def _normalize_catalog_jsonb_prices(data: dict) -> None:
+    """Prepare price configuration fields for PostgreSQL JSONB persistence."""
+    for field in ("surface_prices", "pricing_config"):
+        if field in data and data[field] is not None:
+            data[field] = _jsonb_decimal_safe(data[field])
+
+
 class SessionTemplateError(ValueError):
     """Raised when a session template fails validation (sum mismatch, etc.)."""
+
+
+class CommercialConfigurationError(ValueError):
+    """Raised when a system item's commercial configuration is invalid."""
 
 
 def validate_session_template(
@@ -460,6 +482,8 @@ class CatalogService:
         data: dict,
     ) -> TreatmentCatalogItem:
         """Create a new catalog item."""
+        _normalize_catalog_jsonb_prices(data)
+
         # Extract relations to handle separately
         odontogram_data = data.pop("odontogram_mapping", None)
         sessions_data = data.pop("sessions", None)
@@ -511,6 +535,8 @@ class CatalogService:
         ``sessions`` semantics: omitted key = leave template untouched;
         present key (list or empty list) = replace template atomically.
         """
+        _normalize_catalog_jsonb_prices(data)
+
         odontogram_data = data.pop("odontogram_mapping", None)
         sessions_data = data.pop("sessions", "__not_provided__")
 
@@ -553,6 +579,35 @@ class CatalogService:
 
         await db.flush()
         return item
+
+    @staticmethod
+    async def update_system_item_commercial(
+        db: AsyncSession,
+        clinic_id: UUID,
+        item: TreatmentCatalogItem,
+        data: dict,
+    ) -> TreatmentCatalogItem:
+        """Update the clinic-owned commercial settings of a system item.
+
+        ``pricing_strategy`` is part of the protected clinical definition, so
+        the submitted settings must be compatible with the stored strategy.
+        VAT selection is tenant-scoped rather than relying solely on the FK.
+        """
+        if "vat_type_id" in data:
+            vat_type = await VatTypeService.get_vat_type(db, clinic_id, data["vat_type_id"])
+            if vat_type is None or not vat_type.is_active:
+                raise CommercialConfigurationError("VAT type is not selectable for this clinic")
+
+        if "surface_prices" in data and item.pricing_strategy != "per_surface":
+            raise CommercialConfigurationError(
+                "surface_prices can only be configured for per_surface pricing"
+            )
+        if "pricing_config" in data and item.pricing_strategy != "per_role":
+            raise CommercialConfigurationError(
+                "pricing_config can only be configured for per_role pricing"
+            )
+
+        return await CatalogService.update_item(db, clinic_id, item, data)
 
     @staticmethod
     async def delete_item(

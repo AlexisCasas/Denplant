@@ -84,6 +84,11 @@ export const PERMISSIONS = {
     read: 'clinical_notes.notes.read',
     write: 'clinical_notes.notes.write'
   },
+  prescriptions: {
+    read: 'prescriptions.read',
+    prescribe: 'prescriptions.prescribe',
+    void: 'prescriptions.void'
+  },
   agents: {
     view: 'agents.view',
     supervise: 'agents.supervise',

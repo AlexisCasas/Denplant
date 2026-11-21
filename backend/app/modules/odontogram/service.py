@@ -1,5 +1,6 @@
 """Business logic service for odontogram module."""
 
+from copy import deepcopy
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -19,11 +20,79 @@ from app.modules.catalog.pricing import (
 
 from .constants import (
     ATOMIC_MULTI_TOOTH_TYPES,
+    DEFAULT_ODONTOGRAM_PROFILE,
+    SURFACE_TREATMENTS,
     ToothCondition,
     TreatmentStatus,
     get_tooth_type,
+    is_valid_odontogram_profile,
 )
-from .models import OdontogramHistory, ToothRecord, Treatment, TreatmentTooth
+from .models import (
+    OdontogramHistory,
+    OdontogramUserPreference,
+    ToothRecord,
+    Treatment,
+    TreatmentTooth,
+)
+from .schemas import TreatmentVisualizationSnapshot
+
+# Modules whose acknowledgement is mandatory before a treatment is soft-deleted
+# (ADR 0023). A plain string, not an import: ``treatment_plan`` owns the link to
+# treatments and is ``auto_install`` / ``removable=False``. Other guards may be
+# added to ``cleared_by`` but never replace these.
+REQUIRED_DELETE_GUARDS: frozenset[str] = frozenset({"treatment_plan"})
+
+SURFACES_LOCKED_CODE_PREFIX = "surfaces_locked_"
+
+# Modules that must acknowledge a surfaces edit before it is applied (ADR 0023).
+# Both own a link to the treatment (``PlannedTreatmentItem`` / ``BudgetItem``);
+# neither can be imported from here (ADR 0003), hence the event.
+REQUIRED_SURFACE_EDIT_GUARDS: frozenset[str] = frozenset({"treatment_plan", "budget"})
+
+
+class TreatmentDeletionBlockedError(ValueError):
+    """A module that owns a link to the treatment refused its deletion.
+
+    Raised by a transactional ``odontogram.treatment.delete_requested``
+    subscriber (ADR 0023). ``code`` is the stable machine-readable reason.
+    """
+
+    code = "treatment_linked_to_plan"
+
+
+class TreatmentDeleteGuardUnavailableError(RuntimeError):
+    """Nobody acknowledged the delete request: fail closed, never delete silently."""
+
+    code = "delete_guard_unavailable"
+
+
+class TreatmentSurfacesEditBlockedError(ValueError):
+    """The surfaces of this treatment cannot be edited safely (409).
+
+    ``reason`` is one of ``not_planned``, ``not_single_tooth``,
+    ``type_without_surfaces``, ``no_surfaces``, ``linked_to_plan``,
+    ``linked_to_budget`` or ``price_snapshot_drift``; the stable machine-readable ``code`` is
+    ``surfaces_locked_<reason>`` (clients match the ``surfaces_locked_``
+    prefix). Raised by this module or by a transactional subscriber of
+    ``odontogram.treatment.surfaces_update_requested`` (ADR 0023).
+    """
+
+    def __init__(self, message: str, reason: str = "locked") -> None:
+        super().__init__(message)
+        self.reason = reason
+
+    @property
+    def code(self) -> str:
+        return f"{SURFACES_LOCKED_CODE_PREFIX}{self.reason}"
+
+
+class TreatmentSurfacesGuardUnavailableError(RuntimeError):
+    """A required module did not acknowledge the edit: fail closed (503)."""
+
+    code = "surfaces_guard_unavailable"
+
+
+VISUALIZATION_SNAPSHOT_SCHEMA_VERSION = 1
 
 
 def build_treatment_response(treatment: Treatment) -> dict:
@@ -71,6 +140,7 @@ def build_treatment_response(treatment: Treatment) -> dict:
         "price_snapshot": treatment.price_snapshot,
         "duration_snapshot": treatment.duration_snapshot,
         "vat_rate_snapshot": treatment.vat_rate_snapshot,
+        "visualization_snapshot": treatment.visualization_snapshot,
         "budget_item_id": treatment.budget_item_id,
         "notes": treatment.notes,
         "source_module": treatment.source_module,
@@ -586,6 +656,34 @@ class TreatmentService:
         return explicit
 
     @staticmethod
+    def _build_visualization_snapshot(
+        catalog_item: TreatmentCatalogItem | None,
+        clinic_id: UUID,
+    ) -> dict | None:
+        """Capture a self-contained mapping for one newly-created treatment.
+
+        A catalog mapping is clinic-owned configuration.  Its values are copied
+        into the treatment instead of referenced, so later catalog edits cannot
+        reinterpret clinical history.  Treatments without a mapping remain
+        valid and intentionally retain a ``NULL`` snapshot.
+        """
+        if catalog_item is None or catalog_item.odontogram_mapping is None:
+            return None
+
+        mapping: TreatmentOdontogramMapping = catalog_item.odontogram_mapping
+        if catalog_item.clinic_id != clinic_id or mapping.clinic_id != clinic_id:
+            raise ValueError("Catalog odontogram mapping does not belong to the clinic")
+
+        snapshot = TreatmentVisualizationSnapshot(
+            schema_version=VISUALIZATION_SNAPSHOT_SCHEMA_VERSION,
+            odontogram_treatment_type=mapping.odontogram_treatment_type,
+            visualization_rules=deepcopy(mapping.visualization_rules or []),
+            visualization_config=deepcopy(mapping.visualization_config or {}),
+            clinical_category=mapping.clinical_category,
+        )
+        return snapshot.model_dump(mode="json")
+
+    @staticmethod
     def _build_teeth_inputs(
         tooth_numbers: list[int],
         teeth: list | None,
@@ -660,6 +758,9 @@ class TreatmentService:
         resolved_clinical_type = TreatmentService._resolve_clinical_type(
             clinical_type, catalog_item
         )
+        visualization_snapshot = TreatmentService._build_visualization_snapshot(
+            catalog_item, clinic_id
+        )
 
         # 2. Normalize teeth input + assign roles for bridges.
         teeth_inputs = TreatmentService._build_teeth_inputs(tooth_numbers, teeth, common_surfaces)
@@ -700,6 +801,7 @@ class TreatmentService:
             price_snapshot=price_snapshot,
             duration_snapshot=duration_snapshot,
             vat_rate_snapshot=vat_rate_snapshot,
+            visualization_snapshot=visualization_snapshot,
             budget_item_id=budget_item_id,
             notes=notes,
             source_module=source_module,
@@ -757,11 +859,30 @@ class TreatmentService:
         notes: str | None = None,
         surfaces: list[str] | None = None,
     ) -> Treatment | None:
-        treatment = await TreatmentService.get_treatment(db, clinic_id, treatment_id)
+        if surfaces is None:
+            treatment = await TreatmentService.get_treatment(db, clinic_id, treatment_id)
+        else:
+            # Row lock first (same order as ``add_item``/delete): a concurrent
+            # plan association or budget line (its FK check takes KEY SHARE on
+            # this row) cannot slip in between the checks below and the write.
+            treatment = await TreatmentService._lock_and_reload(db, clinic_id, treatment_id)
         if not treatment:
             return None
         old_status = treatment.status
         now = datetime.now(UTC)
+
+        # Veto BEFORE any mutation (notes, status, surfaces, price): a combined
+        # request that includes a forbidden surfaces change changes nothing.
+        surfaces_changed = surfaces is not None and TreatmentService._surfaces_changed(
+            treatment, surfaces
+        )
+        new_price: Decimal | None = None
+        if surfaces_changed:
+            assert surfaces is not None
+            await TreatmentService._authorize_surfaces_edit(
+                db, clinic_id, treatment, user_id, surfaces, status
+            )
+            new_price = TreatmentService._price_for_new_surfaces(treatment, surfaces)
 
         if status is not None and status != old_status:
             treatment.status = status
@@ -787,19 +908,15 @@ class TreatmentService:
         if notes is not None:
             treatment.notes = notes
 
-        if surfaces is not None:
+        if surfaces_changed:
+            assert surfaces is not None
             for tooth in treatment.teeth:
-                tooth.surfaces = list(surfaces)
-            if treatment.catalog_item is not None:
-                pricing_teeth = [
-                    PricingTooth(role=t.role, surfaces=t.surfaces) for t in treatment.teeth
-                ]
-                treatment.price_snapshot = compute_price_snapshot(
-                    treatment.catalog_item, pricing_teeth
-                )
-                treatment.duration_snapshot = compute_duration_snapshot(
-                    treatment.catalog_item, len(treatment.teeth)
-                )
+                tooth.surfaces = list(dict.fromkeys(surfaces))  # as sent, deduplicated
+            # Only a ``per_surface`` catalog price depends on surfaces; every
+            # other snapshot (duration, VAT, visualization, other strategies)
+            # is left exactly as it was frozen.
+            if new_price is not None:
+                treatment.price_snapshot = new_price
 
         await db.flush()
         return treatment
@@ -868,6 +985,190 @@ class TreatmentService:
 
     @staticmethod
     async def delete(db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID) -> bool:
+        """Soft-delete a treatment, **guarded** (ADR 0023).
+
+        Default entry point (HTTP and any new caller). Order of operations:
+
+        1. lock the Treatment row (``FOR UPDATE``) — the same first lock that
+           ``TreatmentPlanService.add_item`` takes, so a concurrent
+           associate/delete serialises on this row and never deadlocks;
+        2. publish ``odontogram.treatment.delete_requested`` with ``db``; a
+           transactional subscriber that owns a link to the treatment raises
+           ``TreatmentDeletionBlockedError`` (nothing has been written yet);
+        3. fail closed if no subscriber acknowledged the request;
+        4. only then set ``deleted_at`` and publish ``treatment.deleted``.
+        """
+        if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
+            return False
+        await TreatmentService._request_delete_clearance(db, clinic_id, treatment_id, user_id)
+        return await TreatmentService._soft_delete(db, clinic_id, treatment_id, user_id)
+
+    @staticmethod
+    async def delete_after_plan_release(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID
+    ) -> bool:
+        """Soft-delete WITHOUT the clearance request.
+
+        Reserved for the plan lifecycle (closing / archiving a plan keeps its
+        items as history while dropping the hold on `planned` treatments).
+        Python-only: no router exposes it and it takes no client input. Do not
+        use it from a request handler.
+        """
+        if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
+            return False
+        return await TreatmentService._soft_delete(db, clinic_id, treatment_id, user_id)
+
+    @staticmethod
+    async def _lock_and_reload(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID
+    ) -> Treatment | None:
+        """``SELECT … FOR UPDATE`` the live treatment, then re-read it fresh.
+
+        ``populate_existing`` matters: the identity map may hold a state read
+        before the lock was granted (e.g. by the router's access check).
+        """
+        if not await TreatmentService._lock_for_delete(db, clinic_id, treatment_id):
+            return None
+        result = await db.execute(
+            TreatmentService._select_with_relations()
+            .where(
+                Treatment.clinic_id == clinic_id,
+                Treatment.id == treatment_id,
+                Treatment.deleted_at.is_(None),
+            )
+            .execution_options(populate_existing=True)
+        )
+        return result.scalars().unique().one_or_none()
+
+    @staticmethod
+    def _surfaces_changed(treatment: Treatment, surfaces: list[str]) -> bool:
+        """True when the requested set differs from what a tooth stores today.
+
+        Compared as sets: ``["O", "M"]`` is ``["M", "O"]``. A treatment with no
+        teeth (global scope) has no surfaces, so only a non-empty request is a change.
+        """
+        wanted = set(surfaces)
+        if not treatment.teeth:
+            return bool(wanted)
+        return any(set(t.surfaces or []) != wanted for t in treatment.teeth)
+
+    @staticmethod
+    async def _authorize_surfaces_edit(
+        db: AsyncSession,
+        clinic_id: UUID,
+        treatment: Treatment,
+        user_id: UUID,
+        surfaces: list[str],
+        requested_status: str | None,
+    ) -> None:
+        """Own rules first, then the owners of the links (ADR 0023). Read-only."""
+        blocked = TreatmentSurfacesEditBlockedError
+        # A combined request must also END planned: otherwise it would be a way
+        # to edit the surfaces of a treatment that is performed by the same call.
+        if treatment.status != "planned" or requested_status not in (None, "planned"):
+            raise blocked("Only planned treatments can change surfaces", "not_planned")
+        if treatment.scope != "tooth" or len(treatment.teeth) != 1:
+            raise blocked(
+                "Surfaces can only be edited on a single-tooth treatment", "not_single_tooth"
+            )
+        if treatment.clinical_type not in SURFACE_TREATMENTS:
+            raise blocked("This treatment type does not use surfaces", "type_without_surfaces")
+        # A surface treatment without a selected surface has no anatomical
+        # location.  Keep historical empty rows compatible when the caller is
+        # not changing their set (``_authorize_surfaces_edit`` is then never
+        # reached), but do not let an effective edit erase the location.
+        if not set(surfaces):
+            raise blocked("Select at least one surface for this treatment", "no_surfaces")
+        if treatment.budget_item_id is not None:
+            raise blocked("Treatment is linked to a budget line", "linked_to_budget")
+
+        payload: dict = {
+            "clinic_id": str(clinic_id),
+            "treatment_id": str(treatment.id),
+            "requested_by": str(user_id),
+            "old_surfaces": sorted(set(treatment.teeth[0].surfaces or [])),
+            "new_surfaces": sorted(set(surfaces)),
+            # Guards append their module name when they ran and agreed.
+            "cleared_by": [],
+        }
+        await event_bus.publish(
+            EventType.ODONTOGRAM_TREATMENT_SURFACES_UPDATE_REQUESTED, payload, db=db
+        )
+        missing = REQUIRED_SURFACE_EDIT_GUARDS - set(payload["cleared_by"])
+        if missing:
+            raise TreatmentSurfacesGuardUnavailableError(
+                "Required surfaces guard did not clear the request: " + ", ".join(sorted(missing))
+            )
+
+    @staticmethod
+    def _price_for_new_surfaces(treatment: Treatment, surfaces: list[str]) -> Decimal | None:
+        """New ``price_snapshot`` or ``None`` to keep the frozen one.
+
+        Surfaces only move the price under the ``per_surface`` strategy. There
+        the catalog tiers are *current*, the snapshot is *frozen*: if the
+        current catalog does not reproduce the frozen price for the OLD
+        surfaces, the catalog drifted since creation and recomputing would
+        silently re-price the treatment, so the edit is refused instead.
+        """
+        item = treatment.catalog_item
+        if item is None or (item.pricing_strategy or "flat") != "per_surface":
+            return None
+        old = [PricingTooth(role=t.role, surfaces=t.surfaces) for t in treatment.teeth]
+        deduped = list(dict.fromkeys(surfaces))
+        new = [PricingTooth(role=t.role, surfaces=deduped) for t in treatment.teeth]
+        frozen = treatment.price_snapshot
+        reproduced = compute_price_snapshot(item, old)
+        if (frozen is None) != (reproduced is None) or (
+            frozen is not None
+            and reproduced is not None
+            and Decimal(frozen).quantize(Decimal("0.01")) != reproduced.quantize(Decimal("0.01"))
+        ):
+            raise TreatmentSurfacesEditBlockedError(
+                "The catalog price changed since this treatment was priced; "
+                "recreate the treatment instead of editing its surfaces",
+                "price_snapshot_drift",
+            )
+        result = compute_price_snapshot(item, new)
+        return result.quantize(Decimal("0.01")) if result is not None else None
+
+    @staticmethod
+    async def _lock_for_delete(db: AsyncSession, clinic_id: UUID, treatment_id: UUID) -> bool:
+        locked = await db.execute(
+            select(Treatment.id)
+            .where(
+                Treatment.id == treatment_id,
+                Treatment.clinic_id == clinic_id,
+                Treatment.deleted_at.is_(None),
+            )
+            .with_for_update()
+        )
+        return locked.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def _request_delete_clearance(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID
+    ) -> None:
+        payload: dict = {
+            "clinic_id": str(clinic_id),
+            "treatment_id": str(treatment_id),
+            "requested_by": str(user_id),
+            # Guards append their module name here when they ran and agreed.
+            "cleared_by": [],
+        }
+        await event_bus.publish(EventType.ODONTOGRAM_TREATMENT_DELETE_REQUESTED, payload, db=db)
+        missing = REQUIRED_DELETE_GUARDS - set(payload["cleared_by"])
+        if missing:
+            # A required guard did not run (absent or silent): do not guess that
+            # the treatment is unlinked. Other modules' acknowledgements are
+            # welcome but can never stand in for a required one.
+            raise TreatmentDeleteGuardUnavailableError(
+                "Required delete guard did not clear the request: " + ", ".join(sorted(missing))
+            )
+
+    @staticmethod
+    async def _soft_delete(
+        db: AsyncSession, clinic_id: UUID, treatment_id: UUID, user_id: UUID
+    ) -> bool:
         treatment = await TreatmentService.get_treatment(db, clinic_id, treatment_id)
         if not treatment:
             return False
@@ -887,3 +1188,45 @@ class TreatmentService:
         await db.flush()
         await event_bus.publish(EventType.ODONTOGRAM_TREATMENT_DELETED, event_data)
         return True
+
+
+class OdontogramPreferenceService:
+    """Per-user, per-clinic odontogram profile preference.
+
+    Read is non-destructive: a user without a stored row simply gets the
+    default profile back, no row is created. Rows appear only when someone
+    actually chooses a profile.
+    """
+
+    @staticmethod
+    async def _get_row(
+        db: AsyncSession, clinic_id: UUID, user_id: UUID
+    ) -> OdontogramUserPreference | None:
+        result = await db.execute(
+            select(OdontogramUserPreference).where(
+                OdontogramUserPreference.clinic_id == clinic_id,
+                OdontogramUserPreference.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_profile(db: AsyncSession, clinic_id: UUID, user_id: UUID) -> str:
+        """Return the effective profile; never writes."""
+        row = await OdontogramPreferenceService._get_row(db, clinic_id, user_id)
+        return row.profile if row is not None else DEFAULT_ODONTOGRAM_PROFILE
+
+    @staticmethod
+    async def set_profile(db: AsyncSession, clinic_id: UUID, user_id: UUID, profile: str) -> str:
+        """Upsert the caller's own preference. Raises ValueError if unsupported."""
+        if not is_valid_odontogram_profile(profile):
+            raise ValueError(f"Unsupported odontogram profile: {profile}")
+
+        row = await OdontogramPreferenceService._get_row(db, clinic_id, user_id)
+        if row is None:
+            row = OdontogramUserPreference(clinic_id=clinic_id, user_id=user_id, profile=profile)
+            db.add(row)
+        else:
+            row.profile = profile
+        await db.flush()
+        return row.profile

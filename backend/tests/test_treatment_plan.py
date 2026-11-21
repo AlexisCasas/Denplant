@@ -33,7 +33,10 @@ async def _ensure_clinic_and_patient(
     await db_session.flush()
 
     db_session.add(
-        ClinicMembership(id=uuid4(), user_id=user_id, clinic_id=clinic.id, role="dentist")
+        # These workflow tests exercise budget transitions; use an admin
+        # actor. Dentist financial visibility is covered separately with a
+        # patient-scoped Dentist A fixture.
+        ClinicMembership(id=uuid4(), user_id=user_id, clinic_id=clinic.id, role="admin")
     )
     await db_session.commit()
 
@@ -133,6 +136,27 @@ async def _create_plan_with_items(
     return plan_id, item_ids
 
 
+@pytest.mark.asyncio
+async def test_plan_treatment_brief_exposes_visualization_snapshot(
+    client: AsyncClient, auth_headers: dict, setup: dict
+) -> None:
+    """Plan detail preserves the treatment's immutable visual API contract."""
+    plan_id, _ = await _create_plan_with_items(client, auth_headers, setup, [16])
+
+    response = await client.get(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}", headers=auth_headers
+    )
+    assert response.status_code == 200, response.text
+    snapshot = response.json()["data"]["items"][0]["treatment"]["visualization_snapshot"]
+    assert snapshot == {
+        "schema_version": 1,
+        "odontogram_treatment_type": "crown",
+        "visualization_rules": [],
+        "visualization_config": {},
+        "clinical_category": "restauradora",
+    }
+
+
 async def _sync(db_session: AsyncSession) -> None:
     """Commit the test session and drop cached ORM state.
 
@@ -211,9 +235,15 @@ async def test_add_treatment_item_to_plan(
 
 
 @pytest.mark.asyncio
-async def test_duplicate_treatment_id_rejected(
+async def test_duplicate_treatment_id_in_same_plan_is_idempotent(
     client: AsyncClient, auth_headers: dict, setup: dict
 ) -> None:
+    """Re-linking the same treatment to the same plan answers 200 + same item.
+
+    (Before DP-08.B1 this surfaced ``uq_planned_item_treatment`` as a 5xx.
+    The full contract — 409 for another plan, locked/closed plans, races —
+    lives in ``test_treatment_plan_add_item_idempotency.py``.)
+    """
     plan_resp = await client.post(
         "/api/v1/treatment_plan/treatment-plans",
         headers=auth_headers,
@@ -229,20 +259,13 @@ async def test_duplicate_treatment_id_rejected(
     )
     assert first.status_code == 201
 
-    # Unique constraint on treatment_id — second add raises IntegrityError
-    # which the handler surfaces as a 5xx. Capture the exception to keep the
-    # assertion focused on "the duplicate was blocked".
-    from sqlalchemy.exc import IntegrityError
-
-    try:
-        second = await client.post(
-            f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
-            headers=auth_headers,
-            json={"treatment_id": treatment_id},
-        )
-        assert second.status_code in (400, 409, 500)
-    except IntegrityError:
-        pass
+    second = await client.post(
+        f"/api/v1/treatment_plan/treatment-plans/{plan_id}/items",
+        headers=auth_headers,
+        json={"treatment_id": treatment_id},
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["data"]["id"] == first.json()["data"]["id"]
 
 
 # ---------------------------------------------------------------------------
@@ -1219,8 +1242,11 @@ async def test_complete_first_session_does_not_finalize_item(
         assert session_events[0]["amount"] == "200.00"
         assert treatment_events == []
     finally:
-        event_bus._handlers.pop("treatment_plan.item_session_completed", None)  # noqa: SLF001
-        event_bus._handlers.pop("treatment_plan.treatment_completed", None)  # noqa: SLF001
+        # unsubscribe (not _handlers.pop) — pop would also remove the
+        # module handlers (payments, patient_timeline, recalls) registered
+        # at startup and poison later tests in the same pytest session.
+        event_bus.unsubscribe("treatment_plan.item_session_completed", _capture)
+        event_bus.unsubscribe("treatment_plan.treatment_completed", _capture)
 
 
 @pytest.mark.asyncio
@@ -1251,7 +1277,7 @@ async def test_complete_last_session_finalizes_item(
         assert item["status"] == "completed"
         assert len(events) == 1  # treatment_completed fires exactly once
     finally:
-        event_bus._handlers.pop("treatment_plan.treatment_completed", None)  # noqa: SLF001
+        event_bus.unsubscribe("treatment_plan.treatment_completed", _capture)
 
 
 @pytest.mark.asyncio
@@ -1289,7 +1315,7 @@ async def test_cancel_session_blocks_earned(
         # Only the completed session fired an earned event; cancelled didn't
         assert len(session_events) == 1
     finally:
-        event_bus._handlers.pop("treatment_plan.item_session_completed", None)  # noqa: SLF001
+        event_bus.unsubscribe("treatment_plan.item_session_completed", _capture)
 
 
 @pytest.mark.asyncio

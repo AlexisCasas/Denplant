@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.email import EmailResult, email_service
 
@@ -480,13 +481,13 @@ class NotificationService:
             use_tls=use_tls,
             use_ssl=use_ssl,
             default_from_email=from_email,
-            default_from_name="DentalPin",
+            default_from_name="Denplant",
         )
 
         # Send test email
         message = EmailMessage(
             to_email=to_email,
-            subject="DentalPin - Test de conexión SMTP",
+            subject="Denplant - Test de conexión SMTP",
             body_html="""
             <html>
             <body style="font-family: sans-serif; padding: 20px;">
@@ -495,7 +496,7 @@ class NotificationService:
                 <p>Si has recibido este mensaje, la configuración está funcionando correctamente.</p>
                 <hr>
                 <p style="color: #666; font-size: 12px;">
-                    Enviado desde DentalPin
+                    Enviado desde Denplant
                 </p>
             </body>
             </html>
@@ -528,6 +529,7 @@ class NotificationService:
         patient_id: UUID | None = None,
         status: str | None = None,
         template_key: str | None = None,
+        patient_access_predicate: ColumnElement[bool] | None = None,
     ) -> tuple[list[CommunicationMessage], int]:
         """List email logs with optional filters."""
         conditions = [CommunicationMessage.clinic_id == clinic_id]
@@ -538,6 +540,8 @@ class NotificationService:
             conditions.append(CommunicationMessage.status == status)
         if template_key:
             conditions.append(CommunicationMessage.template_key == template_key)
+        if patient_access_predicate is not None:
+            conditions.append(CommunicationMessage.patient.has(patient_access_predicate))
 
         # Count total
         count_query = select(func.count()).select_from(CommunicationMessage)
@@ -631,21 +635,21 @@ class NotificationService:
 
         message = EmailMessage(
             to_email=to_email,
-            subject="DentalPin - Test de conexión de email",
+            subject="Denplant - Test de conexión de email",
             body_html="""
             <html>
             <body style="font-family: sans-serif; padding: 20px;">
                 <h2>¡Conexión exitosa!</h2>
-                <p>Este es un email de prueba de DentalPin.</p>
+                <p>Este es un email de prueba de Denplant.</p>
                 <p>Si has recibido este mensaje, la configuración de email está funcionando correctamente.</p>
                 <hr>
                 <p style="color: #666; font-size: 12px;">
-                    Enviado desde DentalPin
+                    Enviado desde Denplant
                 </p>
             </body>
             </html>
             """,
-            body_text="¡Conexión exitosa! Este es un email de prueba de DentalPin.",
+            body_text="¡Conexión exitosa! Este es un email de prueba de Denplant.",
         )
 
         return await email_service.send(message)

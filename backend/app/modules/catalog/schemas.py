@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ============================================================================
 # VAT Type Schemas
@@ -252,6 +252,51 @@ class CatalogItemUpdate(BaseModel):
     # Session template. When provided (even as empty list) the server
     # atomically replaces the stored template.
     sessions: list[CatalogItemSessionInput] | None = None
+
+
+class SystemCatalogItemCommercialUpdate(BaseModel):
+    """The only mutable configuration on a system-seeded catalog item.
+
+    System items are copied into each clinic's catalog, but their clinical
+    identity must remain stable.  Keeping this allowlist separate from the
+    general update schema makes mass assignment impossible at this boundary.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_price: Decimal = Field(default=None, ge=0)
+    cost_price: Decimal = Field(default=None, ge=0)
+    vat_type_id: UUID = None
+    surface_prices: dict[str, Decimal] = None
+    pricing_config: dict[str, Decimal] = None
+    sessions: list[CatalogItemSessionInput] = None
+    default_duration_minutes: int = Field(default=None, ge=0, le=480)
+    requires_appointment: bool = None
+
+    @field_validator("surface_prices")
+    @classmethod
+    def validate_surface_price_tiers(
+        cls, value: dict[str, Decimal] | None
+    ) -> dict[str, Decimal] | None:
+        if value is None:
+            return value
+        invalid = set(value) - {"1", "2", "3", "4", "5"}
+        if invalid:
+            raise ValueError("surface_prices keys must be tiers 1 through 5")
+        if any(price < 0 for price in value.values()):
+            raise ValueError("surface_prices values must be non-negative")
+        return value
+
+    @field_validator("pricing_config")
+    @classmethod
+    def validate_pricing_config_keys(
+        cls, value: dict[str, Decimal] | None
+    ) -> dict[str, Decimal] | None:
+        if value is not None and any(not key.strip() for key in value):
+            raise ValueError("pricing_config keys must not be empty")
+        if value is not None and any(price < 0 for price in value.values()):
+            raise ValueError("pricing_config values must be non-negative")
+        return value
 
 
 class CatalogItemResponse(BaseModel):

@@ -34,7 +34,7 @@ class BillingModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["*"],
+            "dentist": [],
             "hygienist": ["read"],
             "assistant": ["read", "write"],
             "receptionist": ["read", "write"],

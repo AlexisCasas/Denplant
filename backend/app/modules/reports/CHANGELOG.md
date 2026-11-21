@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- fix(security): dentists retain scheduling reports only; billing and budget report endpoints are blocked.
+
 - fix(#184): type-check clean — sibling composable imports are relative (the `~/` form resolved to the host for vue-tsc and made half the page implicitly `any`), ISO dates via `.slice(0, 10)`, budget status badge colour is `UiColor`.
 - style(lint): first ESLint pass over this module's frontend layer —
   module layers were outside the linter's base path until now, so

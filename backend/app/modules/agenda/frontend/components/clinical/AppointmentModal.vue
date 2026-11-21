@@ -34,9 +34,10 @@ const toast = useToast()
 const auth = useAuth()
 const clinic = useClinic()
 const api = useApi()
-const { can } = usePermissions()
+const { can, canManageAllProfessionals } = usePermissions()
 const { isMobile } = useBreakpoint()
 const { createAppointment, updateAppointment, cancelAppointment } = useAppointments()
+const { labels, fetchLabels } = useAppointmentLabels()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
 const { fetchSettings, getAutoSendStatus } = useNotificationSettings()
 const { sendConfirmation, sendReminder, isSending: isSendingEmail } = useNotificationSend()
@@ -58,7 +59,8 @@ const formData = reactive({
   date: '',
   startTime: '09:00',
   duration: 30,
-  cabinet: UNASSIGNED_CABINET
+  cabinet: UNASSIGNED_CABINET,
+  appointmentLabelId: '__none__'
 })
 
 // Duration options (in minutes)
@@ -111,12 +113,22 @@ const cabinetOptions = computed(() => {
 
 // Professional options
 const professionalOptions = computed(() => {
-  return professionals.value.map(prof => ({
+  const visible = canManageAllProfessionals.value
+    ? professionals.value
+    : professionals.value.filter(prof => prof.id === auth.user.value?.id)
+  return visible.map(prof => ({
     value: prof.id,
     label: `${prof.first_name} ${prof.last_name}`,
     color: getProfessionalColor(prof.id)
   }))
 })
+const labelOptions = computed(() => [
+  { value: '__none__', label: t('appointments.labels.none') },
+  ...labels.value.filter(label => label.is_active || label.id === props.appointment?.appointment_label_id).map(label => ({
+    value: label.id, label: `● ${label.name}`
+  }))
+])
+const selectedLabel = computed(() => labels.value.find(label => label.id === formData.appointmentLabelId))
 
 // Computed
 const modalTitle = computed(() =>
@@ -289,7 +301,7 @@ watch(() => props.open, async (isOpen) => {
   // fetching produced "Access denied" / "Error loading settings" toasts
   // every time they opened the modal. When skipped, getAutoSendStatus
   // falls back to its sensible default (auto-send on).
-  const tasks: Array<Promise<unknown>> = [fetchProfessionals()]
+  const tasks: Array<Promise<unknown>> = [fetchProfessionals(), fetchLabels()]
   if (can(PERMISSIONS.notifications.settingsRead)) {
     tasks.push(fetchSettings())
   }
@@ -304,6 +316,7 @@ watch(() => props.open, async (isOpen) => {
     formData.startTime = apt.start_time.split('T')[1]?.substring(0, 5) ?? '09:00'
     // null cabinet (#51) maps to the "assign later" option.
     formData.cabinet = apt.cabinet ?? UNASSIGNED_CABINET
+    formData.appointmentLabelId = apt.appointment_label_id ?? '__none__'
 
     // Map each AppointmentTreatmentBrief into a PlannedTreatmentItem shape so the
     // shared selector can render it. The Treatment.id is not available in the
@@ -320,9 +333,11 @@ watch(() => props.open, async (isOpen) => {
         completed_without_appointment: false,
         completed_at: undefined,
         completed_by: undefined,
+        assigned_professional_id: t.assigned_professional_id ?? null,
         notes: undefined,
         created_at: '',
         updated_at: '',
+        sessions: t.sessions,
         treatment: {
           id: '',
           clinical_type: 'crown',
@@ -346,6 +361,11 @@ watch(() => props.open, async (isOpen) => {
               names: t.names,
               default_price: t.default_price != null ? String(t.default_price) : null
             }
+          : undefined,
+        // Lets PlannedTreatmentSelector pre-select the originating plan
+        // in edit mode instead of leaving the picker unresolved.
+        treatment_plan: t.plan_id
+          ? { id: t.plan_id, plan_number: t.plan_number ?? '', status: 'active' }
           : undefined
       }))
     } else {
@@ -375,7 +395,9 @@ watch(() => props.open, async (isOpen) => {
 
     // Set professional - use initialProfessionalId, current user if professional, or first available
     if (props.initialProfessionalId) {
-      selectedProfessionalId.value = props.initialProfessionalId
+      selectedProfessionalId.value = canManageAllProfessionals.value
+        ? props.initialProfessionalId
+        : auth.user.value?.id || ''
     } else {
       // Check if current user is a professional
       const currentUserId = auth.user.value?.id
@@ -421,6 +443,7 @@ watch(() => props.open, async (isOpen) => {
       formData.cabinet = UNASSIGNED_CABINET
     }
     selectedTreatments.value = []
+    formData.appointmentLabelId = '__none__'
     // Reset email checkbox for create mode
     sendConfirmationEmail.value = true
   }
@@ -520,13 +543,16 @@ async function handleSave() {
 
     const appointmentData: AppointmentCreate = {
       patient_id: selectedPatient.value.id,
-      professional_id: selectedProfessionalId.value,
+      professional_id: canManageAllProfessionals.value
+        ? selectedProfessionalId.value
+        : auth.user.value?.id || selectedProfessionalId.value,
       cabinet: cabinetValue,
       start_time: startTime,
       end_time: endTime,
       planned_item_ids: selectedTreatments.value.length > 0
         ? selectedTreatments.value.map(t => t.id)
-        : undefined
+        : undefined,
+      appointment_label_id: formData.appointmentLabelId === '__none__' ? null : formData.appointmentLabelId
     }
 
     let savedAppointment: Appointment
@@ -692,6 +718,7 @@ function openPatientFile() {
                 <PlannedTreatmentSelector
                   v-model="selectedTreatments"
                   :patient-id="selectedPatient?.id"
+                  :professionals="professionals"
                 />
               </div>
             </section>
@@ -773,8 +800,28 @@ function openPatientFile() {
                   icon="i-lucide-door-open"
                 />
               </UFormField>
+              <UFormField :label="t('appointments.labels.field')">
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="selectedLabel"
+                    class="h-4 w-4 shrink-0 rounded-full"
+                    :style="{ backgroundColor: selectedLabel.color }"
+                    aria-hidden="true"
+                  />
+                  <USelect
+                    v-model="formData.appointmentLabelId"
+                    :items="labelOptions"
+                    value-key="value"
+                    label-key="label"
+                    :size="isMobile ? 'lg' : 'md'"
+                    icon="i-lucide-tag"
+                    class="flex-1"
+                  />
+                </div>
+              </UFormField>
 
               <UFormField
+                v-if="canManageAllProfessionals"
                 :label="t('appointments.professional')"
                 required
               >

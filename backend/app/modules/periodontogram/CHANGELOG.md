@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- fix(QW-PER): **profile strip and Suma row** (frontend only; no backend, schema, migration or session change).
+  - Margen and Sondaje are two independent series, each measured from its own zero (the baseline). The old second line was `margin + probing` (i.e. CAL), mislabelled as Sondaje, and a missing margin counted as 0.
+  - One path per tooth: the strip used to walk every site of the arch in one list, so a line ran from the last site of 14 into 15 (and from 11 into 21). A `null` site ended nothing, so `3 · null · 2` drew a line through the empty site. Now a `null` ends the run (a lone site is a dot) and a `0` is a real point on the baseline.
+  - Negative margins (-5…-1) are no longer clamped at -3, and are no longer clipped: the SVG is `overflow: visible`, because they lie past the 0 mm baseline.
+  - Probing depth colour: 0–3 mm normal, 4 mm or more red (the amber/orange tones are gone). The red is a dot on the measured site; the line stays neutral. The deep-pocket index (>= 5 mm) is unchanged.
+  - New derived **Suma** row (probing + margin, sign respected, `null` if either is missing, a real 0 shown) in the four zones. Frontend-only, never persisted.
+  - The pocket band between margin and margin + probing is no longer drawn. No data or formula was removed.
+  - Geometry lives in `frontend/utils/periodontalProfileGeometry.ts`.
+
 - fix(#184): type-check clean — non-empty tuple cycles for the mobility/prognosis/furcation toggles, explicit central-incisor defaults for the per-position viewBox maps, `?? null` on optional site markers.
 - docs(#183): both event handlers documented as own-session/payload-only, with a note that PR-3's real cleanup should be transactional (ADR 0019).
 - i18n: add Tamil locale (`ta.json`) with full UI coverage.

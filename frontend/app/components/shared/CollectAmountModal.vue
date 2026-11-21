@@ -178,6 +178,9 @@ const submitText = computed(() => props.submitLabel ?? t('shared.collect.submit'
           </div>
         </section>
 
+        <!-- Optional target picker supplied by a collecting context. -->
+        <slot name="before-form" :amount="amount" />
+
         <!-- Method -->
         <section class="space-y-2">
           <label class="block text-sm font-medium text-default">

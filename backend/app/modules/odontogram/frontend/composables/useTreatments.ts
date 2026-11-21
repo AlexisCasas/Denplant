@@ -6,6 +6,7 @@
  * be passed explicitly.
  */
 
+import { surfacesLockedReason } from '~~/app/utils/treatmentSurfaces'
 import type {
   ApiResponse,
   Arch,
@@ -46,6 +47,11 @@ export function useTreatments() {
 
   const treatments = ref<Treatment[]>([])
   const loading = ref(false)
+  /**
+   * Why the last `updateTreatment` failed, in the user's words. `null` after a
+   * success or before any attempt. The edit modal shows it inline and stays open.
+   */
+  const updateError = ref<string | null>(null)
 
   // ============================================================================
   // Helpers
@@ -131,6 +137,7 @@ export function useTreatments() {
     treatmentId: string,
     data: TreatmentUpdate
   ): Promise<Treatment | null> {
+    updateError.value = null
     try {
       const body = { ...data, status: toBackendStatus(data.status) }
       const response = await api.put<ApiResponse<Treatment>>(
@@ -142,6 +149,14 @@ export function useTreatments() {
       toast.add({ title: t('odontogram.messages.updated'), color: 'success' })
       return normalized
     } catch (err) {
+      const reason = surfacesLockedReason(err)
+      if (reason) {
+        // Refused by the server's policy: explain it once, inline, in the modal
+        // (which stays open with the user's selection). No error toast on top.
+        updateError.value = `${t('odontogram.surfacesLockedPrefix')} ${t(`odontogram.surfacesLocked.${reason}`)}`
+        return null
+      }
+      // Any other failure keeps its single error toast; no second inline message.
       toast.add({
         title: t('common.error'),
         description: t('odontogram.messages.error'),
@@ -251,6 +266,7 @@ export function useTreatments() {
     createTreatment,
     createGlobalTreatment,
     updateTreatment,
+    updateError,
     deleteTreatment,
     performTreatment,
     fetchToothWithTreatments,

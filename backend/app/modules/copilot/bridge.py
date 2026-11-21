@@ -28,7 +28,7 @@ from .serde import message_from_row
 from .service import ClinicBudgetGuard, ConversationService
 
 _BASE_PROMPT = (
-    "Eres el copiloto de DentalPin, asistente de una clínica dental. "
+    "Eres el copiloto de Denplant, asistente de una clínica dental. "
     "Respondes en español, con concisión y precisión. Usa las herramientas "
     "disponibles para consultar y actuar sobre los datos de la clínica; no "
     "inventes información que no provenga de una herramienta. Para acciones "
@@ -99,6 +99,7 @@ def _build_context(
     db: AsyncSession,
     clinic_id: UUID,
     permissions: list[str],
+    role: str,
     user_id: UUID,
     agent_id: UUID,
     session_id: UUID,
@@ -111,6 +112,8 @@ def _build_context(
         permissions=permissions,
         tools=tool_registry,
         db=db,
+        actor_user_id=user_id,
+        actor_role=role,
         supervisor_id=user_id,
         guardrail_config=COPILOT_GUARDRAILS,
     )
@@ -140,6 +143,7 @@ async def drive_turn(
     conv: CopilotConversation,
     settings_row: CopilotSettings,
     permissions: list[str],
+    role: str,
     user_id: UUID,
     agent_id: UUID,
     session_id: UUID,
@@ -159,6 +163,7 @@ async def drive_turn(
         db=db,
         clinic_id=conv.clinic_id,
         permissions=permissions,
+        role=role,
         user_id=user_id,
         agent_id=agent_id,
         session_id=session_id,
@@ -186,6 +191,7 @@ async def resume_turn(
     conv: CopilotConversation,
     settings_row: CopilotSettings,
     permissions: list[str],
+    role: str,
     user_id: UUID,
     agent_id: UUID,
     session_id: UUID,
@@ -206,6 +212,7 @@ async def resume_turn(
         db=db,
         clinic_id=conv.clinic_id,
         permissions=permissions,
+        role=role,
         user_id=user_id,
         agent_id=agent_id,
         session_id=session_id,

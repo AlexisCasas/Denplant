@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
+import { PERMISSIONS } from '~~/app/config/permissions'
 import { defineAsyncComponent } from 'vue'
 import { formatLocalDate } from '../../utils/date'
 
@@ -17,8 +18,36 @@ const route = useRoute()
 const router = useRouter()
 const clinic = useClinic()
 const { appointments, isLoading, fetchAppointments, updateAppointment } = useAppointments()
+const { labels, fetchLabels } = useAppointmentLabels()
+const { currentClinic } = useClinicState()
 const { professionals, fetchProfessionals, getProfessionalColor } = useProfessionals()
+const { canManageAllProfessionals, can } = usePermissions()
+const auth = useAuth()
 const { isMobile } = useBreakpoint()
+const labelsModalOpen = ref(false)
+const selectedLabelId = ref<string | null>(null)
+
+async function loadLabelsSafely() {
+  try {
+    await fetchLabels()
+  } catch {
+    // Labels are an optional display filter; the agenda must remain usable
+    // when the catalogue is temporarily unavailable.
+    toast.add({ title: t('appointments.labels.title'), description: t('common.error'), color: 'warning' })
+  }
+}
+
+onMounted(() => { void loadLabelsSafely() })
+
+watch(currentClinic, (clinic, previousClinic) => {
+  if (clinic?.id !== previousClinic?.id) void loadLabelsSafely()
+})
+
+watch(labels, (catalogue) => {
+  if (selectedLabelId.value && !catalogue.some(label => label.id === selectedLabelId.value && label.is_active)) {
+    selectedLabelId.value = null
+  }
+})
 
 // Query params for pre-selecting patient from treatment plan flow
 const initialPatientId = ref<string | undefined>(
@@ -68,6 +97,10 @@ watch(() => clinic.cabinets.value, (cabinets) => {
 
 // Initialize selected professionals when professionals load
 watch(professionals, (profs) => {
+  if (!canManageAllProfessionals.value && auth.user.value?.id) {
+    selectedProfessionals.value = [auth.user.value.id]
+    return
+  }
   if (profs.length > 0 && selectedProfessionals.value.length === 0) {
     selectedProfessionals.value = profs.map(p => p.id)
   }
@@ -88,6 +121,10 @@ const filteredAppointments = computed(() => {
   // Filter by professional
   if (selectedProfessionals.value.length > 0) {
     result = result.filter(apt => selectedProfessionals.value.includes(apt.professional_id))
+  }
+
+  if (selectedLabelId.value) {
+    result = result.filter(apt => apt.appointment_label_id === selectedLabelId.value)
   }
 
   return result
@@ -113,7 +150,10 @@ const professionalFilterOptions = computed(() => {
 
 // Professionals with colors for calendar
 const professionalsWithColors = computed(() => {
-  return professionals.value.map(prof => ({
+  const visible = canManageAllProfessionals.value
+    ? professionals.value
+    : professionals.value.filter(prof => prof.id === auth.user.value?.id)
+  return visible.map(prof => ({
     ...prof,
     color: getProfessionalColor(prof.id)
   }))
@@ -602,7 +642,10 @@ watch(isMobile, async (mobile) => {
 
 <template>
   <div class="h-full flex flex-col w-full min-w-0 overflow-hidden">
-    <PageHeader :title="t('appointments.title')">
+    <PageHeader
+      :title="t('appointments.title')"
+      class="agenda-page-header shrink-0"
+    >
       <template #actions>
         <SegmentedControl
           v-if="!isMobile"
@@ -614,6 +657,14 @@ watch(isMobile, async (mobile) => {
           ]"
           @update:model-value="(v) => (viewMode = v as 'week' | 'day' | 'kanban')"
         />
+        <UButton
+          v-if="can(PERMISSIONS.appointments.read)"
+          variant="soft"
+          icon="i-lucide-tags"
+          @click="labelsModalOpen = true"
+        >
+          {{ t('appointments.labels.title') }}
+        </UButton>
         <UButton
           v-if="!isMobile"
           color="primary"
@@ -629,11 +680,11 @@ watch(isMobile, async (mobile) => {
     <!-- Filters (hidden on mobile to save space; mobile uses simple day view) -->
     <div
       v-if="!isMobile"
-      class="flex flex-wrap items-center gap-x-6 gap-y-[var(--density-gap,0.75rem)] mb-[var(--density-gap,1rem)] shrink-0"
+      class="grid grid-cols-1 xl:grid-cols-[auto_minmax(0,1fr)] items-start gap-x-5 gap-y-2 mb-3 shrink-0 rounded-token-lg border border-subtle bg-surface-muted/40 px-3 py-2"
     >
       <div
         v-if="cabinetFilterOptions.length > 0"
-        class="flex items-center gap-2 flex-wrap"
+        class="flex items-center gap-2 flex-wrap min-w-0"
       >
         <span class="text-caption text-subtle">
           {{ t('appointments.cabinet') }}
@@ -658,13 +709,13 @@ watch(isMobile, async (mobile) => {
       </div>
 
       <div
-        v-if="professionalFilterOptions.length > 0"
-        class="flex items-center gap-2 min-w-0 flex-1"
+        v-if="canManageAllProfessionals && professionalFilterOptions.length > 0"
+        class="flex items-center gap-2 min-w-0"
       >
         <span class="text-caption text-subtle shrink-0">
           {{ t('appointments.professional') }}
         </span>
-        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0 [&>*]:shrink-0">
+        <div class="flex flex-1 items-center gap-2 overflow-x-auto no-scrollbar min-w-0 [&>*]:shrink-0">
           <FilterChip
             v-for="prof in professionalFilterOptions"
             :key="prof.value"
@@ -694,6 +745,7 @@ watch(isMobile, async (mobile) => {
       <AppointmentMobileDayView
         v-if="isMobile"
         :appointments="filteredAppointments"
+        :all-appointments="appointments"
         :professionals="professionalsWithColors"
         :cabinets="clinic.cabinets.value"
         :current-date="currentDate"
@@ -704,7 +756,9 @@ watch(isMobile, async (mobile) => {
         @create-at="(d) => { currentDate = d; openCreateModal() }"
         @free-slot-tap="handleFreeSlotTap"
         @highlight-cleared="clearHighlight"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentMobileDayView>
 
       <!-- Weekly view -->
       <AppointmentCalendar
@@ -722,7 +776,9 @@ watch(isMobile, async (mobile) => {
         @appointment-move="handleAppointmentMove"
         @appointment-resize="handleAppointmentResize"
         @highlight-cleared="clearHighlight"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentCalendar>
 
       <!-- Daily view -->
       <AppointmentDailyView
@@ -739,12 +795,15 @@ watch(isMobile, async (mobile) => {
         @appointment-move="handleDailyAppointmentMove"
         @appointment-resize="handleDailyAppointmentResize"
         @highlight-cleared="clearHighlight"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentDailyView>
 
       <!-- Kanban view -->
       <AppointmentKanbanView
         v-else
         :appointments="filteredAppointments"
+        :all-appointments="appointments"
         :cabinets="clinic.cabinets.value"
         :professionals="professionalsWithColors"
         :current-date="currentDate"
@@ -752,7 +811,9 @@ watch(isMobile, async (mobile) => {
         @appointment-click="handleAppointmentClick"
         @date-change="handleDateChange"
         @professional-filter="handleProfessionalFilter"
-      />
+      >
+        <template #legend><AppointmentLabelsLegend :labels="labels" :selected-label-id="selectedLabelId" @select="selectedLabelId = $event" /></template>
+      </AppointmentKanbanView>
     </div>
 
     <!-- Appointment Modal -->
@@ -769,6 +830,14 @@ watch(isMobile, async (mobile) => {
       @saved="handleSaved"
       @cancelled="handleCancelled"
     />
+    <AppointmentLabelsModal v-model:open="labelsModalOpen" />
+
+    <!-- "Which treatments were done" gate, shown before an appointment
+         linked to treatment-plan items transitions to `completed`.
+         Triggered by `useAppointmentCompletionGate()` from QuickActions
+         and Kanban. Mounted before the follow-up host so its own
+         `completed` transition can chain into that modal. -->
+    <AppointmentCompletionGateModal />
 
     <!-- Renders the post-completion follow-up modal once for the
          whole agenda page. Triggered by `useCompletionFollowup()`
@@ -780,4 +849,25 @@ watch(isMobile, async (mobile) => {
 <style scoped>
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* PageHeader is shared globally; keep its responsive treatment local to Agenda. */
+:deep(.agenda-page-header) {
+  margin-bottom: 0.75rem;
+}
+
+:deep(.agenda-page-header > div:first-child) {
+  align-items: center;
+}
+
+@media (max-width: 1279px) {
+  :deep(.agenda-page-header > div:first-child) {
+    flex-wrap: wrap;
+  }
+
+  :deep(.agenda-page-header > div:first-child > div:last-child) {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
 </style>

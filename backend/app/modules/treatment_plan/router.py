@@ -3,12 +3,14 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.financial_visibility import mark_financial_response
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.patients.access import PatientAccessPolicy
 
 from .schemas import (
     ClosePlanRequest,
@@ -30,9 +32,21 @@ from .schemas import (
     TreatmentPlanUpdate,
     UpdateSessionRequest,
 )
-from .service import PlanLockedError, TreatmentPlanService
+from .service import PlanLockedError, TreatmentAlreadyPlannedError, TreatmentPlanService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(mark_financial_response)])
+
+
+async def _get_accessible_plan(db: AsyncSession, ctx: ClinicContext, plan_id: UUID):
+    plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
+    if plan is None or not await PatientAccessPolicy.can_access(db, ctx, plan.patient_id):
+        raise HTTPException(status_code=404, detail="Treatment plan not found")
+    return plan
+
+
+async def _require_patient_access(db: AsyncSession, ctx: ClinicContext, patient_id: UUID) -> None:
+    if not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=404, detail="Patient not found")
 
 
 # -----------------------------------------------------------------------------
@@ -77,6 +91,8 @@ async def list_pipeline(
     rows, total = await TreatmentPlanService.list_pipeline(
         db,
         clinic_id=ctx.clinic_id,
+        role=ctx.role,
+        user_id=ctx.user_id,
         tab=tab,
         page=page,
         page_size=page_size,
@@ -107,8 +123,16 @@ async def list_treatment_plans(
     status: list[str] | None = Query(default=None),
 ) -> PaginatedApiResponse[TreatmentPlanResponse]:
     """List treatment plans with pagination and filters."""
+    if patient_id is not None:
+        await _require_patient_access(db, ctx, patient_id)
     plans, total = await TreatmentPlanService.list(
-        db, ctx.clinic_id, page, page_size, patient_id=patient_id, status=status
+        db,
+        ctx.clinic_id,
+        page,
+        page_size,
+        patient_id=patient_id,
+        status=status,
+        patient_access_predicate=PatientAccessPolicy.predicate(ctx),
     )
     # Compute counts and totals from loaded items
     for p in plans:
@@ -140,6 +164,7 @@ async def list_patient_plans(
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> PaginatedApiResponse[TreatmentPlanResponse]:
     """List treatment plans for a specific patient."""
+    await _require_patient_access(db, ctx, patient_id)
     plans, total = await TreatmentPlanService.list(
         db, ctx.clinic_id, page, page_size, patient_id=patient_id
     )
@@ -171,9 +196,7 @@ async def get_treatment_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanDetailResponse]:
     """Get a treatment plan with full details."""
-    plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+    plan = await _get_accessible_plan(db, ctx, plan_id)
     return ApiResponse(data=TreatmentPlanDetailResponse.model_validate(plan))
 
 
@@ -189,6 +212,7 @@ async def create_treatment_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
     """Create a new treatment plan."""
+    await _require_patient_access(db, ctx, data.patient_id)
     try:
         plan = await TreatmentPlanService.create(db, ctx.clinic_id, ctx.user_id, data.model_dump())
         return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
@@ -207,6 +231,7 @@ async def update_treatment_plan(
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
+    await _get_accessible_plan(db, ctx, plan_id)
     """Update a treatment plan."""
     try:
         plan = await TreatmentPlanService.update(
@@ -230,6 +255,7 @@ async def update_plan_status(
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
+    await _get_accessible_plan(db, ctx, plan_id)
     """Change treatment plan status."""
     try:
         plan = await TreatmentPlanService.update_status(
@@ -257,6 +283,7 @@ async def confirm_treatment_plan(
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.confirm"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
+    await _get_accessible_plan(db, ctx, plan_id)
     """Doctor confirms the plan (``draft`` → ``pending``).
 
     Auto-creates the draft budget so reception can review and send.
@@ -278,6 +305,7 @@ async def reopen_treatment_plan(
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
+    await _get_accessible_plan(db, ctx, plan_id)
     """Reopen a confirmed plan back to ``draft`` and cancel its budget."""
     try:
         plan = await TreatmentPlanService.reopen(db, ctx.clinic_id, plan_id, ctx.user_id)
@@ -297,6 +325,7 @@ async def close_treatment_plan(
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.close"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
+    await _get_accessible_plan(db, ctx, plan_id)
     """Move the plan to terminal ``closed`` state with a reason."""
     try:
         plan = await TreatmentPlanService.close(
@@ -322,6 +351,7 @@ async def reactivate_treatment_plan(
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.reactivate"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
+    await _get_accessible_plan(db, ctx, plan_id)
     """Revive a closed plan back to ``draft`` for a fresh cycle."""
     try:
         plan = await TreatmentPlanService.reactivate(db, ctx.clinic_id, plan_id, ctx.user_id)
@@ -350,9 +380,7 @@ async def log_plan_contact(
     """
     from datetime import UTC, datetime
 
-    plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+    plan = await _get_accessible_plan(db, ctx, plan_id)
     timestamp = datetime.now(UTC).isoformat()
     line = f"[{timestamp}] {data.channel} by {ctx.user_id}"
     if data.note:
@@ -369,6 +397,7 @@ async def delete_treatment_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Soft delete (archive) a treatment plan."""
+    await _get_accessible_plan(db, ctx, plan_id)
     deleted = await TreatmentPlanService.delete(db, ctx.clinic_id, plan_id, ctx.user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Treatment plan not found")
@@ -383,22 +412,57 @@ async def delete_treatment_plan(
     "/treatment-plans/{plan_id}/items",
     response_model=ApiResponse[PlannedTreatmentItemResponse],
     status_code=status.HTTP_201_CREATED,
+    responses={
+        200: {
+            "model": ApiResponse[PlannedTreatmentItemResponse],
+            "description": (
+                "The treatment was already an item of this plan: the existing "
+                "item is returned unchanged (idempotent repeat)."
+            ),
+        },
+        409: {
+            "description": (
+                "Plan locked by a sent/accepted budget, or the treatment is "
+                "already linked to a different plan."
+            ),
+        },
+    },
 )
 async def add_plan_item(
     plan_id: UUID,
     data: PlannedTreatmentItemCreate,
+    response: Response,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("treatment_plan.plans.write"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
-    """Add a treatment item to the plan."""
+    """Link a treatment to the plan (idempotent per plan).
+
+    201 on first link; 200 with the same item when the treatment is already
+    an item of this plan (no new sessions, event or budget line).
+    """
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
-        item = await TreatmentPlanService.add_item(db, ctx.clinic_id, plan_id, data.model_dump())
-        return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
+        item, created = await TreatmentPlanService.add_item(
+            db, ctx.clinic_id, plan_id, data.model_dump()
+        )
     except PlanLockedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        # ``code`` is machine-readable so the client can tell the two 409s
+        # apart without parsing prose (standard ``ErrorResponse.code``).
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "plan_locked", "message": str(e), "errors": [str(e)]},
+        )
+    except TreatmentAlreadyPlannedError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "treatment_already_planned", "message": str(e), "errors": [str(e)]},
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
 
 
 @router.put(
@@ -414,6 +478,7 @@ async def update_plan_item(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Update a planned treatment item."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.update_item(
             db, ctx.clinic_id, plan_id, item_id, data.model_dump(exclude_unset=True)
@@ -439,6 +504,7 @@ async def remove_plan_item(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Remove an item from the plan."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         removed = await TreatmentPlanService.remove_item(
             db, ctx.clinic_id, plan_id, item_id, ctx.user_id
@@ -465,6 +531,7 @@ async def reorder_plan_items(
     `item_ids` MUST cover exactly the plan's current items. Returns the full plan
     with items in the new order so the caller doesn't need a second round-trip.
     """
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         items = await TreatmentPlanService.reorder_items(db, ctx.clinic_id, plan_id, data.item_ids)
     except PlanLockedError as e:
@@ -493,6 +560,7 @@ async def complete_plan_item(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Mark a treatment item as completed."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.complete_item(
             db,
@@ -535,6 +603,7 @@ async def complete_item_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Mark one session of a plan item as completed."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.complete_session(
             db,
@@ -565,6 +634,7 @@ async def cancel_item_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Mark a session as cancelled (no earned entry will be generated)."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.cancel_session(
             db, ctx.clinic_id, plan_id, item_id, session_id, ctx.user_id, data.notes
@@ -588,6 +658,7 @@ async def update_item_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Edit label / amount / notes on a pending session."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.update_session(
             db,
@@ -616,6 +687,7 @@ async def add_item_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Append a new session to a plan item (manual; outside catalog template)."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.add_session_manual(
             db,
@@ -642,6 +714,7 @@ async def delete_item_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PlannedTreatmentItemResponse]:
     """Remove a pending session. Returns the updated item."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         item = await TreatmentPlanService.delete_session(
             db, ctx.clinic_id, plan_id, item_id, session_id
@@ -668,6 +741,7 @@ async def link_budget_to_plan(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[TreatmentPlanResponse]:
     """Link an existing budget to the treatment plan."""
+    await _get_accessible_plan(db, ctx, plan_id)
     try:
         plan = await TreatmentPlanService.link_budget(db, ctx.clinic_id, plan_id, data.budget_id)
         if not plan:
@@ -688,6 +762,7 @@ async def sync_plan_with_budget(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[dict]:
     """Request synchronization of plan items with linked budget."""
+    await _get_accessible_plan(db, ctx, plan_id)
     success = await TreatmentPlanService.request_budget_sync(db, ctx.clinic_id, plan_id)
     if not success:
         raise HTTPException(
@@ -711,9 +786,7 @@ async def generate_budget_from_plan(
     """Generate a new budget from the treatment plan items."""
     from app.modules.budget.service import BudgetService
 
-    plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+    plan = await _get_accessible_plan(db, ctx, plan_id)
 
     # Check if existing linked budget is cancelled - if so, allow creating new one
     if plan.budget_id:

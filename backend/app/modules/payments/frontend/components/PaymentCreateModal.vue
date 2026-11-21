@@ -190,6 +190,13 @@ function addAllocation() {
   })
 }
 
+function setAllocationType(allocation: PaymentAllocationCreate, type: PaymentAllocationCreate['target_type']) {
+  allocation.target_type = type
+  allocation.target_id = undefined
+  allocation.budget_item_id = undefined
+  splitManually.value = true
+}
+
 function removeAllocation(idx: number) {
   if (form.value.allocations.length > 1) {
     form.value.allocations.splice(idx, 1)
@@ -226,7 +233,8 @@ async function submit() {
       notes: form.value.notes || undefined,
       allocations: form.value.allocations.map(a => ({
         target_type: a.target_type,
-        target_id: a.target_type === 'budget' ? a.target_id : undefined,
+        target_id: a.target_type === 'budget' || a.target_type === 'budget_item' ? a.target_id : undefined,
+        budget_item_id: a.target_type === 'budget_item' ? a.budget_item_id : undefined,
         amount: Number(a.amount)
       }))
     })
@@ -478,22 +486,30 @@ function handleKeydown(e: KeyboardEvent) {
                 class="mb-2 flex items-center gap-2"
               >
                 <USelect
-                  v-model="a.target_type"
+                  :model-value="a.target_type"
                   :items="[
                     { label: t('payments.new.allocationOnAccount'), value: 'on_account' },
-                    { label: t('payments.new.allocationToBudget'), value: 'budget', disabled: !hasBudgetTargets }
+                    { label: t('payments.new.allocationToBudget'), value: 'budget', disabled: !hasBudgetTargets },
+                    { label: 'Tratamiento', value: 'budget_item', disabled: !hasBudgetTargets }
                   ]"
                   class="w-40"
                   :disabled="idx === 0 && isBudgetContext"
+                  @update:model-value="setAllocationType(a, $event as PaymentAllocationCreate['target_type'])"
                 />
                 <AllocationTargetSelect
-                  v-if="a.target_type === 'budget'"
+                  v-if="a.target_type === 'budget' || a.target_type === 'budget_item'"
                   :model-value="a.target_id || ''"
                   :patient-id="form.patient_id"
                   :disabled="idx === 0 && isBudgetContext"
                   budgets-only
                   class="flex-1"
                   @update:model-value="a.target_id = $event; splitManually = true"
+                />
+                <BudgetItemTargetSelect
+                  v-if="a.target_type === 'budget_item'"
+                  v-model="a.budget_item_id"
+                  :budget-id="a.target_id || ''"
+                  class="flex-1"
                 />
                 <UInput
                   v-model.number="a.amount"

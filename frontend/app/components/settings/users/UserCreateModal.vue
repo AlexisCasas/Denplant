@@ -28,7 +28,7 @@ const translatedRoles = computed(() =>
 const PROFESSIONAL_ROLES: UserRole[] = ['dentist', 'hygienist']
 
 const isCreating = ref(false)
-const form = ref({ email: '', password: '', first_name: '', last_name: '' })
+const form = ref({ email: '', password: '', first_name: '', last_name: '', professional_id: '' })
 const role = ref<UserRole>('dentist')
 const isProfessional = ref(true)
 
@@ -41,7 +41,7 @@ const copied = ref(false)
 
 watch(() => props.open, (open) => {
   if (!open) return
-  form.value = { email: '', password: '', first_name: '', last_name: '' }
+  form.value = { email: '', password: '', first_name: '', last_name: '', professional_id: '' }
   role.value = 'dentist'
   isProfessional.value = true
   invite.value = null
@@ -54,6 +54,7 @@ async function submit() {
     email: form.value.email,
     first_name: form.value.first_name,
     last_name: form.value.last_name,
+    professional_id: form.value.professional_id,
     role: role.value,
     is_professional: isProfessional.value
   }
@@ -184,6 +185,17 @@ const expiresLabel = computed(() =>
               type="email"
               class="w-full"
               required
+            />
+          </UFormField>
+
+          <UFormField
+            :label="t('settings.professionalRegistration')"
+            :help="t('settings.professionalRegistrationHelp')"
+          >
+            <UInput
+              v-model="form.professional_id"
+              class="w-full"
+              maxlength="50"
             />
           </UFormField>
 

@@ -17,15 +17,21 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.financial_visibility import mark_financial_response
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.patients.access import PatientAccessPolicy
 
+from .access import AppointmentAccessPolicy
 from .kanban_service import KanbanDayService
 from .models import Appointment
 from .schemas import (
     AppointmentCabinetAssignment,
     AppointmentCabinetEventResponse,
     AppointmentCreate,
+    AppointmentLabelCreate,
+    AppointmentLabelResponse,
+    AppointmentLabelUpdate,
     AppointmentResponse,
     AppointmentStatusEventResponse,
     AppointmentStatusTransition,
@@ -39,6 +45,7 @@ from .schemas import (
 )
 from .service import (
     AlreadyInStateError,
+    AppointmentLabelService,
     AppointmentService,
     CabinetRequiredError,
     CabinetService,
@@ -46,7 +53,80 @@ from .service import (
 )
 from .tz import safe_zone
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(mark_financial_response)])
+
+
+@router.get("/appointment-labels", response_model=ApiResponse[list[AppointmentLabelResponse]])
+async def list_appointment_labels(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    active_only: bool = False,
+) -> ApiResponse[list[AppointmentLabelResponse]]:
+    labels = await AppointmentLabelService.list_labels(db, ctx.clinic_id, active_only=active_only)
+    return ApiResponse(data=[AppointmentLabelResponse.model_validate(label) for label in labels])
+
+
+@router.post(
+    "/appointment-labels",
+    response_model=ApiResponse[AppointmentLabelResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_appointment_label(
+    data: AppointmentLabelCreate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AppointmentLabelResponse]:
+    try:
+        label = await AppointmentLabelService.create_label(db, ctx.clinic_id, data.model_dump())
+        await db.commit()
+        await db.refresh(label)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Label name already exists"
+        ) from exc
+    return ApiResponse(data=AppointmentLabelResponse.model_validate(label))
+
+
+@router.put("/appointment-labels/{label_id}", response_model=ApiResponse[AppointmentLabelResponse])
+async def update_appointment_label(
+    label_id: UUID,
+    data: AppointmentLabelUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AppointmentLabelResponse]:
+    label = await AppointmentLabelService.get_label(db, ctx.clinic_id, label_id)
+    if label is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Appointment label not found"
+        )
+    try:
+        label = await AppointmentLabelService.update_label(
+            db, label, data.model_dump(exclude_unset=True)
+        )
+        await db.commit()
+        await db.refresh(label)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Label name already exists"
+        ) from exc
+    return ApiResponse(data=AppointmentLabelResponse.model_validate(label))
+
+
+async def _get_accessible_appointment(db: AsyncSession, ctx: ClinicContext, appointment_id: UUID):
+    appointment = await AppointmentService.get_appointment(
+        db,
+        ctx.clinic_id,
+        appointment_id,
+        access_predicate=AppointmentAccessPolicy.predicate(ctx),
+    )
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    return appointment
 
 
 def _localize(response: AppointmentResponse, ctx: ClinicContext) -> AppointmentResponse:
@@ -80,6 +160,8 @@ async def list_appointments(
     page_size: int = Query(default=100, ge=1, le=500),
 ) -> PaginatedApiResponse[AppointmentResponse]:
     """List appointments with filters."""
+    if patient_id is not None and not await PatientAccessPolicy.can_access(db, ctx, patient_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     appointments, total = await AppointmentService.list_appointments(
         db,
         ctx.clinic_id,
@@ -91,6 +173,7 @@ async def list_appointments(
         page,
         page_size,
         patient_id=patient_id,
+        access_predicate=AppointmentAccessPolicy.predicate(ctx),
     )
     return PaginatedApiResponse(
         data=[_localize(AppointmentResponse.model_validate(a), ctx) for a in appointments],
@@ -113,14 +196,18 @@ async def create_appointment(
 ) -> ApiResponse[AppointmentResponse]:
     """Create a new appointment."""
     if data.patient_id:
-        if not await AppointmentService.validate_patient_access(db, ctx.clinic_id, data.patient_id):
+        if not await PatientAccessPolicy.can_access(db, ctx, data.patient_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found",
             )
 
+    appointment_data = data.model_dump(exclude_unset=True)
+    if ctx.role == "dentist":
+        appointment_data["professional_id"] = ctx.user_id
+
     if not await AppointmentService.validate_professional_access(
-        db, ctx.clinic_id, data.professional_id
+        db, ctx.clinic_id, appointment_data["professional_id"]
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -131,7 +218,7 @@ async def create_appointment(
         appointment = await AppointmentService.create_appointment(
             db,
             ctx.clinic_id,
-            data.model_dump(exclude_unset=True),
+            appointment_data,
             created_by=ctx.user_id,
         )
     except ValueError as e:
@@ -156,12 +243,7 @@ async def get_appointment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AppointmentResponse]:
     """Get an appointment by ID, including the status audit trail."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     response = _localize(AppointmentResponse.model_validate(appointment), ctx)
     response.history = [AppointmentStatusEventResponse.model_validate(e) for e in events]
@@ -177,19 +259,19 @@ async def update_appointment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AppointmentResponse]:
     """Update an appointment."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
 
     if data.patient_id:
-        if not await AppointmentService.validate_patient_access(db, ctx.clinic_id, data.patient_id):
+        if not await PatientAccessPolicy.can_access(db, ctx, data.patient_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found",
             )
+
+    if ctx.role == "dentist" and data.professional_id not in (None, ctx.user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot reassign appointment"
+        )
 
     if data.professional_id:
         if not await AppointmentService.validate_professional_access(
@@ -229,12 +311,7 @@ async def delete_appointment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Cancel an appointment."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     try:
         await AppointmentService.cancel_appointment(db, appointment, changed_by=ctx.user_id)
     except ValueError as e:
@@ -260,12 +337,7 @@ async def transition_appointment(
     Returns the full appointment with its ``history`` populated so the
     frontend can update the detail view in one round-trip.
     """
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     try:
         await AppointmentService.transition(
             db, appointment, data.to_status, changed_by=ctx.user_id, note=data.note
@@ -303,12 +375,7 @@ async def list_appointment_transitions(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[AppointmentStatusEventResponse]]:
     """Return the full status audit trail for an appointment (asc)."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     return ApiResponse(data=[AppointmentStatusEventResponse.model_validate(e) for e in events])
 
@@ -329,12 +396,7 @@ async def assign_appointment_cabinet(
     Returns the updated appointment with its cabinet history populated so
     the frontend can update the detail view in one round-trip.
     """
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     try:
         await AppointmentService.assign_cabinet(
             db,
@@ -371,12 +433,7 @@ async def list_appointment_cabinet_history(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[AppointmentCabinetEventResponse]]:
     """Return the cabinet assignment audit trail (asc)."""
-    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
-    if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+    appointment = await _get_accessible_appointment(db, ctx, appointment_id)
     events = await AppointmentService.list_cabinet_events(db, ctx.clinic_id, appointment.id)
     return ApiResponse(data=[AppointmentCabinetEventResponse.model_validate(e) for e in events])
 
@@ -400,7 +457,12 @@ async def get_kanban_day(
 ) -> ApiResponse[KanbanDaySnapshot]:
     """Return the professionals strip state for the kanban board."""
     target_date = target or datetime.now(safe_zone(ctx.clinic.timezone)).date()
-    data = await KanbanDayService.snapshot(db, ctx.clinic_id, target_date)
+    data = await KanbanDayService.snapshot(
+        db,
+        ctx.clinic_id,
+        target_date,
+        professional_ids=[ctx.user_id] if ctx.role == "dentist" else None,
+    )
     return ApiResponse(data=KanbanDaySnapshot(**data))
 
 
@@ -532,6 +594,8 @@ async def update_appointment_treatment_note(
     is the visit-level anchor of the four-level clinical-notes model even
     though the row is owned by the agenda module (issue #60).
     """
+    if not await AppointmentAccessPolicy.can_access_treatment(db, ctx, appointment_treatment_id):
+        raise HTTPException(status_code=404, detail="Appointment treatment not found")
     row = await AppointmentService.update_appointment_treatment_note(
         db,
         ctx.clinic_id,

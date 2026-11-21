@@ -1,0 +1,480 @@
+<script setup lang="ts">
+/* eslint-disable @stylistic/max-statements-per-line */
+/** NTS geometry for the Plan, wired to the established clinical treatment flows. */
+import type { ClinicalType, MultiToothTreatmentConfig, PlannedTreatmentItem, Surface, ToothTreatmentView, Treatment, TreatmentCreate, TreatmentStatus } from '~~/app/types'
+import { calculateToothRange, getMultiToothConfig, isSameArch } from '~~/app/config/odontogramConstants'
+import { viewForTooth } from '~~/app/utils/treatmentView'
+import { isSurfaceTreatment } from '../../../../odontogram/frontend/components/odontogram/TreatmentIcons'
+import GlobalTreatmentsStrip from '../../../../odontogram/frontend/components/odontogram/GlobalTreatmentsStrip.vue'
+import MultiToothConfirmPopup from '../../../../odontogram/frontend/components/odontogram/MultiToothConfirmPopup.vue'
+import SurfaceSelectorPopup from '../../../../odontogram/frontend/components/odontogram/SurfaceSelectorPopup.vue'
+import TreatmentBar from '../../../../odontogram/frontend/components/odontogram/TreatmentBar.vue'
+import TreatmentEditModal from '../../../../odontogram/frontend/components/odontogram/TreatmentEditModal.vue'
+import { useTreatments } from '../../../../odontogram/frontend/composables/useTreatments'
+import { usePlanTreatmentLink, type PlanCreateLinkResult } from '../../composables/usePlanTreatmentLink'
+import type { PlanLinkFailureReason } from '../../utils/planTreatmentLink'
+import PlanLinkRecoveryNotice from './PlanLinkRecoveryNotice.vue'
+import { NTS_ROWS } from '../../../../odontogram/frontend/utils/ntsDentition'
+import { NTS_CHART_HEIGHT, NTS_CHART_SCALE, NTS_CHART_VIEWBOX, NTS_CHART_WIDTH, toothPlacement } from '../../../../odontogram/frontend/utils/ntsChartGeometry'
+import NtsDentitionRow from '../../../../odontogram/frontend/components/odontogram/NtsDentitionRow.vue'
+import NtsTherapeuticLayer from '../../../../odontogram/frontend/components/odontogram/NtsTherapeuticLayer.vue'
+import TreatmentPlanVisualLegend from './TreatmentPlanVisualLegend.vue'
+import { activeTreatmentCount, isActivePlanMarker, orderedPlanMarkers, THERAPEUTIC_LAYER_ORDER } from '../../../../odontogram/frontend/utils/treatmentPlanComposition'
+import { getLateralIcon } from '../../../../odontogram/frontend/components/odontogram/LateralViewIcons'
+import { isTherapeuticSurface, therapeuticSurfaceAnchor } from '../../../../odontogram/frontend/utils/ntsTherapeuticGeometry'
+import { renderableTherapeuticInstructions, type TherapeuticLayer } from '../../../../odontogram/frontend/utils/therapeuticVisualization'
+
+const props = withDefaults(defineProps<{
+  items: PlannedTreatmentItem[]
+  patientId?: string
+  planId?: string
+  planTitle?: string
+  readonly?: boolean
+  highlightedTeeth?: number[]
+  highlightedGlobalIds?: string[]
+}>(), { patientId: '', planId: '', planTitle: '', readonly: false, highlightedTeeth: () => [], highlightedGlobalIds: () => [] })
+const emit = defineEmits<{
+  toothSelect: [fdi: number]
+  toothHover: [fdi: number | null]
+  globalHover: [treatmentId: string | null]
+  archHover: [arch: 'upper' | 'lower' | null]
+  treatmentsChanged: []
+}>()
+
+const { t, locale } = useI18n()
+const toast = useToast()
+const { treatments, fetchTreatments, createTreatment, updateTreatment, updateError, deleteTreatment, performTreatment } = useTreatments()
+const planLink = usePlanTreatmentLink()
+const selectedTooth = ref<number | null>(null)
+const selectedTreatmentType = ref<string | null>(null)
+const selectedCatalogItemId = ref<string | null>(null)
+const selectedTreatmentStatus = ref<TreatmentStatus>('planned')
+const showSurfaceSelector = ref(false)
+const multiToothSelection = ref<{ teeth: number[], anchor: number | null }>({ teeth: [], anchor: null })
+const showMultiToothConfirm = ref(false)
+const editingTreatment = ref<ToothTreatmentView | null>(null)
+const showTreatmentEditModal = ref(false)
+// Entries carry the Plan they were associated with so undo can go through the Plan's removeItem.
+const undoStack = ref<Array<{ treatmentId: string, planId: string }>>([])
+
+type MarkerSurface = 'M' | 'D' | 'O' | 'V' | 'L'
+interface ToothMarker { itemId: string, treatmentId: string, fdi: number, type: string, status: PlannedTreatmentItem['status'], treatmentStatus: string, snapshot: unknown, surfaces: MarkerSurface[], role: 'pillar' | 'pontic' | null }
+/** Cancelled items stay in the Plan detail; the chart only draws what is still in force. */
+const activeItems = computed(() => props.items.filter(item => isActivePlanMarker({ itemId: item.id, treatmentId: item.treatment_id, status: item.status, treatmentStatus: item.treatment?.status })))
+const markers = computed<ToothMarker[]>(() => activeItems.value.flatMap(item => (item.treatment?.teeth ?? []).map(tooth => ({ itemId: item.id, treatmentId: item.treatment?.id ?? item.treatment_id, fdi: tooth.tooth_number, type: item.treatment?.clinical_type ?? 'migrated', status: item.status, treatmentStatus: item.treatment?.status ?? 'planned', snapshot: item.treatment?.visualization_snapshot ?? null, surfaces: (tooth.surfaces ?? []) as MarkerSurface[], role: tooth.role ?? null }))))
+const markersByTooth = computed(() => markers.value.reduce<Record<number, ToothMarker[]>>((byTooth, marker) => { ;(byTooth[marker.fdi] ??= []).push(marker); return byTooth }, {}))
+const orderedMarkersByTooth = computed(() => Object.fromEntries(Object.entries(markersByTooth.value).map(([fdi, toothMarkers]) => [fdi, orderedPlanMarkers(toothMarkers)])) as Record<number, ToothMarker[]>)
+const visibleTherapeuticLayers = computed<TherapeuticLayer[]>(() => THERAPEUTIC_LAYER_ORDER.filter(layer => markers.value.some(marker => isActivePlanMarker(marker) && renderableTherapeuticInstructions(marker.snapshot, marker.surfaces).some(instruction => instruction.layer === layer))))
+const hasMultipleTreatments = computed(() => Object.values(markersByTooth.value).some(toothMarkers => activeTreatmentCount(toothMarkers) > 1))
+const hasMarkers = computed(() => markers.value.length > 0)
+const hasFallbackMarkers = computed(() => markers.value.some(marker => renderableTherapeuticInstructions(marker.snapshot, marker.surfaces).length === 0))
+const hasGenericIcons = computed(() => markers.value.some(marker => renderableTherapeuticInstructions(marker.snapshot, marker.surfaces).some(instruction => instruction.layer === 'lateral_icon' && instruction.icon !== 'implant' && !getLateralIcon(instruction.icon || ''))))
+const hasSurfaceMarkers = computed(() => markers.value.some(marker => marker.surfaces.some(isTherapeuticSurface)))
+const hasRoles = computed(() => markers.value.some(marker => marker.role !== null))
+const hasCompletedMarkers = computed(() => markers.value.some(marker => marker.status === 'completed' || marker.treatmentStatus === 'performed'))
+const hasPendingMarkers = computed(() => markers.value.some(marker => isActivePlanMarker(marker) && marker.status === 'pending' && marker.treatmentStatus !== 'performed'))
+const bridges = computed(() => activeItems.value.filter(item => item.treatment?.clinical_type === 'bridge').map(item => (item.treatment?.teeth ?? []).map(tooth => tooth.tooth_number).map(toothPlacement).filter((placement): placement is NonNullable<typeof placement> => placement !== null)).filter(placements => placements.length > 1))
+const planTreatmentIds = computed(() => new Set(props.items.map(item => item.treatment_id)))
+const activeTreatmentIds = computed(() => new Set(activeItems.value.map(item => item.treatment_id)))
+const hasActiveGlobals = computed(() => activeItems.value.some(item => item.treatment?.scope === 'global_mouth' || item.treatment?.scope === 'global_arch'))
+const hasActiveToothless = computed(() => activeItems.value.some(item => !item.treatment?.teeth?.length))
+const planTreatments = computed(() => treatments.value.filter(treatment => planTreatmentIds.value.has(treatment.id)))
+const activePlanTreatments = computed(() => planTreatments.value.filter(treatment => activeTreatmentIds.value.has(treatment.id)))
+const multipleTreatmentDescriptions = computed(() => Object.entries(markersByTooth.value).filter(([, toothMarkers]) => activeTreatmentCount(toothMarkers) > 1).map(([fdi, toothMarkers]) => `${activeTreatmentCount(toothMarkers)} tratamientos vigentes en la pieza ${fdi}`))
+const selectedToothTreatments = computed(() => !selectedTooth.value ? [] : activePlanTreatments.value.map(treatment => viewForTooth(treatment, selectedTooth.value!)).filter((treatment): treatment is ToothTreatmentView => treatment !== null))
+const selectedTeeth = computed(() => [...new Set([...props.highlightedTeeth, ...multiToothSelection.value.teeth, ...(selectedTooth.value ? [selectedTooth.value] : [])])])
+const isClickToApplyMode = computed(() => selectedTreatmentType.value !== null || selectedCatalogItemId.value !== null)
+const multiToothConfig = computed<MultiToothTreatmentConfig | null>(() => selectedTreatmentType.value ? getMultiToothConfig(selectedTreatmentType.value) : null)
+
+function markerTone(marker: ToothMarker) { return marker.status === 'completed' ? 'var(--color-success-500)' : marker.status === 'cancelled' ? 'var(--color-text-dimmed)' : 'var(--color-primary-500)' }
+function markerTitle(marker: ToothMarker) { return `${marker.type}${marker.role ? ` (${marker.role})` : ''}` }
+function treatmentLabel(treatment: ToothTreatmentView) { return treatment.catalog_item?.names?.[locale.value] || treatment.catalog_item?.names?.es || t(`odontogram.treatments.types.${treatment.clinical_type}`, treatment.clinical_type) }
+function resetMultiToothSelection() { multiToothSelection.value = { teeth: [], anchor: null }; showMultiToothConfirm.value = false }
+function cancelClickToApplyMode() { selectedTreatmentType.value = null; selectedCatalogItemId.value = null; selectedTooth.value = null; resetMultiToothSelection() }
+function handleToothSelect(toothNumber: number) {
+  emit('toothSelect', toothNumber); selectedTooth.value = toothNumber
+  if (props.readonly || !isClickToApplyMode.value) return
+  if (multiToothConfig.value) handleMultiToothClick(toothNumber)
+  else if (selectedTreatmentType.value && isSurfaceTreatment(selectedTreatmentType.value)) showSurfaceSelector.value = true
+  else void applyTreatment(toothNumber)
+}
+function handleMultiToothClick(toothNumber: number) {
+  const cfg = multiToothConfig.value
+  if (!cfg) return
+  if (cfg.selectionMode === 'range') {
+    if (multiToothSelection.value.anchor === null) { multiToothSelection.value = { teeth: [toothNumber], anchor: toothNumber }; return }
+    try {
+      const range = calculateToothRange(multiToothSelection.value.anchor, toothNumber)
+      if (range.length < cfg.minTeeth || range.length > cfg.maxTeeth) { toast.add({ title: t(range.length < cfg.minTeeth ? 'odontogram.multiTooth.errors.tooFew' : 'odontogram.multiTooth.errors.tooMany', { n: range.length < cfg.minTeeth ? cfg.minTeeth : cfg.maxTeeth }), color: 'warning' }); return }
+      multiToothSelection.value = { teeth: range, anchor: multiToothSelection.value.anchor }; showMultiToothConfirm.value = true
+    } catch { toast.add({ title: t('odontogram.multiTooth.errors.sameArchRequired'), color: 'warning' }) }
+    return
+  }
+  const selected = multiToothSelection.value.teeth
+  if (selected.includes(toothNumber)) { multiToothSelection.value = { ...multiToothSelection.value, teeth: selected.filter(t => t !== toothNumber) }; return }
+  const candidate = [...selected, toothNumber]
+  if ((cfg.requiresSameArch && !isSameArch(candidate)) || candidate.length > cfg.maxTeeth) { toast.add({ title: t(cfg.requiresSameArch && !isSameArch(candidate) ? 'odontogram.multiTooth.errors.sameArchRequired' : 'odontogram.multiTooth.errors.tooMany', { n: cfg.maxTeeth }), color: 'warning' }); return }
+  multiToothSelection.value = { ...multiToothSelection.value, teeth: candidate }
+}
+function canConfirmFreeSelection() { return multiToothConfig.value?.selectionMode === 'free' && multiToothSelection.value.teeth.length >= multiToothConfig.value.minTeeth }
+/** Plan context: preflight → create once → associate. Standalone: create only. */
+async function createInContext(create: () => Promise<Treatment | null>): Promise<PlanCreateLinkResult | { status: 'standalone', treatmentId: string } | null> {
+  if (props.planId) return planLink.createAndLink(props.planId, create)
+  const created = await create()
+  return created ? { status: 'standalone', treatmentId: created.id } : null
+}
+async function finishCreate(result: Awaited<ReturnType<typeof createInContext>>) {
+  if (!result || result.status === 'create_failed') return
+  if (result.status === 'blocked') { planLink.explain(result.reason); return }
+  if (result.status === 'unlinked') {
+    // Treatment exists but is NOT in the Plan: no success toast, no undo entry.
+    // The recovery notice (planLink.pending) offers a retry with the same id.
+    await refetchTreatments(); emit('treatmentsChanged'); cancelClickToApplyMode(); return
+  }
+  undoStack.value.push({ treatmentId: result.treatmentId, planId: props.planId })
+  if (result.status === 'linked') planLink.notifyLinked(result.recovered)
+  emit('treatmentsChanged'); cancelClickToApplyMode()
+}
+async function retryPlanLink() {
+  const pending = planLink.pending.value
+  const result = await planLink.retry()
+  if (result?.ok && pending) {
+    undoStack.value.push({ treatmentId: pending.treatmentId, planId: pending.planId })
+    planLink.notifyLinked(true); await refetchTreatments(); emit('treatmentsChanged')
+  }
+}
+async function applyTreatment(toothNumber: number, surfaces?: Surface[]) {
+  if (!props.patientId || !isClickToApplyMode.value) return
+  const payload: TreatmentCreate = { tooth_numbers: [toothNumber], status: 'planned', scope: 'tooth' }
+  if (selectedCatalogItemId.value) payload.catalog_item_id = selectedCatalogItemId.value
+  if (selectedTreatmentType.value) payload.clinical_type = selectedTreatmentType.value as ClinicalType
+  if (surfaces?.length) payload.surfaces = surfaces
+  await finishCreate(await createInContext(() => createTreatment(props.patientId, payload)))
+}
+function handleSurfaceConfirm(surfaces: Surface[]) { if (selectedTooth.value && surfaces.length) void applyTreatment(selectedTooth.value, surfaces); selectedTooth.value = null }
+async function confirmMultiToothSelection(roles: Array<{ tooth_number: number, role: 'pillar' | 'pontic' }> | null) {
+  const cfg = multiToothConfig.value
+  if (!cfg || !props.patientId) return
+  const payload: TreatmentCreate = { scope: 'multi_tooth', status: 'planned', clinical_type: (cfg.mode === 'bridge' ? 'bridge' : cfg.key) as ClinicalType }
+  if (cfg.mode === 'bridge' && roles?.length) payload.teeth = roles
+  else payload.tooth_numbers = [...multiToothSelection.value.teeth].sort((a, b) => a - b)
+  if (selectedCatalogItemId.value) payload.catalog_item_id = selectedCatalogItemId.value
+  await finishCreate(await createInContext(() => createTreatment(props.patientId, payload)))
+}
+async function handleUndo() {
+  const entry = undoStack.value.pop()
+  if (!entry) return
+  // Plan context never falls back to the odontogram DELETE (see releaseTreatment).
+  const removed = await planLink.releaseTreatment(entry.planId, entry.treatmentId, deleteTreatment)
+  if (!removed) {
+    undoStack.value.push(entry) // local state untouched: undo can be retried later
+    return
+  }
+  await refetchTreatments()
+  emit('treatmentsChanged')
+}
+async function refetchTreatments() { if (props.patientId) await fetchTreatments(props.patientId) }
+async function handleGlobalTreatmentApplied(treatment: Treatment) {
+  // TreatmentBar only emits this once the Plan item is confirmed.
+  if (props.planId) undoStack.value.push({ treatmentId: treatment.id, planId: props.planId })
+  await refetchTreatments(); emit('treatmentsChanged')
+}
+async function handlePlanLinkFailed(payload: { planId: string, treatmentId: string, reason: PlanLinkFailureReason, label?: string }) {
+  planLink.setPending(payload)
+  await refetchTreatments(); emit('treatmentsChanged')
+}
+function editTreatment(treatment: ToothTreatmentView) { updateError.value = null; editingTreatment.value = treatment; showTreatmentEditModal.value = true }
+async function handleTreatmentUpdate(treatmentId: string, data: { status?: TreatmentStatus, notes?: string, surfaces?: Surface[] }) {
+  // Close only once the API confirmed the save; a refusal keeps the modal open
+  // (selection intact, reason shown inline) and emits nothing.
+  const updated = await updateTreatment(treatmentId, data)
+  if (!updated) return
+  await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged')
+}
+async function handleTreatmentDelete(treatmentId: string) {
+  // Explicit manual deletion. In Plan context it only ever goes through the
+  // Plan; if that is refused or unverifiable the modal stays open with the
+  // error toast, nothing is emitted and the undo stack is left alone.
+  const removed = await planLink.releaseTreatment(props.planId || undefined, treatmentId, deleteTreatment)
+  if (!removed) return
+  undoStack.value = undoStack.value.filter(e => e.treatmentId !== treatmentId)
+  await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged')
+}
+async function handleTreatmentPerform(treatmentId: string) { await performTreatment(treatmentId); await refetchTreatments(); showTreatmentEditModal.value = false; editingTreatment.value = null; emit('treatmentsChanged') }
+onMounted(() => refetchTreatments())
+watch(() => props.patientId, () => refetchTreatments())
+defineExpose({ refetchTreatments })
+</script>
+
+<template>
+  <section
+    class="space-y-3"
+    data-testid="nts-plan-odontogram-chart"
+    aria-label="Odontograma del plan de tratamiento"
+  >
+    <p
+      class="text-caption text-subtle"
+      data-testid="nts-plan-odontogram-description"
+    >
+      Tratamientos del plan sobre la geometría del odontograma clínico. Los indicadores no son hallazgos MINSA.
+    </p>
+    <div
+      class="overflow-x-auto"
+      data-testid="nts-plan-chart-scroll"
+    >
+      <div
+        class="relative mx-auto py-2 space-y-1"
+        :class="{ 'cursor-crosshair': isClickToApplyMode && !readonly }"
+        :style="{ minWidth: `${NTS_CHART_WIDTH}px` }"
+        data-testid="nts-plan-chart-canvas"
+      >
+        <NtsDentitionRow
+          v-for="row in NTS_ROWS"
+          :key="row.id"
+          :row="row"
+          :scale="NTS_CHART_SCALE"
+          selectable
+          purpose="pick"
+          :selected-teeth="selectedTeeth"
+          :class="row.id === 'deciduousUpper' ? 'pt-3' : row.id === 'permanentLower' ? 'pt-3' : ''"
+          @select="handleToothSelect"
+        />
+        <svg
+          class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2"
+          :viewBox="NTS_CHART_VIEWBOX"
+          :width="NTS_CHART_WIDTH"
+          :height="NTS_CHART_HEIGHT"
+          aria-hidden="true"
+          focusable="false"
+          data-testid="nts-plan-chart-overlay"
+        >
+          <template
+            v-for="layer in THERAPEUTIC_LAYER_ORDER"
+            :key="layer"
+          >
+            <template
+              v-for="(toothMarkers, fdi) in orderedMarkersByTooth"
+              :key="fdi"
+            >
+              <NtsTherapeuticLayer
+                v-for="marker in toothMarkers"
+                :key="`therapy-${layer}-${marker.itemId}`"
+                :fdi="marker.fdi"
+                :snapshot="marker.snapshot"
+                :surfaces="marker.surfaces"
+                :item-status="marker.status"
+                :treatment-status="marker.treatmentStatus"
+                :layer="layer"
+              />
+            </template>
+          </template>
+          <template
+            v-for="(bridge, index) in bridges"
+            :key="index"
+          >
+            <line
+              v-for="(placement, placementIndex) in bridge.slice(1)"
+              :key="`${placement.fdi}-${placementIndex}`"
+              :x1="bridge[placementIndex]?.center.x"
+              :y1="bridge[placementIndex]?.center.y"
+              :x2="placement.center.x"
+              :y2="placement.center.y"
+              stroke="var(--color-primary-500)"
+              stroke-width="2"
+              stroke-dasharray="3 2"
+            />
+          </template>
+          <template
+            v-for="(toothMarkers, fdi) in orderedMarkersByTooth"
+            :key="fdi"
+          ><template v-if="toothPlacement(Number(fdi))"><rect
+            :x="toothPlacement(Number(fdi))!.crown.x"
+            :y="toothPlacement(Number(fdi))!.crown.y"
+            :width="toothPlacement(Number(fdi))!.crown.width"
+            :height="toothPlacement(Number(fdi))!.crown.height"
+            rx="2"
+            fill="none"
+            :stroke="markerTone(toothMarkers[0]!)"
+            stroke-width="1.5"
+          /><circle
+            v-for="(marker, markerIndex) in toothMarkers"
+            :key="marker.itemId"
+            :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 5 - markerIndex * 6"
+            :cy="toothPlacement(Number(fdi))!.annotation.y + 6"
+            r="2.5"
+            :fill="markerTone(marker)"
+          ><title>{{ markerTitle(marker) }}</title></circle><template
+            v-for="marker in toothMarkers"
+            :key="`${marker.itemId}-surfaces`"
+          ><circle
+            v-for="surface in marker.surfaces.filter(isTherapeuticSurface)"
+            :key="surface"
+            :cx="therapeuticSurfaceAnchor(marker.fdi, surface)?.x"
+            :cy="therapeuticSurfaceAnchor(marker.fdi, surface)?.y"
+            r="1.8"
+            :fill="markerTone(marker)"
+          /></template><template
+            v-for="(marker, markerIndex) in toothMarkers"
+            :key="`${marker.itemId}-role`"
+          ><rect
+            v-if="marker.role"
+            :x="toothPlacement(Number(fdi))!.annotation.x + 2 + markerIndex * 6"
+            :y="toothPlacement(Number(fdi))!.annotation.y + 2"
+            width="4"
+            height="4"
+            :fill="marker.role === 'pillar' ? 'currentColor' : 'none'"
+            stroke="currentColor"
+            :data-role="marker.role"
+          /></template><g
+            v-if="activeTreatmentCount(toothMarkers) > 1"
+            data-testid="nts-plan-treatment-count"
+          ><circle
+            :cx="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
+            :cy="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 3"
+            r="5"
+            fill="var(--color-primary-700)"
+          /><text
+            :x="toothPlacement(Number(fdi))!.annotation.x + toothPlacement(Number(fdi))!.annotation.width - 3"
+            :y="toothPlacement(Number(fdi))!.annotation.y + toothPlacement(Number(fdi))!.annotation.height - 1.5"
+            text-anchor="middle"
+            font-size="6"
+            fill="white"
+          >{{ activeTreatmentCount(toothMarkers) }}</text></g></template></template></svg>
+      </div>
+    </div>
+    <ul
+      v-if="multipleTreatmentDescriptions.length"
+      class="sr-only"
+      data-testid="nts-plan-treatment-descriptions"
+    >
+      <li
+        v-for="description in multipleTreatmentDescriptions"
+        :key="description"
+      >
+        {{ description }}
+      </li>
+    </ul>
+    <TreatmentPlanVisualLegend
+      :layers="visibleTherapeuticLayers"
+      :has-markers="hasMarkers"
+      :has-fallback="hasFallbackMarkers"
+      :has-generic-icon="hasGenericIcons"
+      :has-surfaces="hasSurfaceMarkers"
+      :has-roles="hasRoles"
+      :has-bridge="bridges.length > 0"
+      :has-global="hasActiveGlobals"
+      :has-multiple="hasMultipleTreatments"
+      :has-completed="hasCompletedMarkers"
+      :has-pending="hasPendingMarkers"
+    />
+    <GlobalTreatmentsStrip
+      v-if="patientId"
+      :treatments="activePlanTreatments"
+      :highlighted-ids="highlightedGlobalIds"
+      @treatment-hover="emit('globalHover', $event)"
+      @arch-hover="emit('archHover', $event)"
+    />
+    <div
+      v-if="selectedTooth && !isClickToApplyMode"
+      class="flex flex-wrap items-center gap-2 rounded-md border border-default p-2"
+      data-testid="nts-plan-tooth-selection"
+    >
+      <span class="text-sm font-medium">{{ t('odontogram.tooth') }} {{ selectedTooth }}</span><span
+        v-if="selectedToothTreatments.length === 0"
+        class="text-caption text-subtle"
+      >Sin tratamientos del plan.</span><UButton
+        v-for="treatment in selectedToothTreatments"
+        :key="treatment.id"
+        size="xs"
+        variant="soft"
+        :disabled="readonly"
+        @click="editTreatment(treatment)"
+      >
+        {{ treatmentLabel(treatment) }}
+      </UButton>
+    </div>
+    <TreatmentBar
+      v-if="!readonly && patientId"
+      v-model:selected-treatment="selectedTreatmentType"
+      v-model:selected-catalog-item-id="selectedCatalogItemId"
+      :selected-status="selectedTreatmentStatus"
+      :selected-plan-id="planId"
+      :plan-context-title="planTitle"
+      :patient-id="patientId"
+      mode="planning"
+      @update:selected-status="selectedTreatmentStatus = $event"
+      @treatment-select="selectedTreatmentType = $event"
+      @treatment-applied="handleGlobalTreatmentApplied"
+      @plan-link-failed="handlePlanLinkFailed"
+      @cancel="cancelClickToApplyMode"
+    />
+    <PlanLinkRecoveryNotice
+      v-if="planLink.pending.value"
+      :pending="planLink.pending.value"
+      :busy="planLink.busy.value"
+      @retry="retryPlanLink"
+      @dismiss="planLink.dismiss()"
+    />
+    <p
+      v-if="hasActiveToothless"
+      class="text-caption text-subtle"
+    >
+      Los tratamientos por arco, boca completa o sin una representación dental se mantienen en la lista del plan.
+    </p>
+    <SurfaceSelectorPopup
+      v-if="patientId"
+      v-model:open="showSurfaceSelector"
+      :tooth-number="selectedTooth || 0"
+      :treatment-type="(selectedTreatmentType as ClinicalType) || 'filling_composite'"
+      status="planned"
+      @confirm="handleSurfaceConfirm"
+      @cancel="selectedTooth = null"
+    />
+    <TreatmentEditModal
+      v-if="patientId"
+      v-model:open="showTreatmentEditModal"
+      :treatment="editingTreatment"
+      :plan-context="!!planId"
+      :error-message="updateError"
+      @update="handleTreatmentUpdate"
+      @delete="handleTreatmentDelete"
+      @perform="handleTreatmentPerform"
+    />
+    <MultiToothConfirmPopup
+      v-if="patientId && multiToothConfig"
+      v-model:open="showMultiToothConfirm"
+      :config="multiToothConfig"
+      :teeth="multiToothSelection.teeth"
+      status="planned"
+      @confirm="confirmMultiToothSelection"
+      @cancel="resetMultiToothSelection"
+    />
+    <div
+      v-if="multiToothConfig?.selectionMode === 'free' && multiToothSelection.teeth.length > 0 && !showMultiToothConfirm"
+      class="flex items-center gap-2 rounded-md border border-default bg-surface p-2"
+      data-testid="nts-plan-multi-selection"
+    >
+      <span class="text-sm">{{ multiToothSelection.teeth.join(', ') }}</span><UButton
+        size="xs"
+        variant="ghost"
+        @click="resetMultiToothSelection"
+      >
+        {{ t('common.cancel') }}
+      </UButton><UButton
+        size="xs"
+        :disabled="!canConfirmFreeSelection()"
+        @click="showMultiToothConfirm = true"
+      >
+        {{ t('common.confirm') }}
+      </UButton>
+    </div>
+    <UButton
+      v-if="undoStack.length && !readonly"
+      size="xs"
+      variant="ghost"
+      @click="handleUndo"
+    >
+      {{ t('common.undo') }}
+    </UButton>
+  </section>
+</template>

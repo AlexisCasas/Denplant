@@ -2522,7 +2522,7 @@ def _zero_pricing_config(config: dict[str, Any]) -> dict[str, Any]:
     """Zero the numeric values of a pricing_config (per_role / pillar-pontic prices)."""
     # ponytail: configs are flat {key: number}; recurse if a nested shape ever appears.
     return {
-        k: 0 if isinstance(v, (int, float, Decimal)) and not isinstance(v, bool) else v
+        k: 0 if isinstance(v, int | float | Decimal) and not isinstance(v, bool) else v
         for k, v in config.items()
     }
 

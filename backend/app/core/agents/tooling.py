@@ -24,12 +24,12 @@ from pydantic import BaseModel
 
 def jsonify(obj: Any) -> Any:
     """Recursively coerce a value into JSON/JSONB-safe primitives."""
-    if obj is None or isinstance(obj, (str, int, float, bool)):
+    if obj is None or isinstance(obj, str | int | float | bool):
         return obj
     if isinstance(obj, Decimal):
         return float(obj)
     # datetime is a subclass of date; isoformat() is right for both.
-    if isinstance(obj, (datetime, date)):
+    if isinstance(obj, datetime | date):
         return obj.isoformat()
     if isinstance(obj, UUID):
         return str(obj)
@@ -37,6 +37,6 @@ def jsonify(obj: Any) -> Any:
         return jsonify(obj.model_dump())
     if isinstance(obj, dict):
         return {str(k): jsonify(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple, set)):
+    if isinstance(obj, list | tuple | set):
         return [jsonify(v) for v in obj]
     return str(obj)

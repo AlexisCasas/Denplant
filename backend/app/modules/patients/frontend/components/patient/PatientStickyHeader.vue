@@ -21,9 +21,12 @@ import type { PatientExtended } from '~~/app/types'
 
 interface Props {
   patient: PatientExtended
+  canArchive?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  canArchive: false
+})
 
 const emit = defineEmits<{
   edit: []
@@ -84,15 +87,17 @@ const actionItems = computed(() => [
     icon: 'i-lucide-edit',
     onSelect: () => emit('newNote')
   },
-  {
-    type: 'separator' as const
-  },
-  {
-    label: t('patients.archive'),
-    icon: 'i-lucide-archive',
-    color: 'error' as const,
-    onSelect: () => emit('archive')
-  }
+  ...(props.canArchive && !isArchived.value
+    ? [
+        { type: 'separator' as const },
+        {
+          label: t('patients.archive'),
+          icon: 'i-lucide-archive',
+          color: 'error' as const,
+          onSelect: () => emit('archive')
+        }
+      ]
+    : [])
 ])
 </script>
 

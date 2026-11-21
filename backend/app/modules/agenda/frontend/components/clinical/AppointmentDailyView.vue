@@ -483,8 +483,8 @@ const appointmentsByProfIndex = computed(() => {
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4 flex-shrink-0">
-      <div class="flex items-center gap-2">
+    <div class="flex items-center justify-between gap-3 mb-2 flex-shrink-0 min-w-0">
+      <div class="flex items-center gap-2 shrink-0">
         <UButton
           variant="outline"
           color="neutral"
@@ -507,12 +507,13 @@ const appointmentsByProfIndex = computed(() => {
       </div>
 
       <h2
-        class="text-h2 capitalize"
+        class="text-h2 capitalize truncate text-right"
         :class="isToday ? 'text-[var(--color-primary-soft-text)]' : 'text-default'"
       >
         {{ formattedDate }}
       </h2>
     </div>
+    <slot name="legend" />
 
     <!-- Loading -->
     <div
@@ -651,7 +652,7 @@ const appointmentsByProfIndex = computed(() => {
                   :style="{
                     ...getAppointmentStyle(appointment),
                     ...getOverlapStyle(appointment),
-                    ...getProfessionalFill(prof.color)
+                    ...getProfessionalFill(appointment.appointment_label?.color || prof.color)
                   }"
                   @click="handleAppointmentClick(appointment, $event)"
                   @mousedown="startDrag(appointment, $event, 'move')"
@@ -691,6 +692,11 @@ const appointmentsByProfIndex = computed(() => {
                     >
                       {{ appointment.treatment_type }}
                     </div>
+                    <span
+                      v-if="appointment.appointment_label"
+                      class="text-[10px] leading-none truncate"
+                      :title="appointment.appointment_label.name"
+                    >{{ appointment.appointment_label.name }}</span>
                   </div>
 
                   <!-- Resize handle -->

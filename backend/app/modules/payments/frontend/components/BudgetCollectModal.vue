@@ -5,7 +5,7 @@
  * + on-account excess narration. Optimised for receptionists.
  */
 
-import type { PaymentMethod, PaymentRecord, PaymentAllocationCreate } from '~~/app/types'
+import type { BudgetItem, BudgetItemPaymentSummary, PaymentMethod, PaymentRecord, PaymentAllocationCreate } from '~~/app/types'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
   budgetNumber?: string
   patientName?: string
   pendingAmount: number
+  budgetItems?: BudgetItem[]
 }>(), {
   budgetNumber: undefined,
   patientName: undefined
@@ -28,9 +29,42 @@ const { t } = useI18n()
 const { create } = usePayments()
 const { format: formatCurrency } = useCurrency()
 const toast = useToast()
+const api = useApi()
 
 const isSubmitting = ref(false)
 const errorMsg = ref<string | null>(null)
+const selectedItemId = ref<string>('')
+const itemSummaries = ref<Record<string, BudgetItemPaymentSummary>>({})
+const splitMode = ref(false)
+const splitAmounts = ref<Record<string, number>>({})
+
+async function loadItemSummaries() {
+  if (!props.budgetItems?.length) return
+  try {
+    const response = await api.get<{ data: BudgetItemPaymentSummary[] }>(
+      `/api/v1/payments/budgets/${props.budgetId}/item-summaries`
+    )
+    itemSummaries.value = Object.fromEntries(response.data.map(row => [row.budget_item_id, row]))
+  } catch {
+    itemSummaries.value = {}
+  }
+}
+
+watch(() => props.open, open => {
+  if (open) {
+    selectedItemId.value = ''
+    splitMode.value = false
+    splitAmounts.value = {}
+    loadItemSummaries()
+  }
+})
+
+const selectedItem = computed(() => props.budgetItems?.find(item => item.id === selectedItemId.value))
+const selectedItemBalance = computed(() => Number(itemSummaries.value[selectedItemId.value]?.balance ?? selectedItem.value?.line_total ?? 0))
+function itemLabel(item: BudgetItem) {
+  const name = Object.values(item.catalog_item?.names || {})[0] || 'Tratamiento'
+  return `${name}${item.tooth_number ? ` ${item.tooth_number}` : ''}`
+}
 
 const title = computed(() =>
   t('payments.budgetCollect.title') + (props.budgetNumber ? ` · ${props.budgetNumber}` : '')
@@ -41,6 +75,30 @@ function fmt(value: number | string) {
 }
 
 function buildAllocations(amount: number): PaymentAllocationCreate[] {
+  if (splitMode.value) {
+    const itemAllocations = (props.budgetItems || [])
+      .map(item => ({ item, amount: Number(splitAmounts.value[item.id] || 0) }))
+      .filter(row => row.amount > 0)
+      .map(row => ({
+        target_type: 'budget_item' as const,
+        target_id: props.budgetId,
+        budget_item_id: row.item.id,
+        amount: row.amount
+      }))
+    const allocated = itemAllocations.reduce((sum, allocation) => sum + allocation.amount, 0)
+    return [
+      ...itemAllocations,
+      ...(amount > allocated ? [{ target_type: 'on_account' as const, amount: amount - allocated }] : [])
+    ]
+  }
+  if (selectedItem.value) {
+    const toItem = Math.min(amount, selectedItemBalance.value)
+    const toOnAccount = Math.max(0, amount - toItem)
+    return [
+      ...(toItem > 0 ? [{ target_type: 'budget_item' as const, target_id: props.budgetId, budget_item_id: selectedItem.value.id, amount: toItem }] : []),
+      ...(toOnAccount > 0 ? [{ target_type: 'on_account' as const, amount: toOnAccount }] : [])
+    ]
+  }
   const pending = Math.max(0, Number(props.pendingAmount || 0))
   const toBudget = Math.min(amount, pending)
   const toOnAccount = Math.max(0, amount - pending)
@@ -62,6 +120,19 @@ async function handleSubmit(payload: {
   notes?: string
 }) {
   errorMsg.value = null
+  if (splitMode.value) {
+    const allocated = Object.values(splitAmounts.value).reduce((sum, value) => sum + Number(value || 0), 0)
+    if (allocated <= 0 || allocated > payload.amount) {
+      errorMsg.value = 'La distribución debe ser mayor que cero y no superar el monto recibido.'
+      return
+    }
+    for (const item of props.budgetItems || []) {
+      if (Number(splitAmounts.value[item.id] || 0) > Number(itemSummaries.value[item.id]?.balance ?? item.line_total)) {
+        errorMsg.value = `El importe de ${itemLabel(item)} supera su saldo pendiente.`
+        return
+      }
+    }
+  }
   isSubmitting.value = true
   try {
     const created = await create({
@@ -104,6 +175,41 @@ async function handleSubmit(payload: {
     @update:open="emit('update:open', $event)"
     @submit="handleSubmit"
   >
+    <template #before-form="{ amount }">
+      <section v-if="budgetItems?.length" class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-sm font-medium text-default">Aplicar a tratamiento</label>
+          <UButton size="xs" variant="ghost" @click="splitMode = !splitMode">
+            {{ splitMode ? 'Pago a un tratamiento' : 'Distribuir entre varios' }}
+          </UButton>
+        </div>
+        <UFormField v-if="!splitMode">
+          <USelect
+            v-model="selectedItemId"
+            :items="[
+              { label: 'Presupuesto general', value: '' },
+              ...budgetItems.map(item => ({
+                label: `${itemLabel(item)} · Pendiente ${fmt(itemSummaries[item.id]?.balance ?? item.line_total)}`,
+                value: item.id
+              }))
+            ]"
+          />
+        </UFormField>
+        <div v-else class="space-y-2 rounded-md border border-default p-3">
+          <div v-for="item in budgetItems" :key="item.id" class="grid grid-cols-[1fr_7rem] items-center gap-2">
+            <div class="min-w-0 text-sm">
+              <div class="truncate font-medium">{{ itemLabel(item) }}</div>
+              <div class="text-xs text-muted">Saldo: {{ fmt(itemSummaries[item.id]?.balance ?? item.line_total) }}</div>
+            </div>
+            <UInput v-model.number="splitAmounts[item.id]" type="number" min="0" step="0.01" />
+          </div>
+          <p class="text-xs text-muted">
+            Aplicado: {{ fmt(Object.values(splitAmounts).reduce((sum, value) => sum + Number(value || 0), 0)) }}
+            · Saldo a favor: {{ fmt(Math.max(0, amount - Object.values(splitAmounts).reduce((sum, value) => sum + Number(value || 0), 0))) }}
+          </p>
+        </div>
+      </section>
+    </template>
     <template #narration="{ amount, pending }">
       <section
         v-if="amount > 0"
