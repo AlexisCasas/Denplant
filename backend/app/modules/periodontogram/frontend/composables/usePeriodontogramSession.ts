@@ -48,19 +48,18 @@ export function usePeriodontogramSession() {
   const pendingPayloads = new Map<string, Record<string, unknown>>()
   // Multiple sites may save concurrently. An individual completed PATCH
   // must not mark the entire session as saved while others are pending.
-  const inFlight = new Set<Promise<void>>()
+  const inFlight = new Set<Promise<unknown>>()
 
   function syncSaveState(): void {
     saving.value = inFlight.size > 0
     dirty.value = pendingPayloads.size > 0 || inFlight.size > 0
   }
 
-  async function trackedSave(operation: Promise<void>): Promise<void> {
+  async function trackedSave(operation: Promise<unknown>): Promise<void> {
     inFlight.add(operation)
     syncSaveState()
     try {
       await operation
-      lastError.value = null
     } catch (e) {
       lastError.value = e instanceof Error ? e.message : 'save_failed'
       throw e
@@ -89,6 +88,7 @@ export function usePeriodontogramSession() {
     patch: Record<string, unknown>,
     exec: (payload: Record<string, unknown>) => Promise<void>
   ) {
+    lastError.value = null
     dirty.value = true
     const merged = { ...(pendingPayloads.get(key) ?? {}), ...patch }
     pendingPayloads.set(key, merged)
