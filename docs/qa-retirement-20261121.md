@@ -66,3 +66,41 @@ Procedimiento orientativo, **no probado durante esta limpieza**:
 - El VPS publica puertos de Docker sin que ufw los filtre (Docker salta ufw). Conviene añadir reglas en la cadena `DOCKER-USER` o publicar solo en `127.0.0.1`.
 - Los archivos compose de los QA estaban en `/tmp` y no forman parte del repo; no se pueden reconstruir idénticos.
 - Los directorios de código con cambios locales sin commit (p. ej. pestañas de paciente, dp09) siguen en el VPS y no se tocaron.
+
+## 8. Anexo de cierre operativo y residuos pendientes (2026-11-21)
+
+### Medición antes/después
+
+| Métrica | Previa | Posterior | Variación aproximada |
+|---|---:|---:|---:|
+| Disco usado | 141 GB | 126 GB | -15 GB (grupo A ~9 GB; B ~6 GB) |
+| Disco libre | 53 GB | 68 GB | +15 GB |
+| RAM en uso | 10.792 MB | 8.771 MB | -2.021 MB; incluye cambios de caché y otros procesos |
+| RAM disponible | 5.199 MB | 7.156 MB | +1.957 MB |
+
+Se reportaron **67 contenedores, 19 volúmenes, 18 imágenes y 8 redes retirados**. Estado final comunicado: **49 contenedores en total, 33 activos**. Los recuentos globales pueden variar por otras tareas ejecutadas en el mismo host; no derivar un ahorro de RAM exacto únicamente de la variación de memoria total.
+
+### Backups privados de los QA retirados
+
+Antes de eliminar el grupo B se generaron cuatro volcados comprimidos en la VPS: `/opt/backups/denplant-qa-retired-20261121/`. El informe del operador registra permisos restringidos a root (archivos 0600) y prueba de integridad `gzip -t` correcta; tamaños reportados: 53 KB, 83 KB, 24 KB y 366 bytes. **No son parte del repositorio público**, no equivalen a un ensayo de restauración y su persistencia fuera de la VPS no fue verificada. La eliminación o traslado de esos respaldos requiere una decisión separada.
+
+### Cuatro volúmenes de BD QA anteriores, preservados
+
+No pertenecían a los grupos A/B expresamente autorizados y por eso no fueron eliminados. Consumo total aproximado: **0,3 GB**.
+
+- `denplant-c2a_c2a_pg`
+- `denplant-c2b-b02-r3-20261020t2310z_b02r3_pg`
+- `denplant-rc012-clinical-r2-20261024-pg`
+- `denplant_clinical_reconcile_qa_pgdata`
+
+Antes de un eventual retiro: comprobar ausencia de consumidores y datos únicos, registrar inventario/respaldos si corresponde y autorizar una nueva operación específica. Los directorios del grupo C con cambios locales **también se conservaron**.
+
+### Validaciones y riesgos aún abiertos
+
+- Verificación HTTP posterior comunicada: Denplant `302`, CRM `307`, Supabase `401`, coincidente con la línea base. Esta verificación no sustituye QA funcional extremo a extremo.
+- Los puertos QA `5432, 13001, 18001, 15433, 13080, 18080, 28080, 28081, 28432, 25432` dejaron de escuchar según el informe de limpieza.
+- `ufw` activo, pero las publicaciones Docker pueden eludir sus reglas; la cadena `DOCKER-USER` estaba vacía al auditar. **No se cambiaron reglas de firewall**. Evaluar restricción de puertos y pruebas desde el exterior en una tarea de seguridad independiente.
+- **Riesgo de trazabilidad:** `main` no refleja la versión desplegada `f58a09f`. Código preservado en la rama `preserve/20261121-dp33-demo-integration-prod-f58a09f` y PR Draft [#26](https://github.com/AlexisCasas/Denplant/pull/26). No integrar directamente sin revisión de diferencias y estrategia de sincronización; la preservación no constituye aprobación de despliegue.
+- PR Draft [#27](https://github.com/AlexisCasas/Denplant/pull/27) (DP-17) y [#28](https://github.com/AlexisCasas/Denplant/pull/28) (pagos) siguen pendientes de evaluación.
+
+**Alcance de esta bitácora:** hechos y cifras informados por la ejecución de Claude Code en la VPS. La actualización documental en GitHub no implica una nueva ejecución ni comprobación independiente del host.
