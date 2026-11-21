@@ -16,7 +16,7 @@
  */
 
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
@@ -852,7 +852,11 @@ describe('printing', () => {
     expect(popup.opener).toBeNull()
     expect(popup.location.href).toBe('blob:fake-1')
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
-    expect(((URL.createObjectURL as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0]) instanceof Blob).toBe(true)
+    // Response.blob() may belong to a different JS realm than jsdom's Blob.
+    // Validate the actual PDF payload instead of realm-specific instanceof.
+    const pdfBlob = (URL.createObjectURL as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Blob
+    expect(pdfBlob.type).toBe('application/pdf')
+    expect(pdfBlob.size).toBeGreaterThan(0)
     expect(popup.close).not.toHaveBeenCalled()
     // not released while the viewer may still be reading it
     expect(URL.revokeObjectURL).not.toHaveBeenCalled()
@@ -1236,10 +1240,18 @@ describe('the Content-Disposition file name', () => {
 // ===========================================================================
 
 describe('the layer', () => {
-  const walk = (dir: string): string[] =>
-    readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
-      entry.isDirectory() ? walk(resolve(dir, entry.name)) : [resolve(dir, entry.name)])
-  const sources = walk(MODULE).filter(f => /\.(vue|ts)$/.test(f))
+  // Phase C is intentionally read-only. Phase D introduces separate write
+  // components for creating prescriptions and managing medication favorites;
+  // those are covered by prescriptionsWrite.spec.ts, not this contract.
+  const sources = [
+    'components/PrescriptionsView.vue',
+    'components/PrescriptionDetailModal.vue',
+    'composables/usePrescriptions.ts',
+    'utils/prescriptionDates.ts',
+    'types/prescriptions.ts',
+    'plugins/slots.client.ts',
+    'nuxt.config.ts'
+  ].map(path => resolve(MODULE, path))
 
   it('never edits or deletes: no PUT, PATCH or DELETE, ever', () => {
     expect(sources.length).toBeGreaterThanOrEqual(6)
