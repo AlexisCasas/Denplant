@@ -178,3 +178,47 @@ ROLLBACK;
 Si el módulo aparece `uninstalled` o `disabled`, confirmar si fue decisión funcional y registrar excepción de instalación. Si aparece `installed` sin tablas/migraciones, tratarlo como **inconsistencia real**: investigar logs/estado antes de decidir activar o corregir, sin aplicar `upgrade`, `stamp` ni reinicios no autorizados.
 
 **Estado operativo:** `MAIN_CI=PASS`; `VPS_HEALTH=PASS`; `BACKEND_PROVENANCE=PASS`; `FRONTEND_PROVENANCE=UNVERIFIED`; `COPILOT_MODULE_STATE=PENDING`; `CLOSURE_GATE=BLOCKED`. Las dudas pendientes no invalidan el merge ya completado del PR #30.
+
+
+## 12. Aclaración final de Copilot y política de instalación (2026-11-21)
+
+**Decisión operativa del propietario: Copilot no se necesita y debe permanecer desinstalado.** No se solicitaron ni ejecutaron migraciones, instalación ni cambios de configuración en producción.
+
+### Evidencia de la base de datos — auditoría READ ONLY
+
+- `core_module.name='copilot'`: `state='uninstalled'`, `installed_at=NULL`, `applied_revision=NULL`, `base_revision='cop_0004'`.
+- `core_module_operation_log`: desinstalación el 2026-10-09 16:25:18–16:25:23 UTC, con cinco etapas completas: `backup`, `lifecycle`, `delete_data`, `migrate_down`, `finalize`.
+- `alembic_version`: sin `cop_%`. Las tres tablas investigadas `copilot_settings`, `copilot_conversations`, `copilot_messages` no existen.
+- El respaldo generado por el paso `backup` de esa desinstalación no fue localizado ni restaurado; la auditoría no atribuyó quién ordenó la operación. Esta evidencia demuestra una desinstalación **técnicamente completada**, no una intención histórica documentada.
+- La etiqueta `COPILOT_DB_STATE=OTHER` en un informe intermedio obedeció a un problema de enumeración del informe; el **valor real de la BD es `uninstalled`**.
+
+**Conclusión:** la ausencia de `cop_0004` es coherente con la desinstalación: `COPILOT_CAUSE=EXPLAINED`, `MIGRATIONS_ACTION_REQUIRED=NO`, `PRODUCTION_MODIFIED=NO`.
+
+### Auditoría de arranque en el código realmente desplegado (`f58a09f`)
+
+Se revisaron `backend/docker-entrypoint.sh`, `backend/app/cli/db.py`, `backend/app/core/plugins/alembic_paths.py`, `backend/app/core/plugins/service.py`, `backend/app/core/plugins/processor.py` y `backend/app/main.py` en `f58a09f`.
+
+1. El entrypoint usa `python -m app.cli db upgrade`, **no** `alembic upgrade heads` indiscriminado.
+2. `_cmd_upgrade` decide instalar una rama solo cuando su registro de `core_module` está en `installed`; `manifest.auto_install` se consulta como valor supletorio **únicamente si falta la fila del módulo**.
+3. `boot_upgrade_targets` omite las ramas cuyo módulo no está instalado. Por lo tanto la rama `copilot` se omite con el registro actual `uninstalled`.
+4. El reconciliador conserva `state` de los módulos ya existentes, y `PendingProcessor` actúa solo sobre estados pendientes; el montaje de rutas/trabajos del módulo también se limita a registros `installed`.
+
+**Resultado acotado:** con la fila actual `core_module.state='uninstalled'`, un arranque normal del código `f58a09f` **no debería reinstalar Copilot ni aplicar `cop_0004`**. Este control deriva de lectura estática del código y del estado reportado, no de un reinicio experimental.
+
+**Riesgo futuro:** `CopilotModule.manifest.auto_install=True` sigue en el código. En una BD recién inicializada o si desaparece la fila de `core_module`, este valor permitiría instalarlo automáticamente. Si la política de producto exige **Copilot siempre desactivado incluso en instalaciones nuevas**, proponer cambio `auto_install=False` mediante PR independiente, revisión y QA. No es condición para mantenerlo desinstalado en la BD actual.
+
+### Equivalencia entre archivos Alembic `f58a09f` y `main`
+
+`ag_0007`, `pc_0002`, `pay_0005` tienen el mismo contenido operativo según comparación por líneas y secuencia de tokens fuente excluyendo blancos, comentarios y comas finales opcionales. **Las tres secuencias de tokens coinciden**. Las modificaciones corresponden a formato, no a alteraciones de DDL. No repetir migraciones existentes ni hacer `stamp` por esos cambios.
+
+### Estado del cierre
+
+- `GITHUB_MAIN_MERGE=PASS` (`e4130774`).
+- `MAIN_CI=PASS` (10/10 en run `44938682765`).
+- `BACKEND_PROVENANCE=PASS`.
+- `COPILOT_STATE=UNINSTALLED_CONFIRMED`, `COPILOT_EXCEPTION=EXPLAINED`.
+- `ALEMBIC_PC0002_SOURCE_EQUIVALENCE=PASS`; el esquema físico no fue comparado exhaustivamente.
+- `PRODUCTION_HEALTH=PASS` en la auditoría del operador.
+- `FRONTEND_PROVENANCE=UNVERIFIED`, pendiente como excepción de trazabilidad **no resuelta**. No reconstruir ni desplegar frontend productivo por esta sola auditoría.
+
+**La prioridad de sincronización GitHub/CI está finalizada.** El cierre de trazabilidad binaria de frontend es distinto y sigue abierto sin evidencia nueva; no presentar un resultado no verificado como PASS.
