@@ -138,3 +138,43 @@ El merge se realizó mediante commit de merge, con condición de SHA esperado. G
 GitHub Actions [run #44938682765](https://github.com/AlexisCasas/Denplant/actions/runs/44938682765) terminó **`completed/success`** sobre `main` en el commit de merge `e41307742d235c2eb95bac878d4af32fe926d122`. Se verificaron **10/10 jobs PASS**: `catalog-freshness`, `docs-layout`, `frontend-test`, `e2e`, `backend-test` (incluido Alembic round-trip), `frontend-typecheck`, `backend-lint`, `manifest-consistency`, `docs-portal-build` y `frontend-lint`.
 
 **`PR30_MERGE=PASS; MAIN_CI=PASS; VPS_PROVENANCE=UNVERIFIED`.** Lo anterior completa la **integración de código**. Sigue pendiente el gate de auditoría de solo lectura en VPS de procedencia real de imágenes, revisiones aplicadas de Alembic, salud productiva posterior y revisión de automatizaciones externas. No equivale a un despliegue ni verifica el estado de la VPS.
+
+
+## 11. Auditoría VPS de procedencia y migraciones (2026-11-21)
+
+Se recibió informe de auditoría **solo lectura** desde `srv1917080`:
+- `PROVENANCE_BACKEND=PASS`: se extrajeron `/app/app`, `/app/alembic`, `pyproject.toml` de la imagen ejecutada `denplant-backend:dp33-f58a09f` y se compararon con `git archive f58a09f`, **0 diferencias** según el informe del operador.
+- `PROVENANCE_FRONTEND=UNVERIFIED`: la imagen `denplant-frontend:dp33-f10b358` solo contiene el build `.output`. Etiqueta, compose e intervalo de 8 minutos desde el commit son indicios, **no prueba criptográfica de procedencia**. No se ejecutó rebuild ni deploy.
+- `PRODUCTION_HEALTH=PASS`: backend, frontend y PostgreSQL sanos, Caddy activo y validado; HTTP Denplant 302, CRM 307, Supabase 401; WACRM/Supabase contenedores sanos según observación.
+- `EXTERNAL_DEPLOY_TRIGGERS=NONE` **dentro de los mecanismos auditados**: crontab, systemd timers/services, runners/webhooks, Watchtower y workflows GitHub. No se verificaron todos los sistemas externos.
+- Hay backups anteriores al despliegue en `/opt/apps/dentalpin/backups`; su restaurabilidad **no se probó** y no se identificó la imagen backend previa disponible en VPS.
+
+### Migraciones con mismo ID, contenido reformateado
+
+Se cotejó el código de `f58a09f` vs `main` para `ag_0007`, `pc_0002` y `pay_0005`. Se hizo una comparación de diferencias por líneas y una segunda comparación por secuencia de tokens, ignorando únicamente blancos, comentarios y comas finales opcionales. Las tres secuencias resultaron **idénticas**. No se observaron cambios semánticos en las operaciones Alembic. Esto elimina la sospecha de cambio funcional de esas tres migraciones, **sin demostrar por sí solo la equivalencia del esquema físico de la BD**.
+
+### Copilot / `cop_0004`: diagnóstico pendiente
+
+La BD de producción registra 20 cabezas de Alembic de 21 que existen en el código: falta `cop_0004` y el operador no encontró tablas `copilot*`. Esto puede significar un módulo no instalado, pero requiere verificación.
+
+**Hallazgo del código:** `CopilotModule.manifest.auto_install=True` en `backend/app/modules/copilot/__init__.py`, mientras `ModuleService.reconcile_with_db` conserva `state` de módulos ya registrados: el auto-install inicial aplica **solo si el registro aún no existía**. El arranque monta únicamente módulos `core_module.state='installed'`. Por tanto el estado persistido determina la interpretación; **no ejecutar migraciones automáticamente**.
+
+Verificación pendiente en SQL exclusivamente lectura, sin valores sensibles:
+```sql
+BEGIN TRANSACTION READ ONLY;
+SELECT name, state, auto_install, installed_at, base_revision, applied_revision,
+       last_state_change
+FROM core_module WHERE name = 'copilot';
+
+SELECT operation, step, status, created_at
+FROM core_module_operation_log
+WHERE module_name = 'copilot'
+ORDER BY created_at DESC LIMIT 20;
+
+SELECT version_num FROM alembic_version WHERE version_num LIKE 'cop_%' ORDER BY version_num;
+SELECT to_regclass('public.copilot_conversations') AS copilot_conversations;
+ROLLBACK;
+```
+Si el módulo aparece `uninstalled` o `disabled`, confirmar si fue decisión funcional y registrar excepción de instalación. Si aparece `installed` sin tablas/migraciones, tratarlo como **inconsistencia real**: investigar logs/estado antes de decidir activar o corregir, sin aplicar `upgrade`, `stamp` ni reinicios no autorizados.
+
+**Estado operativo:** `MAIN_CI=PASS`; `VPS_HEALTH=PASS`; `BACKEND_PROVENANCE=PASS`; `FRONTEND_PROVENANCE=UNVERIFIED`; `COPILOT_MODULE_STATE=PENDING`; `CLOSURE_GATE=BLOCKED`. Las dudas pendientes no invalidan el merge ya completado del PR #30.
