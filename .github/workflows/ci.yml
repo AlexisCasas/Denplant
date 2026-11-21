@@ -44,7 +44,10 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/dental_clinic_test
+      # Keep the configured development URL distinct from the disposable
+      # TEST_DATABASE_URL to preserve the test fixture's isolation guard.
+      DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/dental_clinic_ci_reserved
+      TEST_DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/dental_clinic_test
       SECRET_KEY: test-secret-key-for-ci
       ENVIRONMENT: test
       TESTING: "true"
@@ -261,7 +264,8 @@ jobs:
     # Nuxt on the host (simpler than juggling the container's bind
     # mount + host npm), drives it with Playwright on the host. Slow
     # (~6 min). Required on main + PRs.
-    runs-on: ubuntu-latest
+    # Playwright 1.59.1 does not support ubuntu-26.04 runners.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       POSTGRES_PASSWORD: testpass
