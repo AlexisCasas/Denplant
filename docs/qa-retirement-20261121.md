@@ -131,3 +131,10 @@ El merge se realizó mediante commit de merge, con condición de SHA esperado. G
 - Los PR [#27](https://github.com/AlexisCasas/Denplant/pull/27) y [#28](https://github.com/AlexisCasas/Denplant/pull/28), los cuatro volúmenes QA antiguos y directorios C permanecen como actividades separadas, no incluidas en el merge.
 
 **Estado:** `PR30_MERGE=PASS`; `MAIN_CI=RUNNING` al documentar; `VPS_PROVENANCE=UNVERIFIED`. No equiparar merge exitoso con cierre de la auditoría operativa.
+
+
+## 10. Resultado definitivo del CI de `main` (2026-11-21)
+
+GitHub Actions [run #44938682765](https://github.com/AlexisCasas/Denplant/actions/runs/44938682765) terminó **`completed/success`** sobre `main` en el commit de merge `e41307742d235c2eb95bac878d4af32fe926d122`. Se verificaron **10/10 jobs PASS**: `catalog-freshness`, `docs-layout`, `frontend-test`, `e2e`, `backend-test` (incluido Alembic round-trip), `frontend-typecheck`, `backend-lint`, `manifest-consistency`, `docs-portal-build` y `frontend-lint`.
+
+**`PR30_MERGE=PASS; MAIN_CI=PASS; VPS_PROVENANCE=UNVERIFIED`.** Lo anterior completa la **integración de código**. Sigue pendiente el gate de auditoría de solo lectura en VPS de procedencia real de imágenes, revisiones aplicadas de Alembic, salud productiva posterior y revisión de automatizaciones externas. No equivale a un despliegue ni verifica el estado de la VPS.
