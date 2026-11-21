@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
-from app.modules.patients.service import PatientService
 from app.modules.patients.access import PatientAccessPolicy
+from app.modules.patients.service import PatientService
 
 from .schemas import TimelineResponse
 from .service import TimelineService
