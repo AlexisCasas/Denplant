@@ -69,6 +69,8 @@ export interface UseNtsFindingEditorOptions {
    * Returning `false` means the refetch itself failed — which is a different
    * fact from the mutation failing, and is reported as such.
    */
+  // The callback intentionally supports either a boolean result or Promise<void>.
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
   reload: () => Promise<boolean | void>
   /** Called when a mutation hits a 409, with the kind of conflict. */
   onConflict: (kind: 'version' | 'draft' | 'state') => Promise<void>
@@ -263,7 +265,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
   function setRole(tooth: number, role: string | null): void {
     const roles = { ...selection.value.roles }
     if (role) roles[tooth] = role
-    else delete roles[tooth]
+    else Reflect.deleteProperty(roles, tooth)
     selection.value = { ...selection.value, roles }
   }
 
@@ -295,7 +297,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     const roles = { ...selection.value.roles }
 
     if (teeth.includes(tooth)) {
-      delete roles[tooth]
+      Reflect.deleteProperty(roles, tooth)
       selection.value = { ...selection.value, teeth: teeth.filter(t => t !== tooth), roles }
       return
     }
@@ -316,7 +318,7 @@ export function useNtsFindingEditor(options: UseNtsFindingEditorOptions) {
     // its role with it, so no role is ever sent for a tooth that is no longer
     // part of the finding.
     for (const dropped of teeth) {
-      if (!next.includes(dropped)) delete roles[dropped]
+      if (!next.includes(dropped)) Reflect.deleteProperty(roles, dropped)
     }
     selection.value = { ...selection.value, teeth: next, roles }
   }
