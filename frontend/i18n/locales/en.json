@@ -390,6 +390,10 @@
     "tabs": {
       "summary": "Summary",
       "info": "Info",
+      "information": "Information",
+      "dentalAnamnesis": "Dental anamnesis",
+      "pediatricDentalAnamnesis": "Pediatric dental anamnesis",
+      "endodontics": "Endodontics",
       "clinical": "Clinical",
       "odontogram": "Dental Chart",
       "administration": "Administration",
@@ -402,6 +406,44 @@
       "documents": "Documents",
       "gallery": "Gallery"
     },
+    "dentalAnamnesis": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "consultationReason": "Reason for consultation",
+      "currentIllness": "CURRENT ILLNESS", "illnessDuration": "Duration of illness", "mainSymptoms": "Main signs and symptoms", "chronologicalNarrative": "Chronological narrative", "biologicalFunctions": "Biological functions",
+      "history": "MEDICAL HISTORY", "familyHistory": "Family history", "personalHistory": "Personal history", "haveYouHad": "Do you have or have you had?",
+      "highBloodPressure": "High blood pressure", "lowBloodPressure": "Low blood pressure", "hepatitis": "Hepatitis", "gastritis": "Gastritis", "ulcers": "Ulcers", "hiv": "HIV", "diabetes": "Diabetes", "asthma": "Asthma", "smoker": "Do you smoke?", "additionalComment": "Additional comment",
+      "dentalHistory": "DENTAL / ADDITIONAL HISTORY", "bloodDiseases": "Blood diseases", "heartProblems": "Heart problems", "otherDisease": "Do you have any other disease?", "brushingFrequency": "How many times a day do you brush your teeth?", "bleedingGums": "Do your gums bleed?", "abnormalExtractionBleeding": "Have you had abnormal bleeding after an extraction?", "bruxism": "Do you grind or clench your teeth?", "mouthDiscomfort": "Other mouth discomfort", "allergies": "Allergies", "recentMajorSurgery": "Have you had major surgery in recent years?", "permanentMedication": "Do you take any medication permanently?", "detail": "Details",
+      "clinicalExam": "CLINICAL EXAMINATION", "vitalSigns": "Vital signs", "bloodPressure": "BP", "pulse": "Pulse", "heartRate": "HR", "respiratoryRate": "RR", "temperature": "Temperature", "extraoralExam": "Extraoral examination", "intraoralExam": "Intraoral examination", "auxiliaryExamResults": "Auxiliary examination results", "observations": "Observations",
+      "no": "No", "yes": "Yes", "save": "Save", "saveUnavailable": "Saving will be available soon.",
+      "placeholders": {
+        "consultationReason": "E.g. Pain in lower right molar", "illnessDuration": "E.g. 3 days", "mainSymptoms": "E.g. Pain when chewing, cold sensitivity", "chronologicalNarrative": "E.g. Started 3 days ago and progressively increased", "biologicalFunctions": "E.g. Sleep preserved, normal appetite", "familyHistory": "E.g. Mother with hypertension", "personalHistory": "E.g. No relevant history", "additionalComment": "E.g. Relevant additional information", "brushingFrequency": "E.g. 3 times a day", "bloodDiseases": "E.g. Anemia", "heartProblems": "E.g. Arrhythmia", "otherDisease": "E.g. Hypothyroidism", "mouthDiscomfort": "E.g. Dental sensitivity", "allergies": "E.g. Penicillin", "recentMajorSurgery": "E.g. Appendectomy in 2021", "permanentMedication": "E.g. Losartan 50 mg", "extraoralExam": "E.g. No visible alterations", "intraoralExam": "E.g. Inflamed gum in posterior area", "auxiliaryExamResults": "E.g. Panoramic X-ray without relevant findings", "observations": "E.g. Patient reports anxiety during procedures"
+      }
+    },
+    "pediatricDentalAnamnesis": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "consultationReason": "Reason for consultation", "motherName": "Mother's name", "fatherName": "Father's name", "siblingsCount": "Number of siblings", "birthOrder": "Birth order",
+      "currentIllness": "CURRENT ILLNESS", "diseaseType": "Type of illness", "chronologicalNarrative": "Chronological narrative",
+      "prenatalHistory": "PRENATAL HISTORY", "maternalDiseases": "Maternal diseases", "pregnancyComplications": "Were there complications during pregnancy?", "prematureBaby": "Was the baby premature?", "birthWeight": "Birth weight", "comment": "Comment",
+      "postnatalHistory": "POSTNATAL HISTORY", "birthProblems": "Problems during delivery?", "pacifierUse": "Pacifier use?", "bottleUse": "Bottle use?", "thumbSucking": "Does/did the child suck their thumb?", "medicationOrTherapy": "Does the child take medication or therapy?", "allergiesOrIntolerances": "Is the child allergic or intolerant to anything?", "brushesBeforeSleep": "Does the child brush before sleeping?", "openMouthOrSnores": "Does the child sleep with an open mouth or snore?", "detail": "Details", "additionalComment": "Additional comment",
+      "feedingAndHygiene": "FEEDING / HYGIENE HABITS", "sweetsConsumption": "How many sweets does the child eat?", "timesPerDay": "Times per day", "daysPerWeek": "days/week", "milkType": "What type of milk does the baby receive?", "dentalHygiene": "How do you brush the baby's or child's teeth?", "dailyDiet": "Describe a day of your baby's/child's meals starting with breakfast.", "parentingStyle": "Do you consider yourself an authoritarian, cooperative, unconcerned, or overprotective parent?",
+      "finalSection": "FINAL ASSESSMENT", "oralHabits": "Oral habits", "brushingTechnique": "Brushing technique", "clinicalExam": "Clinical examination", "observations": "Observations", "no": "No", "yes": "Yes", "save": "Save", "saveUnavailable": "Saving will be available soon."
+    },
+    "endodonticForm": {
+      "doctor": "Doctor", "selectDoctor": "Select professional", "yes": "Yes", "no": "No", "save": "Save", "saveUnavailable": "Saving will be available soon.",
+      "priorEndodonticTreatment": "Previous endodontic treatment?", "painHistory": "Pain history", "additionalNote": "Additional note", "toothNumber": "Tooth no.",
+      "clinicalExam": "CLINICAL EXAMINATION", "anatomicalCrown": "Anatomical crown", "caries": "Caries", "restoration": "Restoration", "bruxism": "Bruxism", "fracture": "Fracture", "fractureWithPulpExposure": "Fracture with pulp exposure",
+      "inflammationPresent": "Inflammation present", "fistulas": "Fistulas", "gingivitis": "Gingivitis", "pockets": "Pockets", "calculus": "Calculus", "specify": "Specify", "mobility": "Mobility", "probing": "Probing",
+      "painCharacteristics": "Pain characteristics", "spontaneous": "Spontaneous", "provoked": "Provoked", "cold": "Cold", "heat": "Heat", "chewing": "Chewing", "nocturnal": "Nocturnal", "air": "Air", "sweet": "Sweet", "acidic": "Acidic", "radiated": "Radiated", "diffuse": "Diffuse", "stabbing": "Stabbing", "continuous": "Continuous", "intermittent": "Intermittent", "sporadic": "Sporadic",
+      "percussionPain": "Pain on percussion", "palpationPain": "Pain on palpation", "horizontal": "Horizontal", "vertical": "Vertical", "vestibular": "Vestibular", "lingualPalatal": "Lingual/Palatal", "additionalClinicalNote": "Additional clinical examination note",
+      "vitalityTest": "VITALITY TEST", "test": "Test", "result": "Yes/No", "duration": "Duration", "intensity": "Intensity", "selectUnavailable": "No options defined",
+      "radiographicExam": "RADIOGRAPHIC EXAMINATION", "pulpChamber": "Pulp chamber", "open": "Open", "closed": "Closed", "wide": "Wide", "narrow": "Narrow", "pulpStones": "Pulp stones", "canals": "Canal(s)", "singleCanal": "Single", "twoCanals": "2 canals", "threeCanals": "3 canals", "fourCanals": "4 canals", "straight": "Straight", "curved": "Curved", "previouslyTreated": "Previously treated", "openApex": "Open apex",
+      "furcationLesion": "Furcation lesion", "apicalLesion": "Apical lesion", "lateralLesion": "Lateral lesion", "endoPerioLesion": "Endo-perio lesion", "dwarfRoots": "Dwarf roots", "rootFracture": "Root fracture", "calcification": "Calcification", "periodontalLigament": "Periodontal ligament", "resorption": "Resorption", "additionalRadiographicNote": "Additional radiographic note",
+      "presumptivePulpalDiagnosis": "PRESUMPTIVE PULPAL DIAGNOSIS", "normalPulp": "Normal pulp", "reversiblePulpitis": "Reversible pulpitis", "symptomaticIrreversiblePulpitis": "Symptomatic irreversible pulpitis", "asymptomaticIrreversiblePulpitis": "Asymptomatic irreversible pulpitis", "pulpNecrosis": "Pulp necrosis", "diagnosisPreviouslyTreated": "Previously treated", "previouslyInitiated": "Previously initiated",
+      "periapicalDiagnosis": "PERIAPICAL DIAGNOSIS", "healthyApicalTissues": "Healthy apical tissues", "acuteApicalPeriodontitis": "Acute apical periodontitis (symptomatic)", "chronicApicalPeriodontitis": "Chronic apical periodontitis (asymptomatic)", "acuteApicalAbscess": "Acute apical abscess (without fistula)", "chronicApicalAbscess": "Chronic apical abscess (with fistula)", "condensingOsteitis": "Condensing osteitis",
+      "definitiveDiagnosis": "DEFINITIVE DIAGNOSIS", "irreversiblePulpitis": "Irreversible pulpitis", "necroticPulp": "Necrotic pulp",
+      "indicatedTreatment": "INDICATED TREATMENT", "biopulpectomy": "Biopulpectomy", "apicoectomy": "Apicoectomy", "necropulpectomy": "Necropulpectomy", "hemisection": "Hemisection", "retreatment": "Retreatment", "radicectomy": "Radicectomy", "whitening": "Whitening", "extraction": "Extraction",
+      "clinicalData": "CLINICAL DATA", "identification": "Identification", "canal": "Canal", "workingLength": "Working length (mm)", "referencePoint": "Reference point", "initialFile": "Initial file", "finalApicalFile": "Final apical file", "cementType": "Cement type", "masterGuttaPerchaCone": "Master gutta-percha cone", "single": "Single", "palatalLingual": "Palatal/Lingual", "mesiolingual": "Mesiolingual", "mesiobuccal": "Mesiobuccal", "distal": "Distal", "distobuccal": "Distobuccal", "distolingual": "Distolingual",
+      "finalSection": "FINAL SECTION", "operativeAccidents": "Operative accidents", "postEndodonticRestoration": "Indicated post-endodontic restoration", "post": "Post", "amalgamResin": "Amalgam/Resin", "crown": "Crown", "other": "Other", "prognosis": "Prognosis", "favorable": "Favorable", "unfavorable": "Unfavorable", "reserved": "Reserved"
+    },
+    "anamneses": { "loadError": "Could not load the clinical form.", "saveError": "Could not save the clinical form. Your changes were kept.", "dentalSaved": "Dental anamnesis saved successfully.", "pediatricSaved": "Pediatric dental anamnesis saved successfully.", "endodonticSaved": "Endodontic record saved successfully." },
     "historyPlaceholder": "Clinical notes available in future version",
     "noAppointments": "This patient has no appointments",
     "scheduleAppointment": "Schedule appointment",

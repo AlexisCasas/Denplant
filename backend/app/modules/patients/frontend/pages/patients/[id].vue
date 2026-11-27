@@ -87,6 +87,33 @@ const { medicalHistory, isSaving: isSavingMedical, saveMedicalHistory } = useMed
 // Tabs — Resumen is the landing.
 const activeTab = ref('summary')
 
+type InfoMode = 'information' | 'dental-anamnesis' | 'pediatric-dental-anamnesis' | 'endodontics'
+
+const infoMode = ref<InfoMode>('information')
+
+const infoTabs = computed(() => [
+  {
+    value: 'information',
+    label: t('patientDetail.tabs.information'),
+    icon: 'i-lucide-info'
+  },
+  {
+    value: 'dental-anamnesis',
+    label: t('patientDetail.tabs.dentalAnamnesis'),
+    icon: 'i-lucide-clipboard-list'
+  },
+  {
+    value: 'pediatric-dental-anamnesis',
+    label: t('patientDetail.tabs.pediatricDentalAnamnesis'),
+    icon: 'i-lucide-baby'
+  },
+  {
+    value: 'endodontics',
+    label: t('patientDetail.tabs.endodontics'),
+    icon: 'i-lucide-scan-line'
+  }
+])
+
 watch(
   () => route.query.tab,
   (tab) => {
@@ -397,56 +424,77 @@ function collect() {
 
           <!-- Datos tab content -->
           <template #info>
-            <div class="mt-4 space-y-3 lg:space-y-4 overflow-visible">
-              <MedicalSnapshotCard
-                :medical-history="medicalHistory"
-                :active-alerts="patient.active_alerts"
-                :can-edit="canEditMedicalHistory"
-                @edit="openSectionModal('medical')"
-                @complete-history="openSectionModal('medical')"
+            <div class="mt-4 space-y-3">
+              <SegmentedControl
+                v-model="infoMode"
+                :options="infoTabs"
+                full-width
               />
 
-              <PersonalInfoCard
-                :patient="patient"
-                :can-edit="canEditPatient"
-                @edit="openSectionModal('demographics')"
-              />
+              <div
+                v-if="infoMode === 'information'"
+                class="space-y-3 lg:space-y-4 overflow-visible"
+              >
+                <MedicalSnapshotCard
+                  :medical-history="medicalHistory"
+                  :active-alerts="patient.active_alerts"
+                  :can-edit="canEditMedicalHistory"
+                  @edit="openSectionModal('medical')"
+                  @complete-history="openSectionModal('medical')"
+                />
 
-              <ContactInfoCard
-                :patient="patient"
-                :is-minor="isMinor"
-                :can-edit="canEditPatient"
-                @edit-contact="openSectionModal('demographics')"
-                @edit-emergency="openSectionModal('emergency')"
-                @edit-guardian="openSectionModal('guardian')"
-              />
+                <PersonalInfoCard
+                  :patient="patient"
+                  :can-edit="canEditPatient"
+                  @edit="openSectionModal('demographics')"
+                />
 
-              <AdministrativeCard
-                :patient="patient"
-                :can-edit="canEditPatient"
-                @edit="openSectionModal('billing')"
-              />
+                <ContactInfoCard
+                  :patient="patient"
+                  :is-minor="isMinor"
+                  :can-edit="canEditPatient"
+                  @edit-contact="openSectionModal('demographics')"
+                  @edit-emergency="openSectionModal('emergency')"
+                  @edit-guardian="openSectionModal('guardian')"
+                />
 
-              <!-- Danger zone -->
-              <div class="alert-surface-danger rounded-token-lg px-4 py-3 flex items-center justify-between gap-4">
-                <div class="min-w-0">
-                  <div class="text-ui">
-                    {{ t('patients.dangerZone.title') }}
+                <AdministrativeCard
+                  :patient="patient"
+                  :can-edit="canEditPatient"
+                  @edit="openSectionModal('billing')"
+                />
+
+                <!-- Danger zone -->
+                <div class="alert-surface-danger rounded-token-lg px-4 py-3 flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="text-ui">
+                      {{ t('patients.dangerZone.title') }}
+                    </div>
+                    <div class="text-caption">
+                      {{ t('patients.dangerZone.archiveHelp') }}
+                    </div>
                   </div>
-                  <div class="text-caption">
-                    {{ t('patients.dangerZone.archiveHelp') }}
-                  </div>
+                  <UButton
+                    variant="outline"
+                    color="error"
+                    icon="i-lucide-archive"
+                    size="sm"
+                    @click="isArchiveModalOpen = true"
+                  >
+                    {{ t('patients.archive') }}
+                  </UButton>
                 </div>
-                <UButton
-                  variant="outline"
-                  color="error"
-                  icon="i-lucide-archive"
-                  size="sm"
-                  @click="isArchiveModalOpen = true"
-                >
-                  {{ t('patients.archive') }}
-                </UButton>
               </div>
+
+              <KeepAlive>
+                <DentalAnamnesisForm v-if="infoMode === 'dental-anamnesis'" :patient-id="patientId" />
+              </KeepAlive>
+              <KeepAlive>
+                <PediatricDentalAnamnesisForm v-if="infoMode === 'pediatric-dental-anamnesis'" :patient-id="patientId" />
+              </KeepAlive>
+              <KeepAlive>
+                <EndodonticForm v-if="infoMode === 'endodontics'" :patient-id="patientId" />
+              </KeepAlive>
             </div>
           </template>
 
