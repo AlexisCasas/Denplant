@@ -508,7 +508,7 @@ function collect() {
                   Desarchivar paciente
                 </UButton>
                 <UButton
-                  v-if="canPermanentlyDelete"
+                  v-if="patient?.status === 'archived' && canPermanentlyDelete"
                   variant="outline"
                   color="error"
                   icon="i-lucide-trash-2"

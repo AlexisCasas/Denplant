@@ -362,6 +362,12 @@ class PatientService:
         audit insert and every subscriber share this session, so any raised
         error rolls all database work back in ``get_db``.
         """
+        if patient.status != "archived":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="Archive the patient before permanently deleting their data.",
+            )
+
         # Fiscal records are immutable by policy.  This preflight happens
         # before creating even the deletion audit, so a 409 changes nothing.
         fiscal = await db.scalar(
