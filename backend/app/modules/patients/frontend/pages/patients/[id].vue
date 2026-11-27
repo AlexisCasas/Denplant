@@ -87,6 +87,17 @@ const { medicalHistory, isSaving: isSavingMedical, saveMedicalHistory } = useMed
 // Tabs — Resumen is the landing.
 const activeTab = ref('summary')
 
+type InfoMode = 'information' | 'dental-anamnesis' | 'pediatric-dental-anamnesis' | 'endodontics'
+
+const infoMode = ref<InfoMode>('information')
+
+const infoTabs = computed(() => [
+  { value: 'information', label: t('patientDetail.tabs.information'), icon: 'i-lucide-info' },
+  { value: 'dental-anamnesis', label: t('patientDetail.tabs.dentalAnamnesis'), icon: 'i-lucide-clipboard-list' },
+  { value: 'pediatric-dental-anamnesis', label: t('patientDetail.tabs.pediatricDentalAnamnesis'), icon: 'i-lucide-baby' },
+  { value: 'endodontics', label: t('patientDetail.tabs.endodontics'), icon: 'i-lucide-scan-line' }
+])
+
 watch(
   () => route.query.tab,
   (tab) => {
@@ -433,14 +444,17 @@ function collect() {
 
           <!-- Datos tab content -->
           <template #info>
-            <div class="mt-4 space-y-3 lg:space-y-4 overflow-visible">
-              <MedicalSnapshotCard
-                :medical-history="medicalHistory"
-                :active-alerts="patient.active_alerts"
-                :can-edit="canEditMedicalHistory"
-                @edit="openSectionModal('medical')"
-                @complete-history="openSectionModal('medical')"
-              />
+            <div class="mt-4 space-y-3">
+              <SegmentedControl v-model="infoMode" :options="infoTabs" full-width />
+
+              <div v-if="infoMode === 'information'" class="space-y-3 lg:space-y-4 overflow-visible">
+                <MedicalSnapshotCard
+                  :medical-history="medicalHistory"
+                  :active-alerts="patient.active_alerts"
+                  :can-edit="canEditMedicalHistory"
+                  @edit="openSectionModal('medical')"
+                  @complete-history="openSectionModal('medical')"
+                />
 
               <PersonalInfoCard
                 :patient="patient"
@@ -504,6 +518,16 @@ function collect() {
                   Eliminar definitivamente
                 </UButton>
               </div>
+
+              <KeepAlive>
+                <DentalAnamnesisForm v-if="infoMode === 'dental-anamnesis'" :patient-id="patientId" />
+              </KeepAlive>
+              <KeepAlive>
+                <PediatricDentalAnamnesisForm v-if="infoMode === 'pediatric-dental-anamnesis'" :patient-id="patientId" />
+              </KeepAlive>
+              <KeepAlive>
+                <EndodonticForm v-if="infoMode === 'endodontics'" :patient-id="patientId" />
+              </KeepAlive>
             </div>
           </template>
 
