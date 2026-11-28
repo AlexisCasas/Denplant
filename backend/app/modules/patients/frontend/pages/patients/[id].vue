@@ -529,6 +529,7 @@ function collect() {
                 <EndodonticForm v-if="infoMode === 'endodontics'" :patient-id="patientId" />
               </KeepAlive>
             </div>
+          </div>
           </template>
 
           <!-- Clinical tab content (Odontogram + Treatment Plans) -->
